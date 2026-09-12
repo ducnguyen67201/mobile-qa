@@ -5,3 +5,5 @@ pub mod auth;
 pub mod uploads;
 
 pub mod google;
+
+pub mod workspaces;

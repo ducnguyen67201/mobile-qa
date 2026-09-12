@@ -844,15 +844,13 @@ async fn google_identity_binding_expiry_replay_and_password_removal() {
             &google_login(&server, &owner.email, &Uuid::new_v4().to_string()).await,
             403,
         );
-        error(
-            &google_login(
-                &server,
-                &format!("{}@fixture.invalid", Uuid::new_v4()),
-                &Uuid::new_v4().to_string(),
-            )
-            .await,
-            403,
-        );
+        google_login(
+            &server,
+            &format!("{}@fixture.invalid", Uuid::new_v4()),
+            &Uuid::new_v4().to_string(),
+        )
+        .await
+        .assert_status_ok();
         let (ch, cookie) = challenge(&server).await;
         mobile_qa::models::_entities::google_login_challenges::Entity::update_many()
             .col_expr(
@@ -885,6 +883,189 @@ async fn google_identity_binding_expiry_replay_and_password_removal() {
                 .await,
             401,
         );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn public_registration_approval_and_multiple_workspace_isolation() {
+    let _database = DATABASE_BOOT.lock().await;
+    request::<App, _, _>(|server, ctx| async move {
+        configure_google(&ctx);
+        let email = format!("{}@gmail.com", Uuid::new_v4());
+        let subject = Uuid::new_v4().to_string();
+        let response = google_login(&server, &email, &subject).await;
+        response.assert_status_ok();
+        let body = response.json::<SessionResponse>();
+        assert_eq!(body.user.approval_status, ApprovalStatus::Pending);
+        assert!(body.memberships.is_empty());
+        let first = Uuid::new_v4();
+        let second = Uuid::new_v4();
+        let account = Login {
+            cookie: response
+                .header("set-cookie")
+                .to_str()
+                .unwrap()
+                .split(';')
+                .next()
+                .unwrap()
+                .into(),
+            csrf: body.csrf_token,
+            user: body.user.id,
+            org: first,
+            email: email.clone(),
+            subject: subject.clone(),
+        };
+        let input = CreateWorkspaceRequest {
+            id: first,
+            name: "First workspace".into(),
+        };
+        error(
+            &account
+                .write(server.post("/api/workspaces"))
+                .json(&input)
+                .await,
+            403,
+        );
+        error(
+            &account
+                .read(server.post("/api/workspaces"))
+                .json(&input)
+                .await,
+            403,
+        );
+        let repeated = google_login(&server, &email, &subject)
+            .await
+            .json::<SessionResponse>();
+        assert_eq!(repeated.user.id, account.user);
+        assert!(repeated.memberships.is_empty());
+        let vars = loco_rs::task::Vars::from_cli_args(vec![
+            ("action".into(), "approval".into()),
+            ("user".into(), account.user.to_string()),
+            ("status".into(), "approved".into()),
+        ]);
+        tasks::operator::execute(&ctx, &vars).await.unwrap();
+        assert_eq!(
+            account
+                .read(server.get("/api/auth/session"))
+                .await
+                .json::<SessionResponse>()
+                .user
+                .approval_status,
+            ApprovalStatus::Approved
+        );
+        let (a, b) = tokio::join!(
+            account.write(server.post("/api/workspaces")).json(&input),
+            account.write(server.post("/api/workspaces")).json(&input)
+        );
+        a.assert_status(axum::http::StatusCode::CREATED);
+        b.assert_status(axum::http::StatusCode::CREATED);
+        assert_eq!(
+            a.json::<OrganizationMembership>().organization_id,
+            b.json::<OrganizationMembership>().organization_id
+        );
+        assert_eq!(
+            a.json::<OrganizationMembership>().role,
+            MembershipRole::Operator
+        );
+        account
+            .write(server.post("/api/workspaces"))
+            .json(&CreateWorkspaceRequest {
+                id: second,
+                name: "Second workspace".into(),
+            })
+            .await
+            .assert_status(axum::http::StatusCode::CREATED);
+        let session = account
+            .read(server.get("/api/auth/session"))
+            .await
+            .json::<SessionResponse>();
+        assert_eq!(session.memberships.len(), 2);
+        let first_app = account
+            .write(server.post("/api/apps"))
+            .json(&create_input(first))
+            .await
+            .json::<AppResponse>();
+        let second_app = account
+            .write(server.post("/api/apps"))
+            .json(&create_input(second))
+            .await
+            .json::<AppResponse>();
+        for (org, expected) in [(first, first_app.id), (second, second_app.id)] {
+            let result = account
+                .read(server.get(&format!("/api/apps?organization_id={org}")))
+                .await
+                .json::<AppListResponse>();
+            assert_eq!(result.items.len(), 1);
+            assert_eq!(result.items[0].id, expected);
+        }
+        error(
+            &account
+                .read(server.get(&format!(
+                    "/api/apps?organization_id={first}&cursor={}",
+                    second_app.id
+                )))
+                .await,
+            422,
+        );
+        let foreign = login(&server, &ctx).await;
+        error(
+            &foreign
+                .read(server.get(&format!("/api/apps?organization_id={first}")))
+                .await,
+            404,
+        );
+        error(
+            &foreign
+                .read(server.get(&format!("/api/apps/{}", first_app.id)))
+                .await,
+            404,
+        );
+        error(
+            &foreign
+                .write(server.post("/api/apps"))
+                .json(&create_input(first))
+                .await,
+            404,
+        );
+        error(
+            &foreign
+                .write(server.post("/api/workspaces"))
+                .json(&input)
+                .await,
+            409,
+        );
+        error(
+            &account
+                .write(server.post("/api/workspaces"))
+                .json(&CreateWorkspaceRequest {
+                    id: Uuid::new_v4(),
+                    name: " ".into(),
+                })
+                .await,
+            422,
+        );
+        let vars = loco_rs::task::Vars::from_cli_args(vec![
+            ("action".into(), "approval".into()),
+            ("user".into(), account.user.to_string()),
+            ("status".into(), "pending".into()),
+        ]);
+        tasks::operator::execute(&ctx, &vars).await.unwrap();
+        error(
+            &account
+                .write(server.post("/api/workspaces"))
+                .json(&CreateWorkspaceRequest {
+                    id: Uuid::new_v4(),
+                    name: "Denied".into(),
+                })
+                .await,
+            403,
+        );
+        // Revoking creation approval does not silently delete existing ownership or product data.
+        account
+            .read(server.get(&format!("/api/apps/{}", first_app.id)))
+            .await
+            .assert_status_ok();
     })
     .await;
 }

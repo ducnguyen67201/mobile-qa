@@ -1,6 +1,7 @@
 import { Badge, Box, Card, Divider, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
 import { Database, ShieldCheck, SlidersHorizontal } from 'lucide-react'
+import { useWorkspace } from '@/hooks/use-workspace'
 import { settingsQuery } from '@/api/setup'
 import { useSession } from '@/components/app/session'
 import {
@@ -15,6 +16,7 @@ import {
 export function Settings() {
   const settings = useQuery(settingsQuery)
   const session = useSession()
+  const { workspace } = useWorkspace()
   return (
     <>
       <PageHeading
@@ -22,7 +24,9 @@ export function Settings() {
         title="The essentials."
         description="Your access, upload limits and storage policy. A small set of settings with clear boundaries."
       />
-      {settings.isError && <ErrorNotice error={settings.error} retry={() => void settings.refetch()} />}
+      {settings.isError && (
+        <ErrorNotice error={settings.error} retry={() => void settings.refetch()} />
+      )}
       {settings.isPending ? (
         <LoadingPanel label="Loading settings…" />
       ) : (
@@ -40,15 +44,17 @@ export function Settings() {
                 <Text size="sm" c="dimmed" className="identifier">
                   {session.user.email}
                 </Text>
-                {settings.data.memberships.map((m) => (
-                  <Box key={m.organization_id} mt="lg">
-                    <Divider mb="md" />
-                    <Group justify="space-between">
-                      <Text size="sm">{m.name}</Text>
-                      <Badge tt="capitalize">{m.role}</Badge>
-                    </Group>
-                  </Box>
-                ))}
+                {settings.data.memberships
+                  .filter((m) => m.organization_id === workspace!.organization_id)
+                  .map((m) => (
+                    <Box key={m.organization_id} mt="lg">
+                      <Divider mb="md" />
+                      <Group justify="space-between">
+                        <Text size="sm">{m.name}</Text>
+                        <Badge tt="capitalize">{m.role}</Badge>
+                      </Group>
+                    </Box>
+                  ))}
                 <Text size="xs" c="dimmed" mt="lg">
                   Session expires {formatDate(session.expires_at)}.
                 </Text>
@@ -93,8 +99,8 @@ export function Settings() {
                 {settings.data.accepted_build_retention}
               </Text>
               <Text size="xs" c="dimmed" mt="sm">
-                APK files stay private. Upload expiry applies to unfinished uploads; it does not expire
-                accepted builds.
+                APK files stay private. Upload expiry applies to unfinished uploads; it does not
+                expire accepted builds.
               </Text>
             </Card>
           </Stack>

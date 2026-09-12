@@ -1,10 +1,11 @@
+import { useMounted } from '@/hooks/use-mounted'
 import { useForm } from '@mantine/form'
-import { Button, Divider, Group, NativeSelect, Stack, Text, Textarea, TextInput } from '@mantine/core'
+import { Button, Divider, Group, Stack, Text, Textarea, TextInput } from '@mantine/core'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { ArrowRight } from 'lucide-react'
 import { createApp } from '@/api/setup'
-import { useSession } from './session'
+import { useWorkspace } from '@/hooks/use-workspace'
 import { ErrorNotice } from './feedback'
 
 export function parseOrigins(value: string) {
@@ -14,12 +15,12 @@ export function parseOrigins(value: string) {
     .filter(Boolean)
 }
 export function AppForm({ cancel }: { cancel: () => void }) {
-  const session = useSession()
+  const { workspace, href } = useWorkspace()
+  const mounted = useMounted()
   const client = useQueryClient()
   const navigate = useNavigate()
   const form = useForm({
     initialValues: {
-      organization: session.memberships[0]?.organization_id ?? '',
       name: '',
       packageName: '',
       environment: 'Staging',
@@ -27,7 +28,7 @@ export function AppForm({ cancel }: { cancel: () => void }) {
       login: '',
     },
     transformValues: (values) => ({
-      organization_id: values.organization,
+      organization_id: workspace!.organization_id,
       name: values.name.trim(),
       android_package: values.packageName.trim(),
       environment_name: values.environment.trim(),
@@ -39,18 +40,16 @@ export function AppForm({ cancel }: { cancel: () => void }) {
     mutationFn: createApp,
     onSuccess: (app) => {
       void client.invalidateQueries({ queryKey: ['apps'] })
-      void navigate(`/apps/${app.id}`)
+      if (mounted.current) void navigate(href(`/apps/${app.id}`))
     },
   })
 
   return (
     <form onSubmit={form.onSubmit((values) => mutation.mutate(values))}>
       <Stack gap="lg">
-        <NativeSelect
-          label="Organization"
-          {...form.getInputProps('organization')}
-          data={session.memberships.map((m) => ({ value: m.organization_id, label: m.name }))}
-        />
+        <Text size="sm" c="dimmed">
+          Workspace: {workspace!.name}
+        </Text>
         <TextInput
           label="App name"
           required
@@ -90,8 +89,8 @@ export function AppForm({ cancel }: { cancel: () => void }) {
           aria-describedby="origins-help"
         />
         <Text id="origins-help" size="xs" c="dimmed">
-          Add at least one backend origin. One origin per line. Use scheme and host only, with no path,
-          credentials, or tokens. These settings do not verify network access.
+          Add at least one backend origin. One origin per line. Use scheme and host only, with no
+          path, credentials, or tokens. These settings do not verify network access.
         </Text>
         {mutation.isError && <ErrorNotice focus error={mutation.error} />}
         <Divider />
@@ -101,7 +100,7 @@ export function AppForm({ cancel }: { cancel: () => void }) {
           </Button>
           <Button
             type="submit"
-            disabled={mutation.isPending || !form.values.organization}
+            disabled={mutation.isPending}
             rightSection={<ArrowRight size={16} />}
           >
             {mutation.isPending ? 'Creating…' : 'Create app'}

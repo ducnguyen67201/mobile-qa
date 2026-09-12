@@ -3,7 +3,11 @@ import { queryOptions } from '@tanstack/react-query'
 import type { z } from 'zod'
 import * as sdk from './generated/sdk.gen'
 import * as schemas from './generated/zod.gen'
-import type { CreateAppRequest, UpdateEnvironmentRequest, LoginRequest } from './generated/types.gen'
+import type {
+  CreateAppRequest,
+  UpdateEnvironmentRequest,
+  LoginRequest,
+} from './generated/types.gen'
 import { apiClient } from './runtime'
 let csrfToken = ''
 export function forgetSession() {
@@ -33,7 +37,10 @@ export const sessionQuery = queryOptions({
 })
 export function startGoogleSignIn() {
   return checked(
-    sdk.startGoogleSignIn({ ...options, headers: { 'X-Mobile-QA-Request': '1' } }),
+    sdk.startGoogleSignIn({
+      ...options,
+      headers: { 'X-Mobile-QA-Request': '1' },
+    }),
     schemas.zGoogleLoginChallenge,
   )
 }
@@ -50,24 +57,38 @@ export async function signIn(body: LoginRequest) {
   return session
 }
 export async function signOut() {
-  const result = await checked(sdk.logout({ ...options, headers: headers() }), schemas.zLogoutResponse)
+  const result = await checked(
+    sdk.logout({ ...options, headers: headers() }),
+    schemas.zLogoutResponse,
+  )
   forgetSession()
   return result
 }
-export const appsQuery = (cursor?: string) =>
+export const appsQuery = (workspaceId: string, cursor?: string) =>
   queryOptions({
-    queryKey: ['apps', cursor],
+    queryKey: ['apps', workspaceId, cursor],
     queryFn: () =>
-      checked(sdk.listApps({ ...options, query: { limit: 20, cursor } }), schemas.zAppListResponse),
+      checked(
+        sdk.listApps({
+          ...options,
+          query: { limit: 20, cursor, organization_id: workspaceId },
+        }),
+        schemas.zAppListResponse,
+      ),
   })
 export const appQuery = (appId: string) =>
   queryOptions({
     queryKey: ['app', appId],
-    queryFn: () => checked(sdk.getApp({ ...options, path: { app_id: appId } }), schemas.zAppResponse),
+    queryFn: () =>
+      checked(sdk.getApp({ ...options, path: { app_id: appId } }), schemas.zAppResponse),
   })
 export async function createApp(body: CreateAppRequest) {
   return checked(
-    sdk.createApp({ ...options, body: schemas.zCreateAppRequest.parse(body), headers: headers() }),
+    sdk.createApp({
+      ...options,
+      body: schemas.zCreateAppRequest.parse(body),
+      headers: headers(),
+    }),
     schemas.zAppResponse,
     [201],
   )
@@ -92,21 +113,31 @@ export const buildsQuery = (appId: string, cursor?: string) =>
     queryKey: ['builds', appId, cursor],
     queryFn: () =>
       checked(
-        sdk.listBuilds({ ...options, path: { app_id: appId }, query: { cursor, limit: 20 } }),
+        sdk.listBuilds({
+          ...options,
+          path: { app_id: appId },
+          query: { cursor, limit: 20 },
+        }),
         schemas.zBuildListResponse,
       ),
     refetchInterval: (query) =>
-      query.state.data?.items.some((build) => build.validation.state === 'validating') ? 3000 : false,
+      query.state.data?.items.some((build) => build.validation.state === 'validating')
+        ? 3000
+        : false,
   })
 export const buildQuery = (appId: string, buildId: string) =>
   queryOptions({
     queryKey: ['build', appId, buildId],
     queryFn: () =>
       checked(
-        sdk.getBuild({ ...options, path: { app_id: appId, build_id: buildId } }),
+        sdk.getBuild({
+          ...options,
+          path: { app_id: appId, build_id: buildId },
+        }),
         schemas.zBuildResponse,
       ),
-    refetchInterval: (query) => (query.state.data?.validation.state === 'validating' ? 3000 : false),
+    refetchInterval: (query) =>
+      query.state.data?.validation.state === 'validating' ? 3000 : false,
   })
 export function createUpload(appId: string, file: File, signal?: AbortSignal) {
   return checked(
@@ -126,7 +157,10 @@ export function createUpload(appId: string, file: File, signal?: AbortSignal) {
 }
 export function getUpload(appId: string, uploadId: string) {
   return checked(
-    sdk.getBuildUpload({ ...options, path: { app_id: appId, upload_id: uploadId } }),
+    sdk.getBuildUpload({
+      ...options,
+      path: { app_id: appId, upload_id: uploadId },
+    }),
     schemas.zUploadResponse,
   )
 }
@@ -152,5 +186,19 @@ export function completeUpload(appId: string, uploadId: string, signal?: AbortSi
     }),
     schemas.zBuildResponse,
     [200, 202],
+  )
+}
+
+export async function createWorkspace(
+  body: import('./generated/types.gen').CreateWorkspaceRequest,
+) {
+  return checked(
+    sdk.createWorkspace({
+      ...options,
+      body: schemas.zCreateWorkspaceRequest.parse(body),
+      headers: headers(),
+    }),
+    schemas.zOrganizationMembership,
+    [201],
   )
 }

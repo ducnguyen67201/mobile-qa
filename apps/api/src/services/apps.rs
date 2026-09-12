@@ -336,6 +336,9 @@ pub fn page_limit(query: &ListQuery) -> ApiResult<u64> {
 }
 pub async fn list(ctx: &AppContext, user: Uuid, query: ListQuery) -> ApiResult<AppListResponse> {
     let limit = page_limit(&query)?;
+    if let Some(org) = query.organization_id {
+        membership(ctx, user, org).await?;
+    }
     let ms = memberships::Entity::find()
         .filter(memberships::Column::UserId.eq(user))
         .filter(memberships::Column::Active.eq(true))

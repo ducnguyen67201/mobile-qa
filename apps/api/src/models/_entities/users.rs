@@ -8,6 +8,7 @@ pub struct Model {
     pub email: String,
     pub google_subject: Option<String>,
     pub display_name: String,
+    pub approval_status: String,
     pub disabled_at: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
 }

@@ -143,9 +143,12 @@ the configured HTTPS `HOST`. This GIS credential flow needs no client secret or
 OAuth redirect callback. The client ID is public; the API returns it with a one-use
 nonce/challenge and sets a separate HttpOnly browser-binding cookie.
 
-Only invited users can sign in. First-use linking requires a verified Gmail or
-Google Workspace email. Subsequent sign-ins use Google's immutable `sub`, not email.
-For third-party email accounts, use the explicit operator linking procedure above.
+Any verified Google account can register and sign in. New users have
+`users.approval_status='pending'` and can view their approval status without a
+workspace. Existing users remain approved after migration 000003. First-use linking
+of pre-existing records still requires a Google-authoritative email; subsequent
+sign-ins use Google's immutable `sub`, not email. Third-party email accounts can
+register new records, but cannot claim existing email records without explicit linking.
 The incremental migration drops password hashes and revokes pre-Google sessions,
 while retaining users, memberships, apps and builds. Rollback cannot recover hashes.
 The old password endpoint and password reset task are removed.
@@ -155,3 +158,29 @@ key override `MOBILE_QA_TEST_GOOGLE_JWKS` is honored **only** by Environment::Te
 development/production always fetch Google's fixed JWKS endpoint. No test private
 key or real Google token is committed. Real Google consent/origin configuration and
 rendered browser acceptance still require operator setup and permitted browser access.
+
+### Workspace creation and approval
+
+Approve a registered account by editing `users.approval_status` to `approved` in the
+local database, or run the trusted process-only task from `apps/api`:
+
+```sh
+../../target/debug/mobile-qa-cli task operator action:approval user:<uuid> status:approved --environment development
+```
+
+Use `status:pending` to revoke workspace creation approval. This does not delete
+existing workspace ownership or data; `disabled_at` remains the account disable
+mechanism. There is no HTTP self-approval endpoint. The user can select **Check
+approval status** without signing out. `operator provision` remains a convenience
+for local fixtures/explicit administration, not a sign-in requirement.
+
+Approved users can open `/workspaces/new`, create multiple workspaces, and become
+an operator/owner of each. Creation uses a client-generated UUID for safe retries.
+The existing organizations/memberships tables remain the storage model. Browser
+navigation uses `?workspace=<organization UUID>`; the picker updates that URL,
+clears app-specific selections on switch, and retains the workspace on navigation.
+A missing parameter selects the first available membership. Invalid or inaccessible
+workspace IDs display an error instead of silently selecting a different workspace.
+App lists and creation use the selected organization. Nested app resources derive
+and verify ownership through their app IDs; the browser rejects an app link whose
+organization differs from the selected workspace before loading builds/uploads.

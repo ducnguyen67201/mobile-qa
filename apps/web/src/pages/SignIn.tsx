@@ -18,10 +18,17 @@ import { useGoogleSignIn } from '@/hooks/use-google-sign-in'
 export { safeReturnTo } from '@/lib/navigation'
 
 export function SignIn() {
-  const { challenge, login, providerError, setProviderError, acceptCredential, retry } = useGoogleSignIn()
+  const { challenge, login, providerError, setProviderError, acceptCredential, retry } =
+    useGoogleSignIn()
   return (
     <main className="sign-in">
-      <Stack component="section" visibleFrom="md" p={56} justify="space-between" className="sign-in-story">
+      <Stack
+        component="section"
+        visibleFrom="md"
+        p={56}
+        justify="space-between"
+        className="sign-in-story"
+      >
         <Group>
           <Layers3 size={32} />
           <Text size="xl" fw={600}>
@@ -80,7 +87,11 @@ export function SignIn() {
                 <Text size="sm">Preparing Google sign-in…</Text>
               </Group>
             ) : challenge.isError ? (
-              <ErrorNotice error={challenge.error} title="Google sign-in is unavailable" retry={retry} />
+              <ErrorNotice
+                error={challenge.error}
+                title="Google sign-in is unavailable"
+                retry={retry}
+              />
             ) : login.isPending ? (
               <Group role="status">
                 <Loader size="sm" />
@@ -101,7 +112,9 @@ export function SignIn() {
                   key={challenge.data.challenge_id}
                   clientId={challenge.data.client_id}
                   onScriptLoadError={() =>
-                    setProviderError('Google sign-in could not load. Check your connection and try again.')
+                    setProviderError(
+                      'Google sign-in could not load. Check your connection and try again.',
+                    )
                   }
                 >
                   <GoogleLogin
@@ -111,7 +124,9 @@ export function SignIn() {
                     theme="outline"
                     onSuccess={(response) => acceptCredential(response.credential)}
                     onError={() =>
-                      setProviderError('Google sign-in was canceled or could not complete. Please try again.')
+                      setProviderError(
+                        'Google sign-in was canceled or could not complete. Please try again.',
+                      )
                     }
                   />
                 </GoogleOAuthProvider>
@@ -120,8 +135,8 @@ export function SignIn() {
           </Stack>
           <Divider my="xl" />
           <Text size="xs" c="dimmed">
-            Google sign-in is the only sign-in method. Your workspace operator manages access; use the Google
-            account they invited.
+            Sign in with Google to get started. Once your account is approved, you can create and
+            manage your own workspaces.
           </Text>
         </Box>
       </Center>

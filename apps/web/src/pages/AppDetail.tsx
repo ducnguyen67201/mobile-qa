@@ -2,17 +2,56 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { ArrowLeft, FileArchive, RotateCw } from 'lucide-react'
+import { useWorkspace } from '@/hooks/use-workspace'
 import { appQuery, buildQuery, buildsQuery, completeUpload, settingsQuery } from '@/api/setup'
-import { PageHeading, ErrorNotice, LoadingPanel, formatBytes, formatDate } from '@/components/app/feedback'
+import {
+  PageHeading,
+  ErrorNotice,
+  LoadingPanel,
+  formatBytes,
+  formatDate,
+} from '@/components/app/feedback'
 import { ApkUpload } from '@/components/app/apk-upload'
 import { EnvironmentCard } from '@/components/app/environment'
 import { BuildDetail, ReadinessCard, ValidationBadge } from '@/components/app/build-status'
-import { Anchor, Box, Button, Card, Group, Stack, Table, Text, Title, UnstyledButton } from '@mantine/core'
+import {
+  Anchor,
+  Box,
+  Button,
+  Card,
+  Group,
+  Stack,
+  Table,
+  Text,
+  Title,
+  UnstyledButton,
+} from '@mantine/core'
 export function AppDetail() {
   const { app_id: appId = '' } = useParams()
-  return <AppDetailContent key={appId} appId={appId} />
+  const { workspace } = useWorkspace()
+  const app = useQuery(appQuery(appId))
+  if (app.isError)
+    return (
+      <ErrorNotice
+        error={app.error}
+        retry={() => void app.refetch()}
+        title="App could not be loaded"
+      />
+    )
+  if (!app.data) return <LoadingPanel label="Loading app setup…" />
+  if (app.data.organization_id !== workspace!.organization_id)
+    return (
+      <Card>
+        <Text>This app belongs to a different workspace.</Text>
+        <Button component={Link} to={`/apps?workspace=${workspace!.organization_id}`} mt="md">
+          Back to workspace
+        </Button>
+      </Card>
+    )
+  return <AppDetailContent key={`${workspace!.organization_id}:${appId}`} appId={appId} />
 }
 function AppDetailContent({ appId }: { appId: string }) {
+  const { href } = useWorkspace()
   const [params, setParams] = useSearchParams()
   const [cursors, setCursors] = useState<(string | undefined)[]>([undefined])
   const client = useQueryClient()
@@ -20,7 +59,10 @@ function AppDetailContent({ appId }: { appId: string }) {
   const settings = useQuery(settingsQuery)
   const builds = useQuery(buildsQuery(appId, cursors.at(-1)))
   const selectedId = params.get('build') ?? builds.data?.items[0]?.id ?? ''
-  const selected = useQuery({ ...buildQuery(appId, selectedId), enabled: !!selectedId })
+  const selected = useQuery({
+    ...buildQuery(appId, selectedId),
+    enabled: !!selectedId,
+  })
   const validationState = selected.data?.validation.state
   useEffect(() => {
     if (validationState && validationState !== 'validating')
@@ -28,7 +70,10 @@ function AppDetailContent({ appId }: { appId: string }) {
   }, [validationState, appId, client])
   const retry = useMutation({
     mutationFn: async () => {
-      const latest = await client.fetchQuery({ ...buildQuery(appId, selectedId), staleTime: 0 })
+      const latest = await client.fetchQuery({
+        ...buildQuery(appId, selectedId),
+        staleTime: 0,
+      })
       return latest.can_retry_validation ? completeUpload(appId, latest.upload_id) : latest
     },
     onSuccess: (build) => {
@@ -37,11 +82,24 @@ function AppDetailContent({ appId }: { appId: string }) {
     },
   })
   if (!app.data && app.isError)
-    return <ErrorNotice error={app.error} retry={() => void app.refetch()} title="App could not be loaded" />
+    return (
+      <ErrorNotice
+        error={app.error}
+        retry={() => void app.refetch()}
+        title="App could not be loaded"
+      />
+    )
   if (!app.data) return <LoadingPanel label="Loading app setup…" />
   return (
     <>
-      <Anchor component={Link} to="/apps" size="xs" c="dimmed" mb="lg" display="inline-block">
+      <Anchor
+        component={Link}
+        to={href('/apps')}
+        size="xs"
+        c="dimmed"
+        mb="lg"
+        display="inline-block"
+      >
         <Group gap="xs">
           <ArrowLeft size={14} />
           All apps

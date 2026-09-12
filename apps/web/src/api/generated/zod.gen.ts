@@ -33,6 +33,8 @@ export const zAppListResponse = z.object({
     next_cursor: z.string().nullish()
 });
 
+export const zApprovalStatus = z.enum(['pending', 'approved']);
+
 export const zCheckKind = z.enum([
     'backend',
     'account',
@@ -57,6 +59,11 @@ export const zCreateAppRequest = z.object({
 export const zCreateBuildUploadRequest = z.object({
     expected_size: z.int().gte(1).lte(262144000),
     original_filename: z.string()
+});
+
+export const zCreateWorkspaceRequest = z.object({
+    id: z.uuid(),
+    name: z.string().min(1).max(100)
 });
 
 export const zEnvironmentCheck = z.object({
@@ -184,6 +191,7 @@ export const zUploadResponse = z.object({
 });
 
 export const zUserIdentity = z.object({
+    approval_status: zApprovalStatus,
     display_name: z.string(),
     email: z.string(),
     id: z.uuid()
@@ -401,3 +409,14 @@ export const zGetHealthResponse = zHealthResponse;
  * Success
  */
 export const zGetSettingsResponse = zSettingsResponse;
+
+export const zCreateWorkspaceBody = zCreateWorkspaceRequest;
+
+export const zCreateWorkspaceHeaders = z.object({
+    'X-CSRF-Token': z.string()
+});
+
+/**
+ * Success
+ */
+export const zCreateWorkspaceResponse = zOrganizationMembership;

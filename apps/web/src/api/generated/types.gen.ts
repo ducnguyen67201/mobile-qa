@@ -45,6 +45,8 @@ export type AppSummary = {
     organization_id: string;
 };
 
+export type ApprovalStatus = 'pending' | 'approved';
+
 export type BuildListResponse = {
     items: Array<BuildResponse>;
     next_cursor?: string | null;
@@ -90,6 +92,11 @@ export type CreateAppRequest = {
 export type CreateBuildUploadRequest = {
     expected_size: number;
     original_filename: string;
+};
+
+export type CreateWorkspaceRequest = {
+    id: string;
+    name: string;
 };
 
 export type EnvironmentCheck = {
@@ -208,6 +215,7 @@ export type UploadResponse = {
 export type UploadState = 'pending' | 'receiving' | 'uploaded' | 'finalized' | 'expired';
 
 export type UserIdentity = {
+    approval_status: ApprovalStatus;
     display_name: string;
     email: string;
     id: string;
@@ -1501,3 +1509,83 @@ export type GetSettingsResponses = {
 };
 
 export type GetSettingsResponse = GetSettingsResponses[keyof GetSettingsResponses];
+
+export type CreateWorkspaceData = {
+    body: CreateWorkspaceRequest;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/workspaces';
+};
+
+export type CreateWorkspaceErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type CreateWorkspaceError = CreateWorkspaceErrors[keyof CreateWorkspaceErrors];
+
+export type CreateWorkspaceResponses = {
+    /**
+     * Success
+     */
+    201: OrganizationMembership;
+};
+
+export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];

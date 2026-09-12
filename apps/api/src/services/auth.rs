@@ -161,6 +161,11 @@ pub async fn response(ctx: &AppContext, session: &Session) -> ApiResult<SessionR
             id: session.user.id,
             email: session.user.email.clone(),
             display_name: session.user.display_name.clone(),
+            approval_status: if session.user.approval_status == "approved" {
+                ApprovalStatus::Approved
+            } else {
+                ApprovalStatus::Pending
+            },
         },
         memberships: organization_memberships(ctx, session.user.id).await?,
         csrf_token: session.session.csrf_token.clone(),
@@ -292,6 +297,7 @@ pub async fn provision(
         email: Set(email),
         google_subject: Set(None),
         display_name: Set(name.trim().into()),
+        approval_status: Set("approved".into()),
         disabled_at: Set(None),
         created_at: Set(now),
     }

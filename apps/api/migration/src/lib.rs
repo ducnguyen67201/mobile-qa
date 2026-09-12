@@ -4,6 +4,7 @@
 pub use sea_orm_migration::prelude::*;
 mod m20260912_000001_app_setup;
 mod m20260912_000002_google_sign_in;
+mod m20260912_000003_workspaces;
 pub struct Migrator;
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
@@ -11,6 +12,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20260912_000001_app_setup::Migration),
             Box::new(m20260912_000002_google_sign_in::Migration),
+            Box::new(m20260912_000003_workspaces::Migration),
             // inject-above (do not remove this comment)
         ]
     }

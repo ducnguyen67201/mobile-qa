@@ -13,7 +13,7 @@ An authenticated user creates an app, uploads a test APK and sees the actual APK
 
 ## Ordered work
 
-1. **Auth and shell:** add Google-only sign-in with verified Google identity tokens and framework-issued app sessions, then add organization/project membership enforcement, and build the App / Tests / Runs / Settings navigation. Use an operator-provisioned pilot account initially; public registration and complex invitation flows can wait.
+1. **Auth and shell:** add Google-only sign-in with verified Google identity tokens and framework-issued app sessions, then add organization/project membership enforcement, and build the App / Tests / Runs / Settings navigation. Allow Google registration; gate workspace creation on account approval and scope all navigation to the selected workspace.
 2. **Create app:** migration and Rust service → typed create/detail endpoints → form and persisted detail page. Required fields: name, Android package, test-environment name and permitted backend/login origins. Package identity is checked against uploaded APK metadata.
 3. **Upload build:** private upload session → file transfer → explicit finalization → APK metadata/checksum validation → displayed build record. Retry finalization idempotently. A file visible in storage is not automatically an accepted build.
 4. **Configure test access:** store secret references and readiness metadata, display masked status, and let the operator verify the test account/reset path. Test definitions contain references, not credentials.
@@ -100,6 +100,23 @@ The accepted sign-in method is Google only. GIS renders the sign-in control; the
 backend verifies RS256 signature, issuer, audience, expiry, verified email and the
 one-use browser-bound nonce before issuing the app session. Local passwords and
 reset-password flows are removed. Existing operator-managed membership grants are
-preserved; public workspace registration remains deferred. Migration 000002 preserves
+preserved. The workspace onboarding correction below supersedes the invitation-only policy. Migration 000002 preserves
 product records, removes password hashes and revokes earlier sessions. Real Google
 client registration and consent remain an explicit acceptance gate.
+
+## Workspace onboarding correction
+
+Any verified Google account can sign in without a manual invitation. New accounts
+start pending; existing accounts migrate as approved. Only approved accounts may
+view the Create Workspace screen or call its API. Approval is an operator/database
+setting, distinct from Google identity and workspace membership. Pending accounts
+see a clear status screen and can refresh approval.
+
+Users can create multiple workspaces and own each through an active operator
+membership. The app provides a workspace picker, with selection stored in
+`?workspace=<id>`. Apps, builds, uploads, environments and workspace settings remain
+scoped to that workspace. Switching drops detail/build/upload context, resets forms
+and pagination, and preserves selection across reloads and browser back/forward.
+Invalid workspace IDs and mismatched app links must not render another workspace's
+content. Existing records remain intact; organizations are the internal workspace
+storage representation. Device execution and team invitation UI remain deferred.

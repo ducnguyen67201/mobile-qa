@@ -2,7 +2,7 @@
 use crate::{
     config::Setup,
     errors::{ApiFailure, ApiResult},
-    models::_entities::{google_login_challenges, memberships, users},
+    models::_entities::{google_login_challenges, users},
     services::auth,
 };
 use chrono::{Duration, Utc};
@@ -10,7 +10,8 @@ use jsonwebtoken::{decode, decode_header, jwk::JwkSet, Algorithm, DecodingKey, V
 use loco_rs::{app::AppContext, environment::Environment};
 use mobile_qa_contracts::browser::{GoogleLoginChallenge, LoginRequest};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, TransactionTrait,
+    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect,
+    Set, TransactionTrait,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -28,6 +29,7 @@ pub struct Google {
 #[derive(Clone, Deserialize)]
 struct Identity {
     sub: String,
+    name: Option<String>,
     email: String,
     email_verified: bool,
     nonce: String,
@@ -233,48 +235,65 @@ pub async fn login(
         user
     } else {
         let email = identity.email.trim().to_lowercase();
-        // Only Google-hosted mail is authoritative enough to claim an existing email invitation.
-        if !email.ends_with("@gmail.com") && identity.hd.as_ref().is_none_or(|hd| hd.is_empty()) {
-            return Err(ApiFailure::new(
-                403,
-                "google_account_not_linked",
-                "Ask your operator to link this Google account before signing in",
-            ));
-        }
-        let user = users::Entity::find()
-            .filter(users::Column::Email.eq(email))
-            .filter(users::Column::GoogleSubject.is_null())
-            .filter(users::Column::DisabledAt.is_null())
+        let existing = users::Entity::find()
+            .filter(users::Column::Email.eq(&email))
             .lock_exclusive()
             .one(&tx)
-            .await?
-            .ok_or_else(|| {
-                ApiFailure::new(
+            .await?;
+        if let Some(user) = existing {
+            // A different Google identity cannot take over an existing account through email reuse.
+            if user.google_subject.is_some()
+                || (!email.ends_with("@gmail.com")
+                    && identity.hd.as_ref().is_none_or(|hd| hd.is_empty()))
+            {
+                return Err(ApiFailure::new(
                     403,
-                    "workspace_access_required",
-                    "Ask your workspace operator for access",
-                )
-            })?;
-        let mut active: users::ActiveModel = user.into();
-        active.google_subject = Set(Some(identity.sub));
-        active.update(&tx).await?
+                    "google_account_not_linked",
+                    "This email is linked to another identity or requires operator verification",
+                ));
+            }
+            if user.disabled_at.is_some() {
+                return Err(invalid());
+            }
+            let mut active: users::ActiveModel = user.into();
+            active.google_subject = Set(Some(identity.sub));
+            active.update(&tx).await?
+        } else {
+            // Registration creates identity only. Approval and workspace ownership are separate.
+            let name = identity.name.as_deref().unwrap_or(&email).trim();
+            let name: String = name.chars().filter(|c| !c.is_control()).take(100).collect();
+            users::Entity::insert(users::ActiveModel {
+                id: Set(Uuid::new_v4()),
+                email: Set(email),
+                display_name: Set(if name.is_empty() {
+                    "Google user".into()
+                } else {
+                    name
+                }),
+                google_subject: Set(Some(identity.sub.clone())),
+                approval_status: Set("pending".into()),
+                disabled_at: Set(None),
+                created_at: Set(Utc::now()),
+            })
+            .on_conflict(OnConflict::new().do_nothing().to_owned())
+            .exec_without_returning(&tx)
+            .await?;
+            // Concurrent first logins converge on one durable Google identity.
+            users::Entity::find()
+                .filter(users::Column::GoogleSubject.eq(&identity.sub))
+                .one(&tx)
+                .await?
+                .ok_or_else(|| {
+                    ApiFailure::new(
+                        409,
+                        "identity_conflict",
+                        "This email is already associated with another account",
+                    )
+                })?
+        }
     };
     if user.disabled_at.is_some() {
         return Err(invalid());
-    }
-    // This grant check is independent of Google's identity assertion.
-    if memberships::Entity::find()
-        .filter(memberships::Column::UserId.eq(user.id))
-        .filter(memberships::Column::Active.eq(true))
-        .one(&tx)
-        .await?
-        .is_none()
-    {
-        return Err(ApiFailure::new(
-            403,
-            "workspace_access_required",
-            "Ask your workspace operator for access",
-        ));
     }
     tx.commit().await?;
     auth::issue_session(ctx, user).await

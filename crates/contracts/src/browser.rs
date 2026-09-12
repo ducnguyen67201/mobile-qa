@@ -96,9 +96,26 @@ pub struct GoogleLoginChallenge {
     pub nonce: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ApprovalStatus {
+    Pending,
+    Approved,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CreateWorkspaceRequest {
+    // Client-generated operation ID makes retry after a lost response safe.
+    pub id: Uuid,
+    #[schema(min_length = 1, max_length = 100)]
+    pub name: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UserIdentity {
+    pub approval_status: ApprovalStatus,
     pub id: Uuid,
     pub email: String,
     pub display_name: String,
@@ -337,6 +354,28 @@ responses((status = 200, description = "Success", body = HealthResponse),
 (status = "default", description = "API error", body = ApiError)))]
 #[allow(dead_code)]
 fn endpoint_0() {}
+
+#[utoipa::path(post, path = "/api/workspaces", operation_id = "createWorkspace",
+security(("session_cookie" = [])),
+params(("X-CSRF-Token" = String, Header)),
+request_body(content = CreateWorkspaceRequest, content_type = "application/json"),
+responses((status = 201, description = "Success", body = OrganizationMembership),
+(status = 400, description = "API error", body = ApiError),
+(status = 401, description = "API error", body = ApiError),
+(status = 403, description = "API error", body = ApiError),
+(status = 404, description = "API error", body = ApiError),
+(status = 408, description = "API error", body = ApiError),
+(status = 409, description = "API error", body = ApiError),
+(status = 410, description = "API error", body = ApiError),
+(status = 413, description = "API error", body = ApiError),
+(status = 415, description = "API error", body = ApiError),
+(status = 422, description = "API error", body = ApiError),
+(status = 429, description = "API error", body = ApiError),
+(status = 500, description = "API error", body = ApiError),
+(status = 503, description = "API error", body = ApiError),
+(status = "default", description = "API error", body = ApiError)))]
+#[allow(dead_code)]
+fn endpoint_16() {}
 
 #[utoipa::path(post, path = "/api/auth/google/challenge", operation_id = "startGoogleSignIn",
 params(("X-Mobile-QA-Request" = String, Header)),
@@ -673,7 +712,8 @@ fn endpoint_14() {}
         endpoint_12,
         endpoint_13,
         endpoint_14,
-        endpoint_15
+        endpoint_15,
+        endpoint_16
     ),
     components(schemas(
         HealthStatus,
@@ -688,6 +728,8 @@ fn endpoint_14() {}
         LoginRequest,
         GoogleLoginChallenge,
         UserIdentity,
+        ApprovalStatus,
+        CreateWorkspaceRequest,
         OrganizationMembership,
         SessionResponse,
         LogoutResponse,
@@ -731,6 +773,7 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
 /// Route agreement inventory, shared with integration tests.
 pub const OPERATIONS: &[(&str, &str, &str, u16)] = &[
     ("get", "/api/health", "getHealth", 200),
+    ("post", "/api/workspaces", "createWorkspace", 201),
     ("post", "/api/auth/google/login", "login", 200),
     (
         "post",

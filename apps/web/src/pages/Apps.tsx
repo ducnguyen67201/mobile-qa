@@ -17,14 +17,20 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { AppWindow, ArrowRight, Plus, Smartphone } from 'lucide-react'
+import { useWorkspace } from '@/hooks/use-workspace'
 import { appsQuery } from '@/api/setup'
 import { PageHeading, LoadingPanel, ErrorNotice } from '@/components/app/feedback'
 import { AppForm } from '@/components/app/app-form'
 
 export function Apps() {
+  const { workspace } = useWorkspace()
+  return <WorkspaceApps key={workspace!.organization_id} />
+}
+function WorkspaceApps() {
+  const { workspace, href } = useWorkspace()
   const [creating, { open: openCreate, close: closeCreate }] = useDisclosure(false)
   const [cursors, setCursors] = useState<(string | undefined)[]>([undefined])
-  const apps = useQuery(appsQuery(cursors.at(-1)))
+  const apps = useQuery(appsQuery(workspace!.organization_id, cursors.at(-1)))
 
   return (
     <>
@@ -45,7 +51,14 @@ export function Apps() {
         apps.data && (
           <>
             {apps.data.items.length === 0 ? (
-              <Paper component="section" withBorder radius="lg" px="lg" py={64} className="workbench-grid">
+              <Paper
+                component="section"
+                withBorder
+                radius="lg"
+                px="lg"
+                py={64}
+                className="workbench-grid"
+              >
                 <Stack align="center" gap="md" ta="center">
                   <ThemeIcon variant="light" size={76} radius="lg">
                     <Smartphone size={36} strokeWidth={1.5} />
@@ -57,8 +70,8 @@ export function Apps() {
                     Your first app belongs here.
                   </Title>
                   <Text size="sm" c="dimmed" maw={380}>
-                    Add an Android app and its environment. Then upload an APK to validate its identity and
-                    compatibility.
+                    Add an Android app and its environment. Then upload an APK to validate its
+                    identity and compatibility.
                   </Text>
                   <Button mt="sm" onClick={openCreate} rightSection={<ArrowRight size={16} />}>
                     Create your first app
@@ -71,7 +84,12 @@ export function Apps() {
             ) : (
               <SimpleGrid cols={{ base: 1, md: 2, xl: 3 }} spacing="lg">
                 {apps.data.items.map((app) => (
-                  <Card key={app.id} component={Link} to={`/apps/${app.id}`} className="app-card">
+                  <Card
+                    key={app.id}
+                    component={Link}
+                    to={href(`/apps/${app.id}`)}
+                    className="app-card"
+                  >
                     <Group justify="space-between" mb="xl">
                       <ThemeIcon variant="light" size={48} radius="lg">
                         <AppWindow size={24} strokeWidth={1.5} />

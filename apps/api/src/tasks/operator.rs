@@ -41,6 +41,25 @@ pub async fn execute(ctx: &AppContext, vars: &Vars) -> ApiResult<()> {
         println!("user_id={user} organization_id={org}");
         return Ok(());
     }
+    // Global account approval is a trusted process-only operation, never a workspace API permission.
+    if action == "approval" {
+        let status = arg(vars, "status")?;
+        if !["pending", "approved"].contains(&status) {
+            return Err(ApiFailure::invalid("Status must be pending or approved"));
+        }
+        let result = users::Entity::update_many()
+            .col_expr(
+                users::Column::ApprovalStatus,
+                sea_orm::sea_query::Expr::value(status),
+            )
+            .filter(users::Column::Id.eq(id(vars, "user")?))
+            .exec(&ctx.db)
+            .await?;
+        if result.rows_affected != 1 {
+            return Err(ApiFailure::missing());
+        }
+        return Ok(());
+    }
     let actor = id(vars, "actor")?;
     let org = id(vars, "organization")?;
     users::Entity::find_by_id(actor)
@@ -233,7 +252,7 @@ impl Task for Operator {
     fn task(&self) -> TaskInfo {
         TaskInfo {
             name: "operator".into(),
-            detail: "Explicit provision/link-google/membership/grant/reference/observe operations"
+            detail: "Explicit approval/provision/link-google/membership/grant/reference/observe operations"
                 .into(),
         }
     }

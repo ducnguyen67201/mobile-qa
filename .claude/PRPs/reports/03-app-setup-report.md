@@ -302,3 +302,31 @@ initially selected Java 8; selecting the installed Homebrew JDK 17 fixed the two
 checks. The health contract path-count assertion was updated for the new challenge
 route. Only failed or invalidated checks were repeated. Frontend audit is clean;
 RustSec still reports RUSTSEC-2023-0071.
+
+
+## Public Google registration and owned workspaces (2026-09-12)
+
+Google sign-in now registers unknown identities without a workspace invitation.
+New accounts start pending; migration 000003 retains approved status for existing
+accounts. Only approved accounts can access workspace creation, enforced again
+against the current user row inside the API transaction. Operators manage approval
+through the trusted process task or users.approval_status in the local database.
+Workspace creation atomically grants creator ownership through the existing operator
+membership, with a client UUID for idempotent retries. Existing memberships and
+app permissions remain the workspace isolation boundary.
+
+The Mantine shell includes a workspace switcher and workspace list/create screens.
+The selected workspace is carried by ?workspace=<uuid>; app lists, creation,
+settings and links follow it. Switching from app detail clears previous build/upload
+parameters and remounts form/upload state. Invalid workspace links and mismatched
+app links cannot mount product data screens. Tests/Runs remain placeholders.
+
+Validation: 65 web tests and 17 Rust tests pass, including pending approval,
+approval refresh, concurrent workspace retry, multiple workspace ownership,
+cross-workspace denial, deep links, switching, history and app creation scope.
+TypeScript, ESLint, Rust format/Clippy, generated drift and builds pass. Synthetic
+APK HTTP smoke passes with restart persistence (0.251s fixture finalization).
+Frontend audit is clean; the pre-existing RSA advisory and bundle warning remain.
+Google web-client setup and real local Google sign-in have since been verified
+through the user-authorized browser flow, superseding the earlier open setup note.
+Hosted storage and device acceptance are still outstanding.

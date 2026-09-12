@@ -14,7 +14,12 @@ export const uploadId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
 export const userId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
 export const timestamp = '2026-09-12T09:00:00Z'
 export const session = {
-  user: { id: userId, email: 'synthetic@example.test', display_name: 'Synthetic Member' },
+  user: {
+    id: userId,
+    email: 'synthetic@example.test',
+    display_name: 'Synthetic Member',
+    approval_status: 'approved',
+  },
   memberships: [{ organization_id: orgId, name: 'Fixture workspace', role: 'member' }],
   csrf_token: 'test-only-csrf',
   expires_at: '2099-09-12T09:00:00Z',

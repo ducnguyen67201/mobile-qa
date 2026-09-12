@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { CompleteBuildUploadData, CompleteBuildUploadErrors, CompleteBuildUploadResponses, CreateAppData, CreateAppErrors, CreateAppResponses, CreateBuildUploadData, CreateBuildUploadErrors, CreateBuildUploadResponses, GetAppData, GetAppErrors, GetAppResponses, GetBuildData, GetBuildErrors, GetBuildResponses, GetBuildUploadData, GetBuildUploadErrors, GetBuildUploadResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, ListAppsData, ListAppsErrors, ListAppsResponses, ListBuildsData, ListBuildsErrors, ListBuildsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, StartGoogleSignInData, StartGoogleSignInErrors, StartGoogleSignInResponses, UpdateEnvironmentData, UpdateEnvironmentErrors, UpdateEnvironmentResponses, UploadBuildContentData, UploadBuildContentErrors, UploadBuildContentResponses } from './types.gen';
-import { zCompleteBuildUploadHeaders, zCompleteBuildUploadPath, zCreateAppBody, zCreateAppHeaders, zCreateBuildUploadBody, zCreateBuildUploadHeaders, zCreateBuildUploadPath, zGetAppPath, zGetBuildPath, zGetBuildUploadPath, zListAppsQuery, zListBuildsPath, zListBuildsQuery, zLoginBody, zLoginHeaders, zLogoutHeaders, zStartGoogleSignInHeaders, zUpdateEnvironmentBody, zUpdateEnvironmentHeaders, zUpdateEnvironmentPath, zUploadBuildContentBody, zUploadBuildContentHeaders, zUploadBuildContentPath } from './zod.gen';
+import type { CompleteBuildUploadData, CompleteBuildUploadErrors, CompleteBuildUploadResponses, CreateAppData, CreateAppErrors, CreateAppResponses, CreateBuildUploadData, CreateBuildUploadErrors, CreateBuildUploadResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, GetAppData, GetAppErrors, GetAppResponses, GetBuildData, GetBuildErrors, GetBuildResponses, GetBuildUploadData, GetBuildUploadErrors, GetBuildUploadResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, ListAppsData, ListAppsErrors, ListAppsResponses, ListBuildsData, ListBuildsErrors, ListBuildsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, StartGoogleSignInData, StartGoogleSignInErrors, StartGoogleSignInResponses, UpdateEnvironmentData, UpdateEnvironmentErrors, UpdateEnvironmentResponses, UploadBuildContentData, UploadBuildContentErrors, UploadBuildContentResponses } from './types.gen';
+import { zCompleteBuildUploadHeaders, zCompleteBuildUploadPath, zCreateAppBody, zCreateAppHeaders, zCreateBuildUploadBody, zCreateBuildUploadHeaders, zCreateBuildUploadPath, zCreateWorkspaceBody, zCreateWorkspaceHeaders, zGetAppPath, zGetBuildPath, zGetBuildUploadPath, zListAppsQuery, zListBuildsPath, zListBuildsQuery, zLoginBody, zLoginHeaders, zLogoutHeaders, zStartGoogleSignInHeaders, zUpdateEnvironmentBody, zUpdateEnvironmentHeaders, zUpdateEnvironmentPath, zUploadBuildContentBody, zUploadBuildContentHeaders, zUploadBuildContentPath } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -273,4 +273,24 @@ export const getSettings = <ThrowOnError extends boolean = false>(options?: Opti
         }],
     url: '/api/settings',
     ...options
+});
+
+export const createWorkspace = <ThrowOnError extends boolean = false>(options: Options<CreateWorkspaceData, ThrowOnError>): RequestResult<CreateWorkspaceResponses, CreateWorkspaceErrors, ThrowOnError> => (options.client ?? client).post<CreateWorkspaceResponses, CreateWorkspaceErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zCreateWorkspaceBody,
+        headers: zCreateWorkspaceHeaders,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/workspaces',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });

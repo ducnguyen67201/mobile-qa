@@ -35,6 +35,8 @@ import {
 } from 'lucide-react'
 import { useSession } from '@/components/app/session'
 import { ErrorNotice } from '@/components/app/feedback'
+import { useWorkspace } from '@/hooks/use-workspace'
+import { WorkspaceSwitcher } from '@/components/app/workspace'
 import { signOut } from '@/api/setup'
 
 const links = [
@@ -46,10 +48,11 @@ const links = [
 
 function Navigation({ close }: { close: () => void }) {
   const { pathname } = useLocation()
+  const { href } = useWorkspace()
   return (
     <Stack h="100%" justify="space-between" gap="xl">
       <Stack gap="xl">
-        <Anchor component={Link} to="/apps" underline="never" c="inherit" onClick={close}>
+        <Anchor component={Link} to={href('/apps')} underline="never" c="inherit" onClick={close}>
           <Group gap="sm">
             <ThemeIcon color="forest.2" c="forest.9" size={36} radius="md">
               <Layers3 size={20} />
@@ -71,7 +74,7 @@ function Navigation({ close }: { close: () => void }) {
               <NavLink
                 key={to}
                 component={Link}
-                to={to}
+                to={href(to)}
                 label={label}
                 active={pathname.startsWith(to)}
                 aria-current={pathname.startsWith(to) ? 'page' : undefined}
@@ -101,7 +104,7 @@ function Navigation({ close }: { close: () => void }) {
           </Text>
           <Anchor
             component={Link}
-            to="/settings"
+            to={href('/settings')}
             c="var(--workspace-accent)"
             size="xs"
             mt="md"
@@ -150,7 +153,12 @@ export function App() {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <AppShell.Navbar component="aside" p="lg" className="workspace-nav" style={{ overflowY: 'auto' }}>
+      <AppShell.Navbar
+        component="aside"
+        p="lg"
+        className="workspace-nav"
+        style={{ overflowY: 'auto' }}
+      >
         <Navigation close={closeNavigation} />
       </AppShell.Navbar>
       <Drawer
@@ -174,12 +182,12 @@ export function App() {
               size="sm"
               aria-label="Toggle navigation"
             />
-            <Text size="xs" c="dimmed" visibleFrom="xs">
-              Workspace
-            </Text>
+            <WorkspaceSwitcher />
             <Divider orientation="vertical" />
             <Text size="xs" fw={500}>
-              {links.find((link) => pathname.startsWith(link.to))?.label ?? 'Apps'}
+              {pathname.startsWith('/workspaces')
+                ? 'Workspaces'
+                : links.find((link) => pathname.startsWith(link.to))?.label ?? 'Apps'}
             </Text>
           </Group>
           <Menu position="bottom-end" width={260}>

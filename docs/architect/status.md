@@ -119,3 +119,25 @@ nonblocking size warning. Prior baseline counts above are historical.
 Real Google account consent is unverified: configure a Google web client and its
 origins, and inject GOOGLE_CLIENT_ID through Doppler. No Google/cloud configuration
 or browser access was changed during this implementation.
+
+### Workspace onboarding follow-up
+
+Source now supports Google registration without invitation, approval-gated workspace
+creation, multiple owned workspaces and URL-based selection. Migration 000003 adds
+account approval and preserves existing access. Scoped listing, invalid workspace
+links, app/workspace mismatches and ownership checks are covered by new route/DOM
+cases. Validation passes: 65 web tests, 17 Rust tests, TypeScript, ESLint,
+Rust format/Clippy, both builds and generated-contract drift. The synthetic APK HTTP
+smoke verifies tenant denial and persistence after API restart (0.251s finalization).
+Frontend dependency audit is clean; the existing RustSec RSA advisory and Vite bundle
+size warning remain. The earlier invitation-only descriptions above are historical.
+
+A local Google OAuth web client has now been configured through the user-authorized
+browser flow, with GOOGLE_CLIENT_ID injected through Doppler. Real Google sign-in
+was verified against the local app. This supersedes the earlier unverified Google
+setup and browser-access notes; hosted storage and device acceptance remain open.
+
+The restarted local app was verified through real Google sign-in: the existing
+account lands on its workspace URL, the chooser shows its owned workspace, and
+the approved Create Workspace form renders. Creation/switching across two workspaces
+and pending-account gating are covered by automated route and DOM tests.

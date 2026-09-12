@@ -5,7 +5,7 @@ use crate::{
     services::{
         apps,
         auth::{self, LoginGuard, Session},
-        google, uploads,
+        google, uploads, workspaces,
     },
 };
 use axum::{
@@ -87,6 +87,16 @@ async fn logout(
     Ok((
         jar.remove(cookie),
         Json(LogoutResponse { signed_out: true }),
+    ))
+}
+async fn create_workspace(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Json(input): Json<CreateWorkspaceRequest>,
+) -> ApiResult<(StatusCode, Json<OrganizationMembership>)> {
+    Ok((
+        StatusCode::CREATED,
+        Json(workspaces::create(&ctx, session.user.id, input).await?),
     ))
 }
 async fn list_apps(
@@ -213,6 +223,7 @@ pub fn routes() -> Routes {
         .add("/api/auth/google/login", post(login))
         .add("/api/auth/session", get(session))
         .add("/api/auth/logout", post(logout))
+        .add("/api/workspaces", post(create_workspace))
         .add("/api/apps", get(list_apps).post(create_app))
         .add("/api/apps/{app_id}", get(get_app))
         .add("/api/apps/{app_id}/environment", patch(update_environment))

@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { appId, app, build, buildId, session, settings, upload, uploadId } from '@/test/fixtures'
+import {
+  appId,
+  orgId,
+  app,
+  build,
+  buildId,
+  session,
+  settings,
+  upload,
+  uploadId,
+} from '@/test/fixtures'
 import {
   appQuery,
   appsQuery,
@@ -47,7 +57,9 @@ describe('app setup generated transport', () => {
     await transferUpload(appId, uploadId, new File(['test'], 'synthetic.apk'))
     const request = calls()[0]!
     expect(request.method).toBe('PUT')
-    expect(request.url).toBe(`${window.location.origin}/api/apps/${appId}/build-uploads/${uploadId}/content`)
+    expect(request.url).toBe(
+      `${window.location.origin}/api/apps/${appId}/build-uploads/${uploadId}/content`,
+    )
     expect(request.headers.get('content-type')).toContain('multipart/form-data')
     const payload = await request.text()
     expect(payload, payload).toContain('filename="synthetic.apk"')
@@ -115,9 +127,11 @@ describe('app setup generated transport', () => {
     )
     // queryFn callbacks do not use context; use fetchQuery for QueryOptions context types.
     const { QueryClient } = await import('@tanstack/react-query')
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    })
     await client.fetchQuery(sessionQuery)
-    await client.fetchQuery(appsQuery())
+    await client.fetchQuery(appsQuery(orgId))
     await client.fetchQuery(appQuery(appId))
     await client.fetchQuery(buildsQuery(appId))
     await client.fetchQuery(buildQuery(appId, buildId))

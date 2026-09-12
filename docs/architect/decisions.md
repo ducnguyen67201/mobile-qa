@@ -43,3 +43,16 @@ validation. Account identity is Google `sub`. Auto-link invited email only when 
 is authoritative (verified Gmail/Workspace); otherwise require explicit operator
 linking. No public auto-registration is introduced. The follow-up migration removes
 password hashes and revokes old sessions without removing product data.
+
+## Open Google registration with approved workspace creation
+
+Google verifies identity; account approval controls workspace creation independently.
+Registration no longer needs an existing user or membership. Existing users remain
+approved, new registrations start pending, and trusted operator/database approval
+unlocks workspace creation. There is no browser self-approval permission. Users can
+own multiple workspaces using the existing organizations/memberships model.
+
+The selected workspace lives in the `workspace` URL parameter, not global mutable
+session state. This supports independent tabs and browser history. Workspace list
+queries include organization ID; nested resources retain authoritative server checks
+against their persisted app and organization. Switching remounts transient UI state.

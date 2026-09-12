@@ -1,4 +1,8 @@
 # Mobile QA foundation
+Read [docs/architect/README.md](docs/architect/README.md) before planning or implementation.
+It is the canonical documentation authority. Update the owning document in the same PR
+as a material change; use status.md to distinguish implemented behavior from planned work.
+
 Finish ALL code/test/config for the agreed feature before formatting, typecheck,
 lint, tests, builds, exports or runtime verification. Then validate once; batch fixes
 and rerun only failed/invalidated checks. No check-on-save/lifecycle hooks, check
@@ -19,4 +23,4 @@ browser admin-policy denial; no alternate-access workaround for manual UI inspec
 Runtime secrets come from Doppler process injection. Do not create .env files or env
 examples, download secrets to files, or commit tokens. Vite env-file loading is disabled.
 Only wrap secret-consuming server processes; local checks/fake runs remain Doppler-free.
-See docs/environment.md. Do not change the user's Doppler auth/config without scope.
+See docs/architect/environment.md. Do not change the user's Doppler auth/config without scope.

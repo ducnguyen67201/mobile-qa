@@ -1,0 +1,72 @@
+# System architecture
+
+Status: foundation implemented; device execution and customer workflows planned.
+[Current status](status.md) separates these explicitly.
+
+## Component ownership
+
+| Location | Responsibility | Current state |
+|---|---|---|
+| `apps/api` | Rust/Loco API, authorization, domain services, scheduling, verification and reports | Health route and framework wiring exist; product services planned |
+| `apps/api/migration` | SeaORM database migrations | Migrator and PostgreSQL integration exist; no product tables |
+| `apps/web` | React/Vite dashboard using React Router, TanStack Query, Tailwind and shadcn/ui | App health UI and Tests/Runs/Settings placeholders |
+| `apps/mobile-worker` | Python/uv adapter, device observations and evidence | Deterministic fake executor and import-only Minitap seam; real adapter planned |
+| `crates/contracts` | Pure Rust transport DTOs and browser endpoint declarations | Health and fixture contracts; no Loco/DB dependency |
+| `contracts` | Generated OpenAPI/JSON Schema and serialization fixtures | Derived from Rust, committed and checked for drift |
+| `infra` | Local infrastructure and future device-host provisioning | Isolated local PostgreSQL only |
+| `scripts` / `justfile` | Explicit development, generation and validation | Implemented; no check watchers |
+| `docs/architect` | Product/architecture/specification source of truth | This packet |
+
+Root Cargo.toml is a virtual workspace. Keep runnable applications under apps and shared
+code outside it. Each language uses its native tooling and locked dependencies. Loco's
+internal conventions stay together under apps/api; use backend scaffolding there and a
+separately generated browser client. No additional monorepo orchestration framework is
+needed for the current package count. [Dependency provenance](dependencies.md) records
+versions and upstream adaptations.
+
+## Runtime boundaries
+
+```mermaid
+flowchart LR
+    UI[React dashboard] -->|same-origin HTTP| API[Rust Loco API]
+    API --> DB[(PostgreSQL / SeaORM)]
+    D[Doppler] -->|process environment| API
+    API -. planned .-> O[(Private object storage)]
+    W[Python worker] -. planned lease/events/results .-> API
+    W -. planned local ADB .-> E[Qualified Android emulator]
+    W -. planned scoped uploads .-> O
+    W -. planned inference .-> M[Model provider]
+```
+
+Only the UI → health API and API → local DB paths are implemented. The fake worker
+consumes local fixtures independently; it does not yet claim network jobs or control a
+phone. Rust owns approvals and outcome aggregation. Agent completion alone cannot prove
+a customer expectation passed. Planned results and immutable manifests follow
+[product rules](product.md) and [execution spec](implementation/04-execution-and-reports.md).
+
+Use one application deployment with PostgreSQL and private storage, plus a separate
+qualified Linux emulator host for the pilot. Python initiates scoped HTTP worker calls;
+it does not receive database credentials. Keep one active case per device and exclusive
+test-account leases. Add capacity only after measured queue wait, reset reliability and
+cost justify it. [Spec 07](implementation/07-pilot-readiness-and-scale.md) owns scaling.
+
+## Persistence and ORM
+
+Use SeaORM through Loco with PostgreSQL. Add entities/domain services and versioned
+migrations as features arrive; do not introduce a parallel hand-maintained SQL access
+layer. SQLx is an upstream dependency of the ORM, not a second application data layer.
+The ORM reduces mapping and query boilerplate; it does not replace schema evolution,
+indexes, transaction design or business invariants. Database records are distinct from
+public transport DTOs. [Spec 03](implementation/03-app-setup-and-ui-backend.md) adds the
+first product records; [spec 04](implementation/04-execution-and-reports.md) adds durable
+jobs and the narrow transactional claim/lease behavior.
+
+## Related decisions
+
+- [Contracts](contracts.md): Rust → generated TypeScript SDK/Zod and worker Pydantic.
+- [Environment](environment.md): Doppler runtime injection, no env files, isolated local DB.
+- [Development](development.md): complete authoring before strict affected verification.
+- [Device feasibility](implementation/02-cloud-phone-and-feasibility.md): qualify one Android
+  emulator before committing to real execution; no cloud device is provisioned yet.
+- [Product](product.md): Android-first operated pilot; iOS, broad fleets and App Store
+  submission are outside the current implementation boundary.

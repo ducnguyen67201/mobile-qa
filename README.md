@@ -30,7 +30,7 @@ Run `doppler setup` from this repository root and select its project/config. Loc
 credentials and directory selection are managed by the Doppler CLI; no token belongs
 in Git. `just dev` injects secrets only into the API child using
 `doppler run --no-fallback --forward-signals`. No `.env` or secret export file is used.
-See [environment setup](docs/environment.md) for required variable names and deployment.
+See [environment setup](docs/architect/environment.md) for required variable names and deployment.
 
 Open http://127.0.0.1:5173. API uses5150; PostgreSQL uses55432, all loopback only.
 Ctrl-C stops only child services and the PostgreSQL instance this command started.
@@ -70,8 +70,8 @@ setup; ordinary uv commands use --no-sync. Fixture CLI outcomes passed/failed/bl
 return JSON with exit0; invalid input exits2. `just device-smoke` explains spec02 is
 unimplemented and exits2 without any device/cloud work.
 
-See [architecture](docs/architecture.md), [development](docs/development.md) and
-[upstream provenance](docs/upstream-baseline.md). This local scaffold is unauthenticated;
+Start at **[docs/architect](docs/architect/README.md)**, the source of truth for product,
+architecture, implementation specs and operations. This local scaffold is unauthenticated;
 production configuration support is not a deployed or qualified customer service.
 Rendered browser/keyboard/HMR acceptance remains pending due the browser tool's admin
 policy verification denial. Automated UI tests do not substitute for that observation.

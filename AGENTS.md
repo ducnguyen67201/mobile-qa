@@ -28,3 +28,13 @@ See docs/architect/environment.md. Do not change the user's Doppler auth/config 
 Comments must make scaffold/fake/generated boundaries and non-obvious rules clear.
 Follow docs/architect/commenting.md; explain purpose and constraints without narrating
 every line. Keep comments aligned with implementation and preserve generator markers.
+
+For codebase relationship questions, consult the generated Graphify index when present:
+`GRAPHIFY_QUERY_LOG_DISABLE=1 uv run --project tools/graphify --frozen graphify query "<question>"`.
+Use `graphify explain "<symbol>"` or `graphify path "<A>" "<B>"` through the same uv prefix
+for focused follow-up. Check `built_at_commit` in graphify-out/graph.json and inspect
+source changes since that commit; feature branches and local edits can make it stale.
+Verify graph findings in source. Fall back to normal search if the graph is missing,
+stale or insufficient. Do not load the entire graph into context or rebuild it during
+editing. docs/architect remains authoritative; this code-only index does not model
+requirements or prove complete runtime relationships. CI owns the generated files.

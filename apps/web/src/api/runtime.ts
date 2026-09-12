@@ -8,7 +8,10 @@ import { zApiError } from './generated/zod.gen'
  * callers must not treat an arbitrary upstream error page as a trusted API message.
  */
 export class ApiClientError extends Error {
-  constructor(readonly status: number, readonly body: ApiError | null) {
+  constructor(
+    readonly status: number,
+    readonly body: ApiError | null,
+  ) {
     super(body?.message ?? `Invalid API error response (HTTP ${status})`)
     this.name = 'ApiClientError'
   }
@@ -28,17 +31,20 @@ export const apiClient: Client = new Proxy(transportClient, {
     const method = value as Client['get']
     return (options: RequestOptions) => {
       const validator = options.requestValidator
-      return method({ ...options, requestValidator: validator
-        ? data => validator(Object.assign({}, data, { headers: options.headers }))
-        : undefined })
+      return method({
+        ...options,
+        requestValidator: validator
+          ? (data) => validator(Object.assign({}, data, { headers: options.headers }))
+          : undefined,
+      })
     }
   },
 })
 apiClient.interceptors.error.use((error: unknown, response) => {
   // Network failures and success-body validation errors are not API error envelopes.
   if (!response || response.ok) return error
-  if (response.status === 401 && !response.url.endsWith("/auth/login")) {
-    queueMicrotask(() => window.dispatchEvent(new Event("mobile-qa:unauthorized")))
+  if (response.status === 401 && !response.url.endsWith('/auth/google/login')) {
+    queueMicrotask(() => window.dispatchEvent(new Event('mobile-qa:unauthorized')))
   }
   const parsed = zApiError.safeParse(error)
   return new ApiClientError(response.status, parsed.success ? parsed.data : null)

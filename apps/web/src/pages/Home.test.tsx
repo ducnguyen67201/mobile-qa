@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, expect, it, vi } from 'vitest'
 import { routes } from '../routes'
-import { session, apiError, app, settings, orgId } from '@/test/fixtures'
+import { session, apiError, app, settings, orgId, googleChallenge } from '@/test/fixtures'
 import { safeReturnTo } from './SignIn'
 function show(path = '/') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
@@ -155,12 +155,20 @@ it('submits the current app draft as the generated API payload', async () => {
     login_origins: [],
   })
 })
-it('submits sign-in field values without altering the password', async () => {
+// The provider UI is mocked; our real generated SDK still posts the returned credential.
+vi.mock('@react-oauth/google', () => ({
+  GoogleOAuthProvider: ({ children }: { children: React.ReactNode }) => children,
+  GoogleLogin: ({ onSuccess }: { onSuccess: (response: { credential: string }) => void }) => (
+    <button onClick={() => onSuccess({ credential: 'synthetic-google-token' })}>Continue with Google</button>
+  ),
+}))
+it('offers only Google sign-in and exchanges the credential through the generated API', async () => {
   let submitted: unknown
   vi.stubGlobal(
     'fetch',
     vi.fn(async (request: Request) => {
-      if (request.url.endsWith('/login')) {
+      if (request.url.endsWith('/google/challenge')) return Response.json(googleChallenge)
+      if (request.url.endsWith('/google/login')) {
         submitted = await request.json()
         return Response.json(session)
       }
@@ -169,9 +177,30 @@ it('submits sign-in field values without altering the password', async () => {
     }),
   )
   show('/sign-in')
-  await userEvent.type(screen.getByLabelText('Email address'), session.user.email)
-  await userEvent.type(screen.getByLabelText('Password'), ' synthetic password ')
-  await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+  expect(screen.queryByLabelText('Email address')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
+  await userEvent.click(await screen.findByRole('button', { name: 'Continue with Google' }))
   expect(await screen.findByText('Your first app belongs here.')).toBeInTheDocument()
-  expect(submitted).toEqual({ email: session.user.email, password: ' synthetic password ' })
+  expect(submitted).toEqual({
+    credential: 'synthetic-google-token',
+    challenge_id: googleChallenge.challenge_id,
+  })
+})
+it('requests a new challenge after a rejected Google credential', async () => {
+  let challenges = 0
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      if (request.url.endsWith('/google/challenge')) {
+        challenges += 1
+        return Response.json(googleChallenge)
+      }
+      return apiError()
+    }),
+  )
+  show('/sign-in')
+  await userEvent.click(await screen.findByRole('button', { name: 'Continue with Google' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Retry' }))
+  expect(await screen.findByRole('button', { name: 'Continue with Google' })).toBeInTheDocument()
+  expect(challenges).toBe(2)
 })

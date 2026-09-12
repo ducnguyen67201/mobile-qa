@@ -67,6 +67,12 @@ export const zEnvironmentCheck = z.object({
     state: zCheckState
 });
 
+export const zGoogleLoginChallenge = z.object({
+    challenge_id: z.uuid(),
+    client_id: z.string(),
+    nonce: z.string()
+});
+
 export const zHealthStatus = z.enum(['ok']);
 
 export const zHealthResponse = z.object({
@@ -76,8 +82,8 @@ export const zHealthResponse = z.object({
 });
 
 export const zLoginRequest = z.object({
-    email: z.string(),
-    password: z.string()
+    challenge_id: z.uuid(),
+    credential: z.string().min(1).max(16384)
 });
 
 export const zLogoutResponse = z.object({
@@ -351,6 +357,15 @@ export const zUpdateEnvironmentPath = z.object({
  * Success
  */
 export const zUpdateEnvironmentResponse = zEnvironmentResponse;
+
+export const zStartGoogleSignInHeaders = z.object({
+    'X-Mobile-QA-Request': z.string()
+});
+
+/**
+ * Success
+ */
+export const zStartGoogleSignInResponse = zGoogleLoginChallenge;
 
 export const zLoginBody = zLoginRequest;
 

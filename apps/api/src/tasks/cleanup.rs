@@ -2,7 +2,7 @@
 use crate::{
     config::Setup,
     errors::ApiResult,
-    models::_entities::{build_uploads, builds, login_attempts, sessions},
+    models::_entities::{build_uploads, builds, google_login_challenges, login_attempts, sessions},
 };
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
@@ -16,6 +16,12 @@ pub async fn execute(ctx: &AppContext, apply: bool) -> ApiResult<usize> {
     let setup = Setup::get(ctx);
     let cutoff = Utc::now() - Duration::hours(1);
     let mut candidates = 0;
+    if apply {
+        google_login_challenges::Entity::delete_many()
+            .filter(google_login_challenges::Column::ExpiresAt.lt(Utc::now()))
+            .exec(&ctx.db)
+            .await?;
+    }
     // Inventory is scoped to each expired upload prefix, never the entire bucket. The row
     // lock serializes against completion; a full safety hour outlives transfer/validator leases.
     let rows = build_uploads::Entity::find()

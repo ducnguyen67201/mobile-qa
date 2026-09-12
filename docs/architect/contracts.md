@@ -62,10 +62,10 @@ See [roadmap concurrency](implementation/00-master-spec.md#concurrent-execution-
 
 ## Spec 03 browser boundary
 
-`crates/contracts/src/browser.rs` owns all 15 operations for health, cookie sessions,
+`crates/contracts/src/browser.rs` owns all 16 operations for health, cookie sessions,
 apps/environments, upload intake/completion, build history and Settings. Every API
 error includes a generated request ID matching `X-Request-ID`; API responses use
-`Cache-Control: no-store`. Login requires a same-origin request and
+`Cache-Control: no-store`. Google challenge creation and credential exchange require a same-origin request and
 `X-Mobile-QA-Request: 1`; other mutations require the session's `X-CSRF-Token`.
 The cookie is HttpOnly/SameSite Strict, `mobile_qa_session` locally and
 `__Host-mobile_qa_session` with Secure in production. Raw JWTs are never response DTOs.
@@ -81,3 +81,11 @@ transport path. Worker contracts and generated Pydantic are unchanged.
 The pinned Hey API header/binary adaptations are documented in [dependencies](dependencies.md).
 They preserve generated validation and transport ownership; consumers do not cast JSON
 numbers into BigInt or substitute handwritten upload bodies/endpoints.
+
+Google sign-in uses POST `/api/auth/google/challenge` (`GoogleLoginChallenge`) and
+POST `/api/auth/google/login` (`LoginRequest`: credential plus challenge UUID).
+The challenge response includes the public client ID and nonce. Its separate
+HttpOnly cookie binds the browser; challenge consumption prevents replay. Google
+signature/issuer/audience/expiry/nonce verification precedes account linking and
+session issuance. `/api/auth/login` no longer exists. Google tokens never appear in
+session DTOs or persistent browser storage. All changes use the Rust→OpenAPI pipeline.

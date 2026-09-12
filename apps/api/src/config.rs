@@ -16,8 +16,7 @@ pub struct Setup {
     pub sdk: PathBuf,
     pub storage_backend: String,
     pub store: Arc<crate::storage::ArtifactStore>,
-    pub hashing: Arc<Semaphore>,
-    pub dummy_password_hash: String,
+    pub google: Option<Arc<crate::services::google::Google>>,
     pub transfers: Arc<Semaphore>,
     pub validators: Arc<Semaphore>,
     pub archives: Arc<Semaphore>,
@@ -41,12 +40,20 @@ impl Setup {
         let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
         let origin = if production {
             ctx.config.server.host.clone()
+        } else if matches!(ctx.environment, Environment::Development) {
+            std::env::var("MOBILE_QA_DEV_ORIGIN")
+                .unwrap_or_else(|_| "http://127.0.0.1:5173".to_owned())
         } else {
             "http://127.0.0.1:5173".to_owned()
         };
         let origin_url = url::Url::parse(&origin).map_err(loco_rs::Error::wrap)?;
         if production && origin_url.scheme() != "https" {
             return Err(loco_rs::Error::string("production HOST must use HTTPS"));
+        }
+        if !production && !matches!(origin_url.host_str(), Some("localhost" | "127.0.0.1")) {
+            return Err(loco_rs::Error::string(
+                "development origin must use loopback",
+            ));
         }
         let root = if matches!(ctx.environment, Environment::Test) {
             repo.join(".private/test-artifacts").join(
@@ -78,8 +85,8 @@ impl Setup {
                 "local".into()
             },
             store: Arc::new(store),
-            dummy_password_hash: loco_rs::hash::hash_password(&loco_rs::hash::random_string(64))?,
-            hashing: Arc::new(Semaphore::new(4)),
+            google: crate::services::google::Google::from_environment(&ctx.environment)?
+                .map(Arc::new),
             transfers: Arc::new(Semaphore::new(2)),
             validators: Arc::new(Semaphore::new(1)),
             archives: Arc::new(Semaphore::new(1)),

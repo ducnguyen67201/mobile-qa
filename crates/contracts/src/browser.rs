@@ -83,8 +83,17 @@ pub struct ApiError {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LoginRequest {
-    pub email: String,
-    pub password: String,
+    #[schema(min_length = 1, max_length = 16384)]
+    pub credential: String,
+    pub challenge_id: Uuid,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GoogleLoginChallenge {
+    pub challenge_id: Uuid,
+    pub client_id: String,
+    pub nonce: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -329,7 +338,27 @@ responses((status = 200, description = "Success", body = HealthResponse),
 #[allow(dead_code)]
 fn endpoint_0() {}
 
-#[utoipa::path(post, path = "/api/auth/login", operation_id = "login",
+#[utoipa::path(post, path = "/api/auth/google/challenge", operation_id = "startGoogleSignIn",
+params(("X-Mobile-QA-Request" = String, Header)),
+responses((status = 200, description = "Success", body = GoogleLoginChallenge),
+(status = 400, description = "API error", body = ApiError),
+(status = 401, description = "API error", body = ApiError),
+(status = 403, description = "API error", body = ApiError),
+(status = 404, description = "API error", body = ApiError),
+(status = 408, description = "API error", body = ApiError),
+(status = 409, description = "API error", body = ApiError),
+(status = 410, description = "API error", body = ApiError),
+(status = 413, description = "API error", body = ApiError),
+(status = 415, description = "API error", body = ApiError),
+(status = 422, description = "API error", body = ApiError),
+(status = 429, description = "API error", body = ApiError),
+(status = 500, description = "API error", body = ApiError),
+(status = 503, description = "API error", body = ApiError),
+(status = "default", description = "API error", body = ApiError)))]
+#[allow(dead_code)]
+fn endpoint_15() {}
+
+#[utoipa::path(post, path = "/api/auth/google/login", operation_id = "login",
 params(("X-Mobile-QA-Request" = String, Header)),
 request_body(content = LoginRequest, content_type = "application/json"),
 responses((status = 200, description = "Success", body = SessionResponse),
@@ -643,7 +672,8 @@ fn endpoint_14() {}
         endpoint_11,
         endpoint_12,
         endpoint_13,
-        endpoint_14
+        endpoint_14,
+        endpoint_15
     ),
     components(schemas(
         HealthStatus,
@@ -656,6 +686,7 @@ fn endpoint_14() {}
         HealthResponse,
         ApiError,
         LoginRequest,
+        GoogleLoginChallenge,
         UserIdentity,
         OrganizationMembership,
         SessionResponse,
@@ -700,7 +731,13 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
 /// Route agreement inventory, shared with integration tests.
 pub const OPERATIONS: &[(&str, &str, &str, u16)] = &[
     ("get", "/api/health", "getHealth", 200),
-    ("post", "/api/auth/login", "login", 200),
+    ("post", "/api/auth/google/login", "login", 200),
+    (
+        "post",
+        "/api/auth/google/challenge",
+        "startGoogleSignIn",
+        200,
+    ),
     ("get", "/api/auth/session", "getSession", 200),
     ("post", "/api/auth/logout", "logout", 200),
     ("get", "/api/apps", "listApps", 200),

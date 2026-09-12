@@ -3,15 +3,16 @@
 This is API integration evidence, not rendered browser acceptance or device evidence.
 No Doppler, customer account, cloud artifact or database reset is involved.
 """
+import base64
 import hashlib
 import http.cookiejar
 import json
 import os
 import re
-import secrets
 import signal
 import socket
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -45,12 +46,35 @@ def request(opener, method, path, data=None, csrf=None, content_type="applicatio
 
 def provision(env):
     email = f"{uuid.uuid4()}@smoke.invalid"
-    password = secrets.token_urlsafe(32)
-    result = subprocess.run([str(BINARY), "task", "operator", "action:provision", f"email:{email}", "name:Synthetic smoke", "organization:Synthetic smoke", "--environment", "test"], cwd=ROOT / "apps/api", env={**env, "MOBILE_QA_OPERATOR_PASSWORD": password}, capture_output=True, text=True, check=True, timeout=30)
+    subject = str(uuid.uuid4())
+    result = subprocess.run([str(BINARY), "task", "operator", "action:provision", f"email:{email}", "name:Synthetic smoke", "organization:Synthetic smoke", "--environment", "test"], cwd=ROOT / "apps/api", env=env, capture_output=True, text=True, check=True, timeout=30)
     match = re.search(r"user_id=([0-9a-f-]+) organization_id=([0-9a-f-]+)", result.stdout)
     if not match:
         raise RuntimeError("Provisioning did not return account identifiers")
-    return {"email": email, "password": password}, match[2]
+    return {"email": email, "subject": subject}, match[2]
+
+
+def b64(value):
+    return base64.urlsafe_b64encode(value).rstrip(b"=").decode()
+
+
+@contextmanager
+def google_fixture():
+    """Ephemeral RSA fixture keys; the API accepts these only in Environment::Test."""
+    with tempfile.TemporaryDirectory(prefix="mobile-qa-google-test-") as directory:
+        key = Path(directory) / "key.pem"
+        subprocess.run(["openssl", "genpkey", "-algorithm", "RSA", "-pkeyopt", "rsa_keygen_bits:2048", "-pkeyopt", "rsa_keygen_pubexp:65537", "-out", str(key)], capture_output=True, check=True)
+        modulus = subprocess.run(["openssl", "rsa", "-in", str(key), "-noout", "-modulus"], capture_output=True, text=True, check=True).stdout.strip().split("=", 1)[1]
+        jwks = {"keys": [{"kty": "RSA", "kid": "synthetic", "alg": "RS256", "use": "sig", "n": b64(bytes.fromhex(modulus)), "e": "AQAB"}]}
+        yield key, json.dumps(jwks)
+
+
+def google_sign_in(opener, key, credentials):
+    challenge = request(opener, "POST", "/api/auth/google/challenge")
+    claims = {"iss": "https://accounts.google.com", "aud": "synthetic.apps.googleusercontent.com", "exp": int(time.time()) + 300, "sub": credentials["subject"], "email": credentials["email"], "email_verified": True, "hd": "smoke.invalid", "nonce": challenge["nonce"]}
+    unsigned = b64(json.dumps({"alg": "RS256", "kid": "synthetic", "typ": "JWT"}).encode()) + "." + b64(json.dumps(claims).encode())
+    signature = subprocess.run(["openssl", "dgst", "-sha256", "-sign", str(key)], input=unsigned.encode(), capture_output=True, check=True).stdout
+    return request(opener, "POST", "/api/auth/google/login", {"credential": unsigned + "." + b64(signature), "challenge_id": challenge["challenge_id"]})
 
 
 @contextmanager
@@ -78,12 +102,13 @@ def server(env):
 def main():
     os.umask(0o077)
     env = {**os.environ, "MOBILE_QA_TEST_SCOPE": str(uuid.uuid4())}
-    with database():
+    with google_fixture() as (key, jwks), database():
+        env.update({"GOOGLE_CLIENT_ID": "synthetic.apps.googleusercontent.com", "MOBILE_QA_TEST_GOOGLE_JWKS": jwks})
         credentials, org = provision(env)
         other, _ = provision(env)
         with server(env):
             owner = client()
-            session = request(owner, "POST", "/api/auth/login", credentials)
+            session = google_sign_in(owner, key, credentials)
             csrf = session["csrf_token"]
             app = request(owner, "POST", "/api/apps", {"organization_id": org, "name": "Synthetic intake smoke", "android_package": "com.mobileqa.fixture", "environment_name": "Staging", "backend_origins": ["https://staging.smoke.invalid"], "login_origins": []}, csrf)
             base = f"/api/apps/{app['id']}"
@@ -104,7 +129,7 @@ def main():
             assert request(owner, "POST", upload_path + "/complete", csrf=csrf)["id"] == build["id"]
             request(owner, "POST", "/api/auth/logout", csrf=csrf)
             foreign = client()
-            request(foreign, "POST", "/api/auth/login", other)
+            google_sign_in(foreign, key, other)
             try:
                 request(foreign, "GET", base + "/builds/" + build["id"])
                 raise AssertionError("Cross-organization build leaked")
@@ -113,7 +138,7 @@ def main():
         # Restart the API, re-run migrations non-destructively, and get the persisted build.
         with server(env):
             fresh = client()
-            request(fresh, "POST", "/api/auth/login", credentials)
+            google_sign_in(fresh, key, credentials)
             restored = request(fresh, "GET", base + "/builds/" + build["id"])
             assert restored == build
             assert request(fresh, "GET", base + "/builds")["items"][0]["id"] == build["id"]

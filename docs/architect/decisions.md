@@ -33,3 +33,13 @@ owns drawers, focus handling, menus, forms, responsive shell and table behavior;
 `apps/web/src/theme.ts` owns product tokens/defaults and `index.css` owns the few
 product surface styles. Do not introduce a second local primitive kit or class-string
 variant system. The earlier shadcn plan/reviews remain historical snapshots.
+
+## Google-only identity (2026-09-12)
+
+Use Google Identity Services as the only sign-in provider. Retain Loco HMAC app
+sessions, revocation, CSRF/origin checks and tenant grants. Verify Google assertions
+with jsonwebtoken RS256 and Google's cached JWKS; never use tokeninfo for production
+validation. Account identity is Google `sub`. Auto-link invited email only when Google
+is authoritative (verified Gmail/Workspace); otherwise require explicit operator
+linking. No public auto-registration is introduced. The follow-up migration removes
+password hashes and revokes old sessions without removing product data.

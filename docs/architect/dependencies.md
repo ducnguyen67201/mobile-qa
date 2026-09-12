@@ -60,7 +60,7 @@ package. Exact resolutions are in pnpm-lock.yaml. Official integration reference
 [disclosure state](https://mantine.dev/hooks/use-disclosure/),
 [form state](https://mantine.dev/form/use-form/).
 
-Rust uses Loco 1.1.0's auth/hash/JWT and S3 storage driver, SeaORM entities/migrations,
+Rust uses Loco 1.1.0's app-session JWT and S3 storage driver, SeaORM entities/migrations,
 Axum multipart/cookies, SHA-256 and ZIP 8.6.0 for bounded archive checks. Concrete
 versions are in Cargo.lock. No new worker dependencies or handwritten Android parser.
 
@@ -85,9 +85,20 @@ covered by real generated-client transport tests, including multipart serializat
 
 The 2026-09-12 RustSec audit reports `RUSTSEC-2023-0071` in transitive `rsa 0.9.10`,
 introduced by Loco auth → jsonwebtoken's `rust_crypto` feature. There is no patched
-version in the inspected advisory database. This app uses Loco's HMAC-only JWT API
-(HS512 default) and never invokes RSA private-key operations; the vulnerable signing/
-decryption path is outside this authentication flow. The dependency audit is therefore
-**not clean**, and the upstream advisory remains tracked rather than suppressed.
-Reassess it before introducing asymmetric keys or changing auth providers. See
+version in the inspected advisory database. App sessions use Loco's HMAC JWT API
+(HS512 default); Google identities use RSA public-key verification. Production does
+not invoke RSA private-key signing/decryption. The dependency audit is **not clean**,
+and the upstream advisory remains tracked rather than suppressed. Reassess it before
+introducing production private-key operations. See
 [RustSec advisory](https://rustsec.org/advisories/RUSTSEC-2023-0071.html).
+
+## Google identity
+
+`@react-oauth/google` 0.12.2 wraps the official GIS sign-in control. jsonwebtoken
+10.4.0 verifies Google RS256 tokens; reqwest 0.12 fetches the fixed JWKS URL with a
+timeout and bounded cache. Production performs RSA **public-key verification**, not
+RSA signing/decryption. The tracked RSA advisory remains open; test fixtures use
+only ephemeral synthetic signing material. No actual Google account/token is used
+by automated tests. References: [Google verification](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token),
+[Google setup](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid),
+[React wrapper](https://github.com/MomenSherif/react-oauth).

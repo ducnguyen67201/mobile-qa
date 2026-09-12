@@ -100,12 +100,13 @@ isolation. It does not inspect a rendered browser or reset a database.
 Run explicit Loco tasks from `apps/api` with process injection appropriate to the
 environment, for example `doppler run --no-fallback --forward-signals --
 ../../target/debug/mobile-qa-cli task operator action:provision email:<email>
-name:<name> organization:<name> --environment development`. Inject
-`MOBILE_QA_OPERATOR_PASSWORD`; never place it in the arguments. The task prints only
-new user/org IDs. Other operator actions require `actor:<user-id>` and
+name:<name> organization:<name> --environment development`. This grants access to
+the specified Google email; no password is created. The task prints only new user/org IDs. Other operator actions require `actor:<user-id>` and
 `organization:<org-id>` of an active operator:
 
-- `reset-password user:<id>`: updates the hash and revokes existing sessions.
+- `link-google user:<id> subject:<verified-google-sub>`: explicitly links an unlinked
+  invited account when Google is not authoritative for its email. Verify the Google
+  subject out of band; an existing link cannot be silently reassigned.
 - `membership user:<id> role:member|operator active:true|false`: manage org access.
 - `grant` / `revoke-grant user:<id> app:<id>`: manage explicit member app access.
 - `reference app:<id> kind:account|reset label:<label>`: records an injected
@@ -131,3 +132,26 @@ transient file selection, request phases, cancellation and saved-upload reconcil
 Keep this workflow outside presentation components. Use plain React state for small
 independent values; add memoization/context only when there is a concrete sharing or
 identity requirement. Do not recreate the removed SidebarContext state container.
+
+### Google-only sign-in
+
+Supply `GOOGLE_CLIENT_ID` through Doppler to the API. Register the application origin
+in a Google OAuth **Web application** client. For local Google UI use
+`http://localhost` and `http://localhost:5173` as authorized JavaScript origins,
+set `MOBILE_QA_DEV_ORIGIN=http://localhost:5173`, and open that origin. Production uses
+the configured HTTPS `HOST`. This GIS credential flow needs no client secret or
+OAuth redirect callback. The client ID is public; the API returns it with a one-use
+nonce/challenge and sets a separate HttpOnly browser-binding cookie.
+
+Only invited users can sign in. First-use linking requires a verified Gmail or
+Google Workspace email. Subsequent sign-ins use Google's immutable `sub`, not email.
+For third-party email accounts, use the explicit operator linking procedure above.
+The incremental migration drops password hashes and revokes pre-Google sessions,
+while retaining users, memberships, apps and builds. Rollback cannot recover hashes.
+The old password endpoint and password reset task are removed.
+
+API tests and the HTTP smoke generate ephemeral RSA fixture keys. The public fixture
+key override `MOBILE_QA_TEST_GOOGLE_JWKS` is honored **only** by Environment::Test;
+development/production always fetch Google's fixed JWKS endpoint. No test private
+key or real Google token is committed. Real Google consent/origin configuration and
+rendered browser acceptance still require operator setup and permitted browser access.

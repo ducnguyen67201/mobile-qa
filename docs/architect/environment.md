@@ -94,8 +94,16 @@ records. Dev artifacts live in ignored `.private/artifacts`; production scratch 
 is ignored `.private/android-sdk`. `JAVA_HOME` must select JDK 17. Validators receive
 only this Java location plus a fixed PATH/locale, never the API secret environment.
 
-Operator tasks consume `MOBILE_QA_OPERATOR_PASSWORD` or `MOBILE_QA_SECRET_LOCATOR`
-only when needed. Passwords and locator values must not appear in task arguments.
-Local synthetic smoke passes generated credentials directly in its subprocess
-environment. `MOBILE_QA_TEST_SCOPE` is a test-only UUID that lets the owned HTTP
+Operator reference tasks consume `MOBILE_QA_SECRET_LOCATOR` only when needed.
+Locator values must not appear in task arguments. Google-only sign-in has no local
+password, password reset task, or operator password environment variable.
+Local synthetic smoke keeps signing keys ephemeral and injects only fixture public
+verification keys into its test API subprocess environment. `MOBILE_QA_TEST_SCOPE` is a test-only UUID that lets the owned HTTP
 smoke process restart against the same private scratch/artifact directory.
+
+Google sign-in requires `GOOGLE_CLIENT_ID`, injected into the API via Doppler. The API
+exposes this public identifier with the browser-bound login challenge; it is not a
+secret. No Google client secret is used. `MOBILE_QA_DEV_ORIGIN` optionally selects a
+loopback origin for Google's localhost registration; tests ignore this override.
+See [Google setup](development.md#google-only-sign-in). Without a configured client,
+Google sign-in returns an explicit unavailable error and offers no password fallback.

@@ -26,7 +26,11 @@ axum-extra = { version = "0.12", features = ["cookie"] }
 zip = { version = "=8.6.0", default-features = false, features = ["deflate"] }
 tokio-util = { version = "0.7", features = ["io"] }
 futures-util = "0.3"
+jsonwebtoken = { version = "=10.4.0", features = ["rust_crypto"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 [dev-dependencies]
+rsa = "=0.9.10"
+rand = "0.8"
 axum-test = "17.3"
 tempfile = "3"
 

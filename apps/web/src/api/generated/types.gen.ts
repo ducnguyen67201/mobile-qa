@@ -112,6 +112,12 @@ export type EnvironmentResponse = {
     secret_references: Array<SecretReferenceSummary>;
 };
 
+export type GoogleLoginChallenge = {
+    challenge_id: string;
+    client_id: string;
+    nonce: string;
+};
+
 export type HealthResponse = {
     service: string;
     status: HealthStatus;
@@ -121,8 +127,8 @@ export type HealthResponse = {
 export type HealthStatus = 'ok';
 
 export type LoginRequest = {
-    email: string;
-    password: string;
+    challenge_id: string;
+    credential: string;
 };
 
 export type LogoutResponse = {
@@ -1025,6 +1031,86 @@ export type UpdateEnvironmentResponses = {
 
 export type UpdateEnvironmentResponse = UpdateEnvironmentResponses[keyof UpdateEnvironmentResponses];
 
+export type StartGoogleSignInData = {
+    body?: never;
+    headers: {
+        'X-Mobile-QA-Request': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/google/challenge';
+};
+
+export type StartGoogleSignInErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type StartGoogleSignInError = StartGoogleSignInErrors[keyof StartGoogleSignInErrors];
+
+export type StartGoogleSignInResponses = {
+    /**
+     * Success
+     */
+    200: GoogleLoginChallenge;
+};
+
+export type StartGoogleSignInResponse = StartGoogleSignInResponses[keyof StartGoogleSignInResponses];
+
 export type LoginData = {
     body: LoginRequest;
     headers: {
@@ -1032,7 +1118,7 @@ export type LoginData = {
     };
     path?: never;
     query?: never;
-    url: '/api/auth/login';
+    url: '/api/auth/google/login';
 };
 
 export type LoginErrors = {

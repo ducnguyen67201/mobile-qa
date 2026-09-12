@@ -1,36 +1,24 @@
-import { useForm } from '@mantine/form'
-import { Box, Button, Center, Divider, Group, Stack, Text, TextInput, ThemeIcon, Title } from '@mantine/core'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useLocation, useNavigate } from 'react-router'
-import { ArrowRight, Layers3, ShieldCheck, Smartphone } from 'lucide-react'
-import { signIn, sessionQuery } from '@/api/setup'
+import {
+  Alert,
+  Box,
+  Button,
+  Center,
+  Divider,
+  Group,
+  Loader,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core'
+import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google'
+import { Layers3, ShieldCheck, Smartphone } from 'lucide-react'
 import { ErrorNotice } from '@/components/app/feedback'
+import { useGoogleSignIn } from '@/hooks/use-google-sign-in'
+export { safeReturnTo } from '@/lib/navigation'
 
-export function safeReturnTo(value: unknown) {
-  return typeof value === 'string' &&
-    /^\/(apps(?:\/|\?|$)|settings(?:\?|$)|tests(?:\?|$)|runs(?:\?|$))/.test(value) &&
-    !value.includes('\\')
-    ? value
-    : '/apps'
-}
 export function SignIn() {
-  const form = useForm({
-    initialValues: { email: '', password: '' },
-    transformValues: (values) => ({ email: values.email.trim(), password: values.password }),
-  })
-  const client = useQueryClient()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const login = useMutation({
-    mutationFn: signIn,
-    onSuccess: (session) => {
-      client.clear()
-      client.setQueryData(sessionQuery.queryKey, session)
-      form.setFieldValue('password', '')
-      void navigate(safeReturnTo(location.state?.returnTo), { replace: true })
-    },
-  })
-
+  const { challenge, login, providerError, setProviderError, acceptCredential, retry } = useGoogleSignIn()
   return (
     <main className="sign-in">
       <Stack component="section" visibleFrom="md" p={56} justify="space-between" className="sign-in-story">
@@ -83,45 +71,57 @@ export function SignIn() {
             Welcome back.
           </Title>
           <Text size="sm" c="dimmed" mt="sm">
-            Sign in to manage your apps and builds.
+            Use your Google account to manage your apps and builds.
           </Text>
-          <form onSubmit={form.onSubmit((values) => login.mutate(values))}>
-            <Stack gap="lg" mt={36}>
-              <TextInput
-                label="Email address"
-                type="email"
-                autoComplete="username"
-                required
-                withAsterisk={false}
-                {...form.getInputProps('email')}
-                placeholder="you@company.com"
-                size="md"
-              />
-              <TextInput
-                label="Password"
-                type="password"
-                autoComplete="current-password"
-                required
-                withAsterisk={false}
-                {...form.getInputProps('password')}
-                size="md"
-              />
-              {login.isError && <ErrorNotice focus error={login.error} title="Unable to sign in" />}
-              <Button
-                type="submit"
-                size="md"
-                fullWidth
-                disabled={login.isPending}
-                rightSection={<ArrowRight size={18} />}
-              >
-                {login.isPending ? 'Signing in…' : 'Sign in'}
-              </Button>
-            </Stack>
-          </form>
+          <Stack gap="lg" mt={36}>
+            {challenge.isPending || challenge.isFetching ? (
+              <Group role="status">
+                <Loader size="sm" />
+                <Text size="sm">Preparing Google sign-in…</Text>
+              </Group>
+            ) : challenge.isError ? (
+              <ErrorNotice error={challenge.error} title="Google sign-in is unavailable" retry={retry} />
+            ) : login.isPending ? (
+              <Group role="status">
+                <Loader size="sm" />
+                <Text size="sm">Signing in…</Text>
+              </Group>
+            ) : login.isError ? (
+              <ErrorNotice focus error={login.error} title="Unable to sign in" retry={retry} />
+            ) : providerError ? (
+              <Alert color="red" title="Unable to sign in">
+                <Text size="sm">{providerError}</Text>
+                <Button variant="outline" mt="sm" onClick={retry}>
+                  Try again
+                </Button>
+              </Alert>
+            ) : (
+              challenge.data && (
+                <GoogleOAuthProvider
+                  key={challenge.data.challenge_id}
+                  clientId={challenge.data.client_id}
+                  onScriptLoadError={() =>
+                    setProviderError('Google sign-in could not load. Check your connection and try again.')
+                  }
+                >
+                  <GoogleLogin
+                    nonce={challenge.data.nonce}
+                    text="continue_with"
+                    size="large"
+                    theme="outline"
+                    onSuccess={(response) => acceptCredential(response.credential)}
+                    onError={() =>
+                      setProviderError('Google sign-in was canceled or could not complete. Please try again.')
+                    }
+                  />
+                </GoogleOAuthProvider>
+              )
+            )}
+          </Stack>
           <Divider my="xl" />
           <Text size="xs" c="dimmed">
-            Pilot access is provisioned by your workspace operator. Contact them if you need an account or
-            password assistance.
+            Google sign-in is the only sign-in method. Your workspace operator manages access; use the Google
+            account they invited.
           </Text>
         </Box>
       </Center>

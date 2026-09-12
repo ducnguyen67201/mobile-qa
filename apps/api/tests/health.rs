@@ -11,7 +11,7 @@ use sea_orm::{ConnectionTrait, DbBackend, Statement};
 async fn registered_handler_agrees_with_openapi_and_database() {
     let spec = serde_json::to_value(browser::openapi()).unwrap();
     let paths = spec["paths"].as_object().unwrap();
-    assert_eq!(paths.len(), 14);
+    assert_eq!(paths.len(), 15);
     let operation = &paths[HEALTH_PATH]["get"];
     assert_eq!(operation["operationId"], "getHealth");
     assert!(operation.get("requestBody").is_none());

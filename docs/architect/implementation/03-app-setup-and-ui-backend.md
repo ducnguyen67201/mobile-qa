@@ -13,7 +13,7 @@ An authenticated user creates an app, uploads a test APK and sees the actual APK
 
 ## Ordered work
 
-1. **Auth and shell:** add authentication using the pinned framework's supported facilities (the foundation deliberately omitted auth), then add organization/project membership enforcement, and build the App / Tests / Runs / Settings navigation. Use an operator-provisioned pilot account initially; public registration and complex invitation flows can wait.
+1. **Auth and shell:** add Google-only sign-in with verified Google identity tokens and framework-issued app sessions, then add organization/project membership enforcement, and build the App / Tests / Runs / Settings navigation. Use an operator-provisioned pilot account initially; public registration and complex invitation flows can wait.
 2. **Create app:** migration and Rust service → typed create/detail endpoints → form and persisted detail page. Required fields: name, Android package, test-environment name and permitted backend/login origins. Package identity is checked against uploaded APK metadata.
 3. **Upload build:** private upload session → file transfer → explicit finalization → APK metadata/checksum validation → displayed build record. Retry finalization idempotently. A file visible in storage is not automatically an accepted build.
 4. **Configure test access:** store secret references and readiness metadata, display masked status, and let the operator verify the test account/reset path. Test definitions contain references, not credentials.
@@ -80,7 +80,7 @@ Done means genuine persisted setup with honest readiness, not a polished static 
 
 ## Implementation work (2026-09-12)
 
-Source authoring on `codex/03-app-setup` now covers the operator-created cookie
+Source authoring on `codex/03-app-setup` now covers the Google-authenticated cookie
 session, org/app scoping, app/environment records, immutable private upload attempts,
 real Android validation, build history, operator reference/observation commands and
 Mantine dashboard. The first product schema is one atomic SeaORM migration rather than
@@ -93,3 +93,13 @@ This is provisional craft/accessibility evidence, not rendered quality verificat
 Consolidated generation, static/API/DOM checks, builds and HTTP smoke passed; evidence
 is recorded in [status](../status.md) and the PRP report. Hosted
 Railway round-trip, allowed rendered acceptance and later device checks remain open.
+
+## Google-only authentication correction
+
+The accepted sign-in method is Google only. GIS renders the sign-in control; the
+backend verifies RS256 signature, issuer, audience, expiry, verified email and the
+one-use browser-bound nonce before issuing the app session. Local passwords and
+reset-password flows are removed. Existing operator-managed membership grants are
+preserved; public workspace registration remains deferred. Migration 000002 preserves
+product records, removes password hashes and revokes earlier sessions. Real Google
+client registration and consent remain an explicit acceptance gate.

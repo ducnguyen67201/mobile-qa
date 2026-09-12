@@ -3,7 +3,7 @@
 ## Summary
 
 Implemented the first persisted workflow on `codex/03-app-setup`: an operator-created
-user signs in, creates an Android app/environment, uploads a private APK and sees
+user signs in with Google, creates an Android app/environment, uploads a private APK and sees
 validation of its actual stored bytes plus persisted metadata/history. The dashboard
 uses packaged Mantine 9.6.1 components following user feedback about maintaining
 copied shadcn/Tailwind source. A fresh source-only review passed. Local
@@ -44,28 +44,28 @@ The user subsequently requested publishing this branch as a pull request.
 | Check | Result | Evidence |
 |---|---|---|
 | Rust format / Clippy | Pass | Workspace/all targets, warnings denied |
-| Rust tests | Pass | 5 API units, 5 app-setup integration tests, 1 health route test, 4 pure contract tests |
+| Rust tests | Pass | 5 API units, 6 app-setup integration tests, 1 health route test, 4 pure contract tests |
 | TypeScript / ESLint | Pass | Full web scope |
-| Web tests | Pass | 56 tests across 5 files |
+| Web tests | Pass | 57 tests across 5 files |
 | Generated drift | Pass | No changed outputs after final locked tools installed |
 | Exporter synchronization regression | Pass | 1 Python helper test |
 | Builds | Pass | Cargo workspace and Vite production |
 | Real APK HTTP smoke | Pass | Sign in/create/stream/finalize; independent size/hash; foreign-org denial; same persisted build after API restart |
 | Foundation smoke | Pass | API direct/proxy health, unknown route, migration bookkeeping, fake scenarios and network-blocked Minitap import |
 | Frontend dependency audit | Pass | No known advisories |
-| Rust dependency audit | Finding retained | RUSTSEC-2023-0071 in transitive rsa 0.9.10; HMAC-only auth flow does not invoke RSA private-key operations |
+| Rust dependency audit | Finding retained | RUSTSEC-2023-0071 in transitive rsa 0.9.10; app sessions use HMAC; Google uses RSA public-key verification, with no production RSA private-key operations |
 | GAN design | Provisional source pass | Mantine source review passed; historical shadcn scores 7.27 → 7.87 |
 | Rendered browser acceptance | Open | Existing admin-policy denial; no bypass attempted |
 | Railway round-trip | Open | Adapter implemented, no authorized bucket credentials/provisioning used |
 
-Measured locally: 0.145s finalization of a tiny signed synthetic resource-only APK;
-0.621s warm API startup in the foundation smoke. These are not production SLAs or
-customer APK performance claims. Main web chunk is 749.13 kB / 227.28 kB gzip, yielding
+Measured locally: 0.147s finalization of a tiny signed synthetic resource-only APK;
+0.211s warm API startup in the foundation smoke. These are not production SLAs or
+customer APK performance claims. Main web chunk is 752.46 kB / 228.30 kB gzip, yielding
 a nonblocking Vite size warning. No worker implementation or generated-worker diff.
 
 ## Behavior and test coverage
 
-The real route suite covers all 15 declared operations and safe error envelopes;
+The real route suite covers all 16 declared operations and safe error envelopes;
 login/cookie/session/logout, origin/CSRF rejection, malformed body/UUID/query limits,
 active same-org ungranted and foreign-org denial, disabled/expired/revoked sessions,
 login throttling, app conflicts, upload quota/size mismatch/expiry, stale receiver
@@ -274,3 +274,31 @@ Both affected suites (24 tests) passed again after that fix. TypeScript, ESLint,
 production build, clean dependency audit and diff whitespace checks pass. The
 nonblocking main chunk warning remains (749.13 kB / 227.28 kB gzip). Browser acceptance
 is unchanged and no backend/contract changes were required.
+
+## Google-only sign-in correction (2026-09-12)
+
+Google Identity Services is the only sign-in method. The generated API contract now
+includes a browser-bound one-use challenge and credential exchange. The API checks
+RS256 signatures against Google's fixed public key endpoint, issuer, audience,
+expiry, nonce and verified email. Existing invitations link automatically only when
+Google is authoritative for the email; subsequent logins use Google's immutable sub.
+Other Google email identities require explicit operator linking. No public signup
+policy was introduced.
+
+The second versioned SeaORM migration removes password hashes and revokes old
+sessions without deleting apps or build history. The old password endpoint and reset
+command are removed. The Mantine sign-in page uses the official Google control,
+TanStack Query and a dedicated useGoogleSignIn hook, including retry and failure
+states. Tests use ephemeral RSA fixture keys accepted only by the test environment.
+
+Google OAuth client/origin setup and real Google consent remain open acceptance
+requirements. Supply GOOGLE_CLIENT_ID to the API through Doppler; no client secret
+is needed. See the canonical development guide. No cloud configuration was changed.
+
+Follow-up verification passes: 57 web tests, 16 Rust tests, generated drift,
+TypeScript/ESLint, Rust format/Clippy, both builds, APK HTTP smoke with synthetic
+Google assertions and restart persistence, and foundation smoke. The Java launcher
+initially selected Java 8; selecting the installed Homebrew JDK 17 fixed the two APK
+checks. The health contract path-count assertion was updated for the new challenge
+route. Only failed or invalidated checks were repeated. Frontend audit is clean;
+RustSec still reports RUSTSEC-2023-0071.

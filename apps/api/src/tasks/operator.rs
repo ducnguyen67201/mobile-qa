@@ -2,8 +2,7 @@
 use crate::{
     errors::{ApiFailure, ApiResult},
     models::_entities::{
-        app_memberships, environment_checks, environments, memberships, secret_references,
-        sessions, users,
+        app_memberships, environment_checks, environments, memberships, secret_references, users,
     },
     services::{apps, auth},
 };
@@ -35,7 +34,6 @@ pub async fn execute(ctx: &AppContext, vars: &Vars) -> ApiResult<()> {
         let (user, org) = auth::provision(
             ctx,
             arg(vars, "email")?,
-            &secret("MOBILE_QA_OPERATOR_PASSWORD")?,
             arg(vars, "name")?,
             arg(vars, "organization")?,
         )
@@ -58,35 +56,26 @@ pub async fn execute(ctx: &AppContext, vars: &Vars) -> ApiResult<()> {
         ));
     }
     match action {
-        "reset-password" => {
+        "link-google" => {
             let user = id(vars, "user")?;
             apps::membership(ctx, user, org).await?;
-            let password = secret("MOBILE_QA_OPERATOR_PASSWORD")?;
-            if !(12..=1024).contains(&password.len()) {
-                return Err(ApiFailure::invalid("Password must contain 12–1024 bytes"));
-            }
-            let hash = tokio::task::spawn_blocking(move || loco_rs::hash::hash_password(&password))
-                .await
-                .map_err(|_| ApiFailure::internal())?
-                .map_err(|_| ApiFailure::internal())?;
-            let tx = ctx.db.begin().await?;
-            users::Entity::update_many()
+            let subject = apps::text(arg(vars, "subject")?, 255, "Google subject")?;
+            let result = users::Entity::update_many()
                 .col_expr(
-                    users::Column::PasswordHash,
-                    sea_orm::sea_query::Expr::value(hash),
+                    users::Column::GoogleSubject,
+                    sea_orm::sea_query::Expr::value(subject),
                 )
                 .filter(users::Column::Id.eq(user))
-                .exec(&tx)
+                .filter(users::Column::GoogleSubject.is_null())
+                .exec(&ctx.db)
                 .await?;
-            sessions::Entity::update_many()
-                .col_expr(
-                    sessions::Column::RevokedAt,
-                    sea_orm::sea_query::Expr::value(Utc::now()),
-                )
-                .filter(sessions::Column::UserId.eq(user))
-                .exec(&tx)
-                .await?;
-            tx.commit().await?;
+            if result.rows_affected != 1 {
+                return Err(ApiFailure::new(
+                    409,
+                    "identity_already_linked",
+                    "Google identity is already linked",
+                ));
+            }
         }
         "membership" => {
             let user = id(vars, "user")?;
@@ -244,7 +233,8 @@ impl Task for Operator {
     fn task(&self) -> TaskInfo {
         TaskInfo {
             name: "operator".into(),
-            detail: "Explicit provision/reset/membership/grant/reference/observe operations".into(),
+            detail: "Explicit provision/link-google/membership/grant/reference/observe operations"
+                .into(),
         }
     }
     async fn run(&self, ctx: &AppContext, vars: &Vars) -> loco_rs::Result<()> {

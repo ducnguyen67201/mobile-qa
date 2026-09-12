@@ -60,7 +60,7 @@ Current implementation reports are linked below; this remains the canonical stat
 
 ## Spec 03 implementation evidence (2026-09-12)
 
-Implemented: operator-created cookie sessions with revocation/origin/CSRF controls;
+Implemented: Google-only sign-in and app cookie sessions with revocation/origin/CSRF controls;
 tenant-scoped apps/environments; private local storage and a hosted S3-compatible
 adapter; real bounded Android metadata/signature validation; immutable persisted build
 history; Mantine dashboard; explicit reference/observation/cleanup tasks.
@@ -87,7 +87,7 @@ useDisclosure/useForm with a dedicated useApkUpload workflow hook; generated tra
 and server reconciliation remain authoritative. No browser was
 opened. Vite retains a nonblocking chunk warning (749.13 kB / 227.28 kB gzip main JS;
 235.58 kB / 34.68 kB gzip CSS). RustSec flags unpatched transitive `rsa` advisory RUSTSEC-2023-0071;
-Loco auth here uses only HMAC JWT operations. See [dependencies](dependencies.md).
+App sessions use HMAC JWTs; Google identities use RSA public-key verification. See [dependencies](dependencies.md).
 
 Hosted acceptance still requires authorized Railway bucket/streaming round-trip,
 private access policy, abandoned multipart lifecycle and parser resource isolation
@@ -97,3 +97,25 @@ and overall execution readiness remains false.
 
 Implementation details, deviations and final checks:
 [Spec 03 report](../../.claude/PRPs/reports/03-app-setup-report.md).
+
+### Google-only follow-up (2026-09-12)
+
+Google Identity Services replaces password authentication. A second migration removes
+password hashes and revokes earlier sessions while retaining users and product data.
+Access remains invitation-only. The API verifies the Google signature, issuer,
+audience, expiry, verified email and a one-use browser-bound nonce; linked identities
+use the immutable Google subject. The web uses the official Google button and a
+separate sign-in hook; no password form or reset-password task remains.
+
+Current checks: 57 web tests pass; TypeScript, ESLint, Vite build, Rust format/Clippy
+and generated drift pass. Google route tests cover rejected claims/signatures,
+missing browser binding, replay, expired challenges and unauthorized identities.
+All 16 Rust tests pass. The HTTP smoke completes synthetic Google sign-in, APK
+validation and persisted retrieval after API restart (0.147s fixture finalization);
+foundation smoke passes (0.211s warm API startup). These are local synthetic results. Frontend audit is clean; the existing
+unpatched RSA advisory remains. Main JS is 752.46 kB / 228.30 kB gzip with the existing
+nonblocking size warning. Prior baseline counts above are historical.
+
+Real Google account consent is unverified: configure a Google web client and its
+origins, and inject GOOGLE_CLIENT_ID through Doppler. No Google/cloud configuration
+or browser access was changed during this implementation.

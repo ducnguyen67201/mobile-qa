@@ -5,7 +5,7 @@ use crate::{
     services::{
         apps,
         auth::{self, LoginGuard, Session},
-        uploads,
+        google, uploads,
     },
 };
 use axum::{
@@ -18,13 +18,33 @@ use loco_rs::{app::AppContext, controller::Routes};
 use mobile_qa_contracts::browser::*;
 use uuid::Uuid;
 
+async fn google_challenge(
+    State(ctx): State<AppContext>,
+    guard: LoginGuard,
+    jar: CookieJar,
+) -> ApiResult<(CookieJar, Json<GoogleLoginChallenge>)> {
+    let (response, binding) = google::challenge(&ctx, &guard.network).await?;
+    let setup = Setup::get(&ctx);
+    let cookie = Cookie::build((google::cookie_name(&setup), binding))
+        .path("/")
+        .http_only(true)
+        .secure(setup.secure_cookie)
+        .same_site(SameSite::Strict)
+        .max_age(time::Duration::minutes(10))
+        .build();
+    Ok((jar.add(cookie), Json(response)))
+}
 async fn login(
     State(ctx): State<AppContext>,
     guard: LoginGuard,
     jar: CookieJar,
     Json(input): Json<LoginRequest>,
 ) -> ApiResult<(CookieJar, Json<SessionResponse>)> {
-    let (session, token) = auth::login(&ctx, input, &guard.network).await?;
+    let binding = jar
+        .get(google::cookie_name(&Setup::get(&ctx)))
+        .map(|cookie| cookie.value())
+        .unwrap_or("");
+    let (session, token) = google::login(&ctx, input, binding, &guard.network).await?;
     // Rotate an existing session only after successful credentials; a failed login cannot log out a user.
     let mut parts = axum::http::Request::new(()).into_parts().0;
     if let Some(cookie) = jar.get(Setup::get(&ctx).cookie_name()) {
@@ -189,7 +209,8 @@ async fn settings(
 pub fn routes() -> Routes {
     use axum::routing::{get, patch, post, put};
     Routes::new()
-        .add("/api/auth/login", post(login))
+        .add("/api/auth/google/challenge", post(google_challenge))
+        .add("/api/auth/google/login", post(login))
         .add("/api/auth/session", get(session))
         .add("/api/auth/logout", post(logout))
         .add("/api/apps", get(list_apps).post(create_app))

@@ -11,3 +11,5 @@ pub mod organizations;
 pub mod secret_references;
 pub mod sessions;
 pub mod users;
+
+pub mod google_login_challenges;

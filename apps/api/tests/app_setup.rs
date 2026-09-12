@@ -9,7 +9,7 @@ use mobile_qa::{
     app::App,
     config::Setup,
     models::_entities::{build_uploads, builds, memberships, sessions, users},
-    services::{apps, auth},
+    services::{apps, auth, google},
     tasks,
 };
 use mobile_qa_contracts::browser::*;
@@ -24,7 +24,7 @@ struct Login {
     user: Uuid,
     org: Uuid,
     email: String,
-    password: String,
+    subject: String,
 }
 impl Login {
     fn read(&self, req: TestRequest) -> TestRequest {
@@ -36,27 +36,77 @@ impl Login {
             .add_header("x-csrf-token", &self.csrf)
     }
 }
-async fn login(server: &TestServer, ctx: &AppContext) -> Login {
-    let email = format!("{}@fixture.invalid", Uuid::new_v4());
-    let password = loco_rs::hash::random_string(32);
-    let (user, org) = auth::provision(
-        ctx,
-        &email,
-        &password,
-        "Synthetic operator",
-        "Synthetic organization",
-    )
-    .await
-    .unwrap();
-    let response = server
-        .post("/api/auth/login")
+const GOOGLE_CLIENT: &str = "synthetic.apps.googleusercontent.com";
+fn google_keys() -> &'static (jsonwebtoken::EncodingKey, jsonwebtoken::jwk::JwkSet) {
+    static KEYS: std::sync::OnceLock<(jsonwebtoken::EncodingKey, jsonwebtoken::jwk::JwkSet)> =
+        std::sync::OnceLock::new();
+    KEYS.get_or_init(|| {
+        use base64::Engine;
+        use rsa::{pkcs8::EncodePrivateKey, traits::PublicKeyParts};
+        // Ephemeral signing material exists only in the test process, never in repository fixtures.
+        let key = rsa::RsaPrivateKey::new(&mut rand::rngs::OsRng, 2048).unwrap();
+        let pem = key.to_pkcs8_pem(rsa::pkcs8::LineEnding::LF).unwrap();
+        let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        let jwks = serde_json::json!({"keys":[{"kty":"RSA", "kid":"synthetic", "alg":"RS256", "use":"sig", "n":b64.encode(key.n().to_bytes_be()), "e":b64.encode(key.e().to_bytes_be())}]});
+        (jsonwebtoken::EncodingKey::from_rsa_pem(pem.as_bytes()).unwrap(), serde_json::from_value(jwks).unwrap())
+    })
+}
+fn configure_google(ctx: &AppContext) {
+    let mut setup = Setup::get(ctx);
+    setup.google = Some(std::sync::Arc::new(
+        google::Google::for_test(ctx, GOOGLE_CLIENT.into(), google_keys().1.clone()).unwrap(),
+    ));
+    ctx.shared_store.insert(setup);
+}
+fn google_token(email: &str, subject: &str, nonce: &str, overrides: serde_json::Value) -> String {
+    let mut claims = serde_json::json!({"iss":"https://accounts.google.com", "aud":GOOGLE_CLIENT,
+        "exp":Utc::now().timestamp()+300, "sub":subject, "email":email, "email_verified":true, "nonce":nonce, "hd":"fixture.invalid"});
+    if let Some(fields) = overrides.as_object() {
+        claims.as_object_mut().unwrap().extend(fields.clone());
+    }
+    let mut header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256);
+    header.kid = Some("synthetic".into());
+    jsonwebtoken::encode(&header, &claims, &google_keys().0).unwrap()
+}
+async fn challenge(server: &TestServer) -> (GoogleLoginChallenge, String) {
+    let res = server
+        .post("/api/auth/google/challenge")
         .add_header("origin", ORIGIN)
         .add_header("x-mobile-qa-request", "1")
-        .json(&LoginRequest {
-            email: email.clone(),
-            password: password.clone(),
-        })
         .await;
+    res.assert_status_ok();
+    (
+        res.json(),
+        res.header("set-cookie")
+            .to_str()
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap()
+            .into(),
+    )
+}
+async fn google_login(server: &TestServer, email: &str, subject: &str) -> TestResponse {
+    let (challenge, cookie) = challenge(server).await;
+    server
+        .post("/api/auth/google/login")
+        .add_header("origin", ORIGIN)
+        .add_header("x-mobile-qa-request", "1")
+        .add_header("cookie", cookie)
+        .json(&LoginRequest {
+            credential: google_token(email, subject, &challenge.nonce, serde_json::json!({})),
+            challenge_id: challenge.challenge_id,
+        })
+        .await
+}
+async fn login(server: &TestServer, ctx: &AppContext) -> Login {
+    configure_google(ctx);
+    let email = format!("{}@fixture.invalid", Uuid::new_v4());
+    let subject = Uuid::new_v4().to_string();
+    let (user, org) = auth::provision(ctx, &email, "Synthetic operator", "Synthetic organization")
+        .await
+        .unwrap();
+    let response = google_login(server, &email, &subject).await;
     response.assert_status_ok();
     let cookie = response.header("set-cookie").to_str().unwrap().to_owned();
     assert!(
@@ -72,7 +122,7 @@ async fn login(server: &TestServer, ctx: &AppContext) -> Login {
         user,
         org,
         email,
-        password,
+        subject,
     }
 }
 fn create_input(org: Uuid) -> CreateAppRequest {
@@ -354,15 +404,7 @@ async fn persisted_workflow_auth_scope_and_real_validation() {
         assert!(logout.json::<LogoutResponse>().signed_out);
         error(&owner.read(server.get(&build_path)).await, 401);
         // A fresh cookie/session can retrieve the same persisted record, without reuse of client cache.
-        let login_res = server
-            .post("/api/auth/login")
-            .add_header("origin", ORIGIN)
-            .add_header("x-mobile-qa-request", "1")
-            .json(&LoginRequest {
-                email: owner.email,
-                password: owner.password,
-            })
-            .await;
+        let login_res = google_login(&server, &owner.email, &owner.subject).await;
         login_res.assert_status_ok();
         let fresh = login_res
             .header("set-cookie")
@@ -398,12 +440,12 @@ async fn rejection_recovery_and_infrastructure_failure() {
         let base = format!("/api/apps/{}", app.id);
         error(
             &server
-                .post("/api/auth/login")
+                .post("/api/auth/google/login")
                 .add_header("origin", "https://foreign.invalid")
                 .add_header("x-mobile-qa-request", "1")
                 .json(&LoginRequest {
-                    email: owner.email.clone(),
-                    password: owner.password.clone(),
+                    credential: "invalid".into(),
+                    challenge_id: Uuid::new_v4(),
                 })
                 .await,
             403,
@@ -587,7 +629,14 @@ async fn every_declared_route_requires_the_declared_security_and_errors() {
                 "patch" => server.patch(&path),
                 _ => panic!("unknown operation"),
             };
-            error(&req.await, if operation == "login" { 403 } else { 401 });
+            error(
+                &req.await,
+                if operation == "login" || operation == "startGoogleSignIn" {
+                    403
+                } else {
+                    401
+                },
+            );
         }
     })
     .await;
@@ -646,13 +695,13 @@ async fn throttles_quota_and_revision_scope() {
         error(&quota, 429);
         assert!(quota.headers().contains_key("retry-after"));
         let bad = LoginRequest {
-            email: format!("{}@invalid.example", Uuid::new_v4()),
-            password: "incorrect".into(),
+            credential: "invalid".into(),
+            challenge_id: Uuid::new_v4(),
         };
         for _ in 0..10 {
             error(
                 &server
-                    .post("/api/auth/login")
+                    .post("/api/auth/google/login")
                     .add_header("origin", ORIGIN)
                     .add_header("x-mobile-qa-request", "1")
                     .json(&bad)
@@ -662,7 +711,7 @@ async fn throttles_quota_and_revision_scope() {
         }
         error(
             &server
-                .post("/api/auth/login")
+                .post("/api/auth/google/login")
                 .add_header("origin", ORIGIN)
                 .add_header("x-mobile-qa-request", "1")
                 .json(&bad)
@@ -683,6 +732,158 @@ async fn throttles_quota_and_revision_scope() {
                 .json(&update)
                 .await,
             404,
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn google_identity_binding_expiry_replay_and_password_removal() {
+    let _database = DATABASE_BOOT.lock().await;
+    request::<App, _, _>(|server, ctx| async move {
+        let owner = login(&server, &ctx).await;
+        error(
+            &server
+                .post("/api/auth/login")
+                .json(&serde_json::json!({"email":owner.email,"password":"unused"}))
+                .await,
+            404,
+        );
+        // A Google assertion must have our audience, issuer, nonce, signature and verified email.
+        for fields in [
+            serde_json::json!({"aud":"another-client"}),
+            serde_json::json!({"iss":"https://evil.invalid"}),
+            serde_json::json!({"exp":Utc::now().timestamp()-1}),
+            serde_json::json!({"email_verified":false}),
+            serde_json::json!({"nonce":"wrong"}),
+            serde_json::json!({"azp":"another-client"}),
+        ] {
+            let (ch, cookie) = challenge(&server).await;
+            let input = LoginRequest {
+                challenge_id: ch.challenge_id,
+                credential: google_token(&owner.email, &owner.subject, &ch.nonce, fields),
+            };
+            error(
+                &server
+                    .post("/api/auth/google/login")
+                    .add_header("origin", ORIGIN)
+                    .add_header("x-mobile-qa-request", "1")
+                    .add_header("cookie", cookie)
+                    .json(&input)
+                    .await,
+                401,
+            );
+        }
+        let (bad_challenge, bad_cookie) = challenge(&server).await;
+        let mut bad_token = google_token(
+            &owner.email,
+            &owner.subject,
+            &bad_challenge.nonce,
+            serde_json::json!({}),
+        );
+        let offset = bad_token.rfind('.').unwrap() + 1;
+        let replacement = if &bad_token[offset..offset + 1] == "A" {
+            "B"
+        } else {
+            "A"
+        };
+        bad_token.replace_range(offset..offset + 1, replacement);
+        error(
+            &server
+                .post("/api/auth/google/login")
+                .add_header("origin", ORIGIN)
+                .add_header("x-mobile-qa-request", "1")
+                .add_header("cookie", bad_cookie)
+                .json(&LoginRequest {
+                    challenge_id: bad_challenge.challenge_id,
+                    credential: bad_token,
+                })
+                .await,
+            401,
+        );
+        let (ch, cookie) = challenge(&server).await;
+        let input = LoginRequest {
+            challenge_id: ch.challenge_id,
+            credential: google_token(
+                &owner.email,
+                &owner.subject,
+                &ch.nonce,
+                serde_json::json!({}),
+            ),
+        };
+        // Nonce knowledge alone cannot bind a login to a different browser.
+        error(
+            &server
+                .post("/api/auth/google/login")
+                .add_header("origin", ORIGIN)
+                .add_header("x-mobile-qa-request", "1")
+                .json(&input)
+                .await,
+            401,
+        );
+        let response = server
+            .post("/api/auth/google/login")
+            .add_header("origin", ORIGIN)
+            .add_header("x-mobile-qa-request", "1")
+            .add_header("cookie", &cookie)
+            .json(&input)
+            .await;
+        response.assert_status_ok();
+        error(
+            &server
+                .post("/api/auth/google/login")
+                .add_header("origin", ORIGIN)
+                .add_header("x-mobile-qa-request", "1")
+                .add_header("cookie", cookie)
+                .json(&input)
+                .await,
+            401,
+        );
+        // Email reuse by another Google subject cannot claim a linked workspace identity.
+        error(
+            &google_login(&server, &owner.email, &Uuid::new_v4().to_string()).await,
+            403,
+        );
+        error(
+            &google_login(
+                &server,
+                &format!("{}@fixture.invalid", Uuid::new_v4()),
+                &Uuid::new_v4().to_string(),
+            )
+            .await,
+            403,
+        );
+        let (ch, cookie) = challenge(&server).await;
+        mobile_qa::models::_entities::google_login_challenges::Entity::update_many()
+            .col_expr(
+                mobile_qa::models::_entities::google_login_challenges::Column::ExpiresAt,
+                sea_orm::sea_query::Expr::value(Utc::now() - Duration::seconds(1)),
+            )
+            .filter(
+                mobile_qa::models::_entities::google_login_challenges::Column::Id
+                    .eq(ch.challenge_id),
+            )
+            .exec(&ctx.db)
+            .await
+            .unwrap();
+        let input = LoginRequest {
+            challenge_id: ch.challenge_id,
+            credential: google_token(
+                &owner.email,
+                &owner.subject,
+                &ch.nonce,
+                serde_json::json!({}),
+            ),
+        };
+        error(
+            &server
+                .post("/api/auth/google/login")
+                .add_header("origin", ORIGIN)
+                .add_header("x-mobile-qa-request", "1")
+                .add_header("cookie", cookie)
+                .json(&input)
+                .await,
+            401,
         );
     })
     .await;

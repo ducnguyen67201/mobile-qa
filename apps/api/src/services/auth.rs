@@ -1,4 +1,4 @@
-//! Framework password/JWT authentication plus durable revocation and tenant grants.
+//! App session JWTs, durable revocation, and tenant grants. Google owns sign-in.
 use crate::{
     config::{Setup, SESSION_SECONDS},
     errors::{ApiFailure, ApiResult},
@@ -167,7 +167,12 @@ pub async fn response(ctx: &AppContext, session: &Session) -> ApiResult<SessionR
         expires_at: session.session.expires_at,
     })
 }
-async fn rate_limit(ctx: &AppContext, kind: &str, value: &str, limit: i32) -> ApiResult<()> {
+pub(crate) async fn rate_limit(
+    ctx: &AppContext,
+    kind: &str,
+    value: &str,
+    limit: i32,
+) -> ApiResult<()> {
     let key = format!("{kind}:{:x}", Sha256::digest(value.as_bytes()));
     let now = Utc::now();
     let tx = ctx.db.begin().await?;
@@ -212,46 +217,10 @@ async fn rate_limit(ctx: &AppContext, kind: &str, value: &str, limit: i32) -> Ap
     tx.commit().await?;
     Ok(())
 }
-pub async fn login(
+pub(crate) async fn issue_session(
     ctx: &AppContext,
-    input: LoginRequest,
-    network: &str,
+    user: users::Model,
 ) -> ApiResult<(Session, String)> {
-    let email = input.email.trim().to_lowercase();
-    if email.len() > 254 || input.password.len() > 1024 {
-        return Err(ApiFailure::new(
-            401,
-            "invalid_credentials",
-            "Email or password is incorrect",
-        ));
-    }
-    // Network bucket first also bounds creation of attacker-controlled email buckets.
-    rate_limit(ctx, "network", network, 100).await?;
-    rate_limit(ctx, "email", &email, 10).await?;
-    let setup = Setup::get(ctx);
-    let permit =
-        setup.hashing.clone().try_acquire_owned().map_err(|_| {
-            ApiFailure::new(429, "login_busy", "Sign-in is busy. Try again shortly")
-        })?;
-    let user = users::Entity::find()
-        .filter(users::Column::Email.eq(email))
-        .one(&ctx.db)
-        .await?;
-    let hash = user
-        .as_ref()
-        .map(|u| u.password_hash.clone())
-        .unwrap_or(setup.dummy_password_hash);
-    let valid = tokio::task::spawn_blocking(move || {
-        let _permit = permit;
-        loco_rs::hash::verify_password(&input.password, &hash)
-    })
-    .await
-    .map_err(|_| ApiFailure::internal())?;
-    let user = user
-        .filter(|u| valid && u.disabled_at.is_none())
-        .ok_or_else(|| {
-            ApiFailure::new(401, "invalid_credentials", "Email or password is incorrect")
-        })?;
     let now = Utc::now();
     let session = sessions::ActiveModel {
         id: Set(Uuid::new_v4()),
@@ -291,13 +260,9 @@ pub async fn revoke(ctx: &AppContext, id: Uuid) -> ApiResult<()> {
 pub async fn provision(
     ctx: &AppContext,
     email: &str,
-    password: &str,
     name: &str,
     organization: &str,
 ) -> ApiResult<(Uuid, Uuid)> {
-    if password.len() < 12 || password.len() > 1024 {
-        return Err(ApiFailure::invalid("Password must contain 12–1024 bytes"));
-    }
     let email = email.trim().to_lowercase();
     if !email.contains('@')
         || email.len() > 254
@@ -315,14 +280,9 @@ pub async fn provision(
         return Err(ApiFailure::new(
             409,
             "account_exists",
-            "Account exists; use an explicit reset operation",
+            "Account already exists; manage its organization membership",
         ));
     }
-    let password = password.to_owned();
-    let hash = tokio::task::spawn_blocking(move || loco_rs::hash::hash_password(&password))
-        .await
-        .map_err(|_| ApiFailure::internal())?
-        .map_err(|_| ApiFailure::internal())?;
     let tx = ctx.db.begin().await?;
     let user_id = Uuid::new_v4();
     let org_id = Uuid::new_v4();
@@ -330,7 +290,7 @@ pub async fn provision(
     users::ActiveModel {
         id: Set(user_id),
         email: Set(email),
-        password_hash: Set(hash),
+        google_subject: Set(None),
         display_name: Set(name.trim().into()),
         disabled_at: Set(None),
         created_at: Set(now),

@@ -39,6 +39,19 @@ also successful when inspected; this is not a claim of a separate human review.
 
 ## Open gates and planned work
 
+Graphify refresh workflow and agent navigation guidance are authored locally. Validation
+with graphifyy 0.9.58 produced 305 nodes and 399 edges across 53 source files, including
+Rust, TypeScript and Python; source paths were portable and generated consumers excluded.
+A health-route query returned the route and Rust contract. Repeated generation was
+byte-identical for unchanged input. Actionlint passed. Local bare-Git scenarios verified
+no-change behavior, output-only publication, stale-result discard and non-fast-forward
+rejection. The local preview is not committed because its working files include edits
+newer than the embedded HEAD provenance.
+
+Hosted generation and bot publication remain unverified until this change is merged to
+main and the first `Refresh codebase graph` run succeeds. These checks do not establish
+hosted token permissions or repeat the unrelated application suites.
+
 | Item | Status / next evidence |
 |---|---|
 | Spec 01 rendered browser/keyboard/Retry/HMR acceptance | Pending: browser tool could not verify admin policy; no bypass attempted |

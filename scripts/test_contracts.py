@@ -9,7 +9,7 @@ class ExportTests(unittest.TestCase):
     def test_content_sync_preserves_mtime_and_detects_add_change_delete(self):
         with tempfile.TemporaryDirectory() as left, tempfile.TemporaryDirectory() as right:
             staged, dest = Path(left), Path(right)
-            source = staged / "frontend/src/bindings/Health.ts"
+            source = staged / "apps/web/src/api/generated/types.gen.ts"
             source.parent.mkdir(parents=True)
             source.write_text("original")
             self.assertEqual(len(synchronize(staged, dest, False)), 1)

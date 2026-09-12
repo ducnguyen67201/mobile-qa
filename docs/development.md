@@ -1,47 +1,50 @@
 # Explicit development workflow
 
-Finish the complete agreed implementation and tests before executing format,
-typecheck, lint, test, build, generation or runtime verification. Then run a single
-consolidated final phase. Batch related fixes and rerun failed/invalidated checks.
-No editor check-on-save tasks, lifecycle validation hooks, check watchers, Rust
-rebuild loops or global tool/editor configuration changes are included.
+Finish every scoped source/test/config change before generation, formatting,
+typecheck, lint, tests, builds or runtime verification. Run one final phase, batch
+related fixes, and rerun only failed/invalidated checks. There are no check-on-save
+hooks, lifecycle checks, check watchers, Rust rebuild loops or global configuration
+changes. Vite only performs normal transpilation/HMR.
 
-`just setup` fetches Cargo dependencies, pnpm dependencies (scripts disabled), and
-uv dependencies including the optional SDK. Once lockfiles exist it uses frozen/
-locked installs. It performs no application checks. Regular uv run commands use --no-sync; dependency
-installation is confined to setup. The first authored checkout
-needs `just types`; clean clones already contain generated outputs.
+`just setup` downloads Cargo/pnpm/uv dependencies, including the optional SDK. Existing
+locks use locked/frozen resolution; pnpm dependency scripts are disabled. The web-local
+pnpm-workspace.yaml prevents discovery of unrelated ancestor workspaces. Normal uv
+commands use --no-sync. Moved virtual environments can be refreshed explicitly with
+`uv sync --project apps/mobile-worker --frozen --extra sdk --reinstall`.
 
 | Command | Work |
 |---|---|
-| types | Explicit staged contracts export, update only changed output |
-| check-contracts | Regenerate to temp, compare drift; content-sync tests |
-| check-web | Strict tsc, ESLint, Vitest once each |
-| check-api | Cargo fmt check, Clippy, workspace tests against local test DB |
-| check-worker | Ruff, strict Pyright on owned package, pytest |
-| build | Vite production build; Cargo workspace debug build |
+| dev | Isolated PostgreSQL, explicit API startup, Vite; owned-child cleanup |
+| types | Pure Rust exporter, local Hey API SDK/Zod, worker Pydantic; content-only writes |
+| check-contracts | Temporary regeneration/drift + content-sync test |
+| check-web | Strict tsc including generator config, ESLint, Vitest |
+| check-api | Cargo fmt check, Clippy, workspace tests with isolated test DB |
+| check-worker | Ruff, strict Pyright, pytest |
+| build | Vite production bundle, Cargo workspace debug build |
 | smoke | Built API without dist, Vite proxy, DB bookkeeping, fixtures, import-only SDK |
 
-Development and test use fixed isolated local DB URLs; they ignore inherited
-DATABASE_URL. Both destructive flags remain false. The Loco request test does not
-use automatic create/drop helpers. The checked database name is mobile_qa_test.
-The Compose project is mobile-qa-local, with loopback-only binding, local-only
-credentials and a persistent named volume. Initialization creates the separate
-test database. DB startup never resets volumes. Stop an explicitly started DB with
-`docker compose -f infra/compose.yaml stop postgres`.
+API processes run with apps/api as cwd; workspace target/cache stay at repository
+root. Test binaries resolve apps/api/config from their Cargo package directory.
+Production static assets resolve ../web/dist. Worker tests resolve root fixtures;
+ordinary fake commands can run from the root with an explicit --project.
 
-Scripts stop only children they start, using owned process groups. An already running
-Compose PostgreSQL is left running. API/Vite log files truncate on explicit start;
-do not write payloads/secrets to logs. `.private/` is ignored and mode 0700. No real
-customer credentials, APKs or artifacts belong in this setup baseline.
+Development and test use fixed local database URLs, ignoring inherited DATABASE_URL.
+All destructive flags stay false; integration uses the existing mobile_qa_test DB
+without create/drop helpers. Compose project mobile-qa-local binds loopback, initializes
+the separate test database and persists its named volume. Startup never resets that
+volume. Existing Compose PostgreSQL is left running; commands stop only what they own.
+Logs truncate on explicit startup. Keep secrets/customer data out of source and logs.
+.private/artifacts is reserved only; no storage API is included.
 
-CI filters docs-only changes out of build jobs. API and infrastructure changes check
-Rust/database; frontend changes check/build web; worker changes check Python. Shared
-contracts and generation/tooling changes trigger all consumers and drift. Locks key
-Cargo/pnpm/uv caches. No cloud/device/model tests run in CI. Hosted CI execution itself
-must be observed after publication; local command success is not proof hosted CI ran.
+CI runs pull_request and pushes to main, avoiding duplicate feature push jobs. Docs-only
+changes skip app builds. apps/api/infra changes check Rust/database; apps/web changes
+check/build web; apps/mobile-worker changes check Python. Shared contracts, generator
+configuration/manifests/locks and tooling trigger drift plus all affected consumers.
+The contracts job installs both Node and Python generators; it does not start a DB.
+Caches key Cargo/pnpm/uv by locks/toolchain. No cloud/device/model tests run in CI.
 
-Measured validation/start/HMR/export durations are recorded in the parent spec01
-implementation report, with machine versions and explicit unavailable measurements.
-Do not infer a latency promise from one machine. Cache reuse happens without cargo
-clean or release builds in the ordinary loop.
+The refactor report records actual local gates and timings. Browser admin policy
+verification previously denied access: do not use alternate browser/Playwright/HTTP
+workarounds to evade it. Rendered keyboard/Retry/HMR acceptance remains explicitly
+unverified until approved browser access is available. Endpoint smoke is a separate
+existing automated check, not a claim of rendered browser acceptance.

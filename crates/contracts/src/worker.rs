@@ -2,10 +2,9 @@
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
-use ts_rs::TS;
 use uuid::Uuid;
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, JsonSchema, TS)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Scenario {
     Pass,
@@ -50,7 +49,7 @@ fn nullable_string_schema(generator: &mut schemars::SchemaGenerator) -> schemars
 fn required_nullable<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
     Option::<String>::deserialize(d)
 }
-#[derive(Debug, PartialEq, Serialize, Deserialize, JsonSchema, TS)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ContractProbe {
     pub run_id: Uuid,
@@ -60,7 +59,6 @@ pub struct ContractProbe {
     #[schemars(schema_with = "nullable_string_schema", required)]
     pub nullable_note: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional = nullable)]
     pub optional_note: Option<String>,
     #[schemars(regex(pattern = "^(0|[1-9][0-9]*)$"))]
     pub counter: String,

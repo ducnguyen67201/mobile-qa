@@ -1,6 +1,7 @@
 name: Foundation checks
 on:
   push:
+    branches: [main]
   pull_request:
 permissions:
   contents: read
@@ -28,25 +29,32 @@ jobs:
               - 'justfile'
               - '.github/workflows/**'
               - 'Cargo.lock'
-              - 'workers/mobile/uv.lock'
-              - 'workers/mobile/pyproject.toml'
+              - 'Cargo.toml'
+              - 'apps/web/openapi-ts.config.ts'
+              - 'apps/web/src/api/generated/**'
+              - 'apps/mobile-worker/src/mobile_qa_worker/generated/**'
+              - '.node-version'
+              - 'rust-toolchain.toml'
+              - '.cargo/**'
+              - 'apps/web/pnpm-workspace.yaml'
+              - 'apps/web/package.json'
+              - 'apps/web/pnpm-lock.yaml'
+              - 'apps/mobile-worker/uv.lock'
+              - 'apps/mobile-worker/pyproject.toml'
             api:
               - *shared
               - 'Cargo.toml'
               - 'rust-toolchain.toml'
               - '.cargo/**'
-              - 'src/**'
-              - 'migration/**'
-              - 'tests/**'
-              - 'config/**'
+              - 'apps/api/**'
               - 'infra/**'
             web:
               - *shared
-              - 'frontend/**'
+              - 'apps/web/**'
               - '.node-version'
             worker:
               - *shared
-              - 'workers/mobile/**'
+              - 'apps/mobile-worker/**'
   api:
     needs: scope
     if: needs.scope.outputs.api == 'true'
@@ -72,12 +80,12 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - run: pnpm --dir frontend install --frozen-lockfile --ignore-scripts
-      - run: pnpm --dir frontend typecheck
-      - run: pnpm --dir frontend lint
-      - run: pnpm --dir frontend test
-      - run: pnpm --dir frontend build
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm --dir apps/web install --frozen-lockfile --ignore-scripts
+      - run: pnpm --dir apps/web typecheck
+      - run: pnpm --dir apps/web lint
+      - run: pnpm --dir apps/web test
+      - run: pnpm --dir apps/web build
   worker:
     needs: scope
     if: needs.scope.outputs.worker == 'true'
@@ -88,11 +96,11 @@ jobs:
         with:
           version: 0.12.1
           enable-cache: true
-          cache-dependency-glob: workers/mobile/uv.lock
-      - run: uv sync --project workers/mobile --frozen
-      - run: uv run --no-sync --project workers/mobile --frozen ruff check workers/mobile
-      - run: cd workers/mobile && uv run --no-sync --frozen pyright
-      - run: uv run --no-sync --project workers/mobile --frozen pytest workers/mobile/tests
+          cache-dependency-glob: apps/mobile-worker/uv.lock
+      - run: uv sync --project apps/mobile-worker --frozen
+      - run: uv run --no-sync --project apps/mobile-worker --frozen ruff check apps/mobile-worker
+      - run: cd apps/mobile-worker && uv run --no-sync --frozen pyright
+      - run: uv run --no-sync --project apps/mobile-worker --frozen pytest apps/mobile-worker/tests
   contracts:
     needs: scope
     if: needs.scope.outputs.contracts == 'true'
@@ -105,7 +113,16 @@ jobs:
         with:
           version: 0.12.1
           enable-cache: true
-          cache-dependency-glob: workers/mobile/uv.lock
-      - run: uv sync --project workers/mobile --frozen
+          cache-dependency-glob: apps/mobile-worker/uv.lock
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm --dir apps/web install --frozen-lockfile --ignore-scripts
+      - run: uv sync --project apps/mobile-worker --frozen
       - run: python3 scripts/contracts.py --check
       - run: python3 -m unittest scripts.test_contracts

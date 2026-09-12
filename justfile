@@ -10,13 +10,13 @@ dev:
     python3 scripts/runtime.py dev
 
 dev-web:
-    pnpm --dir frontend dev
+    pnpm --dir apps/web dev
 
 dev-api:
-    cargo run --locked --bin mobile-qa-cli -- start --environment development
+    cd apps/api && cargo run --locked --bin mobile-qa-cli -- start --environment development
 
 dev-worker-fake:
-    uv run --no-sync --project workers/mobile --frozen mobile-qa-worker fake contracts/fixtures/pass.json
+    uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker fake contracts/fixtures/pass.json
 
 types:
     python3 scripts/contracts.py
@@ -26,22 +26,22 @@ check-contracts:
     python3 -m unittest scripts.test_contracts
 
 check-web:
-    pnpm --dir frontend typecheck
-    pnpm --dir frontend lint
-    pnpm --dir frontend test
+    pnpm --dir apps/web typecheck
+    pnpm --dir apps/web lint
+    pnpm --dir apps/web test
 
 check-api:
     python3 scripts/runtime.py check-api
 
 check-worker:
-    cd workers/mobile && uv run --no-sync --frozen ruff check .
-    cd workers/mobile && uv run --no-sync --frozen pyright
-    cd workers/mobile && uv run --no-sync --frozen pytest
+    cd apps/mobile-worker && uv run --no-sync --frozen ruff check .
+    cd apps/mobile-worker && uv run --no-sync --frozen pyright
+    cd apps/mobile-worker && uv run --no-sync --frozen pytest
 
 check: check-contracts check-web check-api check-worker
 
 build:
-    pnpm --dir frontend build
+    pnpm --dir apps/web build
     cargo build --workspace --locked
 
 smoke:

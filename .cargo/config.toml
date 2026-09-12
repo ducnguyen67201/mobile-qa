@@ -1,2 +1,2 @@
 [alias]
-loco = "run --bin mobile-qa-cli --"
+loco = "run --package mobile-qa --bin mobile-qa-cli --"

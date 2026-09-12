@@ -62,14 +62,14 @@ def services(built=False):
     private = ROOT / ".private"
     private.mkdir(mode=0o700, exist_ok=True)
     private.chmod(0o700)
-    commands = [([str(ROOT / "target/debug/mobile-qa-cli"), "start", "--environment", "development"] if built else ["cargo", "run", "--locked", "--bin", "mobile-qa-cli", "--", "start", "--environment", "development"]), ["pnpm", "--dir", "frontend", "dev"]]
+    commands = [([str(ROOT / "target/debug/mobile-qa-cli"), "start", "--environment", "development"] if built else ["cargo", "run", "--locked", "--bin", "mobile-qa-cli", "--", "start", "--environment", "development"]), ["pnpm", "--dir", "apps/web", "dev"]]
     children = []
     handles = []
     try:
         for name, command in zip(("api", "web"), commands, strict=True):
             handle = (private / f"{name}.log").open("w")
             handles.append(handle)
-            children.append(subprocess.Popen(command, cwd=ROOT, stdout=handle, stderr=subprocess.STDOUT, start_new_session=True))
+            children.append(subprocess.Popen(command, cwd=(ROOT / "apps/api" if name == "api" else ROOT), stdout=handle, stderr=subprocess.STDOUT, start_new_session=True))
         yield children
     finally:
         for child in reversed(children):
@@ -86,7 +86,7 @@ def services(built=False):
 
 def smoke():
     # Hide dist while starting development to prove no static build dependency.
-    dist, hidden = ROOT / "frontend/dist", ROOT / ".private/dist-smoke"
+    dist, hidden = ROOT / "apps/web/dist", ROOT / ".private/dist-smoke"
     hidden.parent.mkdir(mode=0o700, exist_ok=True)
     if hidden.exists():
         raise RuntimeError("An earlier hidden dist exists; restore it before smoke.")
@@ -109,9 +109,9 @@ def smoke():
             output = run(COMPOSE + ["exec", "-T", "postgres", "psql", "-U", "mobile_qa", "-d", "mobile_qa_development", "-Atc", "SELECT current_database(), to_regclass('seaql_migrations');"], capture_output=True, text=True).stdout.strip()
             assert output == "mobile_qa_development|seaql_migrations", output
             for kind in ("pass", "fail", "blocked"):
-                run(["uv", "run", "--no-sync", "--project", "workers/mobile", "--frozen", "mobile-qa-worker", "fake", f"contracts/fixtures/{kind}.json"])
+                run(["uv", "run", "--no-sync", "--project", "apps/mobile-worker", "--frozen", "mobile-qa-worker", "fake", f"contracts/fixtures/{kind}.json"])
             # Block network socket connections during the import-only SDK smoke.
-            run(["uv", "run", "--no-sync", "--project", "workers/mobile", "--frozen", "--extra", "sdk", "python", "scripts/sdk_smoke.py"])
+            run(["uv", "run", "--no-sync", "--project", "apps/mobile-worker", "--frozen", "--extra", "sdk", "python", "scripts/sdk_smoke.py"])
             print(f"Smoke passed; warm built API ready in {started:.3f}s")
     finally:
         if moved:

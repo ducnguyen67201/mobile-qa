@@ -1,7 +1,7 @@
 /target/
-/frontend/node_modules/
-/frontend/dist/
-/workers/mobile/.venv/
+/apps/web/node_modules/
+/apps/web/dist/
+/apps/mobile-worker/.venv/
 **/__pycache__/
 **/.pytest_cache/
 **/.ruff_cache/

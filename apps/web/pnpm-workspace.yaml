@@ -1,0 +1,6 @@
+packages:
+  - '.'
+# Keep Hey API's schema parser on patched js-yaml 4.x (GHSA-52cp-r559-cp3m,
+# GHSA-5p4m-2wfm-xmqj, GHSA-2883-xcg3-v3hh).
+overrides:
+  'js-yaml@>=4.0.0 <4.3.2': '4.3.2'

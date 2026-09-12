@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WorkerContracts",
+  "type": "object",
+  "properties": {
+    "probe": {
+      "$ref": "#/$defs/ContractProbe"
+    },
+    "request": {
+      "$ref": "#/$defs/FakeExecutionRequest"
+    },
+    "result": {
+      "$ref": "#/$defs/FakeExecutionResult"
+    }
+  },
+  "required": [
+    "request",
+    "result",
+    "probe"
+  ],
+  "$defs": {
+    "ContractProbe": {
+      "type": "object",
+      "properties": {
+        "counter": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "nullable_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "optional_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "run_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "scenario": {
+          "$ref": "#/$defs/Scenario"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "observed_at",
+        "scenario",
+        "nullable_note",
+        "counter"
+      ]
+    },
+    "FakeExecutionRequest": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "scenario": {
+          "$ref": "#/$defs/Scenario"
+        },
+        "version": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 1,
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "run_id",
+        "scenario"
+      ]
+    },
+    "FakeExecutionResult": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/Outcome"
+        },
+        "run_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "version": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 1,
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "run_id",
+        "outcome",
+        "message"
+      ]
+    },
+    "Outcome": {
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "blocked"
+      ]
+    },
+    "Scenario": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "pass"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "fail"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "blocked"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    }
+  }
+}

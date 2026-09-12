@@ -1,0 +1,25 @@
+[workspace]
+members = ["migration", "crates/contracts"]
+resolver = "2"
+[package]
+name = "mobile-qa"
+version = "0.1.0"
+edition = "2021"
+publish = false
+default-run = "mobile-qa-cli"
+[workspace.dependencies]
+loco-rs = { version = "=1.1.0", default-features = false, features = ["cli", "with-db", "worker"] }
+[dependencies]
+loco-rs = { workspace = true }
+mobile-qa-contracts = { path = "crates/contracts" }
+migration = { path = "migration" }
+async-trait = "0.1"
+axum = "0.8"
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread"] }
+[dev-dependencies]
+loco-rs = { workspace = true, features = ["testing"] }
+sea-orm = { version = "2.0", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
+[[bin]]
+name = "mobile-qa-cli"
+path = "src/bin/main.rs"

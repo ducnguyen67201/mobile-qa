@@ -1,0 +1,111 @@
+name: Foundation checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  scope:
+    permissions:
+      contents: read
+      pull-requests: read
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.paths.outputs.api }}
+      web: ${{ steps.paths.outputs.web }}
+      worker: ${{ steps.paths.outputs.worker }}
+      contracts: ${{ steps.paths.outputs.contracts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: paths
+        with:
+          filters: |
+            contracts: &shared
+              - 'crates/contracts/**'
+              - 'contracts/**'
+              - 'scripts/**'
+              - 'justfile'
+              - '.github/workflows/**'
+              - 'Cargo.lock'
+              - 'workers/mobile/uv.lock'
+              - 'workers/mobile/pyproject.toml'
+            api:
+              - *shared
+              - 'Cargo.toml'
+              - 'rust-toolchain.toml'
+              - '.cargo/**'
+              - 'src/**'
+              - 'migration/**'
+              - 'tests/**'
+              - 'config/**'
+              - 'infra/**'
+            web:
+              - *shared
+              - 'frontend/**'
+              - '.node-version'
+            worker:
+              - *shared
+              - 'workers/mobile/**'
+  api:
+    needs: scope
+    if: needs.scope.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: python3 scripts/runtime.py check-api
+      - run: cargo build --workspace --locked
+  web:
+    needs: scope
+    if: needs.scope.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm --dir frontend install --frozen-lockfile --ignore-scripts
+      - run: pnpm --dir frontend typecheck
+      - run: pnpm --dir frontend lint
+      - run: pnpm --dir frontend test
+      - run: pnpm --dir frontend build
+  worker:
+    needs: scope
+    if: needs.scope.outputs.worker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.12.1
+          enable-cache: true
+          cache-dependency-glob: workers/mobile/uv.lock
+      - run: uv sync --project workers/mobile --frozen
+      - run: uv run --no-sync --project workers/mobile --frozen ruff check workers/mobile
+      - run: cd workers/mobile && uv run --no-sync --frozen pyright
+      - run: uv run --no-sync --project workers/mobile --frozen pytest workers/mobile/tests
+  contracts:
+    needs: scope
+    if: needs.scope.outputs.contracts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.12.1
+          enable-cache: true
+          cache-dependency-glob: workers/mobile/uv.lock
+      - run: uv sync --project workers/mobile --frozen
+      - run: python3 scripts/contracts.py --check
+      - run: python3 -m unittest scripts.test_contracts

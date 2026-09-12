@@ -199,7 +199,7 @@ organization differs from the selected workspace before loading builds/uploads.
 
 This branch retains main's Mantine dashboard, sign-in, workspace and APK intake flows.
 Use `just dev` for that application and `just device-local-agent MODEL` for the
-standalone demo runner. Tests/Runs do not dispatch API jobs yet. An accepted uploaded
+standalone demo runner. Phase 04 Tests/Runs now dispatch approved API jobs to a registered execution worker. An accepted uploaded
 build is not an automatically executable test and device readiness remains separate.
 
 `just setup-android` supplies intake Build Tools 36.0.0; `just device-local-setup`
@@ -227,7 +227,7 @@ evidence reference. Recovery is an operator assertion after stopping the old pro
 and verifying reset, never a substitute for that procedure.
 
 `execution-worker --origin <api-origin> --profile-id <uuid> --state <private-path>`
-polls the protocol. `--once` exits after one claim. A real profile additionally needs
+long-polls the protocol for up to 30 seconds. `--once` exits after one claim, including an idle timeout. A real profile additionally needs
 `--profile <absolute-host-profile>` matching the manifest image/model. `--scenario`
 is an explicit synthetic/demo fixture control, not customer run input. Do not use
 `dev-execution-fake` with a registered real profile: the profile controls the driver.
@@ -246,3 +246,57 @@ Prettier uses 100-column lines, single quotes and no semicolons. Generated brows
 contracts, dependency locks and build outputs are excluded so their generators stay
 authoritative. Rust SQL literals use escaped line breaks where needed to keep query
 calls readable while preserving the exact SQL bytes.
+
+## Test backend dispatch to an emulator
+
+First run `just smoke-execution` for the existing secret-free HTTP/Python fake
+acceptance. It verifies persisted runs and evidence without starting a phone.
+The real path requires an explicitly started worker on the emulator host; the API
+does not provision that host or start a worker daemon for you.
+
+1. Prepare the Android toolchain and build the actual demo with
+   `just device-local-build`. Upload the good demo APK from
+   `apps/qa-demo-android/app/build/outputs/apk/good/debug/` through normal app setup,
+   using package `ai.mobileqa.demo`. Do not upload `.private/test-apks/execution.apk`
+   for this test: it is only an intake fixture, not a runnable application.
+2. Select an existing qualified host TOML profile, with `headless = false` if you
+   want to see the emulator. Its model, system image, SDK paths and Doppler SDK
+   configuration must be valid. `just device-doctor /absolute/path/profile.toml`
+   checks the host. Register the matching backend execution profile with
+   `driver: minitap`, `adapter: demo_persistence_v1`, `package: ai.mobileqa.demo`,
+   the exact same model/image and at most 104857600 APK bytes. Qualification must
+   reference real evidence; do not label an unqualified host qualified just to run.
+3. Use the execution maintenance commands above to import/review
+   `contracts/fixtures/execution/persistence-case.json`, import/review a plan
+   selecting that case and real profile, and register a worker for that app/profile.
+   Inject the same `MOBILE_QA_WORKER_TOKEN` into registration and worker processes
+   through Doppler. Backend origins belong to the demo fixture; customer account
+   and reset references remain unsupported by this adapter.
+4. With the API running, start the worker in another terminal on that host:
+
+   ```bash
+   # Run in a Doppler-injected shell/process with MOBILE_QA_WORKER_TOKEN available.
+   just dev-execution-real http://127.0.0.1:5150 PROFILE_UUID \
+     /absolute/private/execution-state /absolute/path/profile.toml
+   ```
+
+5. Submit the approved plan/build using the dashboard Run button, or the normal
+   authenticated `POST /api/apps/{app_id}/runs` endpoint with an Idempotency-Key
+   and body `{"build_id":"BUILD_UUID","plan_version_id":"PLAN_UUID",
+"environment_revision":1}`. Browser session, CSRF and app membership checks
+   still apply. Start the worker **before** submitting to observe the wakeup.
+6. The waiting claim returns, the emulator boots, the APK installs, and Minitap
+   creates the unique task. The worker restarts the app, captures checkpoints,
+   verifies reset and uploads evidence. Read `GET /api/runs/{run_id}` or the report
+   page: expect `driver: minitap`, a passed persistence check and
+   `cleanup: verified_clean`. A simulated report does not validate this path.
+
+The claim endpoint waits up to 30 seconds; the Python HTTP timeout is 35 seconds.
+An idle response sets `poll_after_seconds: 0`, so the worker immediately opens its
+next waiting request. Ordinary HTTP calls retain five-second timeouts. Same-process
+run commits and clean resource release wake claims immediately; a five-second
+database recheck covers other API processes and maintenance commands. This initial
+wakeup is process-local, not PostgreSQL LISTEN/NOTIFY. No transaction is held while
+waiting. Worker revocation is rechecked on each wake/recheck. Reverse proxies must
+permit requests lasting longer than 30 seconds. Heartbeats and cleanup fencing are
+unchanged. Real-device/model execution is not part of ordinary checks.

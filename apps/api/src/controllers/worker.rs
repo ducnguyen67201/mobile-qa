@@ -25,7 +25,9 @@ async fn claim(
     w: Worker,
     Json(input): Json<ClaimRequest>,
 ) -> ApiResult<Json<ClaimResponse>> {
-    Ok(Json(scheduler::claim(&ctx, &w, input).await?))
+    Ok(Json(
+        scheduler::claim_wait(&ctx, &w, input, std::time::Duration::from_secs(30)).await?,
+    ))
 }
 async fn heartbeat(
     State(ctx): State<AppContext>,

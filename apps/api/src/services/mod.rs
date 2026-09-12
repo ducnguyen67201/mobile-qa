@@ -21,3 +21,5 @@ pub mod worker_auth;
 pub mod run_artifacts;
 
 pub mod verification;
+
+pub mod execution_wakeup;

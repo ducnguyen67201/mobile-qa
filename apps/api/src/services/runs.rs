@@ -214,6 +214,7 @@ pub async fn create(
     }
     let result = detail(&tx, id).await?;
     tx.commit().await?;
+    super::execution_wakeup::notify(ctx);
     tracing::info!(run_id=%id,app_id=%app,phase="queued","Approved execution queued");
     Ok((result, true))
 }

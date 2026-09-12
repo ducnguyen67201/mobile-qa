@@ -462,3 +462,106 @@ async fn evidence_http_roundtrip_pass_failure_and_blocked() {
  }
  }).await;
 }
+
+#[tokio::test]
+async fn long_poll_wakes_on_committed_run_and_times_out_without_reserving() {
+    use std::time::Duration;
+    let _guard = DATABASE_BOOT.lock().await;
+    request::<App, _, _>(|server, ctx| async move {
+        let owner = login(&server, &ctx).await;
+        let (app, build, plan, worker, token) = prepared(&server, &ctx, &owner).await;
+        let request = ClaimRequest {
+            version: 1,
+            claim_id: Uuid::new_v4(),
+            profile_id: worker.profile_id,
+        };
+        let start = tokio::time::Instant::now();
+        let idle =
+            scheduler::claim_wait(&ctx, &worker, request.clone(), Duration::from_millis(100))
+                .await
+                .unwrap();
+        assert!(idle.lease.is_none());
+        assert_eq!(idle.poll_after_seconds, 0);
+        assert!(start.elapsed() >= Duration::from_millis(100));
+        assert!(rows(
+            &ctx.db,
+            "SELECT resource FROM execution_reservations WHERE resource=$1",
+            vec![format!("app:{app}").into()]
+        )
+        .await
+        .unwrap()
+        .is_empty());
+        // Start the actual HTTP request first. Submission must wake it before the
+        // five-second fallback, and only after the run transaction commits.
+        let claim = async {
+            server
+                .post("/api/worker/claims")
+                .add_header("authorization", format!("Bearer {token}"))
+                .json(&request)
+                .await
+        };
+        let enqueue = async {
+            tokio::time::sleep(Duration::from_millis(150)).await;
+            runs::create(
+                &ctx,
+                owner.user,
+                app,
+                "wake-test",
+                CreateRunRequest {
+                    build_id: build,
+                    plan_version_id: plan,
+                    environment_revision: 1,
+                },
+            )
+            .await
+            .unwrap()
+            .0
+        };
+        let start = tokio::time::Instant::now();
+        let (response, run) = tokio::time::timeout(Duration::from_secs(3), async {
+            tokio::join!(claim, enqueue)
+        })
+        .await
+        .expect("queue commit must wake waiting HTTP claim");
+        response.assert_status_ok();
+        let lease = response.json::<ClaimResponse>().lease.unwrap();
+        assert_eq!(lease.run_id, run.id);
+        assert!(start.elapsed() >= Duration::from_millis(150));
+        assert_eq!(lease.manifest.build_id, build);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn long_poll_rechecks_revocation_after_waking() {
+    use std::time::Duration;
+    let _guard = DATABASE_BOOT.lock().await;
+    request::<App, _, _>(|server, ctx| async move {
+        let owner = login(&server, &ctx).await;
+        let (_, _, _, worker, _) = prepared(&server, &ctx, &owner).await;
+        let waiting = scheduler::claim_wait(
+            &ctx,
+            &worker,
+            ClaimRequest {
+                version: 1,
+                claim_id: Uuid::new_v4(),
+                profile_id: worker.profile_id,
+            },
+            Duration::from_secs(2),
+        );
+        let revoke = async {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            exec(
+                &ctx.db,
+                "UPDATE execution_workers SET revoked=true WHERE id=$1",
+                vec![worker.id.into()],
+            )
+            .await
+            .unwrap();
+            mobile_qa::services::execution_wakeup::notify(&ctx);
+        };
+        let (result, ()) = tokio::join!(waiting, revoke);
+        assert_eq!(result.unwrap_err().code, "unauthenticated");
+    })
+    .await;
+}

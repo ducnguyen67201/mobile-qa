@@ -82,3 +82,7 @@ semantic action events are the customer-visible evidence in this slice.
 
 Completion remains subject to the recorded validation report and open real-device /
 hosted acceptance gates. No paid resources are launched by normal checks or smoke.
+
+Worker claims now use bounded 30-second HTTP long polling with immediate local
+commit notifications and a five-second database fallback across API processes.
+See the backend-to-emulator runbook in development.md.

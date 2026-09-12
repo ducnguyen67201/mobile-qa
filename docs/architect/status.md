@@ -285,3 +285,10 @@ reports the previously documented `RUSTSEC-2023-0071` in rsa 0.9.10.
 The [implementation report](../../.claude/PRPs/reports/04-execution-and-reports-report.md)
 records changes, validation, deviations and remaining gates. The plan remains active;
 this is local execution/reporting implementation, not phase-wide acceptance.
+
+Phase 04 follow-up: bounded long-poll claims and an explicit real-worker launch
+recipe are implemented. Validation passed: seven execution route/database tests
+(including wake-on-commit, idle timeout and revocation), the health route test,
+15 worker execution tests, Rust build, Clippy, Ruff/Pyright, formatting and the
+simulated HTTP/restart smoke. Real emulator/API acceptance remains pending; this
+change does not run Minitap or provision a device.

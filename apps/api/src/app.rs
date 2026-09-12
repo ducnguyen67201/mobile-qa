@@ -41,6 +41,8 @@ impl Hooks for App {
     }
     async fn after_context(ctx: AppContext) -> Result<AppContext> {
         ctx.shared_store.insert(crate::config::Setup::new(&ctx)?);
+        ctx.shared_store
+            .insert(crate::services::execution_wakeup::ExecutionWakeup::default());
         Ok(ctx)
     }
     async fn after_routes(router: axum::Router, _ctx: &AppContext) -> Result<axum::Router> {

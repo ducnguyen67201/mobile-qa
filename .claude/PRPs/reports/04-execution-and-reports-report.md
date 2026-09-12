@@ -236,3 +236,18 @@ Python dependency audit found none; the local mobile-qa-worker package is not on
 PyPI and was skipped. The documented Rust rsa advisory remains open. The PR is
 stacked on phase 02's branch while PR #2 remains open. Real/browser/hosted gates
 remain unchanged.
+
+## Long-poll follow-up
+
+Claims now wait up to 30 seconds with a 35-second worker HTTP timeout. A watch
+notification wakes local waiting requests after run creation or resource-release
+commit; a five-second database fallback handles other processes. No transaction
+is held while waiting, and worker revocation is rechecked before another claim.
+Idle replies request immediate reconnect. Heartbeat timeouts remain five seconds.
+
+Validation: Clippy, Ruff/Pyright, format checks, seven execution route/database
+tests, health route test, 15 worker execution tests, Rust build and simulated
+HTTP/restart smoke passed. New coverage proves wake-on-commit before the fallback,
+idle timeout without reservation, revocation after wake and claim-only timeout
+extension. The runbook and `just dev-execution-real` explain real host launch;
+no emulator/model acceptance was performed.

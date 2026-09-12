@@ -62,7 +62,10 @@ class Client:
             headers["X-Lease-Generation"] = str(generation)
         request = urllib.request.Request(self.origin + path, payload, headers, method=method)
         try:
-            with self.opener.open(request, timeout=5) as response:
+            # Claims may wait 30 seconds server-side; other calls keep their short
+            # timeout so the heartbeat watchdog remains responsive.
+            timeout = 35 if method == "POST" and path == "/api/worker/claims" else 5
+            with self.opener.open(request, timeout=timeout) as response:
                 data = response.read(limit + 1)
                 if len(data) > limit:
                     raise ValueError("response_too_large")

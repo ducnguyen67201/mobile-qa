@@ -67,6 +67,48 @@ fn token() -> String {
     loco_rs::hash::random_string(64)
 }
 
+/// Wait without holding a transaction or device reservation. Subscribe before the
+/// first query so a commit between checking the queue and waiting cannot be lost.
+pub async fn claim_wait(
+    ctx: &AppContext,
+    worker: &Worker,
+    input: ClaimRequest,
+    wait: std::time::Duration,
+) -> ApiResult<ClaimResponse> {
+    use tokio::time::{Duration, Instant};
+    let mut wakeup = super::execution_wakeup::subscribe(ctx);
+    let deadline = Instant::now() + wait.min(Duration::from_secs(30));
+    loop {
+        // Authentication may have been revoked while this HTTP request was asleep.
+        let registered = rows(
+            &ctx.db,
+            "SELECT id FROM execution_workers WHERE id=$1 AND app_id=$2 \
+                AND profile_id=$3 AND revoked=false",
+            vec![
+                worker.id.into(),
+                worker.app_id.into(),
+                worker.profile_id.into(),
+            ],
+        )
+        .await?;
+        if registered.is_empty() {
+            return Err(ApiFailure::unauthorized());
+        }
+        let mut response = claim(ctx, worker, input.clone()).await?;
+        if response.lease.is_some() || Instant::now() >= deadline {
+            response.poll_after_seconds = 0;
+            return Ok(response);
+        }
+        // Local commits wake immediately. Other API processes are discovered within
+        // five seconds; PostgreSQL remains authoritative if a notification is lost.
+        let until = deadline.min(Instant::now() + Duration::from_secs(5));
+        tokio::select! {
+            _ = wakeup.changed() => {},
+            _ = tokio::time::sleep_until(until) => {},
+        }
+    }
+}
+
 pub async fn claim(
     ctx: &AppContext,
     worker: &Worker,
@@ -450,6 +492,7 @@ pub async fn cleanup(
     }
     let result = runs::attempt(&tx, id).await?;
     tx.commit().await?;
+    super::execution_wakeup::notify(ctx);
     Ok(AttemptReceipt { attempt: result })
 }
 /// Trusted operator reconciles physical recovery; never changes the original outcome.
@@ -490,5 +533,6 @@ pub async fn recover(
     )
     .await?;
     tx.commit().await?;
+    super::execution_wakeup::notify(ctx);
     Ok(())
 }

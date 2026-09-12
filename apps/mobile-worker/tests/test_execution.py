@@ -218,3 +218,24 @@ def test_checkpoint_deadline_respects_approved_window(monkeypatch):
     fake_device = SimpleNamespace(profile=SimpleNamespace(assertion_seconds=60))
     with pytest.raises(QualificationError, match="observation_timeout"):
         device.Device.capture(fake_device, "checkpoint", "task", timeout=1)
+
+
+def test_long_poll_has_longer_timeout_than_heartbeat():
+    from io import BytesIO
+
+    class Opener:
+        def __init__(self):
+            self.timeouts = []
+
+        def open(self, request, timeout):
+            self.timeouts.append(timeout)
+            return BytesIO(b'{"lease":null,"poll_after_seconds":0}')
+
+    client = Client("http://127.0.0.1:5151", "x" * 64)
+    opener = Opener()
+    client.opener = opener
+    result = client.send("/api/worker/claims", {}, ClaimResponse)
+    assert result.lease is None
+    assert result.poll_after_seconds == 0
+    client.raw("POST", "/api/worker/attempts/example/heartbeat", b"{}")
+    assert opener.timeouts == [35, 5]

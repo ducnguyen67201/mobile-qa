@@ -234,6 +234,8 @@ jobs:
       - run: python3 infra/device-host/install_tools.py --sdk-root "$GITHUB_WORKSPACE/.private/android-sdk" --demo-only
       - name: Build and lint controlled APKs only
         run: |
+          # Hosted runners predefine a different SDK through this deprecated alias.
+          unset ANDROID_SDK_ROOT
           export ANDROID_HOME="$GITHUB_WORKSPACE/.private/android-sdk"
           cd apps/qa-demo-android
           ./gradlew --no-daemon :app:assembleGoodDebug :app:assembleBrokenDebug :app:lintGoodDebug :app:lintBrokenDebug

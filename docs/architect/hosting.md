@@ -7,12 +7,12 @@ remains a separate qualification decision.
 
 ## Initial deployment shape
 
-| Component | Initial placement | Reason / boundary |
-|---|---|---|
-| Rust API and compiled React dashboard | One Railway application service | Loco already has same-origin static SPA configuration; keep separate source apps but one deployed image |
-| PostgreSQL | Railway database service | API connects privately; Python never receives database credentials |
-| APKs and report artifacts | Railway private Buckets for hosted APKs; reports follow spec 04 | S3-compatible adapter exists; hosted round-trip and provisioning remain open |
-| Python Minitap worker and Android emulator | One separately qualified Linux x86_64 KVM host | Current harness owns the emulator locally; Railway device execution is not qualified |
+| Component                                  | Initial placement                                               | Reason / boundary                                                                                       |
+| ------------------------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Rust API and compiled React dashboard      | One Railway application service                                 | Loco already has same-origin static SPA configuration; keep separate source apps but one deployed image |
+| PostgreSQL                                 | Railway database service                                        | API connects privately; Python never receives database credentials                                      |
+| APKs and report artifacts                  | Railway private Buckets for hosted APKs; reports follow spec 04 | S3-compatible adapter exists; hosted round-trip and provisioning remain open                            |
+| Python Minitap worker and Android emulator | One separately qualified Linux x86_64 KVM host                  | Current harness owns the emulator locally; Railway device execution is not qualified                    |
 
 Railway supports container services and monorepos. Its documentation describes
 non-privileged containers, and a Railway employee's nested-virtualization support

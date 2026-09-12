@@ -28,7 +28,14 @@ check-contracts:
     python3 scripts/contracts.py --check
     python3 -m unittest scripts.test_contracts
 
+format:
+    python3 scripts/format.py
+
+format-check:
+    python3 scripts/format.py --check
+
 check-web:
+    pnpm --dir apps/web format:check
     pnpm --dir apps/web typecheck
     pnpm --dir apps/web lint
     pnpm --dir apps/web test
@@ -84,3 +91,10 @@ apk-fixtures:
 
 smoke-app-setup:
     python3 scripts/app_setup_smoke.py
+
+# Explicit HTTP worker commands. Simulated profiles never import the device SDK.
+dev-execution-fake origin profile_id state:
+    uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker execution-worker --origin {{quote(origin)}} --profile-id {{quote(profile_id)}} --state {{quote(state)}}
+
+smoke-execution:
+    python3 scripts/execution_smoke.py

@@ -3,8 +3,18 @@
   "InstanceType": "m8i.xlarge",
   "MinCount": 1,
   "MaxCount": 1,
-  "CpuOptions": {"NestedVirtualization": "enabled"},
-  "MetadataOptions": {"HttpTokens": "required", "HttpEndpoint": "enabled"},
+  "CpuOptions": { "NestedVirtualization": "enabled" },
+  "MetadataOptions": { "HttpTokens": "required", "HttpEndpoint": "enabled" },
   "InstanceInitiatedShutdownBehavior": "stop",
-  "BlockDeviceMappings": [{"DeviceName": "/dev/sda1", "Ebs": {"VolumeSize": 40, "VolumeType": "gp3", "Encrypted": true, "DeleteOnTermination": true}}]
+  "BlockDeviceMappings": [
+    {
+      "DeviceName": "/dev/sda1",
+      "Ebs": {
+        "VolumeSize": 40,
+        "VolumeType": "gp3",
+        "Encrypted": true,
+        "DeleteOnTermination": true
+      }
+    }
+  ]
 }

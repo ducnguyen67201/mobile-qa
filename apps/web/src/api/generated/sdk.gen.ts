@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { CompleteBuildUploadData, CompleteBuildUploadErrors, CompleteBuildUploadResponses, CreateAppData, CreateAppErrors, CreateAppResponses, CreateBuildUploadData, CreateBuildUploadErrors, CreateBuildUploadResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, GetAppData, GetAppErrors, GetAppResponses, GetBuildData, GetBuildErrors, GetBuildResponses, GetBuildUploadData, GetBuildUploadErrors, GetBuildUploadResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, ListAppsData, ListAppsErrors, ListAppsResponses, ListBuildsData, ListBuildsErrors, ListBuildsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, StartGoogleSignInData, StartGoogleSignInErrors, StartGoogleSignInResponses, UpdateEnvironmentData, UpdateEnvironmentErrors, UpdateEnvironmentResponses, UploadBuildContentData, UploadBuildContentErrors, UploadBuildContentResponses } from './types.gen';
-import { zCompleteBuildUploadHeaders, zCompleteBuildUploadPath, zCreateAppBody, zCreateAppHeaders, zCreateBuildUploadBody, zCreateBuildUploadHeaders, zCreateBuildUploadPath, zCreateWorkspaceBody, zCreateWorkspaceHeaders, zGetAppPath, zGetBuildPath, zGetBuildUploadPath, zListAppsQuery, zListBuildsPath, zListBuildsQuery, zLoginBody, zLoginHeaders, zLogoutHeaders, zStartGoogleSignInHeaders, zUpdateEnvironmentBody, zUpdateEnvironmentHeaders, zUpdateEnvironmentPath, zUploadBuildContentBody, zUploadBuildContentHeaders, zUploadBuildContentPath } from './zod.gen';
+import type { CancelRunData, CancelRunErrors, CancelRunResponses, CompleteBuildUploadData, CompleteBuildUploadErrors, CompleteBuildUploadResponses, CreateAppData, CreateAppErrors, CreateAppResponses, CreateBuildUploadData, CreateBuildUploadErrors, CreateBuildUploadResponses, CreateRunData, CreateRunErrors, CreateRunResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, GetAppData, GetAppErrors, GetAppResponses, GetBuildData, GetBuildErrors, GetBuildResponses, GetBuildUploadData, GetBuildUploadErrors, GetBuildUploadResponses, GetExecutionPlanData, GetExecutionPlanErrors, GetExecutionPlanResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetRunArtifactData, GetRunArtifactErrors, GetRunArtifactResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, ListAppsData, ListAppsErrors, ListAppsResponses, ListBuildsData, ListBuildsErrors, ListBuildsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, StartGoogleSignInData, StartGoogleSignInErrors, StartGoogleSignInResponses, UpdateEnvironmentData, UpdateEnvironmentErrors, UpdateEnvironmentResponses, UploadBuildContentData, UploadBuildContentErrors, UploadBuildContentResponses } from './types.gen';
+import { zCancelRunPath, zCompleteBuildUploadHeaders, zCompleteBuildUploadPath, zCreateAppBody, zCreateAppHeaders, zCreateBuildUploadBody, zCreateBuildUploadHeaders, zCreateBuildUploadPath, zCreateRunBody, zCreateRunHeaders, zCreateRunPath, zCreateWorkspaceBody, zCreateWorkspaceHeaders, zGetAppPath, zGetBuildPath, zGetBuildUploadPath, zGetExecutionPlanPath, zGetExecutionPlanQuery, zGetRunArtifactPath, zGetRunPath, zListAppsQuery, zListBuildsPath, zListBuildsQuery, zListRunsPath, zListRunsQuery, zLoginBody, zLoginHeaders, zLogoutHeaders, zStartGoogleSignInHeaders, zUpdateEnvironmentBody, zUpdateEnvironmentHeaders, zUpdateEnvironmentPath, zUploadBuildContentBody, zUploadBuildContentHeaders, zUploadBuildContentPath } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -193,6 +193,56 @@ export const updateEnvironment = <ThrowOnError extends boolean = false>(options:
     }
 });
 
+export const getExecutionPlan = <ThrowOnError extends boolean = false>(options: Options<GetExecutionPlanData, ThrowOnError>): RequestResult<GetExecutionPlanResponses, GetExecutionPlanErrors, ThrowOnError> => (options.client ?? client).get<GetExecutionPlanResponses, GetExecutionPlanErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetExecutionPlanPath,
+        query: zGetExecutionPlanQuery
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/execution-plan',
+    ...options
+});
+
+export const listRuns = <ThrowOnError extends boolean = false>(options: Options<ListRunsData, ThrowOnError>): RequestResult<ListRunsResponses, ListRunsErrors, ThrowOnError> => (options.client ?? client).get<ListRunsResponses, ListRunsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zListRunsPath,
+        query: zListRunsQuery.optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/runs',
+    ...options
+});
+
+export const createRun = <ThrowOnError extends boolean = false>(options: Options<CreateRunData, ThrowOnError>): RequestResult<CreateRunResponses, CreateRunErrors, ThrowOnError> => (options.client ?? client).post<CreateRunResponses, CreateRunErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zCreateRunBody,
+        headers: zCreateRunHeaders,
+        path: zCreateRunPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/runs',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
 export const startGoogleSignIn = <ThrowOnError extends boolean = false>(options: Options<StartGoogleSignInData, ThrowOnError>): RequestResult<StartGoogleSignInResponses, StartGoogleSignInErrors, ThrowOnError> => (options.client ?? client).post<StartGoogleSignInResponses, StartGoogleSignInErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
@@ -257,6 +307,51 @@ export const getHealth = <ThrowOnError extends boolean = false>(options?: Option
         query: z.never().optional()
     }).parseAsync(data),
     url: '/api/health',
+    ...options
+});
+
+export const getRun = <ThrowOnError extends boolean = false>(options: Options<GetRunData, ThrowOnError>): RequestResult<GetRunResponses, GetRunErrors, ThrowOnError> => (options.client ?? client).get<GetRunResponses, GetRunErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetRunPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/runs/{run_id}',
+    ...options
+});
+
+export const getRunArtifact = <ThrowOnError extends boolean = false>(options: Options<GetRunArtifactData, ThrowOnError>): RequestResult<GetRunArtifactResponses, GetRunArtifactErrors, ThrowOnError> => (options.client ?? client).get<GetRunArtifactResponses, GetRunArtifactErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetRunArtifactPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/runs/{run_id}/artifacts/{artifact_id}/content',
+    ...options
+});
+
+export const cancelRun = <ThrowOnError extends boolean = false>(options: Options<CancelRunData, ThrowOnError>): RequestResult<CancelRunResponses, CancelRunErrors, ThrowOnError> => (options.client ?? client).post<CancelRunResponses, CancelRunErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zCancelRunPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/runs/{run_id}/cancel',
     ...options
 });
 

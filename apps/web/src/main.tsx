@@ -10,10 +10,16 @@ import './index.css'
 const root = document.getElementById('root')
 if (!root) throw new Error('No root element found')
 // Avoid hidden retries/focus refreshes in the foundation; the health page exposes Retry.
-const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } })
+const client = new QueryClient({
+  defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+})
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <MantineProvider theme={theme} cssVariablesResolver={cssVariablesResolver} forceColorScheme="light">
+    <MantineProvider
+      theme={theme}
+      cssVariablesResolver={cssVariablesResolver}
+      forceColorScheme="light"
+    >
       <QueryClientProvider client={client}>
         <RouterProvider router={router} />
       </QueryClientProvider>

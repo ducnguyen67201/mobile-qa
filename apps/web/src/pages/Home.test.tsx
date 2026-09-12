@@ -49,20 +49,33 @@ it('keeps an unavailable session visibly retryable', async () => {
   expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: 'Your apps.' })).not.toBeInTheDocument()
 })
-it('keeps tests and runs truthful placeholders behind authentication', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(session)))
+it('keeps operator-managed tests and run history behind authentication', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) =>
+      Response.json(
+        new URL(request.url).pathname.endsWith('/session')
+          ? session
+          : { items: [], next_cursor: null },
+      ),
+    ),
+  )
   show('/tests')
   expect(await screen.findByRole('heading', { name: 'Tests', level: 1 })).toBeInTheDocument()
   await userEvent.click(screen.getByRole('link', { name: /Runs/ }))
   expect(screen.getByRole('heading', { name: 'Runs', level: 1 })).toBeInTheDocument()
-  expect(screen.getByText(/planned for a later phase/)).toBeInTheDocument()
+  expect(screen.getByText(/Saved release checks and their evidence/)).toBeInTheDocument()
 })
-it.each(['https://evil.test', '//evil.test', '/apps\\evil', '/sign-in', 'javascript:alert(1)', null])(
-  'rejects unsafe return destination %s',
-  (value) => {
-    expect(safeReturnTo(value)).toBe('/apps')
-  },
-)
+it.each([
+  'https://evil.test',
+  '//evil.test',
+  '/apps\\evil',
+  '/sign-in',
+  'javascript:alert(1)',
+  null,
+])('rejects unsafe return destination %s', (value) => {
+  expect(safeReturnTo(value)).toBe('/apps')
+})
 it('preserves a local build destination', () => {
   expect(safeReturnTo('/apps/example?build=123')).toBe('/apps/example?build=123')
 })
@@ -109,13 +122,17 @@ it('opens the account menu and signs out through the API', async () => {
   vi.stubGlobal('fetch', fetchMock)
   show('/apps')
   await userEvent.click(
-    await screen.findByRole('button', { name: `Open account menu for ${session.user.display_name}` }),
+    await screen.findByRole('button', {
+      name: `Open account menu for ${session.user.display_name}`,
+    }),
   )
   const menu = await screen.findByRole('menu')
   await userEvent.click(within(menu).getByRole('menuitem', { name: 'Sign out' }))
   expect(await screen.findByRole('heading', { name: 'Welcome back.' })).toBeInTheDocument()
   expect(
-    fetchMock.mock.calls.some(([request]) => request.url.endsWith('/logout') && request.method === 'POST'),
+    fetchMock.mock.calls.some(
+      ([request]) => request.url.endsWith('/logout') && request.method === 'POST',
+    ),
   ).toBe(true)
 })
 
@@ -159,7 +176,9 @@ it('submits the current app draft as the generated API payload', async () => {
 vi.mock('@react-oauth/google', () => ({
   GoogleOAuthProvider: ({ children }: { children: React.ReactNode }) => children,
   GoogleLogin: ({ onSuccess }: { onSuccess: (response: { credential: string }) => void }) => (
-    <button onClick={() => onSuccess({ credential: 'synthetic-google-token' })}>Continue with Google</button>
+    <button onClick={() => onSuccess({ credential: 'synthetic-google-token' })}>
+      Continue with Google
+    </button>
   ),
 }))
 it('offers only Google sign-in and exchanges the credential through the generated API', async () => {

@@ -48,7 +48,7 @@ impl Hooks for App {
             crate::middleware::request_context,
         )))
     }
-    // Device workers are a separate future protocol.
+    // Device workers poll the explicit HTTP protocol; startup never launches a phone.
     async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn Initializer>>> {
         Ok(vec![])
     }
@@ -56,16 +56,19 @@ impl Hooks for App {
         AppRoutes::with_default_routes()
             .add_route(controllers::health::routes())
             .add_route(controllers::setup::routes())
+            .add_route(controllers::runs::routes())
+            .add_route(controllers::worker::routes())
         // routes-inject (do not remove)
     }
     // No Rust background jobs are registered yet. This hook will not launch the
-    // separate Python device worker; that worker needs the planned HTTP protocol.
+    // separate Python device worker; it polls our HTTP lease protocol.
     async fn connect_workers(_ctx: &AppContext, _queue: &Queue) -> Result<()> {
         Ok(())
     }
     fn register_tasks(tasks: &mut Tasks) {
         tasks.register(crate::tasks::operator::Operator);
         tasks.register(crate::tasks::cleanup::Cleanup);
+        tasks.register(crate::tasks::execution::Execution);
         // tasks-inject (do not remove)
     }
     // Explicit provisioning owns account creation. Startup never resets or seeds customer data.

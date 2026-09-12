@@ -1,6 +1,17 @@
 # 04 — Run one test and produce an evidence report
 
-Status: planned. Depends on: 02 and 03. Owns: Rust run/scheduler/report modules and migrations, worker protocol/adapter, Runs UI.
+Status: locally implemented and simulated HTTP flow verified; real-device/browser and hosted acceptance pending. Depends on: 02 and 03. Owns: Rust run/scheduler/report modules and migrations, worker protocol/adapter, Runs UI.
+
+## Implementation planning
+
+The [phase 04 implementation plan](../../../.claude/PRPs/plans/04-execution-and-reports.plan.md)
+was prepared against main `9eb5dba` plus the device integration branch `d4c4729`.
+The local implementation is recorded in the [implementation report](../../../.claude/PRPs/reports/04-execution-and-reports-report.md); device qualification and hosted
+storage acceptance remain open. It covers versioned operator-authored test definitions, semantic
+Minitap actions, independent evidence checks, HTTP leases and the Runs interface.
+The existing executable test is the controlled persistence demo; the customer test
+editor remains spec 05. The plan records proposed implementation details; this spec
+and product requirements remain authoritative.
 
 ## Deliverable
 
@@ -52,3 +63,22 @@ Poll run status through TanStack Query initially, stopping when terminal and bac
 Use the fake worker for deterministic tests: duplicate submit/completion, worker disappearance, late completion, cancellation, artifact failure, backend outage, mixed retries and cross-project access. Use a real PostgreSQL integration test for competing claims and lease uniqueness.
 
 Repeat the three qualified device scenarios through the browser. Restart the Rust app during a run and recover persisted progress; interrupt the worker and prove it cannot cause double execution on the same account/device. Done means an actual useful report, not just a “job succeeded” badge.
+
+## Local implementation scope
+
+The phase 04 implementation uses one typed version store (`execution_definitions`)
+for cases, suites and plans, with distinct Rust variants and separate review grants
+and immutable approvals. Attempts serve as durable queue records; the manifest pins
+resolved case selections. This reduces parallel table/entity scaffolding while keeping
+case/suite/plan meaning and version identity separate. All SQL goes through SeaORM
+with bound parameters; the migration owns constraints.
+
+The first registered adapter is `demo_persistence_v1`. Real mode reuses the phase 02
+controlled device lifecycle and executes imported semantic actions through the shared
+pinned Minitap seam. Fake mode uses the same HTTP protocol and labels all reports as
+simulated. Arbitrary customer package/reset/login adapters and the phase 05 editor
+remain future work. SDK traces remain private; normalized checkpoint PNG/XML and
+semantic action events are the customer-visible evidence in this slice.
+
+Completion remains subject to the recorded validation report and open real-device /
+hosted acceptance gates. No paid resources are launched by normal checks or smoke.

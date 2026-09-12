@@ -15,8 +15,8 @@ export function Placeholder({ title, description }: { title: string; description
             One step at a time.
           </Title>
           <Text size="sm" c="dimmed">
-            This part of the workspace is planned for a later phase. Start by setting up your app and
-            validating an APK.
+            This part of the workspace is planned for a later phase. Start by setting up your app
+            and validating an APK.
           </Text>
           <Button component={Link} to="/apps" variant="outline">
             Go to apps

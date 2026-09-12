@@ -14,3 +14,5 @@
 /apps/qa-demo-android/**/build/
 /apps/qa-demo-android/local.properties
 /apps/mobile-worker/dist/
+
+**/*.tsbuildinfo

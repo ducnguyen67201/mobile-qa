@@ -104,3 +104,16 @@ The browser's `workspace` URL parameter maps to the list API's `organization_id`
 List queries validate membership, and cursors from another organization are rejected.
 Nested resources continue to use their persisted app/organization ownership for
 server authorization; URL selection never grants access.
+
+## Phase 04 execution boundary
+
+`crates/contracts/src/execution.rs` owns semantic definitions, manifests, results and
+worker envelope leaves. `execution_api.rs` merges browser operations into the same
+OpenAPI export; `worker/execution.rs` exposes protocol/local child messages through
+WorkerContracts. Qualification and foundation fake messages remain distinct.
+
+Definitions are imported as a tagged case/suite/plan JSON object. Approval is separate
+and binds an exact content hash and reviewer purpose. `contracts/fixtures/execution/`
+contains a synthetic persistence case, not customer test data. Worker requests use
+bearer identity plus an attempt-scoped token/generation; Python never receives DB
+credentials. See the phase 04 plan for the route inventory and fencing semantics.

@@ -283,9 +283,17 @@ class Device:
         return observe(xml, task), xml, png
 
     def capture(
-        self, name: str, task: str, predicate: Callable[[Observation], bool] | None = None
+        self,
+        name: str,
+        task: str,
+        predicate: Callable[[Observation], bool] | None = None,
+        *,
+        timeout: int | None = None,
     ) -> Observation:
-        deadline = time.monotonic() + self.profile.assertion_seconds
+        deadline = time.monotonic() + min(
+            self.profile.assertion_seconds,
+            timeout if timeout is not None else self.profile.assertion_seconds,
+        )
         last: tuple[Observation, bytes, bytes] | None = None
         stable = 0
         while time.monotonic() < deadline:

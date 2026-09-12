@@ -27,7 +27,9 @@ export function Protected({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('mobile-qa:unauthorized', expire)
   }, [client, navigate])
   if (query.error instanceof ApiClientError && query.error.status === 401)
-    return <Navigate to="/sign-in" state={{ returnTo: location.pathname + location.search }} replace />
+    return (
+      <Navigate to="/sign-in" state={{ returnTo: location.pathname + location.search }} replace />
+    )
   if (query.isError)
     return (
       <Container component="main" size="sm" p="xl">

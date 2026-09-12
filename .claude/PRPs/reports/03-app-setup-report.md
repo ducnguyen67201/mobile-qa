@@ -13,50 +13,50 @@ The user subsequently requested publishing this branch as a pull request.
 
 ## Assessment vs reality
 
-| Metric | Plan | Actual |
-|---|---|---|
-| Complexity | XL | XL: auth, tenant schema, storage, tools and UI integrated |
-| Confidence | 8/10 | Local behavior verified; browser/hosted acceptance unverified |
-| Files changed | About 115–125 | See working diff; includes subsequent Mantine replacement |
-| Implementation | 14 tasks | Local scope complete; explicit external gates retained |
+| Metric         | Plan          | Actual                                                        |
+| -------------- | ------------- | ------------------------------------------------------------- |
+| Complexity     | XL            | XL: auth, tenant schema, storage, tools and UI integrated     |
+| Confidence     | 8/10          | Local behavior verified; browser/hosted acceptance unverified |
+| Files changed  | About 115–125 | See working diff; includes subsequent Mantine replacement     |
+| Implementation | 14 tasks      | Local scope complete; explicit external gates retained        |
 
 ## Tasks completed
 
-| # | Task | Status |
-|---|---|---|
-| 1 | Configuration and error/contracts foundation | Complete for local implementation |
-| 2 | Users, organizations and revocable sessions | Complete for local implementation |
-| 3 | Protected sign-in/dashboard shell | Complete for local implementation |
-| 4 | App/environment persistence | Complete for local implementation |
-| 5 | Create-app and persisted detail UI | Complete for local implementation |
-| 6 | Private upload sessions and bounded transfer | Complete for local implementation |
-| 7 | Real APK validation and idempotent completion | Complete for local implementation |
-| 8 | Upload recovery and build history | Complete for local implementation |
-| 9 | Scoped references and operator observations | Complete for local implementation |
-| 10 | Honest readiness and Settings | Complete for local implementation |
-| 11 | Explicit maintenance and operational setup | Complete for local implementation |
-| 12 | Synthetic fixtures and acceptance tests | Complete for local implementation |
-| 13 | CI, HTTP smoke and canonical documentation | Complete for local implementation |
-| 14 | Generation and consolidated validation | Complete for local implementation |
+| #   | Task                                          | Status                            |
+| --- | --------------------------------------------- | --------------------------------- |
+| 1   | Configuration and error/contracts foundation  | Complete for local implementation |
+| 2   | Users, organizations and revocable sessions   | Complete for local implementation |
+| 3   | Protected sign-in/dashboard shell             | Complete for local implementation |
+| 4   | App/environment persistence                   | Complete for local implementation |
+| 5   | Create-app and persisted detail UI            | Complete for local implementation |
+| 6   | Private upload sessions and bounded transfer  | Complete for local implementation |
+| 7   | Real APK validation and idempotent completion | Complete for local implementation |
+| 8   | Upload recovery and build history             | Complete for local implementation |
+| 9   | Scoped references and operator observations   | Complete for local implementation |
+| 10  | Honest readiness and Settings                 | Complete for local implementation |
+| 11  | Explicit maintenance and operational setup    | Complete for local implementation |
+| 12  | Synthetic fixtures and acceptance tests       | Complete for local implementation |
+| 13  | CI, HTTP smoke and canonical documentation    | Complete for local implementation |
+| 14  | Generation and consolidated validation        | Complete for local implementation |
 
 ## Validation results
 
-| Check | Result | Evidence |
-|---|---|---|
-| Rust format / Clippy | Pass | Workspace/all targets, warnings denied |
-| Rust tests | Pass | 5 API units, 6 app-setup integration tests, 1 health route test, 4 pure contract tests |
-| TypeScript / ESLint | Pass | Full web scope |
-| Web tests | Pass | 57 tests across 5 files |
-| Generated drift | Pass | No changed outputs after final locked tools installed |
-| Exporter synchronization regression | Pass | 1 Python helper test |
-| Builds | Pass | Cargo workspace and Vite production |
-| Real APK HTTP smoke | Pass | Sign in/create/stream/finalize; independent size/hash; foreign-org denial; same persisted build after API restart |
-| Foundation smoke | Pass | API direct/proxy health, unknown route, migration bookkeeping, fake scenarios and network-blocked Minitap import |
-| Frontend dependency audit | Pass | No known advisories |
-| Rust dependency audit | Finding retained | RUSTSEC-2023-0071 in transitive rsa 0.9.10; app sessions use HMAC; Google uses RSA public-key verification, with no production RSA private-key operations |
-| GAN design | Provisional source pass | Mantine source review passed; historical shadcn scores 7.27 → 7.87 |
-| Rendered browser acceptance | Open | Existing admin-policy denial; no bypass attempted |
-| Railway round-trip | Open | Adapter implemented, no authorized bucket credentials/provisioning used |
+| Check                               | Result                  | Evidence                                                                                                                                                  |
+| ----------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rust format / Clippy                | Pass                    | Workspace/all targets, warnings denied                                                                                                                    |
+| Rust tests                          | Pass                    | 5 API units, 6 app-setup integration tests, 1 health route test, 4 pure contract tests                                                                    |
+| TypeScript / ESLint                 | Pass                    | Full web scope                                                                                                                                            |
+| Web tests                           | Pass                    | 57 tests across 5 files                                                                                                                                   |
+| Generated drift                     | Pass                    | No changed outputs after final locked tools installed                                                                                                     |
+| Exporter synchronization regression | Pass                    | 1 Python helper test                                                                                                                                      |
+| Builds                              | Pass                    | Cargo workspace and Vite production                                                                                                                       |
+| Real APK HTTP smoke                 | Pass                    | Sign in/create/stream/finalize; independent size/hash; foreign-org denial; same persisted build after API restart                                         |
+| Foundation smoke                    | Pass                    | API direct/proxy health, unknown route, migration bookkeeping, fake scenarios and network-blocked Minitap import                                          |
+| Frontend dependency audit           | Pass                    | No known advisories                                                                                                                                       |
+| Rust dependency audit               | Finding retained        | RUSTSEC-2023-0071 in transitive rsa 0.9.10; app sessions use HMAC; Google uses RSA public-key verification, with no production RSA private-key operations |
+| GAN design                          | Provisional source pass | Mantine source review passed; historical shadcn scores 7.27 → 7.87                                                                                        |
+| Rendered browser acceptance         | Open                    | Existing admin-policy denial; no bypass attempted                                                                                                         |
+| Railway round-trip                  | Open                    | Adapter implemented, no authorized bucket credentials/provisioning used                                                                                   |
 
 Measured locally: 0.147s finalization of a tiny signed synthetic resource-only APK;
 0.211s warm API startup in the foundation smoke. These are not production SLAs or
@@ -128,118 +128,118 @@ hostile Android archive variant.
 
 ## Files changed
 
-| File | Action |
-|---|---|
-| `.github/workflows/ci.yaml` | Modified |
-| `AGENTS.md` | Modified |
-| `Cargo.lock` | Modified |
-| `Cargo.toml` | Modified |
-| `NOTICE` | Modified |
-| `apps/api/Cargo.toml` | Modified |
-| `apps/api/migration/src/lib.rs` | Modified |
-| `apps/api/src/app.rs` | Modified |
-| `apps/api/src/controllers/health.rs` | Modified |
-| `apps/api/src/controllers/mod.rs` | Modified |
-| `apps/api/src/lib.rs` | Modified |
-| `apps/api/src/models/mod.rs` | Modified |
-| `apps/api/src/tasks/mod.rs` | Modified |
-| `apps/api/tests/health.rs` | Modified |
-| `apps/web/components.json` | Deleted |
-| `apps/web/openapi-ts.config.ts` | Modified |
-| `apps/web/package.json` | Modified |
-| `apps/web/pnpm-lock.yaml` | Modified |
-| `apps/web/src/App.tsx` | Modified |
-| `apps/web/src/api/generated/index.ts` | Modified |
-| `apps/web/src/api/generated/sdk.gen.ts` | Modified |
-| `apps/web/src/api/generated/types.gen.ts` | Modified |
-| `apps/web/src/api/generated/zod.gen.ts` | Modified |
-| `apps/web/src/api/runtime.ts` | Modified |
-| `apps/web/src/api/transport.test.ts` | Modified |
-| `apps/web/src/components/ui/button.tsx` | Deleted |
-| `apps/web/src/components/ui/card.tsx` | Deleted |
-| `apps/web/src/index.css` | Modified |
-| `apps/web/src/lib/utils.ts` | Deleted |
-| `apps/web/src/main.tsx` | Modified |
-| `apps/web/src/pages/Home.test.tsx` | Modified |
-| `apps/web/src/pages/Home.tsx` | Modified |
-| `apps/web/src/pages/Placeholder.tsx` | Modified |
-| `apps/web/src/routes.tsx` | Modified |
-| `apps/web/src/test/contracts.compile.ts` | Modified |
-| `apps/web/src/test/setup.ts` | Modified |
-| `apps/web/vite.config.ts` | Modified |
-| `contracts/browser.openapi.json` | Modified |
-| `crates/contracts/src/browser.rs` | Modified |
-| `docs/architect/README.md` | Modified |
-| `docs/architect/contracts.md` | Modified |
-| `docs/architect/decisions.md` | Modified |
-| `docs/architect/dependencies.md` | Modified |
-| `docs/architect/development.md` | Modified |
-| `docs/architect/environment.md` | Modified |
-| `docs/architect/implementation/00-master-spec.md` | Modified |
+| File                                                            | Action   |
+| --------------------------------------------------------------- | -------- |
+| `.github/workflows/ci.yaml`                                     | Modified |
+| `AGENTS.md`                                                     | Modified |
+| `Cargo.lock`                                                    | Modified |
+| `Cargo.toml`                                                    | Modified |
+| `NOTICE`                                                        | Modified |
+| `apps/api/Cargo.toml`                                           | Modified |
+| `apps/api/migration/src/lib.rs`                                 | Modified |
+| `apps/api/src/app.rs`                                           | Modified |
+| `apps/api/src/controllers/health.rs`                            | Modified |
+| `apps/api/src/controllers/mod.rs`                               | Modified |
+| `apps/api/src/lib.rs`                                           | Modified |
+| `apps/api/src/models/mod.rs`                                    | Modified |
+| `apps/api/src/tasks/mod.rs`                                     | Modified |
+| `apps/api/tests/health.rs`                                      | Modified |
+| `apps/web/components.json`                                      | Deleted  |
+| `apps/web/openapi-ts.config.ts`                                 | Modified |
+| `apps/web/package.json`                                         | Modified |
+| `apps/web/pnpm-lock.yaml`                                       | Modified |
+| `apps/web/src/App.tsx`                                          | Modified |
+| `apps/web/src/api/generated/index.ts`                           | Modified |
+| `apps/web/src/api/generated/sdk.gen.ts`                         | Modified |
+| `apps/web/src/api/generated/types.gen.ts`                       | Modified |
+| `apps/web/src/api/generated/zod.gen.ts`                         | Modified |
+| `apps/web/src/api/runtime.ts`                                   | Modified |
+| `apps/web/src/api/transport.test.ts`                            | Modified |
+| `apps/web/src/components/ui/button.tsx`                         | Deleted  |
+| `apps/web/src/components/ui/card.tsx`                           | Deleted  |
+| `apps/web/src/index.css`                                        | Modified |
+| `apps/web/src/lib/utils.ts`                                     | Deleted  |
+| `apps/web/src/main.tsx`                                         | Modified |
+| `apps/web/src/pages/Home.test.tsx`                              | Modified |
+| `apps/web/src/pages/Home.tsx`                                   | Modified |
+| `apps/web/src/pages/Placeholder.tsx`                            | Modified |
+| `apps/web/src/routes.tsx`                                       | Modified |
+| `apps/web/src/test/contracts.compile.ts`                        | Modified |
+| `apps/web/src/test/setup.ts`                                    | Modified |
+| `apps/web/vite.config.ts`                                       | Modified |
+| `contracts/browser.openapi.json`                                | Modified |
+| `crates/contracts/src/browser.rs`                               | Modified |
+| `docs/architect/README.md`                                      | Modified |
+| `docs/architect/contracts.md`                                   | Modified |
+| `docs/architect/decisions.md`                                   | Modified |
+| `docs/architect/dependencies.md`                                | Modified |
+| `docs/architect/development.md`                                 | Modified |
+| `docs/architect/environment.md`                                 | Modified |
+| `docs/architect/implementation/00-master-spec.md`               | Modified |
 | `docs/architect/implementation/01-source-setup-and-fast-dev.md` | Modified |
-| `docs/architect/implementation/03-app-setup-and-ui-backend.md` | Modified |
-| `docs/architect/product.md` | Modified |
-| `docs/architect/status.md` | Modified |
-| `docs/architect/system.md` | Modified |
-| `justfile` | Modified |
-| `.claude/PRPs/plans/completed/03-app-setup.plan.md` | Created |
-| `.claude/PRPs/reports/03-app-setup-report.md` | Created |
-| `apps/api/migration/src/m20260912_000001_app_setup.rs` | Created |
-| `apps/api/src/config.rs` | Created |
-| `apps/api/src/controllers/setup.rs` | Created |
-| `apps/api/src/errors.rs` | Created |
-| `apps/api/src/middleware/mod.rs` | Created |
-| `apps/api/src/models/_entities/app_memberships.rs` | Created |
-| `apps/api/src/models/_entities/apps.rs` | Created |
-| `apps/api/src/models/_entities/build_uploads.rs` | Created |
-| `apps/api/src/models/_entities/builds.rs` | Created |
-| `apps/api/src/models/_entities/environment_checks.rs` | Created |
-| `apps/api/src/models/_entities/environments.rs` | Created |
-| `apps/api/src/models/_entities/login_attempts.rs` | Created |
-| `apps/api/src/models/_entities/memberships.rs` | Created |
-| `apps/api/src/models/_entities/mod.rs` | Created |
-| `apps/api/src/models/_entities/organizations.rs` | Created |
-| `apps/api/src/models/_entities/secret_references.rs` | Created |
-| `apps/api/src/models/_entities/sessions.rs` | Created |
-| `apps/api/src/models/_entities/users.rs` | Created |
-| `apps/api/src/services/apk_validation.rs` | Created |
-| `apps/api/src/services/apps.rs` | Created |
-| `apps/api/src/services/auth.rs` | Created |
-| `apps/api/src/services/mod.rs` | Created |
-| `apps/api/src/services/uploads.rs` | Created |
-| `apps/api/src/storage/mod.rs` | Created |
-| `apps/api/src/tasks/cleanup.rs` | Created |
-| `apps/api/src/tasks/operator.rs` | Created |
-| `apps/api/tests/app_setup.rs` | Created |
-| `apps/api/tests/fixtures/apk/AndroidManifest.xml` | Created |
-| `apps/api/tests/fixtures/apk/README.md` | Created |
-| `apps/web/src/api/setup.test.ts` | Created |
-| `apps/web/src/api/setup.ts` | Created |
-| `apps/web/src/components/app/apk-upload.tsx` | Created |
-| `apps/web/src/components/app/app-form.tsx` | Created |
-| `apps/web/src/components/app/build-status.tsx` | Created |
-| `apps/web/src/components/app/environment.tsx` | Created |
-| `apps/web/src/components/app/feedback.test.ts` | Created |
-| `apps/web/src/components/app/feedback.tsx` | Created |
-| `apps/web/src/components/app/session.tsx` | Created |
-| `apps/web/src/hooks/use-apk-upload.ts` | Created |
-| `apps/web/src/lib/format.ts` | Created |
-| `apps/web/src/pages/AppDetail.test.tsx` | Created |
-| `apps/web/src/pages/AppDetail.tsx` | Created |
-| `apps/web/src/pages/Apps.tsx` | Created |
-| `apps/web/src/pages/Settings.tsx` | Created |
-| `apps/web/src/pages/SignIn.tsx` | Created |
-| `apps/web/src/test/fixtures.ts` | Created |
-| `apps/web/src/theme.ts` | Created |
-| `gan-harness/eval-rubric.md` | Created |
-| `gan-harness/feedback/iteration-01.md` | Created |
-| `gan-harness/feedback/iteration-02.md` | Created |
-| `gan-harness/feedback/mantine-review.md` | Created |
-| `gan-harness/generator-state.md` | Created |
-| `gan-harness/spec.md` | Created |
-| `scripts/apk_fixtures.py` | Created |
-| `scripts/app_setup_smoke.py` | Created |
-| `scripts/setup_android.py` | Created |
+| `docs/architect/implementation/03-app-setup-and-ui-backend.md`  | Modified |
+| `docs/architect/product.md`                                     | Modified |
+| `docs/architect/status.md`                                      | Modified |
+| `docs/architect/system.md`                                      | Modified |
+| `justfile`                                                      | Modified |
+| `.claude/PRPs/plans/completed/03-app-setup.plan.md`             | Created  |
+| `.claude/PRPs/reports/03-app-setup-report.md`                   | Created  |
+| `apps/api/migration/src/m20260912_000001_app_setup.rs`          | Created  |
+| `apps/api/src/config.rs`                                        | Created  |
+| `apps/api/src/controllers/setup.rs`                             | Created  |
+| `apps/api/src/errors.rs`                                        | Created  |
+| `apps/api/src/middleware/mod.rs`                                | Created  |
+| `apps/api/src/models/_entities/app_memberships.rs`              | Created  |
+| `apps/api/src/models/_entities/apps.rs`                         | Created  |
+| `apps/api/src/models/_entities/build_uploads.rs`                | Created  |
+| `apps/api/src/models/_entities/builds.rs`                       | Created  |
+| `apps/api/src/models/_entities/environment_checks.rs`           | Created  |
+| `apps/api/src/models/_entities/environments.rs`                 | Created  |
+| `apps/api/src/models/_entities/login_attempts.rs`               | Created  |
+| `apps/api/src/models/_entities/memberships.rs`                  | Created  |
+| `apps/api/src/models/_entities/mod.rs`                          | Created  |
+| `apps/api/src/models/_entities/organizations.rs`                | Created  |
+| `apps/api/src/models/_entities/secret_references.rs`            | Created  |
+| `apps/api/src/models/_entities/sessions.rs`                     | Created  |
+| `apps/api/src/models/_entities/users.rs`                        | Created  |
+| `apps/api/src/services/apk_validation.rs`                       | Created  |
+| `apps/api/src/services/apps.rs`                                 | Created  |
+| `apps/api/src/services/auth.rs`                                 | Created  |
+| `apps/api/src/services/mod.rs`                                  | Created  |
+| `apps/api/src/services/uploads.rs`                              | Created  |
+| `apps/api/src/storage/mod.rs`                                   | Created  |
+| `apps/api/src/tasks/cleanup.rs`                                 | Created  |
+| `apps/api/src/tasks/operator.rs`                                | Created  |
+| `apps/api/tests/app_setup.rs`                                   | Created  |
+| `apps/api/tests/fixtures/apk/AndroidManifest.xml`               | Created  |
+| `apps/api/tests/fixtures/apk/README.md`                         | Created  |
+| `apps/web/src/api/setup.test.ts`                                | Created  |
+| `apps/web/src/api/setup.ts`                                     | Created  |
+| `apps/web/src/components/app/apk-upload.tsx`                    | Created  |
+| `apps/web/src/components/app/app-form.tsx`                      | Created  |
+| `apps/web/src/components/app/build-status.tsx`                  | Created  |
+| `apps/web/src/components/app/environment.tsx`                   | Created  |
+| `apps/web/src/components/app/feedback.test.ts`                  | Created  |
+| `apps/web/src/components/app/feedback.tsx`                      | Created  |
+| `apps/web/src/components/app/session.tsx`                       | Created  |
+| `apps/web/src/hooks/use-apk-upload.ts`                          | Created  |
+| `apps/web/src/lib/format.ts`                                    | Created  |
+| `apps/web/src/pages/AppDetail.test.tsx`                         | Created  |
+| `apps/web/src/pages/AppDetail.tsx`                              | Created  |
+| `apps/web/src/pages/Apps.tsx`                                   | Created  |
+| `apps/web/src/pages/Settings.tsx`                               | Created  |
+| `apps/web/src/pages/SignIn.tsx`                                 | Created  |
+| `apps/web/src/test/fixtures.ts`                                 | Created  |
+| `apps/web/src/theme.ts`                                         | Created  |
+| `gan-harness/eval-rubric.md`                                    | Created  |
+| `gan-harness/feedback/iteration-01.md`                          | Created  |
+| `gan-harness/feedback/iteration-02.md`                          | Created  |
+| `gan-harness/feedback/mantine-review.md`                        | Created  |
+| `gan-harness/generator-state.md`                                | Created  |
+| `gan-harness/spec.md`                                           | Created  |
+| `scripts/apk_fixtures.py`                                       | Created  |
+| `scripts/app_setup_smoke.py`                                    | Created  |
+| `scripts/setup_android.py`                                      | Created  |
 
 ## Mantine maintenance refactor (2026-09-12)
 
@@ -302,7 +302,6 @@ initially selected Java 8; selecting the installed Homebrew JDK 17 fixed the two
 checks. The health contract path-count assertion was updated for the new challenge
 route. Only failed or invalidated checks were repeated. Frontend audit is clean;
 RustSec still reports RUSTSEC-2023-0071.
-
 
 ## Public Google registration and owned workspaces (2026-09-12)
 

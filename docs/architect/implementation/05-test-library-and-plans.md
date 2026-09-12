@@ -8,12 +8,12 @@ Replace operator-only case fixtures with a compact editor/review experience. A c
 
 ## Objects and rules
 
-| Object | Meaning | Minimum fields |
-|---|---|---|
+| Object    | Meaning                                    | Minimum fields                                                                                                              |
+| --------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
 | Test case | One behavior with explicit expected checks | Title, source/criterion references, prerequisites, setup/reset, steps, checks, evidence method, fixture references, budgets |
-| Suite | Named grouping such as Login or Tasks | Title, ordered case-version membership |
-| Test plan | Reusable selection for a purpose | Suite/direct-case selection, requiredness, data/device configuration, policy |
-| Run | One execution against a particular build | Immutable resolved manifest, attempts and results |
+| Suite     | Named grouping such as Login or Tasks      | Title, ordered case-version membership                                                                                      |
+| Test plan | Reusable selection for a purpose           | Suite/direct-case selection, requiredness, data/device configuration, policy                                                |
+| Run       | One execution against a particular build   | Immutable resolved manifest, attempts and results                                                                           |
 
 A plan does not permanently select the build. Choose the build at run time. Cases can belong to several suites; resolve duplicates using case version + data variant + device configuration. If duplicate selections disagree on policy/requiredness, reject the ambiguity for review rather than choosing silently.
 

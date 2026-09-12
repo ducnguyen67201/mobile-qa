@@ -49,6 +49,6 @@ change. Preserve Loco scaffold markers, license attribution, lint directives and
 Review comments with their code in the same PR. After the complete edit batch, use
 checks appropriate to the change: token/AST/config comparisons, links and formatting
 can establish a comment-only change without repeating unrelated app suites. A changed
-Python module docstring may also improve CLI help where argparse reads __doc__; it
+Python module docstring may also improve CLI help where argparse reads **doc**; it
 must not quietly change command behavior. If executable code or generated schema changes,
 validate the affected implementation and consumers as usual.

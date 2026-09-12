@@ -41,16 +41,16 @@ also successful when inspected; this is not a claim of a separate human review.
 
 ## Open gates and planned work
 
-| Item | Status / next evidence |
-|---|---|
-| Spec 01 rendered browser/keyboard/Retry/HMR acceptance | Pending: browser tool could not verify admin policy; no bypass attempted |
-| Spec 02 real Android/cloud qualification | Local ADB and one live Minitap demo passed; full campaign and cloud qualification pending |
-| Spec 03 auth/app creation/APK upload | Local implementation verified; hosted Railway round-trip and allowed rendered acceptance remain open |
-| Spec 04 worker HTTP leases/runs/evidence reports | Planned; local fake protocol is not a scheduler |
-| Spec 05 versioned case/suite/plan editor and approvals | Planned |
-| Spec 06 requirements-to-tests generation | Planned |
-| Spec 07 regression, retention, production deployment and pilot reliability | Planned |
-| Paid pilot/customer validation | No accepted customer app, signed pilot or demonstrated willingness to pay recorded |
+| Item                                                                       | Status / next evidence                                                                               |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Spec 01 rendered browser/keyboard/Retry/HMR acceptance                     | Pending: browser tool could not verify admin policy; no bypass attempted                             |
+| Spec 02 real Android/cloud qualification                                   | Local ADB and one live Minitap demo passed; full campaign and cloud qualification pending            |
+| Spec 03 auth/app creation/APK upload                                       | Local implementation verified; hosted Railway round-trip and allowed rendered acceptance remain open |
+| Spec 04 worker HTTP leases/runs/evidence reports                           | Planned; local fake protocol is not a scheduler                                                      |
+| Spec 05 versioned case/suite/plan editor and approvals                     | Planned                                                                                              |
+| Spec 06 requirements-to-tests generation                                   | Planned                                                                                              |
+| Spec 07 regression, retention, production deployment and pilot reliability | Planned                                                                                              |
+| Paid pilot/customer validation                                             | No accepted customer app, signed pilot or demonstrated willingness to pay recorded                   |
 
 Doppler project creation does not provision database/model credentials, deploy a service,
 or implement customer-secret resolution. Model/device performance, reset reliability,
@@ -205,11 +205,11 @@ cases, both demo APK builds and Android flavor lint passed after the implementat
 Native doctor verified the pinned Android API 35 ARM64 image and Hypervisor.Framework.
 Real ADB demo outcomes (reports remain private under `.private/artifacts/local-device`):
 
-| Scenario | Outcome | Reset | Attempt |
-|---|---|---|---|
-| Good APK | passed | verified_clean | `4b52a6a0-d97a-4b3a-9362-af43bc4c0d67` |
-| Broken APK | failed | verified_clean | `06e29435-7652-4a79-bc91-c36ca7c483c7` |
-| Backend unavailable | blocked | verified_clean | `76de6d90-8ef9-435f-945c-faad66fc487c` |
+| Scenario                 | Outcome                  | Reset          | Attempt                                |
+| ------------------------ | ------------------------ | -------------- | -------------------------------------- |
+| Good APK                 | passed                   | verified_clean | `4b52a6a0-d97a-4b3a-9362-af43bc4c0d67` |
+| Broken APK               | failed                   | verified_clean | `06e29435-7652-4a79-bc91-c36ca7c483c7` |
+| Backend unavailable      | blocked                  | verified_clean | `76de6d90-8ef9-435f-945c-faad66fc487c` |
 | SIGINT during navigation | inconclusive / cancelled | verified_clean | `cb812944-46d7-4497-9ab2-f957a6d41a7e` |
 
 The interruption probe signalled the actual local launcher after navigation started,
@@ -226,7 +226,6 @@ These timings describe this Mac, not a cloud capacity promise.
 
 No model calls or cloud resources were used. Minitap mode is implemented but its live
 11-attempt qualification remains pending, as do HTTP worker leases and dashboard jobs.
-
 
 ## First live Minitap demo
 
@@ -250,7 +249,6 @@ Minitap tool execution through LangGraph. See dependencies.md for scope and remo
 This single live demo does not complete the full 11-attempt reliability campaign,
 cloud-host qualification, customer APK execution or dashboard job integration.
 
-
 ## Main dashboard integration
 
 Merged main `9eb5dba` into the device branch, preserving apps/web and apps/api byte
@@ -266,3 +264,24 @@ Frontend and Python dependency audits found no known vulnerabilities. The existi
 Vite chunk-size warning remains. API code is unchanged from main; API runtime tests
 and billed/device runs were not repeated for this merge. Historical API and device
 validation above retain their original scope.
+
+## Phase 04 implementation work
+
+Local source on `codex/04-execution-and-reports` adds versioned operator test imports,
+approval grants, immutable run manifests, worker HTTP leases/reservations, private
+checkpoint evidence and Runs/read-only Tests UI. Local validation passed: 29 Rust
+unit/route/contract tests, 69 frontend tests, 115 worker tests, strict type/lint checks,
+Rust/web builds, zero generated-contract drift and 17 CI scope cases. Test totals
+include targeted reruns after fixes; they are not a single uninterrupted run.
+
+`just smoke-execution` passed through real HTTP, PostgreSQL and the Python worker:
+queued-job restart, simulated passed/failed/blocked evidence, and identical saved
+reports after API restart. The separate foundation `just smoke` could not start
+because existing servers occupy 5150/5173; those processes were left running.
+No manual browser, model/device, cloud or hosted S3 acceptance ran for this phase.
+The frontend production audit found no known vulnerabilities; Cargo audit still
+reports the previously documented `RUSTSEC-2023-0071` in rsa 0.9.10.
+
+The [implementation report](../../.claude/PRPs/reports/04-execution-and-reports-report.md)
+records changes, validation, deviations and remaining gates. The plan remains active;
+this is local execution/reporting implementation, not phase-wide acceptance.

@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "generate:sdk": "openapi-ts"
+    "generate:sdk": "openapi-ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@mantine/core": "9.6.1",
@@ -37,6 +39,7 @@
     "eslint": "^9",
     "globals": "^16",
     "jsdom": "^27",
+    "prettier": "3.9.6",
     "typescript": "^5",
     "typescript-eslint": "^8",
     "vite": "^8.2.1",

@@ -2,12 +2,12 @@
 
 Source-only re-review of the generator's iteration 01 fixes. No browser, runtime, builds, tests, formatting or exports were run. This result evaluates authored source and remains provisional; it is not rendered acceptance or proof that the feature executes successfully.
 
-| Dimension | Score | Weight | Evidence |
-| --- | ---: | ---: | --- |
-| Design quality | 8.2 | .35 | The coherent forest/ivory workbench composition is retained. Core metadata and timestamps now use a more readable small-text scale; prose and identifiers have distinct wrapping. |
-| Originality | 7.3 | .30 | The restrained Android QA identity remains purposeful. No decorative widgets or fabricated metrics were added merely to raise novelty. |
-| Craft | 8.0 | .25 | Labeled workspace navigation and account controls, exact durations, improved long-label wrapping, keyed app state and coordinated status refresh address the concrete rough edges. |
-| Functionality | 8.1 | .10 | The three earlier blockers are resolved in source. Relevant regression cases have been authored, with execution appropriately deferred. |
+| Dimension      | Score | Weight | Evidence                                                                                                                                                                           |
+| -------------- | ----: | -----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Design quality |   8.2 |    .35 | The coherent forest/ivory workbench composition is retained. Core metadata and timestamps now use a more readable small-text scale; prose and identifiers have distinct wrapping.  |
+| Originality    |   7.3 |    .30 | The restrained Android QA identity remains purposeful. No decorative widgets or fabricated metrics were added merely to raise novelty.                                             |
+| Craft          |   8.0 |    .25 | Labeled workspace navigation and account controls, exact durations, improved long-label wrapping, keyed app state and coordinated status refresh address the concrete rough edges. |
+| Functionality  |   8.1 |    .10 | The three earlier blockers are resolved in source. Relevant regression cases have been authored, with execution appropriately deferred.                                            |
 
 **Weighted score: 7.87 / 10. Result: provisional source-review pass.** Stop the design loop at iteration 02; retain application verification and rendered acceptance as separate gates.
 

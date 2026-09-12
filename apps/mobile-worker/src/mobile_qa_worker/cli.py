@@ -7,12 +7,14 @@ Explicit device commands qualify the controlled demo; they are never run by ordi
 """
 
 import argparse
+import asyncio
 import importlib
 import importlib.metadata
 import json
 import logging
 import os
 from pathlib import Path
+from uuid import UUID
 
 from mobile_qa_worker.fake import execute, parse_request
 
@@ -69,8 +71,41 @@ def main() -> int:
     child = commands.add_parser("_sdk-run", help=argparse.SUPPRESS)
     child.add_argument("--request", type=Path, required=True)
     child.add_argument("--result", type=Path, required=True)
+    worker = commands.add_parser(
+        "execution-worker", help="Poll durable jobs; real profiles explicitly launch devices"
+    )
+    worker.add_argument("--origin", required=True)
+    worker.add_argument("--profile-id", type=UUID, required=True)
+    worker.add_argument("--state", type=Path, required=True)
+    worker.add_argument("--profile", type=Path)
+    worker.add_argument("--scenario", choices=["pass", "fail", "blocked"], default="pass")
+    worker.add_argument("--once", action="store_true")
+    run = commands.add_parser("_execution-run", help=argparse.SUPPRESS)
+    run.add_argument("--job", type=Path, required=True)
+    run.add_argument("--directory", type=Path, required=True)
+    run.add_argument("--driver", choices=["fake", "minitap"], required=True)
+    run.add_argument("--profile", type=Path)
+    run.add_argument("--scenario", choices=["pass", "fail", "blocked"], default="pass")
+    nav = commands.add_parser("_execution-sdk", help=argparse.SUPPRESS)
+    nav.add_argument("--request", type=Path, required=True)
+    nav.add_argument("--result", type=Path, required=True)
     args = parser.parse_args()
     try:
+        if args.command == "execution-worker":
+            from mobile_qa_worker.execution.runner import serve
+
+            serve(args.origin, args.profile_id, args.state, args.profile, args.scenario, args.once)
+            return 0
+        if args.command == "_execution-run":
+            from mobile_qa_worker.execution.runner import dispatch_child
+
+            dispatch_child(args.job, args.directory, args.driver, args.scenario, args.profile)
+            return 0
+        if args.command == "_execution-sdk":
+            from mobile_qa_worker.execution.sdk_adapter import execute as navigate
+
+            asyncio.run(navigate(args.request.resolve(), args.result.resolve()))
+            return 0
         if args.command.startswith("device-") or args.command == "_sdk-run":
             from mobile_qa_worker.qualification.commands import dispatch
 

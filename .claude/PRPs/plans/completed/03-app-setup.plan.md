@@ -67,15 +67,15 @@ Use **shadcn/ui + Tailwind CSS**, extending the existing `new-york` configuratio
 
 shadcn distributes component source into the application. Import the upstream implementation and required dependencies; do not recreate its primitives. Custom components such as AppForm and ApkUpload compose the kit and connect generated API adapters.
 
-| Dashboard surface | Reuse | Product-specific work |
-|---|---|---|
-| Navigation shell | Sidebar block, SidebarProvider/Inset/Trigger, Sheet, Tooltip, Separator | Four product links, active route and responsive layout |
-| Sign-in and setup forms | Card, Button, Input, Label, Textarea, Select | Field values, generated validation, errors and submissions |
-| Account actions | DropdownMenu and Button | Current account and sign-out |
-| Build history | Table, Badge and Button | Actual build rows, URL selection and server pagination |
-| APK picker | Input type=file, Button, Card | Upload/finalization state and recovery |
-| Loading/errors | Skeleton, Alert and text with live-region semantics | Real state and Retry; indeterminate transfer feedback |
-| Metadata/readiness | Card, Badge, Separator | Persisted values and truthful readiness labels |
+| Dashboard surface       | Reuse                                                                   | Product-specific work                                      |
+| ----------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Navigation shell        | Sidebar block, SidebarProvider/Inset/Trigger, Sheet, Tooltip, Separator | Four product links, active route and responsive layout     |
+| Sign-in and setup forms | Card, Button, Input, Label, Textarea, Select                            | Field values, generated validation, errors and submissions |
+| Account actions         | DropdownMenu and Button                                                 | Current account and sign-out                               |
+| Build history           | Table, Badge and Button                                                 | Actual build rows, URL selection and server pagination     |
+| APK picker              | Input type=file, Button, Card                                           | Upload/finalization state and recovery                     |
+| Loading/errors          | Skeleton, Alert and text with live-region semantics                     | Real state and Retry; indeterminate transfer feedback      |
+| Metadata/readiness      | Card, Badge, Separator                                                  | Persisted values and truthful readiness labels             |
 
 Follow the existing-project [Vite integration](https://ui.shadcn.com/docs/installation/vite). Preserve Vite, Router, Query, the `@/` alias and `rsc:false`; do not scaffold another app. Pin the chosen official registry revision/CLI version when importing components, record it in dependencies.md, and lock runtime dependencies with pnpm. Import only the listed components and the sidebar’s actual dependencies. Review changes to existing Button/Card before replacement: preserve `type="button"` as the safe default and existing heading/accessibility semantics while adding upstream variants/composition support.
 
@@ -85,65 +85,65 @@ Use the kit’s simple Table with server pagination. Small forms use React state
 
 ### Interaction Changes
 
-| Touchpoint | Before | After | Notes |
-|---|---|---|---|
-| Entry | Public health panel | Sign-in or app list | Return destination limited to local protected routes |
-| Create app | Absent | Name, Android package, environment name, backend/login origins | Inline errors; save disabled only while submitting |
-| Upload | Absent | Choose file → create session → transfer → finalize | Indeterminate transfer indicator; no fabricated percentage |
-| Finalization | Absent | Validating → validated / invalid / unsupported / error | Error means validator infrastructure failed; not necessarily bad APK |
-| Interrupted request | Absent | Reload server upload status; retry appropriate step | Never automatically create another build after an uncertain response |
-| App/build selection | Absent | URL identifies selected app/build | Browser file selection cannot survive reload; reselect only if bytes never sealed |
-| Account setup | Absent | Masked reference status and operator-reported checks | Stored reference is not proof of credentials working |
-| Network failure | Health-only Retry | Keep last known data, show stale/error indicator and Retry | Do not replace stale data with a green state |
-| Auth expiry/logout | Absent | Clear cached tenant data and return to sign-in | Server revocation remains authoritative |
-| Accessibility | Existing skip link/navigation | Labeled fields, field errors, focus to first error, live status | Status uses text; do not depend on color |
+| Touchpoint          | Before                        | After                                                           | Notes                                                                             |
+| ------------------- | ----------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Entry               | Public health panel           | Sign-in or app list                                             | Return destination limited to local protected routes                              |
+| Create app          | Absent                        | Name, Android package, environment name, backend/login origins  | Inline errors; save disabled only while submitting                                |
+| Upload              | Absent                        | Choose file → create session → transfer → finalize              | Indeterminate transfer indicator; no fabricated percentage                        |
+| Finalization        | Absent                        | Validating → validated / invalid / unsupported / error          | Error means validator infrastructure failed; not necessarily bad APK              |
+| Interrupted request | Absent                        | Reload server upload status; retry appropriate step             | Never automatically create another build after an uncertain response              |
+| App/build selection | Absent                        | URL identifies selected app/build                               | Browser file selection cannot survive reload; reselect only if bytes never sealed |
+| Account setup       | Absent                        | Masked reference status and operator-reported checks            | Stored reference is not proof of credentials working                              |
+| Network failure     | Health-only Retry             | Keep last known data, show stale/error indicator and Retry      | Do not replace stale data with a green state                                      |
+| Auth expiry/logout  | Absent                        | Clear cached tenant data and return to sign-in                  | Server revocation remains authoritative                                           |
+| Accessibility       | Existing skip link/navigation | Labeled fields, field errors, focus to first error, live status | Status uses text; do not depend on color                                          |
 
 ## Mandatory Reading
 
 Line references refer to the inspected baseline; new modules listed later do not exist yet.
 
-| Priority | File | Lines | Why |
-|---|---|---|---|
-| P0 | `AGENTS.md` | all | Ownership, secrets, final-only verification, browser restriction |
-| P0 | `docs/architect/README.md` | all | Canonical authority |
-| P0 | `docs/architect/implementation/03-app-setup-and-ui-backend.md` | all | Feature scope and acceptance |
-| P0 | `docs/architect/status.md` | all | Existing evidence and open gates |
-| P0 | `docs/architect/contracts.md` | all | Generated boundary and route agreement |
-| P0 | `docs/architect/environment.md` | all | Doppler isolation and no env files |
-| P0 | `apps/api/src/app.rs` | 20–60 | Hook, routing, task and migration integration |
-| P0 | `apps/api/src/controllers/health.rs` | 5–50 | Typed responses and 404/405 handling |
-| P0 | `crates/contracts/src/browser.rs` | 9–62 | Pure DTO and Utoipa declaration |
-| P0 | `apps/api/tests/health.rs` | 10–49 | Real route/OpenAPI/DB test |
-| P1 | `apps/api/migration/src/lib.rs` | 1–14 | Registry and injection marker |
-| P1 | `apps/web/src/api/runtime.ts` | 1–25 | Same-origin cookies and generated error validation |
-| P1 | `apps/web/src/api/queries.ts` | 7–23 | Expected status plus generated success validation |
-| P1 | `apps/web/src/api/transport.test.ts` | 1–53 | Test generated SDK using fetch-only mocks |
-| P1 | `apps/web/src/pages/Home.test.tsx` | 1–36 | Memory router, QueryClient, accessible assertions |
-| P1 | `apps/web/src/routes.tsx`, `apps/web/src/App.tsx` | all | Existing shell and markers |
-| P1 | `apps/web/components.json`, `apps/web/src/index.css`, `apps/web/src/components/ui/button.tsx`, `apps/web/src/components/ui/card.tsx` | all | Existing shadcn setup, palette and primitive behavior |
-| P1 | `apps/web/src/main.tsx` | 8–12 | Query client lifetime and retry policy |
-| P1 | `scripts/runtime.py` | 27–38, 67–156 | Owned processes, secret-free smoke, DB checks |
-| P1 | `scripts/contracts.py` | 15–66 | Content-only generation/drift |
-| P1 | `.github/workflows/ci.yaml` | all | Affected surfaces; new files must trigger consumers |
-| P1 | `Cargo.toml`, `apps/api/Cargo.toml`, `Cargo.lock` | all | Loco 1.1.0; SeaORM 2.0.2; Axum 0.8 |
-| P1 | `apps/web/package.json`, `apps/web/openapi-ts.config.ts` | all | Pinned client generator 0.99.0 and Zod 4.6.2 |
-| P2 | `docs/architect/implementation/02-cloud-phone-and-feasibility.md` | all | Candidate API 35/x86_64 profile is unqualified |
-| P2 | `docs/architect/product.md`, `docs/architect/commenting.md`, `docs/architect/development.md` | all | Scope, comments and validation rules |
+| Priority | File                                                                                                                                 | Lines         | Why                                                              |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------- | ---------------------------------------------------------------- |
+| P0       | `AGENTS.md`                                                                                                                          | all           | Ownership, secrets, final-only verification, browser restriction |
+| P0       | `docs/architect/README.md`                                                                                                           | all           | Canonical authority                                              |
+| P0       | `docs/architect/implementation/03-app-setup-and-ui-backend.md`                                                                       | all           | Feature scope and acceptance                                     |
+| P0       | `docs/architect/status.md`                                                                                                           | all           | Existing evidence and open gates                                 |
+| P0       | `docs/architect/contracts.md`                                                                                                        | all           | Generated boundary and route agreement                           |
+| P0       | `docs/architect/environment.md`                                                                                                      | all           | Doppler isolation and no env files                               |
+| P0       | `apps/api/src/app.rs`                                                                                                                | 20–60         | Hook, routing, task and migration integration                    |
+| P0       | `apps/api/src/controllers/health.rs`                                                                                                 | 5–50          | Typed responses and 404/405 handling                             |
+| P0       | `crates/contracts/src/browser.rs`                                                                                                    | 9–62          | Pure DTO and Utoipa declaration                                  |
+| P0       | `apps/api/tests/health.rs`                                                                                                           | 10–49         | Real route/OpenAPI/DB test                                       |
+| P1       | `apps/api/migration/src/lib.rs`                                                                                                      | 1–14          | Registry and injection marker                                    |
+| P1       | `apps/web/src/api/runtime.ts`                                                                                                        | 1–25          | Same-origin cookies and generated error validation               |
+| P1       | `apps/web/src/api/queries.ts`                                                                                                        | 7–23          | Expected status plus generated success validation                |
+| P1       | `apps/web/src/api/transport.test.ts`                                                                                                 | 1–53          | Test generated SDK using fetch-only mocks                        |
+| P1       | `apps/web/src/pages/Home.test.tsx`                                                                                                   | 1–36          | Memory router, QueryClient, accessible assertions                |
+| P1       | `apps/web/src/routes.tsx`, `apps/web/src/App.tsx`                                                                                    | all           | Existing shell and markers                                       |
+| P1       | `apps/web/components.json`, `apps/web/src/index.css`, `apps/web/src/components/ui/button.tsx`, `apps/web/src/components/ui/card.tsx` | all           | Existing shadcn setup, palette and primitive behavior            |
+| P1       | `apps/web/src/main.tsx`                                                                                                              | 8–12          | Query client lifetime and retry policy                           |
+| P1       | `scripts/runtime.py`                                                                                                                 | 27–38, 67–156 | Owned processes, secret-free smoke, DB checks                    |
+| P1       | `scripts/contracts.py`                                                                                                               | 15–66         | Content-only generation/drift                                    |
+| P1       | `.github/workflows/ci.yaml`                                                                                                          | all           | Affected surfaces; new files must trigger consumers              |
+| P1       | `Cargo.toml`, `apps/api/Cargo.toml`, `Cargo.lock`                                                                                    | all           | Loco 1.1.0; SeaORM 2.0.2; Axum 0.8                               |
+| P1       | `apps/web/package.json`, `apps/web/openapi-ts.config.ts`                                                                             | all           | Pinned client generator 0.99.0 and Zod 4.6.2                     |
+| P2       | `docs/architect/implementation/02-cloud-phone-and-feasibility.md`                                                                    | all           | Candidate API 35/x86_64 profile is unqualified                   |
+| P2       | `docs/architect/product.md`, `docs/architect/commenting.md`, `docs/architect/development.md`                                         | all           | Scope, comments and validation rules                             |
 
 ## Discovery and Traces
 
 ### Unified Discovery Table
 
-| Category | File:Lines | Pattern | Key snippet / finding |
-|---|---|---|---|
-| Similar implementation | `apps/api/src/controllers/health.rs:10–17` | Typed Axum response in Loco controller | `async fn current() -> Json<HealthResponse>` |
-| Naming | `crates/contracts/src/browser.rs:12–25` | Rust PascalCase DTOs, snake_case enum wire values | `#[serde(rename_all = "snake_case")]` |
-| Errors | `apps/web/src/api/runtime.ts:10–24` | Structured errors validated with generated Zod | `zApiError.safeParse(error)` |
-| Logging | `apps/api/config/development.yaml:4–8`, `apps/api/config/production.yaml:4–8` | Compact info locally, JSON info in production | No owned domain tracing calls yet |
-| Types | `crates/contracts/src/browser.rs:39–62` | Pure OpenAPI declarations | `operation_id = "getHealth"` |
-| Tests | `apps/api/tests/health.rs:29–48` | Loco request harness, actual HTTP and local DB | `request::<App, _, _>(...)` |
-| Configuration | `apps/web/vite.config.ts:8–12`, `scripts/runtime.py:78–89` | Env-file loading off; API-only secret injection | `envDir: false` |
-| Dependencies | `Cargo.toml:9–10`, `apps/web/package.json` | Fixed framework and generated-client baseline | Auth feature currently disabled; no product ORM/storage service |
+| Category               | File:Lines                                                                    | Pattern                                           | Key snippet / finding                                           |
+| ---------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------- |
+| Similar implementation | `apps/api/src/controllers/health.rs:10–17`                                    | Typed Axum response in Loco controller            | `async fn current() -> Json<HealthResponse>`                    |
+| Naming                 | `crates/contracts/src/browser.rs:12–25`                                       | Rust PascalCase DTOs, snake_case enum wire values | `#[serde(rename_all = "snake_case")]`                           |
+| Errors                 | `apps/web/src/api/runtime.ts:10–24`                                           | Structured errors validated with generated Zod    | `zApiError.safeParse(error)`                                    |
+| Logging                | `apps/api/config/development.yaml:4–8`, `apps/api/config/production.yaml:4–8` | Compact info locally, JSON info in production     | No owned domain tracing calls yet                               |
+| Types                  | `crates/contracts/src/browser.rs:39–62`                                       | Pure OpenAPI declarations                         | `operation_id = "getHealth"`                                    |
+| Tests                  | `apps/api/tests/health.rs:29–48`                                              | Loco request harness, actual HTTP and local DB    | `request::<App, _, _>(...)`                                     |
+| Configuration          | `apps/web/vite.config.ts:8–12`, `scripts/runtime.py:78–89`                    | Env-file loading off; API-only secret injection   | `envDir: false`                                                 |
+| Dependencies           | `Cargo.toml:9–10`, `apps/web/package.json`                                    | Fixed framework and generated-client baseline     | Auth feature currently disabled; no product ORM/storage service |
 
 ### Five Traces
 
@@ -157,18 +157,18 @@ Line references refer to the inspected baseline; new modules listed later do not
 
 Research performed 2026-09-12. Version-specific installed Loco source was also inspected under Cargo's registry; it is read-only evidence, never an edit target.
 
-| Topic | Source | Key takeaway |
-|---|---|---|
-| Loco cookie auth | [Pinned extractor source](https://github.com/loco-rs/loco/blob/v1.1.0/src/controller/extractor/auth.rs) | Supports cookie-only JWT extraction; default bearer behavior must be overridden |
-| Password hashing | [Pinned Loco hash source](https://github.com/loco-rs/loco/blob/v1.1.0/src/hash.rs) | Reuse framework Argon2id hashing/verification |
-| ORM transactions | [SeaORM transactions](https://www.sea-ql.org/SeaORM/docs/advanced-query/transaction/) | Commit/rollback define atomic state changes; file storage still needs reconciliation |
-| Request limits | [Axum DefaultBodyLimit](https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html) | Extractor limit is not a universal streaming-body cap |
-| APK metadata | [AAPT2](https://developer.android.com/tools/aapt2) | `dump badging` and `dump xmltree` inspect compiled APK metadata |
-| Alternative metadata tool | [apkanalyzer](https://developer.android.com/tools/apkanalyzer) | Supplies individual package/version/SDK queries; requires command-line tools |
-| Signature validation | [apksigner](https://developer.android.com/tools/apksigner) | `verify` checks APK signatures; do not modify bytes after verification |
-| Tool distribution | [Build Tools](https://developer.android.com/tools/releases/build-tools) | Use an explicit Build Tools version, not an unpinned PATH binary |
-| ZIP inspection | [zip 8.6.0 ZipArchive](https://docs.rs/zip/8.6.0/zip/read/struct.ZipArchive.html) | Read entries without extracting; enforce our own budgets and entry policy |
-| CSRF | [OWASP CSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html) | SameSite alone is insufficient; validate origin and a session-bound token |
+| Topic                     | Source                                                                                                                       | Key takeaway                                                                         |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Loco cookie auth          | [Pinned extractor source](https://github.com/loco-rs/loco/blob/v1.1.0/src/controller/extractor/auth.rs)                      | Supports cookie-only JWT extraction; default bearer behavior must be overridden      |
+| Password hashing          | [Pinned Loco hash source](https://github.com/loco-rs/loco/blob/v1.1.0/src/hash.rs)                                           | Reuse framework Argon2id hashing/verification                                        |
+| ORM transactions          | [SeaORM transactions](https://www.sea-ql.org/SeaORM/docs/advanced-query/transaction/)                                        | Commit/rollback define atomic state changes; file storage still needs reconciliation |
+| Request limits            | [Axum DefaultBodyLimit](https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html)                               | Extractor limit is not a universal streaming-body cap                                |
+| APK metadata              | [AAPT2](https://developer.android.com/tools/aapt2)                                                                           | `dump badging` and `dump xmltree` inspect compiled APK metadata                      |
+| Alternative metadata tool | [apkanalyzer](https://developer.android.com/tools/apkanalyzer)                                                               | Supplies individual package/version/SDK queries; requires command-line tools         |
+| Signature validation      | [apksigner](https://developer.android.com/tools/apksigner)                                                                   | `verify` checks APK signatures; do not modify bytes after verification               |
+| Tool distribution         | [Build Tools](https://developer.android.com/tools/releases/build-tools)                                                      | Use an explicit Build Tools version, not an unpinned PATH binary                     |
+| ZIP inspection            | [zip 8.6.0 ZipArchive](https://docs.rs/zip/8.6.0/zip/read/struct.ZipArchive.html)                                            | Read entries without extracting; enforce our own budgets and entry policy            |
+| CSRF                      | [OWASP CSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html) | SameSite alone is insufficient; validate origin and a session-bound token            |
 
 - **KEY_INSIGHT:** Loco 1.1.0 already exposes `hash::hash_password`, `hash::verify_password`, `auth::jwt::JWT::generate_token`, and `controller::extractor::auth::extract_jwt_from_request_parts`. **APPLIES_TO:** Authentication slice. **GOTCHA:** Enable `auth`; YAML uses `from: Cookie` with uppercase C (`src/config/auth.rs:40–48`); JWT signing expects a base64-encoded key (`src/auth/jwt.rs:100–139`). Add a session ID in custom claims and look it up in the DB; built-in JWT validation alone does not implement logout revocation.
 - **KEY_INSIGHT:** There is no owned session or product service to copy. **APPLIES_TO:** New service layout. **GOTCHA:** Use Loco crypto facilities and small adapters; do not add a separate password algorithm, bearer fallback or browser token persistence.
@@ -185,16 +185,16 @@ Complete each slice's source, tests, contracts and UI before authoring the next 
 
 ### Alternatives considered
 
-| Alternative | Decision |
-|---|---|
-| Managed identity service immediately | Unnecessary for this pilot slice: inspected Loco supports the required primitives. Reconsider if implementation exposes a concrete unsupported requirement |
-| Starter JWT in localStorage | Rejected by canonical cookie/session requirements |
-| Automatic acceptance when file exists | Rejected: cannot prove completeness, package identity or validity |
-| Browser-only APK parsing | Useful optional hint later; cannot establish trusted build metadata |
-| Pure custom binary Android manifest parser | Avoid new format implementation; pin official Android tools |
-| Python device worker for validation | Would couple spec 03 to future worker protocol; keep Python unchanged |
-| New queue/broker | Bounded synchronous validation with durable status and reclaimable lease suffices initially |
-| Hosted APK storage | Implement an S3-compatible adapter for Railway Buckets now; preserve AWS S3 migration. Bucket provisioning/deployment remain separate actions |
+| Alternative                                | Decision                                                                                                                                                   |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Managed identity service immediately       | Unnecessary for this pilot slice: inspected Loco supports the required primitives. Reconsider if implementation exposes a concrete unsupported requirement |
+| Starter JWT in localStorage                | Rejected by canonical cookie/session requirements                                                                                                          |
+| Automatic acceptance when file exists      | Rejected: cannot prove completeness, package identity or validity                                                                                          |
+| Browser-only APK parsing                   | Useful optional hint later; cannot establish trusted build metadata                                                                                        |
+| Pure custom binary Android manifest parser | Avoid new format implementation; pin official Android tools                                                                                                |
+| Python device worker for validation        | Would couple spec 03 to future worker protocol; keep Python unchanged                                                                                      |
+| New queue/broker                           | Bounded synchronous validation with durable status and reclaimable lease suffices initially                                                                |
+| Hosted APK storage                         | Implement an S3-compatible adapter for Railway Buckets now; preserve AWS S3 migration. Bucket provisioning/deployment remain separate actions              |
 
 ### Scope / NOT Building
 
@@ -206,20 +206,20 @@ Do not build public signup, email/reset flows, invitations, OAuth providers, dev
 
 All IDs are server-generated UUIDs; timestamps are UTC. Public IDs are not authorization. Use explicit SeaORM entities, ActiveModels and versioned migrations. Use text plus CHECK constraints for small lifecycle enums; UUID foreign keys and indexes; server-side length validation plus DB constraints. Do not serialize ORM entities directly.
 
-| Table | Fields and constraints |
-|---|---|
-| `users` | id, normalized email UNIQUE, password_hash, display_name, disabled_at, created_at, updated_at. No public registration |
-| `organizations` | id, name, created_at |
-| `memberships` | user_id, organization_id, role `operator/member`, active; UNIQUE pair |
-| `app_memberships` | user_id, organization_id, app_id; UNIQUE user/app; FK to org membership and matching app/org. Explicit per-app grant for members |
-| `sessions` | id, user_id, created_at, expires_at, revoked_at, csrf_token. Never return session ID or JWT in JSON; token is exposed only in the protected session response. Index user/expiry |
-| `login_attempts` | bounded rate bucket key, window_start, count, expires_at. Hash normalized-email/network buckets, no password or raw login body |
-| `apps` | id, organization_id, name, android_package, created_by, created_at, updated_at; UNIQUE org/package; UNIQUE id/org for composite child FKs |
-| `environments` | id, organization_id, app_id UNIQUE, name, backend_origins JSON, login_origins JSON, revision, account_secret_reference_id nullable, reset_secret_reference_id nullable, updated_at; matching org/app FKs |
-| `secret_references` | id, org/app, label, private operator-managed locator, kind `account/reset`, created_at, updated_at. Public view returns label/present only, never locator or value |
-| `environment_checks` | id, org/app/environment, environment_revision, kind `backend/account/reset`, state `not_checked/operator_reported_ok/operator_reported_blocked`, safe note, checked_by, checked_at. Preserve check history |
-| `build_uploads` | id, org/app, created_by, original_filename, expected_size, state, expires_at, attempt_id nullable, lease_until nullable, storage_backend, sealed_storage_key nullable, actual_size nullable, sha256 nullable, created_at; index app/created, state/expiry |
-| `builds` | id, org/app, upload_id UNIQUE, immutable storage_backend/storage_key/sha256/byte_size/original_filename, validation_state, reason_code/message nullable, parsed metadata nullable, validator_version, intake_policy_version, attempt_id/lease_until, created_at, validated_at nullable |
+| Table                | Fields and constraints                                                                                                                                                                                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`              | id, normalized email UNIQUE, password_hash, display_name, disabled_at, created_at, updated_at. No public registration                                                                                                                                                                  |
+| `organizations`      | id, name, created_at                                                                                                                                                                                                                                                                   |
+| `memberships`        | user_id, organization_id, role `operator/member`, active; UNIQUE pair                                                                                                                                                                                                                  |
+| `app_memberships`    | user_id, organization_id, app_id; UNIQUE user/app; FK to org membership and matching app/org. Explicit per-app grant for members                                                                                                                                                       |
+| `sessions`           | id, user_id, created_at, expires_at, revoked_at, csrf_token. Never return session ID or JWT in JSON; token is exposed only in the protected session response. Index user/expiry                                                                                                        |
+| `login_attempts`     | bounded rate bucket key, window_start, count, expires_at. Hash normalized-email/network buckets, no password or raw login body                                                                                                                                                         |
+| `apps`               | id, organization_id, name, android_package, created_by, created_at, updated_at; UNIQUE org/package; UNIQUE id/org for composite child FKs                                                                                                                                              |
+| `environments`       | id, organization_id, app_id UNIQUE, name, backend_origins JSON, login_origins JSON, revision, account_secret_reference_id nullable, reset_secret_reference_id nullable, updated_at; matching org/app FKs                                                                               |
+| `secret_references`  | id, org/app, label, private operator-managed locator, kind `account/reset`, created_at, updated_at. Public view returns label/present only, never locator or value                                                                                                                     |
+| `environment_checks` | id, org/app/environment, environment_revision, kind `backend/account/reset`, state `not_checked/operator_reported_ok/operator_reported_blocked`, safe note, checked_by, checked_at. Preserve check history                                                                             |
+| `build_uploads`      | id, org/app, created_by, original_filename, expected_size, state, expires_at, attempt_id nullable, lease_until nullable, storage_backend, sealed_storage_key nullable, actual_size nullable, sha256 nullable, created_at; index app/created, state/expiry                              |
+| `builds`             | id, org/app, upload_id UNIQUE, immutable storage_backend/storage_key/sha256/byte_size/original_filename, validation_state, reason_code/message nullable, parsed metadata nullable, validator_version, intake_policy_version, attempt_id/lease_until, created_at, validated_at nullable |
 
 Projects and apps are one customer boundary in this phase: implement `apps`, not separate overlapping project/app hierarchies. An active org operator may administer all apps in that org; a member may create an app and receives its explicit app grant in the same transaction. Other app operations require both active organization membership and app grant, or the same-org operator role. Check joins on every scoped API and CLI operation. Foreign-tenant/missing resources both return 404; a known same-org resource with a disallowed operation returns 403 only where existence is already authorized.
 
@@ -247,22 +247,22 @@ Logging is new domain behavior: use `tracing` fields `request_id`, authorized or
 
 All routes remain under `/api`; shared path constants in pure Rust declarations connect to Axum registrations. OpenAPI uses `{app_id}` etc. Each operation declares cookie security where required, path/query/body schemas, CSRF/custom headers, success status and the `ApiError` error envelope. Operation IDs below determine generated SDK names. Use `limit` (default 20/max 100) and optional cursor for lists; stable `(created_at,id)` ordering, app/org-bound cursors validated server-side.
 
-| Method / path | Operation ID | Input | Success |
-|---|---|---|---|
-| POST `/api/auth/login` | `login` | LoginRequest {email,password}; custom header/origin | 200 SessionResponse + Set-Cookie |
-| GET `/api/auth/session` | `getSession` | Cookie | 200 SessionResponse |
-| POST `/api/auth/logout` | `logout` | Cookie + CSRF | 200 LogoutResponse {signed_out:true}; absent/expired cookie can also be cleared after origin check |
-| GET `/api/apps` | `listApps` | Optional organization_id, cursor, limit | 200 AppListResponse; only permitted apps |
-| POST `/api/apps` | `createApp` | CreateAppRequest {organization_id,name,android_package,environment_name,backend_origins,login_origins} | 201 AppResponse |
-| GET `/api/apps/{app_id}` | `getApp` | Authorized app | 200 AppResponse including environment/readiness |
-| PATCH `/api/apps/{app_id}/environment` | `updateEnvironment` | UpdateEnvironmentRequest incl. expected_revision, names/origins/reference IDs | 200 EnvironmentResponse |
-| POST `/api/apps/{app_id}/build-uploads` | `createBuildUpload` | CreateBuildUploadRequest {original_filename,expected_size} | 201 UploadResponse |
-| GET `/api/apps/{app_id}/build-uploads/{upload_id}` | `getBuildUpload` | Authorized upload | 200 UploadResponse |
-| PUT `/api/apps/{app_id}/build-uploads/{upload_id}/content` | `uploadBuildContent` | multipart/form-data with exactly one binary `file` part | 200 UploadResponse after sealing |
-| POST `/api/apps/{app_id}/build-uploads/{upload_id}/complete` | `completeBuildUpload` | No JSON body; cookie + CSRF | 200 BuildResponse terminal; 202 BuildResponse if another attempt holds lease |
-| GET `/api/apps/{app_id}/builds` | `listBuilds` | cursor, limit | 200 BuildListResponse |
-| GET `/api/apps/{app_id}/builds/{build_id}` | `getBuild` | Authorized build | 200 BuildResponse |
-| GET `/api/settings` | `getSettings` | Cookie | 200 SettingsResponse with access, configured limits, retention disclosure |
+| Method / path                                                | Operation ID          | Input                                                                                                  | Success                                                                                            |
+| ------------------------------------------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| POST `/api/auth/login`                                       | `login`               | LoginRequest {email,password}; custom header/origin                                                    | 200 SessionResponse + Set-Cookie                                                                   |
+| GET `/api/auth/session`                                      | `getSession`          | Cookie                                                                                                 | 200 SessionResponse                                                                                |
+| POST `/api/auth/logout`                                      | `logout`              | Cookie + CSRF                                                                                          | 200 LogoutResponse {signed_out:true}; absent/expired cookie can also be cleared after origin check |
+| GET `/api/apps`                                              | `listApps`            | Optional organization_id, cursor, limit                                                                | 200 AppListResponse; only permitted apps                                                           |
+| POST `/api/apps`                                             | `createApp`           | CreateAppRequest {organization_id,name,android_package,environment_name,backend_origins,login_origins} | 201 AppResponse                                                                                    |
+| GET `/api/apps/{app_id}`                                     | `getApp`              | Authorized app                                                                                         | 200 AppResponse including environment/readiness                                                    |
+| PATCH `/api/apps/{app_id}/environment`                       | `updateEnvironment`   | UpdateEnvironmentRequest incl. expected_revision, names/origins/reference IDs                          | 200 EnvironmentResponse                                                                            |
+| POST `/api/apps/{app_id}/build-uploads`                      | `createBuildUpload`   | CreateBuildUploadRequest {original_filename,expected_size}                                             | 201 UploadResponse                                                                                 |
+| GET `/api/apps/{app_id}/build-uploads/{upload_id}`           | `getBuildUpload`      | Authorized upload                                                                                      | 200 UploadResponse                                                                                 |
+| PUT `/api/apps/{app_id}/build-uploads/{upload_id}/content`   | `uploadBuildContent`  | multipart/form-data with exactly one binary `file` part                                                | 200 UploadResponse after sealing                                                                   |
+| POST `/api/apps/{app_id}/build-uploads/{upload_id}/complete` | `completeBuildUpload` | No JSON body; cookie + CSRF                                                                            | 200 BuildResponse terminal; 202 BuildResponse if another attempt holds lease                       |
+| GET `/api/apps/{app_id}/builds`                              | `listBuilds`          | cursor, limit                                                                                          | 200 BuildListResponse                                                                              |
+| GET `/api/apps/{app_id}/builds/{build_id}`                   | `getBuild`            | Authorized build                                                                                       | 200 BuildResponse                                                                                  |
+| GET `/api/settings`                                          | `getSettings`         | Cookie                                                                                                 | 200 SettingsResponse with access, configured limits, retention disclosure                          |
 
 Relevant failures: 400 malformed data/cursor, 401 unauthenticated, 403 CSRF/role denial, 404 absent/foreign resource, 409 duplicate app/conflicting transfer/revision/incomplete upload, 410 expired upload, 413 too large, 415 wrong content type, 422 invalid field value, 429 bounded capacity, 500/503 internal/unavailable. List actual applicable codes per operation plus default ApiError. A well-formed completion returning a persisted `invalid` build uses 200: file validation is a domain result, not a transport failure.
 
@@ -420,35 +420,35 @@ Use unique UUID fixture scopes in shared `mobile_qa_test`; no whole-table trunca
 
 Braces below enumerate concrete proposed files. Generated outputs are owned solely by `just types`.
 
-| File / group | Action | Justification |
-|---|---|---|
-| `Cargo.toml`, `Cargo.lock`, `apps/api/Cargo.toml` | UPDATE | Enable Loco auth; add direct API dependencies and lock resolution |
-| `apps/api/src/{lib.rs,app.rs,controllers/mod.rs,models/mod.rs,tasks/mod.rs}` | UPDATE | Register feature modules, hooks/tasks without losing markers |
-| `apps/api/src/config.rs`, `apps/api/src/errors.rs` | CREATE | Typed setup configuration and uniform request-aware failures |
-| `apps/api/src/middleware/{mod.rs,request_context.rs,session.rs,csrf.rs}` | CREATE | Request IDs, authenticated context, mutation protection |
-| `apps/api/src/models/_entities/{mod.rs,users.rs,organizations.rs,memberships.rs,app_memberships.rs,sessions.rs,login_attempts.rs,apps.rs,environments.rs,secret_references.rs,environment_checks.rs,build_uploads.rs,builds.rs}` | CREATE | Explicit persistence models; no generator that runs checks during authoring |
-| `apps/api/migration/src/{m20260912_000001_auth.rs,m20260912_000002_apps.rs,m20260912_000003_builds.rs}` | CREATE | Auth/access, app/environment, upload/build migrations |
-| `apps/api/migration/src/lib.rs` | UPDATE | Register migrations in order |
-| `apps/api/src/controllers/{auth.rs,apps.rs,build_uploads.rs,builds.rs,settings.rs,health.rs}` | CREATE/UPDATE | Real handlers and consistent errors |
-| `apps/api/src/services/{mod.rs,auth.rs,apps.rs,uploads.rs,apk_validation.rs,readiness.rs}` | CREATE | Focused logic and injected clock/inspector seams |
-| `apps/api/src/storage/{mod.rs,local.rs,s3.rs}` | CREATE | Private local/Railway writes, immutable keys and cleanup |
-| `apps/api/src/tasks/{provision_pilot.rs,set_app_access.rs,cleanup_app_uploads.rs}` | CREATE | Operator provisioning, references/check observations, cleanup |
-| `apps/api/config/{development,test,production}.yaml` | UPDATE | Auth cookie location, origin, storage and validation settings |
-| `crates/contracts/src/browser.rs` | UPDATE | All browser DTOs, operations, security/errors |
-| `contracts/browser.openapi.json`, `apps/web/src/api/generated/**` | GENERATE | Authoritative browser artifacts |
-| `apps/web/src/api/{runtime.ts,auth.ts,apps.ts,builds.ts,settings.ts}` | UPDATE/CREATE | Generated SDK adapters and expected-status/Zod validation |
-| `apps/web/src/{App.tsx,routes.tsx,main.tsx}` | UPDATE | Protected shell, durable selection, cache clearing |
-| `apps/web/{components.json,package.json,pnpm-lock.yaml}`, `apps/web/src/index.css` | UPDATE | shadcn setup, required dependencies and theme tokens |
-| `apps/web/src/components/AppSidebar.tsx`, `apps/web/src/hooks/use-mobile.ts`, `apps/web/src/test/setup.ts` | CREATE/UPDATE | Adapt upstream sidebar block/hook and required DOM-test shims |
-| `apps/web/src/components/ui/{button.tsx,card.tsx,sidebar.tsx,sheet.tsx,tooltip.tsx,separator.tsx,input.tsx,label.tsx,textarea.tsx,select.tsx,dropdown-menu.tsx,table.tsx,badge.tsx,skeleton.tsx,alert.tsx}` | IMPORT/UPDATE | Reuse reviewed upstream primitives and required block dependencies |
-| `apps/web/src/pages/{SignIn.tsx,Apps.tsx,AppDetail.tsx,Settings.tsx,Home.tsx}` | CREATE/UPDATE | Actual onboarding; remove unused Home if replaced entirely |
-| `apps/web/src/components/{RequireSession.tsx,AppForm.tsx,ApkUpload.tsx,BuildStatus.tsx,EnvironmentForm.tsx}` | CREATE | Focused accessible controls and session boundary |
-| `apps/api/tests/{health.rs,auth.rs,apps.rs,build_uploads.rs,apk_tools.rs,storage_s3.rs,support/mod.rs}` | UPDATE/CREATE | Route agreement, tenant isolation and real APK checks |
-| `apps/api/tests/fixtures/apk/{AndroidManifest.xml,README.md}` | CREATE | Controlled input source/provenance; no APK binary or signing key in Git |
-| `apps/web/src/pages/{Home.test.tsx,SignIn.test.tsx,AppDetail.test.tsx}`, `apps/web/src/api/{transport.test.ts,builds.test.ts}`, `apps/web/src/test/contracts.compile.ts` | UPDATE/CREATE | Auth/form/reload/error/SDK and static contract coverage |
-| `scripts/apk_fixtures.py`, `scripts/app_setup_smoke.py`, `justfile`, `.github/workflows/ci.yaml` | CREATE/UPDATE | Deterministic real-tool fixture generation, HTTP smoke and affected CI |
-| `docs/architect/{system.md,contracts.md,environment.md,development.md,dependencies.md,decisions.md,status.md}` | UPDATE | Implemented design/config, dependencies and evidence after execution |
-| `docs/architect/implementation/03-app-setup-and-ui-backend.md`, `AGENTS.md` | UPDATE | Link plan; later reconcile foundation-only no-auth sentence with implemented phase |
+| File / group                                                                                                                                                                                                                     | Action        | Justification                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------- |
+| `Cargo.toml`, `Cargo.lock`, `apps/api/Cargo.toml`                                                                                                                                                                                | UPDATE        | Enable Loco auth; add direct API dependencies and lock resolution                  |
+| `apps/api/src/{lib.rs,app.rs,controllers/mod.rs,models/mod.rs,tasks/mod.rs}`                                                                                                                                                     | UPDATE        | Register feature modules, hooks/tasks without losing markers                       |
+| `apps/api/src/config.rs`, `apps/api/src/errors.rs`                                                                                                                                                                               | CREATE        | Typed setup configuration and uniform request-aware failures                       |
+| `apps/api/src/middleware/{mod.rs,request_context.rs,session.rs,csrf.rs}`                                                                                                                                                         | CREATE        | Request IDs, authenticated context, mutation protection                            |
+| `apps/api/src/models/_entities/{mod.rs,users.rs,organizations.rs,memberships.rs,app_memberships.rs,sessions.rs,login_attempts.rs,apps.rs,environments.rs,secret_references.rs,environment_checks.rs,build_uploads.rs,builds.rs}` | CREATE        | Explicit persistence models; no generator that runs checks during authoring        |
+| `apps/api/migration/src/{m20260912_000001_auth.rs,m20260912_000002_apps.rs,m20260912_000003_builds.rs}`                                                                                                                          | CREATE        | Auth/access, app/environment, upload/build migrations                              |
+| `apps/api/migration/src/lib.rs`                                                                                                                                                                                                  | UPDATE        | Register migrations in order                                                       |
+| `apps/api/src/controllers/{auth.rs,apps.rs,build_uploads.rs,builds.rs,settings.rs,health.rs}`                                                                                                                                    | CREATE/UPDATE | Real handlers and consistent errors                                                |
+| `apps/api/src/services/{mod.rs,auth.rs,apps.rs,uploads.rs,apk_validation.rs,readiness.rs}`                                                                                                                                       | CREATE        | Focused logic and injected clock/inspector seams                                   |
+| `apps/api/src/storage/{mod.rs,local.rs,s3.rs}`                                                                                                                                                                                   | CREATE        | Private local/Railway writes, immutable keys and cleanup                           |
+| `apps/api/src/tasks/{provision_pilot.rs,set_app_access.rs,cleanup_app_uploads.rs}`                                                                                                                                               | CREATE        | Operator provisioning, references/check observations, cleanup                      |
+| `apps/api/config/{development,test,production}.yaml`                                                                                                                                                                             | UPDATE        | Auth cookie location, origin, storage and validation settings                      |
+| `crates/contracts/src/browser.rs`                                                                                                                                                                                                | UPDATE        | All browser DTOs, operations, security/errors                                      |
+| `contracts/browser.openapi.json`, `apps/web/src/api/generated/**`                                                                                                                                                                | GENERATE      | Authoritative browser artifacts                                                    |
+| `apps/web/src/api/{runtime.ts,auth.ts,apps.ts,builds.ts,settings.ts}`                                                                                                                                                            | UPDATE/CREATE | Generated SDK adapters and expected-status/Zod validation                          |
+| `apps/web/src/{App.tsx,routes.tsx,main.tsx}`                                                                                                                                                                                     | UPDATE        | Protected shell, durable selection, cache clearing                                 |
+| `apps/web/{components.json,package.json,pnpm-lock.yaml}`, `apps/web/src/index.css`                                                                                                                                               | UPDATE        | shadcn setup, required dependencies and theme tokens                               |
+| `apps/web/src/components/AppSidebar.tsx`, `apps/web/src/hooks/use-mobile.ts`, `apps/web/src/test/setup.ts`                                                                                                                       | CREATE/UPDATE | Adapt upstream sidebar block/hook and required DOM-test shims                      |
+| `apps/web/src/components/ui/{button.tsx,card.tsx,sidebar.tsx,sheet.tsx,tooltip.tsx,separator.tsx,input.tsx,label.tsx,textarea.tsx,select.tsx,dropdown-menu.tsx,table.tsx,badge.tsx,skeleton.tsx,alert.tsx}`                      | IMPORT/UPDATE | Reuse reviewed upstream primitives and required block dependencies                 |
+| `apps/web/src/pages/{SignIn.tsx,Apps.tsx,AppDetail.tsx,Settings.tsx,Home.tsx}`                                                                                                                                                   | CREATE/UPDATE | Actual onboarding; remove unused Home if replaced entirely                         |
+| `apps/web/src/components/{RequireSession.tsx,AppForm.tsx,ApkUpload.tsx,BuildStatus.tsx,EnvironmentForm.tsx}`                                                                                                                     | CREATE        | Focused accessible controls and session boundary                                   |
+| `apps/api/tests/{health.rs,auth.rs,apps.rs,build_uploads.rs,apk_tools.rs,storage_s3.rs,support/mod.rs}`                                                                                                                          | UPDATE/CREATE | Route agreement, tenant isolation and real APK checks                              |
+| `apps/api/tests/fixtures/apk/{AndroidManifest.xml,README.md}`                                                                                                                                                                    | CREATE        | Controlled input source/provenance; no APK binary or signing key in Git            |
+| `apps/web/src/pages/{Home.test.tsx,SignIn.test.tsx,AppDetail.test.tsx}`, `apps/web/src/api/{transport.test.ts,builds.test.ts}`, `apps/web/src/test/contracts.compile.ts`                                                         | UPDATE/CREATE | Auth/form/reload/error/SDK and static contract coverage                            |
+| `scripts/apk_fixtures.py`, `scripts/app_setup_smoke.py`, `justfile`, `.github/workflows/ci.yaml`                                                                                                                                 | CREATE/UPDATE | Deterministic real-tool fixture generation, HTTP smoke and affected CI             |
+| `docs/architect/{system.md,contracts.md,environment.md,development.md,dependencies.md,decisions.md,status.md}`                                                                                                                   | UPDATE        | Implemented design/config, dependencies and evidence after execution               |
+| `docs/architect/implementation/03-app-setup-and-ui-backend.md`, `AGENTS.md`                                                                                                                                                      | UPDATE        | Link plan; later reconcile foundation-only no-auth sentence with implemented phase |
 
 Do not alter `apps/mobile-worker`, worker shapes/fixtures, parent sources or global configuration. Existing `apps/api/src/workers` remains a scaffold; synchronous APK validation does not introduce the future worker protocol.
 
@@ -593,31 +593,31 @@ Each task's VALIDATE entry specifies evidence to implement and collect in Task 1
 
 ### Unit, Route and UI Tests
 
-| Test | Input | Expected output | Edge case? |
-|---|---|---|---|
-| Login/session/logout | Provisioned user and correct password | Cookie + safe session; reload works; logout cookie replay gives 401 | No |
-| Auth failure | Bad signature, expired/revoked session, disabled user | Structured 401; no protected data | Yes |
-| Login throttling | Exceed per-email/network window or hash concurrency | 429 before expensive work; generic failures | Yes |
-| CSRF | Cross-origin login; missing/wrong CSRF on each mutation | Rejected before state/file change | Yes |
-| App transaction | Valid create request | App, environment, grant committed together | No |
-| Scope enforcement | Foreign org/app/upload/build/reference; same-org ungranted user | No metadata or artifact disclosure; 404 | Yes |
-| Schema/route agreement | Every registered operation | Correct method/path/input/security/status/DTO; errors match generated schemas | No |
-| Boundary validation | Malformed JSON/multipart/UUID, unexpected 204/nonJSON success | Structured API rejection or client validation error | Yes |
-| Bounded transfer | Exact max, max+1, missing Content-Length, extra parts | Exact max allowed, excess rejected, no memory-buffered APK | Yes |
-| Interrupted transfer | Disconnect/disk failure/stale attempt | No accepted build; retryable/expired upload; no winning-file deletion | Yes |
-| Real APK route | Generated signed APK through real transfer + completion | Stored byte count/hash/package/version match independently known fixture | No |
-| Invalid APK | Corrupt ZIP/binary manifest/signature/package mismatch | Persist invalid with actionable reason | Yes |
-| Unsupported intake | Split set, min SDK too high, ARM-only metadata | Unsupported reason; no device claim | Yes |
-| ABI-neutral | No native libraries | Validated when other checks pass | Yes |
-| Tool failure | Absent executable, timeout, bad/oversized output | Persist error; retry available; no false invalid/pass | Yes |
-| Exactly one build | Concurrent complete and lost response retry | Same build ID; one terminal outcome and immutable bytes | Yes |
-| Crash/recovery | After seal/before DB; after build creation/before terminal write | Orphan cleanup or fenced lease retry; never autoaccept | Yes |
-| Environment revision | Edit after operator observation | Old check stale; optimistic conflict prevents lost update | Yes |
-| Sensitive fields | All ordinary responses/logs | No JWT/password hash/secret locator/storage key | Yes |
-| Readiness truth table | Validated APK without worker/cases | Device not checked; execution_ready=false | Yes |
-| Client uncertainty | Transfer/complete response lost | GET authoritative state before retry mutation | Yes |
-| Reload/cache | Navigate direct URL; logout and another user login | Persisted selection; no previous user's cached data | Yes |
-| Cleanup | Expired nonbuild objects + active/build objects | Delete only eligible owned files on apply | Yes |
+| Test                   | Input                                                            | Expected output                                                               | Edge case? |
+| ---------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------- |
+| Login/session/logout   | Provisioned user and correct password                            | Cookie + safe session; reload works; logout cookie replay gives 401           | No         |
+| Auth failure           | Bad signature, expired/revoked session, disabled user            | Structured 401; no protected data                                             | Yes        |
+| Login throttling       | Exceed per-email/network window or hash concurrency              | 429 before expensive work; generic failures                                   | Yes        |
+| CSRF                   | Cross-origin login; missing/wrong CSRF on each mutation          | Rejected before state/file change                                             | Yes        |
+| App transaction        | Valid create request                                             | App, environment, grant committed together                                    | No         |
+| Scope enforcement      | Foreign org/app/upload/build/reference; same-org ungranted user  | No metadata or artifact disclosure; 404                                       | Yes        |
+| Schema/route agreement | Every registered operation                                       | Correct method/path/input/security/status/DTO; errors match generated schemas | No         |
+| Boundary validation    | Malformed JSON/multipart/UUID, unexpected 204/nonJSON success    | Structured API rejection or client validation error                           | Yes        |
+| Bounded transfer       | Exact max, max+1, missing Content-Length, extra parts            | Exact max allowed, excess rejected, no memory-buffered APK                    | Yes        |
+| Interrupted transfer   | Disconnect/disk failure/stale attempt                            | No accepted build; retryable/expired upload; no winning-file deletion         | Yes        |
+| Real APK route         | Generated signed APK through real transfer + completion          | Stored byte count/hash/package/version match independently known fixture      | No         |
+| Invalid APK            | Corrupt ZIP/binary manifest/signature/package mismatch           | Persist invalid with actionable reason                                        | Yes        |
+| Unsupported intake     | Split set, min SDK too high, ARM-only metadata                   | Unsupported reason; no device claim                                           | Yes        |
+| ABI-neutral            | No native libraries                                              | Validated when other checks pass                                              | Yes        |
+| Tool failure           | Absent executable, timeout, bad/oversized output                 | Persist error; retry available; no false invalid/pass                         | Yes        |
+| Exactly one build      | Concurrent complete and lost response retry                      | Same build ID; one terminal outcome and immutable bytes                       | Yes        |
+| Crash/recovery         | After seal/before DB; after build creation/before terminal write | Orphan cleanup or fenced lease retry; never autoaccept                        | Yes        |
+| Environment revision   | Edit after operator observation                                  | Old check stale; optimistic conflict prevents lost update                     | Yes        |
+| Sensitive fields       | All ordinary responses/logs                                      | No JWT/password hash/secret locator/storage key                               | Yes        |
+| Readiness truth table  | Validated APK without worker/cases                               | Device not checked; execution_ready=false                                     | Yes        |
+| Client uncertainty     | Transfer/complete response lost                                  | GET authoritative state before retry mutation                                 | Yes        |
+| Reload/cache           | Navigate direct URL; logout and another user login               | Persisted selection; no previous user's cached data                           | Yes        |
+| Cleanup                | Expired nonbuild objects + active/build objects                  | Delete only eligible owned files on apply                                     | Yes        |
 
 ### Edge Cases Checklist
 
@@ -730,16 +730,16 @@ Once normal browser access is permitted:
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| First domain/auth slice spans many surfaces | High | Large integration batch | Ordered vertical authoring, shared API inventory, one integration owner and final check phase |
-| Session correctness accidentally reduced to JWT validity | Medium | Unauthorized/revoked access | Session row and membership lookup on every request; cookie-only extraction and replay tests |
-| File/DB crash windows and duplicate finalization | High | Lost/stuck/incorrect builds | Immutable attempt keys, unique upload/build linkage, short locks, fences and recovery tests |
-| Tools missing or parser behavior changes | Medium | Validation unavailable | Explicit version pins, real synthetic APK tests and persisted infrastructure-error states |
-| Hostile APK resource consumption/parser vulnerability | Medium | API availability/security | Strict transfer/archive/process limits, minimal subprocess environment, production isolation gate |
-| Static validation mistaken for installation success | High | Misleading customer promise | Separate facets; candidate policy named; no execution-ready state without later evidence |
-| Browser policy gate unresolved | Known | Rendered acceptance incomplete | Preserve pending gate; provide allowed source/API/DOM evidence without bypass |
-| Local storage fills | Medium | Upload failure | Quotas, expired-upload cleanup, actionably fail disk errors; accepted-build retention remains a later operational requirement |
+| Risk                                                     | Likelihood | Impact                         | Mitigation                                                                                                                    |
+| -------------------------------------------------------- | ---------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| First domain/auth slice spans many surfaces              | High       | Large integration batch        | Ordered vertical authoring, shared API inventory, one integration owner and final check phase                                 |
+| Session correctness accidentally reduced to JWT validity | Medium     | Unauthorized/revoked access    | Session row and membership lookup on every request; cookie-only extraction and replay tests                                   |
+| File/DB crash windows and duplicate finalization         | High       | Lost/stuck/incorrect builds    | Immutable attempt keys, unique upload/build linkage, short locks, fences and recovery tests                                   |
+| Tools missing or parser behavior changes                 | Medium     | Validation unavailable         | Explicit version pins, real synthetic APK tests and persisted infrastructure-error states                                     |
+| Hostile APK resource consumption/parser vulnerability    | Medium     | API availability/security      | Strict transfer/archive/process limits, minimal subprocess environment, production isolation gate                             |
+| Static validation mistaken for installation success      | High       | Misleading customer promise    | Separate facets; candidate policy named; no execution-ready state without later evidence                                      |
+| Browser policy gate unresolved                           | Known      | Rendered acceptance incomplete | Preserve pending gate; provide allowed source/API/DOM evidence without bypass                                                 |
+| Local storage fills                                      | Medium     | Upload failure                 | Quotas, expired-upload cleanup, actionably fail disk errors; accepted-build retention remains a later operational requirement |
 
 ## Notes and Readiness Assessment
 
@@ -759,7 +759,6 @@ operator/cleanup tasks; integration/DOM tests; CI/fixtures/smoke/docs. Task 14 b
 with generation after this complete authoring checkpoint. Differences: one coherent
 initial schema migration, thin routes grouped by app setup, cohesive service modules;
 GAN review is explicitly source-only because of the existing browser denial.
-
 
 ## Final implementation checkpoint
 

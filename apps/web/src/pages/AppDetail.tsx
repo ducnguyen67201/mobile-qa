@@ -11,6 +11,7 @@ import {
   formatBytes,
   formatDate,
 } from '@/components/app/feedback'
+import { RunPreview } from '@/components/app/run-preview'
 import { ApkUpload } from '@/components/app/apk-upload'
 import { EnvironmentCard } from '@/components/app/environment'
 import { BuildDetail, ReadinessCard, ValidationBadge } from '@/components/app/build-status'
@@ -120,6 +121,7 @@ function AppDetailContent({ appId }: { appId: string }) {
           />
         </Box>
       )}
+      {selected.data && <RunPreview key={selectedId} appId={appId} buildId={selectedId} />}
       <div className="detail-layout">
         <Stack gap="xl" miw={0}>
           {settings.data ? (

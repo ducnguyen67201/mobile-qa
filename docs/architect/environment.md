@@ -37,10 +37,10 @@ The supervisor records startup failures in `.private/api.log` as before.
 
 ## Current variables
 
-| Variable | Consumer and use |
-|---|---|
-| `HOST` | Production API public origin, required by production Loco config |
-| `DATABASE_URL` | Production PostgreSQL connection, required by production Loco config |
+| Variable                       | Consumer and use                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `HOST`                         | Production API public origin, required by production Loco config                                        |
+| `DATABASE_URL`                 | Production PostgreSQL connection, required by production Loco config                                    |
 | `MOBILE_USE_TELEMETRY_ENABLED` | Set to `false` before future real Minitap execution; explicit import smoke already sets this internally |
 
 Development/test databases keep their isolated loopback configuration. They ignore
@@ -118,3 +118,16 @@ secret. No Google client secret is used. `MOBILE_QA_DEV_ORIGIN` optionally selec
 loopback origin for Google's localhost registration; tests ignore this override.
 See [Google setup](development.md#google-only-sign-in). Without a configured client,
 Google sign-in returns an explicit unavailable error and offers no password fallback.
+
+## Execution worker injection
+
+The API stores only worker token digests. `MOBILE_QA_WORKER_TOKEN` is injected into
+worker registration and the polling worker process; it is never a CLI argument or
+journal value. The client accepts HTTPS, with HTTP allowed only for loopback local
+checks, and refuses redirects. Lease tokens stay in memory. Local child job files
+contain the nonsecret frozen manifest without API credentials.
+
+Real navigation uses the qualified host profile's explicit Doppler project/config
+for the SDK child, matching phase 02. The child environment excludes API/lease/DB
+credentials. The fake HTTP smoke supplies isolated synthetic tokens and never calls
+Doppler, starts an emulator or calls a model. No .env files are introduced.

@@ -1,4 +1,12 @@
-import { Badge, Button, Card, createTheme, Drawer, Text, type CSSVariablesResolver } from '@mantine/core'
+import {
+  Badge,
+  Button,
+  Card,
+  createTheme,
+  Drawer,
+  Text,
+  type CSSVariablesResolver,
+} from '@mantine/core'
 
 // Product colors and component defaults live here; Mantine owns primitive behavior.
 export const theme = createTheme({

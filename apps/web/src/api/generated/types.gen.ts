@@ -4,6 +4,8 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type ActionKind = 'navigate' | 'restart_app' | 'checkpoint';
+
 export type ApiError = {
     code: string;
     details?: unknown;
@@ -45,7 +47,41 @@ export type AppSummary = {
     organization_id: string;
 };
 
+export type ApprovalPurpose = 'business' | 'executability';
+
 export type ApprovalStatus = 'pending' | 'approved';
+
+export type ArtifactReceipt = {
+    artifact: RunArtifact;
+};
+
+export type ArtifactRequest = {
+    byte_size: number;
+    checkpoint_id: string;
+    generation: number;
+    mime: string;
+    name: string;
+    sha256: string;
+};
+
+export type AttemptReceipt = {
+    attempt: AttemptResponse;
+};
+
+export type AttemptResponse = {
+    artifacts: Array<RunArtifact>;
+    case_version_id: string;
+    checks: Array<CheckResult>;
+    cleanup: CleanupState;
+    events: Array<ExecutionEvent>;
+    generation: number;
+    id: string;
+    number: number;
+    outcome?: null | Outcome;
+    reason?: string | null;
+    state: JobState;
+    usage: Array<ModelUsage>;
+};
 
 export type BuildListResponse = {
     items: Array<BuildResponse>;
@@ -76,9 +112,68 @@ export type BuildValidation = {
     validator_version: string;
 };
 
+export type CaseDefinition = {
+    actions: Array<TestAction>;
+    adapter: string;
+    budget: ExecutionBudget;
+    checks: Array<ExpectedCheck>;
+    key: string;
+    package: string;
+    preconditions: Array<string>;
+    provenance: string;
+    requirement: string;
+    title: string;
+    version: number;
+};
+
+export type CaseSelection = {
+    case_version_id: string;
+    data_variant: string;
+    required: boolean;
+};
+
 export type CheckKind = 'backend' | 'account' | 'reset';
 
+export type CheckMethod = 'ui_property_equals_v1' | 'ui_element_presence_v1' | 'manual';
+
+export type CheckResult = {
+    artifact_ids: Array<string>;
+    check_id: string;
+    expected: string;
+    observed?: string | null;
+    outcome: Outcome;
+    reason: string;
+};
+
 export type CheckState = 'not_checked' | 'operator_reported_ok' | 'operator_reported_blocked';
+
+export type ClaimRequest = {
+    claim_id: string;
+    profile_id: string;
+    version: number;
+};
+
+export type ClaimResponse = {
+    lease?: null | ExecutionLease;
+    poll_after_seconds: number;
+};
+
+export type CleanupRequest = {
+    boot_id: string;
+    evidence_reference: string;
+    generation: number;
+    reset: CleanupState;
+    stopped: boolean;
+};
+
+export type CleanupState = 'pending' | 'verified_clean' | 'quarantined';
+
+export type CompleteRequest = {
+    execution_outcome: Outcome;
+    generation: number;
+    reason: string;
+    usage: Array<ModelUsage>;
+};
 
 export type CreateAppRequest = {
     android_package: string;
@@ -94,10 +189,40 @@ export type CreateBuildUploadRequest = {
     original_filename: string;
 };
 
+export type CreateRunRequest = {
+    build_id: string;
+    environment_revision: number;
+    plan_version_id: string;
+};
+
 export type CreateWorkspaceRequest = {
     id: string;
     name: string;
 };
+
+export type DefinitionApproval = {
+    actor_id: string;
+    approved_at: string;
+    content_hash: string;
+    purpose: ApprovalPurpose;
+};
+
+export type DefinitionImport = {
+    app_id: string;
+    definition: TestDefinition;
+};
+
+export type DefinitionKind = 'case' | 'suite' | 'plan';
+
+export type DefinitionResponse = {
+    app_id: string;
+    approvals: Array<DefinitionApproval>;
+    content_hash: string;
+    definition: TestDefinition;
+    id: string;
+};
+
+export type Driver = 'fake' | 'minitap';
 
 export type EnvironmentCheck = {
     checked_at?: string | null;
@@ -119,6 +244,70 @@ export type EnvironmentResponse = {
     secret_references: Array<SecretReferenceSummary>;
 };
 
+export type EventReceipt = {
+    last_sequence: number;
+};
+
+export type EventRequest = {
+    events: Array<ExecutionEvent>;
+    generation: number;
+};
+
+export type EvidenceState = 'pending' | 'sealed' | 'unavailable';
+
+export type ExecutionBudget = {
+    artifact_bytes: number;
+    duration_seconds: number;
+    max_steps: number;
+};
+
+export type ExecutionEvent = {
+    action_id: string;
+    id: string;
+    message: string;
+    phase: string;
+    sequence: number;
+};
+
+export type ExecutionLease = {
+    attempt_id: string;
+    case_index: number;
+    expires_at: string;
+    generation: number;
+    lease_token: string;
+    manifest: RunManifest;
+    run_id: string;
+};
+
+export type ExecutionProfile = {
+    adapter: string;
+    device_identity: string;
+    driver: Driver;
+    id: string;
+    image: string;
+    max_apk_bytes: number;
+    model: string;
+    name: string;
+    package: string;
+    qualification_reference: string;
+    qualified: boolean;
+};
+
+export type ExpectedCheck = {
+    checkpoint_id: string;
+    description: string;
+    expected: string;
+    id: string;
+    method: CheckMethod;
+    observation_seconds: number;
+    prerequisite_check_ids: Array<string>;
+    property: UiProperty;
+    ready_resource_id: string;
+    required: boolean;
+    resource_id: string;
+    text_filter: string;
+};
+
 export type GoogleLoginChallenge = {
     challenge_id: string;
     client_id: string;
@@ -133,6 +322,18 @@ export type HealthResponse = {
 
 export type HealthStatus = 'ok';
 
+export type JobState = 'queued' | 'leased' | 'running' | 'finalizing' | 'finished' | 'cancel_requested' | 'recovery_required';
+
+export type LeaseRequest = {
+    generation: number;
+};
+
+export type LeaseStatusResponse = {
+    cancel_requested: boolean;
+    expires_at: string;
+    state: JobState;
+};
+
 export type LoginRequest = {
     challenge_id: string;
     credential: string;
@@ -144,10 +345,38 @@ export type LogoutResponse = {
 
 export type MembershipRole = 'operator' | 'member';
 
+export type ModelUsage = {
+    calls: number;
+    input_tokens?: number | null;
+    model: string;
+    output_tokens?: number | null;
+    unknown_calls: number;
+};
+
 export type OrganizationMembership = {
     name: string;
     organization_id: string;
     role: MembershipRole;
+};
+
+export type Outcome = 'passed' | 'failed' | 'blocked' | 'inconclusive' | 'skipped' | 'canceled';
+
+export type PlanDefinition = {
+    budget: ExecutionBudget;
+    cases: Array<CaseSelection>;
+    diagnostic_retries: number;
+    exclusions: Array<string>;
+    key: string;
+    profile_id: string;
+    suite_version_ids: Array<string>;
+    title: string;
+    version: number;
+};
+
+export type PlanPreviewResponse = {
+    blockers: Array<string>;
+    manifest?: null | RunManifest;
+    plan?: null | DefinitionResponse;
 };
 
 export type ReadinessResponse = {
@@ -160,6 +389,55 @@ export type ReadinessResponse = {
     install: string;
     reset: CheckState;
     reset_configured: boolean;
+};
+
+export type ResolvedCase = {
+    case: CaseDefinition;
+    content_hash: string;
+    data_variant: string;
+    definition_id: string;
+    required: boolean;
+};
+
+export type RunArtifact = {
+    attempt_id: string;
+    byte_size: number;
+    checkpoint_id: string;
+    id: string;
+    mime: string;
+    name: string;
+    reason?: string | null;
+    sha256: string;
+    state: EvidenceState;
+};
+
+export type RunListResponse = {
+    items: Array<RunResponse>;
+    next_cursor?: string | null;
+};
+
+export type RunManifest = {
+    app_id: string;
+    budget: ExecutionBudget;
+    build_bytes: number;
+    build_id: string;
+    build_sha256: string;
+    cases: Array<ResolvedCase>;
+    diagnostic_retries: number;
+    environment_revision: number;
+    exclusions: Array<string>;
+    plan_hash: string;
+    plan_version_id: string;
+    profile: ExecutionProfile;
+};
+
+export type RunResponse = {
+    attempts: Array<AttemptResponse>;
+    created_at: string;
+    id: string;
+    manifest: RunManifest;
+    state: JobState;
+    summary: string;
 };
 
 export type SecretKind = 'account' | 'reset';
@@ -186,6 +464,33 @@ export type SettingsResponse = {
     storage: string;
     upload_ttl_seconds: number;
 };
+
+export type SuiteDefinition = {
+    cases: Array<CaseSelection>;
+    key: string;
+    title: string;
+    version: number;
+};
+
+export type TestAction = {
+    checkpoint_id: string;
+    id: string;
+    instruction: string;
+    kind: ActionKind;
+};
+
+export type TestDefinition = {
+    content: CaseDefinition;
+    kind: 'case';
+} | {
+    content: SuiteDefinition;
+    kind: 'suite';
+} | {
+    content: PlanDefinition;
+    kind: 'plan';
+};
+
+export type UiProperty = 'text' | 'content_description' | 'checked' | 'enabled';
 
 export type UpdateEnvironmentRequest = {
     account_secret_reference_id?: string | null;
@@ -1039,6 +1344,218 @@ export type UpdateEnvironmentResponses = {
 
 export type UpdateEnvironmentResponse = UpdateEnvironmentResponses[keyof UpdateEnvironmentResponses];
 
+export type GetExecutionPlanData = {
+    body?: never;
+    path: {
+        app_id: string;
+    };
+    query: {
+        build_id: string;
+    };
+    url: '/api/apps/{app_id}/execution-plan';
+};
+
+export type GetExecutionPlanErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetExecutionPlanError = GetExecutionPlanErrors[keyof GetExecutionPlanErrors];
+
+export type GetExecutionPlanResponses = {
+    /**
+     * Success
+     */
+    200: PlanPreviewResponse;
+};
+
+export type GetExecutionPlanResponse = GetExecutionPlanResponses[keyof GetExecutionPlanResponses];
+
+export type ListRunsData = {
+    body?: never;
+    path: {
+        app_id: string;
+    };
+    query?: {
+        cursor?: string;
+    };
+    url: '/api/apps/{app_id}/runs';
+};
+
+export type ListRunsErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type ListRunsError = ListRunsErrors[keyof ListRunsErrors];
+
+export type ListRunsResponses = {
+    /**
+     * Success
+     */
+    200: RunListResponse;
+};
+
+export type ListRunsResponse = ListRunsResponses[keyof ListRunsResponses];
+
+export type CreateRunData = {
+    body: CreateRunRequest;
+    headers: {
+        'Idempotency-Key': string;
+    };
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/runs';
+};
+
+export type CreateRunErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type CreateRunError = CreateRunErrors[keyof CreateRunErrors];
+
+export type CreateRunResponses = {
+    /**
+     * Idempotent replay
+     */
+    200: RunResponse;
+    /**
+     * Success
+     */
+    201: RunResponse;
+};
+
+export type CreateRunResponse = CreateRunResponses[keyof CreateRunResponses];
+
 export type StartGoogleSignInData = {
     body?: never;
     headers: {
@@ -1432,6 +1949,208 @@ export type GetHealthResponses = {
 };
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
+
+export type GetRunData = {
+    body?: never;
+    path: {
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}';
+};
+
+export type GetRunErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetRunError = GetRunErrors[keyof GetRunErrors];
+
+export type GetRunResponses = {
+    /**
+     * Success
+     */
+    200: RunResponse;
+};
+
+export type GetRunResponse = GetRunResponses[keyof GetRunResponses];
+
+export type GetRunArtifactData = {
+    body?: never;
+    path: {
+        run_id: string;
+        artifact_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}/artifacts/{artifact_id}/content';
+};
+
+export type GetRunArtifactErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetRunArtifactError = GetRunArtifactErrors[keyof GetRunArtifactErrors];
+
+export type GetRunArtifactResponses = {
+    /**
+     * Success
+     */
+    200: Blob | File;
+};
+
+export type GetRunArtifactResponse = GetRunArtifactResponses[keyof GetRunArtifactResponses];
+
+export type CancelRunData = {
+    body?: never;
+    path: {
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}/cancel';
+};
+
+export type CancelRunErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type CancelRunError = CancelRunErrors[keyof CancelRunErrors];
+
+export type CancelRunResponses = {
+    /**
+     * Success
+     */
+    200: RunResponse;
+};
+
+export type CancelRunResponse = CancelRunResponses[keyof CancelRunResponses];
 
 export type GetSettingsData = {
     body?: never;

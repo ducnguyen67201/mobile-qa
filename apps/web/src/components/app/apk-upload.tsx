@@ -4,8 +4,19 @@ import { useApkUpload } from '@/hooks/use-apk-upload'
 import { ErrorNotice, formatBytes } from './feedback'
 
 export function ApkUpload({ appId, maxBytes }: { appId: string; maxBytes: number }) {
-  const { uploadId, upload, phase, error, inputError, selectFile, run, inspect, clear, stop, updateUrl } =
-    useApkUpload(appId, maxBytes)
+  const {
+    uploadId,
+    upload,
+    phase,
+    error,
+    inputError,
+    selectFile,
+    run,
+    inspect,
+    clear,
+    stop,
+    updateUrl,
+  } = useApkUpload(appId, maxBytes)
   return (
     <Card component="section" className="upload-panel" aria-labelledby="upload-title">
       <Group justify="space-between" mb="lg">
@@ -83,12 +94,19 @@ export function ApkUpload({ appId, maxBytes }: { appId: string; maxBytes: number
                     : 'Upload and validate'}
               </Button>
               {upload?.build_id && (
-                <Button variant="outline" onClick={() => updateUrl(upload.id, upload.build_id ?? undefined)}>
+                <Button
+                  variant="outline"
+                  onClick={() => updateUrl(upload.id, upload.build_id ?? undefined)}
+                >
                   View saved build
                 </Button>
               )}
               {uploadId && (
-                <Button variant="outline" onClick={() => void inspect()} leftSection={<RotateCw size={16} />}>
+                <Button
+                  variant="outline"
+                  onClick={() => void inspect()}
+                  leftSection={<RotateCw size={16} />}
+                >
                   Check status
                 </Button>
               )}

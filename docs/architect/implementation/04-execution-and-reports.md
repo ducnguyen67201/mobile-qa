@@ -1,6 +1,6 @@
 # 04 — Run one test and produce an evidence report
 
-Status: locally implemented and simulated HTTP flow verified; real-device/browser and hosted acceptance pending. Depends on: 02 and 03. Owns: Rust run/scheduler/report modules and migrations, worker protocol/adapter, Runs UI.
+Status: locally implemented; simulated HTTP and one real API-to-emulator good-path run verified. Browser, live fault/reliability and hosted acceptance remain pending. Depends on: 02 and 03. Owns: Rust run/scheduler/report modules and migrations, worker protocol/adapter, Runs UI.
 
 ## Implementation planning
 

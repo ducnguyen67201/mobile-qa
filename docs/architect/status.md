@@ -292,3 +292,27 @@ recipe are implemented. Validation passed: seven execution route/database tests
 15 worker execution tests, Rust build, Clippy, Ruff/Pyright, formatting and the
 simulated HTTP/restart smoke. Real emulator/API acceptance remains pending; this
 change does not run Minitap or provision a device.
+
+## Real API-to-emulator acceptance — 2026-09-12
+
+Run `5f942465-1661-4f7b-ad3c-7b555cb61a37`, attempt
+`ecffe2bf-173d-4328-b44e-a94b6e6ff56c`, passed through the current Rust API,
+long-poll Python worker, visible macOS ARM64 emulator and Minitap/gpt-4.1.
+The real good demo APK was uploaded through normal intake. The worker was started
+before HTTP run submission; it claimed the queued attempt, created the unique task,
+restarted the app and published four checkpoint artifacts. Rust independently
+recorded both created and persisted checks as passed. Cleanup was verified_clean;
+the worker exited 0, emulator ports were released, and no dirty marker or active
+AVD remained. The owned test API was stopped; existing development servers were
+left running.
+
+The SDK recorded 10 calls, 46,829 input tokens and 1,258 output tokens, with no
+unknown usage calls. Model credentials were injected only into the SDK child via
+the existing Doppler configuration. The test API used isolated synthetic identity
+and worker credentials; device execution and model calls were real.
+
+Private report/evidence: `.private/live-execution/aad6f00b-7dff-4174-852f-00e5f5aebf87/`
+(`api-report.json` plus the attempt's evidence directory). This proves one good-path
+backend-to-device run, not manual browser acceptance, broken/unavailable scenarios
+through this new path, cancellation under live navigation, full reliability or
+hosted storage acceptance. Those gates remain open.

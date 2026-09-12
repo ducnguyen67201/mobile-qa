@@ -50,6 +50,15 @@ build:
 smoke:
     python3 scripts/runtime.py smoke
 
+setup-android:
+    python3 scripts/setup_android.py
+
+apk-fixtures:
+    python3 scripts/apk_fixtures.py
+
+smoke-app-setup:
+    python3 scripts/app_setup_smoke.py
+
 device-smoke:
     @echo "Spec 02 device qualification is not implemented. No device or cloud action was taken."
     @exit 2

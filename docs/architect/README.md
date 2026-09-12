@@ -45,6 +45,6 @@ Start here before planning or changing the application.
 An operated Android regression-testing service: app setup → reviewed tests → run →
 evidence report, with small Settings. Rust/Loco/SeaORM owns the application; React/Vite
 owns the UI; Python/Minitap owns future device interaction. The source foundation exists.
-The next engineering work is device feasibility (02) and app setup (03), with coordinated
-ownership; real execution/reporting (04) follows both. Manual browser acceptance from
+Local app setup (03) is implemented and verified; hosted storage and rendered acceptance
+remain open. Device feasibility (02) and real execution/reporting (04) remain planned. Manual browser acceptance from
 01 remains open. See the status page before treating any milestone as complete.

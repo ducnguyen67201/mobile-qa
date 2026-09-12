@@ -59,3 +59,47 @@ TypeScript/Python shapes. Future migrations register in apps/api/migration.
 Health is application liveness; database readiness is tested separately. Development/
 test static middleware is disabled; production serves ../web/dist relative to apps/api.
 See [roadmap concurrency](implementation/00-master-spec.md#concurrent-execution-plan) for subsequent work.
+
+## Spec 03 browser boundary
+
+`crates/contracts/src/browser.rs` owns all 17 operations for health, cookie sessions,
+apps/environments, upload intake/completion, build history and Settings. Every API
+error includes a generated request ID matching `X-Request-ID`; API responses use
+`Cache-Control: no-store`. Google challenge creation and credential exchange require a same-origin request and
+`X-Mobile-QA-Request: 1`; other mutations require the session's `X-CSRF-Token`.
+The cookie is HttpOnly/SameSite Strict, `mobile_qa_session` locally and
+`__Host-mobile_qa_session` with Secure in production. Raw JWTs are never response DTOs.
+
+Browser DTOs expose safe reference IDs/labels and static APK metadata, never password
+hashes, locators or storage keys. Completion returns 200 terminal / 202 validating;
+repeated completion shares one build per upload. `error` is retryable infrastructure
+failure, `invalid` describes APK content, `unsupported` describes intake policy.
+`validated` does not imply installation or execution readiness. The generated SDK's
+multipart file field and generated success/error Zod validators are the only browser
+transport path. Worker contracts and generated Pydantic are unchanged.
+
+The pinned Hey API header/binary adaptations are documented in [dependencies](dependencies.md).
+They preserve generated validation and transport ownership; consumers do not cast JSON
+numbers into BigInt or substitute handwritten upload bodies/endpoints.
+
+Google sign-in uses POST `/api/auth/google/challenge` (`GoogleLoginChallenge`) and
+POST `/api/auth/google/login` (`LoginRequest`: credential plus challenge UUID).
+The challenge response includes the public client ID and nonce. Its separate
+HttpOnly cookie binds the browser; challenge consumption prevents replay. Google
+signature/issuer/audience/expiry/nonce verification precedes account linking and
+session issuance. `/api/auth/login` no longer exists. Google tokens never appear in
+session DTOs or persistent browser storage. All changes use the Rust→OpenAPI pipeline.
+
+Workspace onboarding adds `POST /api/workspaces` (`createWorkspace`) with cookie
+session and CSRF/origin protection. `CreateWorkspaceRequest` carries a UUID `id`
+and bounded `name`; success returns an `OrganizationMembership` with status 201.
+Retries with the same ID/name by the existing owner return the same workspace;
+conflicting IDs/names return 409. Non-approved accounts receive 403
+`approval_required`, even with an otherwise valid session. `UserIdentity` includes
+`approval_status: pending | approved`. Verified new Google users receive a session
+with no memberships instead of an invitation rejection.
+
+The browser's `workspace` URL parameter maps to the list API's `organization_id`.
+List queries validate membership, and cursors from another organization are rejected.
+Nested resources continue to use their persisted app/organization ownership for
+server authorization; URL selection never grants access.

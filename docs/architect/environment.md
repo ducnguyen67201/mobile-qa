@@ -75,3 +75,35 @@ introduce secret downloads, mounted env files, or tokens in build artifacts.
 References: [Doppler CLI](https://docs.doppler.com/docs/cli),
 [Doppler configuration](https://docs.doppler.com/docs/environment-based-configuration),
 [Vite envDir](https://vite.dev/config/shared-options#envdir).
+
+## Spec 03 process settings
+
+Production additionally requires `JWT_SECRET` (base64 of at least 64 random bytes),
+`ARTIFACT_S3_ENDPOINT` (HTTPS), `ARTIFACT_S3_REGION`, `ARTIFACT_S3_BUCKET`,
+`ARTIFACT_S3_ACCESS_KEY_ID` and `ARTIFACT_S3_SECRET_ACCESS_KEY`. Supply these through
+Doppler only to the API. They have not been provisioned by this change. Production
+uses private Railway Buckets with the logical backend `pilot`; an AWS S3 migration
+copies immutable object keys/bytes and verifies stored SHA-256 before switching that
+backend's endpoint/credentials. PostgreSQL stores metadata; APK bytes stay in storage.
+
+Development/test always use private local disk and ephemeral JWT keys, even if the
+parent has production credentials. Restart requires a new login and retains app/build
+records. Dev artifacts live in ignored `.private/artifacts`; production scratch uses
+`ARTIFACT_SCRATCH_DIR` or a process-host temporary directory. Scratch is disposable.
+`MOBILE_QA_ANDROID_SDK` may select an explicitly installed read-only SDK; the default
+is ignored `.private/android-sdk`. `JAVA_HOME` must select JDK 17. Validators receive
+only this Java location plus a fixed PATH/locale, never the API secret environment.
+
+Operator reference tasks consume `MOBILE_QA_SECRET_LOCATOR` only when needed.
+Locator values must not appear in task arguments. Google-only sign-in has no local
+password, password reset task, or operator password environment variable.
+Local synthetic smoke keeps signing keys ephemeral and injects only fixture public
+verification keys into its test API subprocess environment. `MOBILE_QA_TEST_SCOPE` is a test-only UUID that lets the owned HTTP
+smoke process restart against the same private scratch/artifact directory.
+
+Google sign-in requires `GOOGLE_CLIENT_ID`, injected into the API via Doppler. The API
+exposes this public identifier with the browser-bound login challenge; it is not a
+secret. No Google client secret is used. `MOBILE_QA_DEV_ORIGIN` optionally selects a
+loopback origin for Google's localhost registration; tests ignore this override.
+See [Google setup](development.md#google-only-sign-in). Without a configured client,
+Google sign-in returns an explicit unavailable error and offers no password fallback.

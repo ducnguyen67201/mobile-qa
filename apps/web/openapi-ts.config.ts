@@ -10,7 +10,16 @@ export default defineConfig({
   plugins: [
     '@hey-api/typescript',
     { name: '@hey-api/client-fetch', baseUrl: false },
-    { name: 'zod', definitions: true, requests: true, responses: true },
+    {
+      name: 'zod', definitions: true, requests: true, responses: true,
+      // 0.99 maps OpenAPI binary to string in Zod, despite Blob|File in TS.
+      // Generate the browser binary boundary from the schema's binary format.
+      $resolvers: {
+        string: ctx => ctx.schema.format === 'binary'
+          ? ctx.$(ctx.symbols.z).attr('instanceof').call(ctx.$('Blob'))
+          : undefined,
+      },
+    },
     // Query boundaries invoke generated response schemas once, including 204/empty
     // bodies which the bundled fetch responseValidator path otherwise skips.
     { name: '@hey-api/sdk', validator: { request: 'zod' } },

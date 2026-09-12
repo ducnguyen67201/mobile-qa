@@ -9,10 +9,31 @@ loco-rs = { workspace = true }
 mobile-qa-contracts = { path = "../../crates/contracts" }
 migration = { path = "migration" }
 async-trait = "0.1"
-axum = "0.8"
+axum = { version = "0.8", features = ["multipart"] }
 serde_json = "1"
-tokio = { version = "1", features = ["rt-multi-thread"] }
+tokio = { version = "1", features = ["rt-multi-thread", "fs", "io-util", "process", "sync", "time"] }
+serde = { version = "1", features = ["derive"] }
+sea-orm = { version = "2.0", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+time = "0.3"
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+sha2 = "0.10"
+url = "2"
+subtle = "2"
+base64 = "0.22"
+axum-extra = { version = "0.12", features = ["cookie"] }
+zip = { version = "=8.6.0", default-features = false, features = ["deflate"] }
+tokio-util = { version = "0.7", features = ["io"] }
+futures-util = "0.3"
+jsonwebtoken = { version = "=10.4.0", features = ["rust_crypto"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 [dev-dependencies]
+rsa = "=0.9.10"
+rand = "0.8"
+axum-test = "17.3"
+tempfile = "3"
+
 loco-rs = { workspace = true, features = ["testing"] }
 sea-orm = { version = "2.0", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
 [[bin]]

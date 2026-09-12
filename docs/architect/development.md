@@ -80,3 +80,107 @@ verification previously denied access: do not use alternate browser/Playwright/H
 workarounds to evade it. Rendered keyboard/Retry/HMR acceptance remains explicitly
 unverified until approved browser access is available. Endpoint smoke is a separate
 existing automated check, not a claim of rendered browser acceptance.
+
+## App setup development and operator commands
+
+Install a JDK 17 and set `JAVA_HOME` in the invoking shell. Explicitly run
+`just setup-android` to install pinned Build Tools 36.0.0 and platform android-35
+under ignored `.private/android-sdk`, then `just apk-fixtures` after authoring and
+before the final API test pass. Installation uses Google's versioned SDK archives;
+it changes no global SDK configuration. API startup and tests never download tools.
+The synthetic resource-only APK and ephemeral signing key prove intake, not execution.
+
+After finishing source/test/config edits: `just types`, `cargo fmt --all`,
+`just apk-fixtures`, `just check-contracts`, `just check-web`, `just check-api`,
+`just build`, `just smoke`, `just smoke-app-setup`. Rerun only failed/invalidated
+checks. The second smoke owns isolated test accounts/API processes, verifies real
+HTTP upload and validation, restarts the API, and checks persisted data and tenant
+isolation. It does not inspect a rendered browser or reset a database.
+
+Run explicit Loco tasks from `apps/api` with process injection appropriate to the
+environment, for example `doppler run --no-fallback --forward-signals --
+../../target/debug/mobile-qa-cli task operator action:provision email:<email>
+name:<name> organization:<name> --environment development`. This grants access to
+the specified Google email; no password is created. The task prints only new user/org IDs. Other operator actions require `actor:<user-id>` and
+`organization:<org-id>` of an active operator:
+
+- `link-google user:<id> subject:<verified-google-sub>`: explicitly links an unlinked
+  invited account when Google is not authoritative for its email. Verify the Google
+  subject out of band; an existing link cannot be silently reassigned.
+- `membership user:<id> role:member|operator active:true|false`: manage org access.
+- `grant` / `revoke-grant user:<id> app:<id>`: manage explicit member app access.
+- `reference app:<id> kind:account|reset label:<label>`: records an injected
+  `MOBILE_QA_SECRET_LOCATOR` beginning `doppler://`, prints only reference ID.
+- `observe app:<id> revision:<n> kind:backend|account|reset
+  state:operator_reported_ok|operator_reported_blocked [note:<safe-note>]`: records
+  an operator observation at the current environment revision. Never include
+  credentials in notes. Editing the environment invalidates old observations.
+
+`task artifact-cleanup` is dry-run by default. `apply:true` deletes expired upload
+attempts and stale scratch after a safety hour, keeping every referenced build object
+and active lease. It also expires old session/rate-limit rows. Run it as an explicitly
+scheduled operator action; no background scheduler or accepted-build retention is
+configured. Hosted cleanup/round-trip and rendered acceptance remain separate gates.
+
+### Browser state ownership
+
+Use Mantine `useDisclosure` for controlled drawers and `useForm` for field values,
+normalization and submission. Generated SDK/Zod boundaries remain authoritative for
+wire validation. TanStack Query owns saved apps/builds/session data and mutation
+status; router search parameters own selected build/upload IDs. `useApkUpload` owns
+transient file selection, request phases, cancellation and saved-upload reconciliation.
+Keep this workflow outside presentation components. Use plain React state for small
+independent values; add memoization/context only when there is a concrete sharing or
+identity requirement. Do not recreate the removed SidebarContext state container.
+
+### Google-only sign-in
+
+Supply `GOOGLE_CLIENT_ID` through Doppler to the API. Register the application origin
+in a Google OAuth **Web application** client. For local Google UI use
+`http://localhost` and `http://localhost:5173` as authorized JavaScript origins,
+set `MOBILE_QA_DEV_ORIGIN=http://localhost:5173`, and open that origin. Production uses
+the configured HTTPS `HOST`. This GIS credential flow needs no client secret or
+OAuth redirect callback. The client ID is public; the API returns it with a one-use
+nonce/challenge and sets a separate HttpOnly browser-binding cookie.
+
+Any verified Google account can register and sign in. New users have
+`users.approval_status='pending'` and can view their approval status without a
+workspace. Existing users remain approved after migration 000003. First-use linking
+of pre-existing records still requires a Google-authoritative email; subsequent
+sign-ins use Google's immutable `sub`, not email. Third-party email accounts can
+register new records, but cannot claim existing email records without explicit linking.
+The incremental migration drops password hashes and revokes pre-Google sessions,
+while retaining users, memberships, apps and builds. Rollback cannot recover hashes.
+The old password endpoint and password reset task are removed.
+
+API tests and the HTTP smoke generate ephemeral RSA fixture keys. The public fixture
+key override `MOBILE_QA_TEST_GOOGLE_JWKS` is honored **only** by Environment::Test;
+development/production always fetch Google's fixed JWKS endpoint. No test private
+key or real Google token is committed. Real Google consent/origin configuration and
+rendered browser acceptance still require operator setup and permitted browser access.
+
+### Workspace creation and approval
+
+Approve a registered account by editing `users.approval_status` to `approved` in the
+local database, or run the trusted process-only task from `apps/api`:
+
+```sh
+../../target/debug/mobile-qa-cli task operator action:approval user:<uuid> status:approved --environment development
+```
+
+Use `status:pending` to revoke workspace creation approval. This does not delete
+existing workspace ownership or data; `disabled_at` remains the account disable
+mechanism. There is no HTTP self-approval endpoint. The user can select **Check
+approval status** without signing out. `operator provision` remains a convenience
+for local fixtures/explicit administration, not a sign-in requirement.
+
+Approved users can open `/workspaces/new`, create multiple workspaces, and become
+an operator/owner of each. Creation uses a client-generated UUID for safe retries.
+The existing organizations/memberships tables remain the storage model. Browser
+navigation uses `?workspace=<organization UUID>`; the picker updates that URL,
+clears app-specific selections on switch, and retains the workspace on navigation.
+A missing parameter selects the first available membership. Invalid or inaccessible
+workspace IDs display an error instead of silently selecting a different workspace.
+App lists and creation use the selected organization. Nested app resources derive
+and verify ownership through their app IDs; the browser rejects an app link whose
+organization differs from the selected workspace before loading builds/uploads.

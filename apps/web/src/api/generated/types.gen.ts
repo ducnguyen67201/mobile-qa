@@ -8,6 +8,121 @@ export type ApiError = {
     code: string;
     details?: unknown;
     message: string;
+    request_id: string;
+};
+
+export type ApkMetadata = {
+    min_sdk: number;
+    native_abis: Array<string>;
+    package_name: string;
+    signature_verified: boolean;
+    target_sdk?: number | null;
+    version_code: string;
+    version_name?: string | null;
+};
+
+export type AppListResponse = {
+    items: Array<AppSummary>;
+    next_cursor?: string | null;
+};
+
+export type AppResponse = {
+    android_package: string;
+    created_at: string;
+    environment: EnvironmentResponse;
+    id: string;
+    name: string;
+    organization_id: string;
+    readiness: ReadinessResponse;
+};
+
+export type AppSummary = {
+    android_package: string;
+    created_at: string;
+    environment_name: string;
+    id: string;
+    name: string;
+    organization_id: string;
+};
+
+export type ApprovalStatus = 'pending' | 'approved';
+
+export type BuildListResponse = {
+    items: Array<BuildResponse>;
+    next_cursor?: string | null;
+};
+
+export type BuildResponse = {
+    app_id: string;
+    byte_size: number;
+    can_retry_validation: boolean;
+    created_at: string;
+    id: string;
+    metadata?: null | ApkMetadata;
+    original_filename: string;
+    readiness: ReadinessResponse;
+    sha256: string;
+    upload_id: string;
+    validation: BuildValidation;
+};
+
+export type BuildValidation = {
+    completed_at?: string | null;
+    intake_policy_version: string;
+    message?: string | null;
+    reason_code?: string | null;
+    started_at: string;
+    state: ValidationState;
+    validator_version: string;
+};
+
+export type CheckKind = 'backend' | 'account' | 'reset';
+
+export type CheckState = 'not_checked' | 'operator_reported_ok' | 'operator_reported_blocked';
+
+export type CreateAppRequest = {
+    android_package: string;
+    backend_origins: Array<string>;
+    environment_name: string;
+    login_origins: Array<string>;
+    name: string;
+    organization_id: string;
+};
+
+export type CreateBuildUploadRequest = {
+    expected_size: number;
+    original_filename: string;
+};
+
+export type CreateWorkspaceRequest = {
+    id: string;
+    name: string;
+};
+
+export type EnvironmentCheck = {
+    checked_at?: string | null;
+    checked_by?: string | null;
+    kind: CheckKind;
+    note?: string | null;
+    state: CheckState;
+};
+
+export type EnvironmentResponse = {
+    account_secret_reference_id?: string | null;
+    backend_origins: Array<string>;
+    checks: Array<EnvironmentCheck>;
+    id: string;
+    login_origins: Array<string>;
+    name: string;
+    reset_secret_reference_id?: string | null;
+    revision: number;
+    secret_references: Array<SecretReferenceSummary>;
+};
+
+export type GoogleLoginChallenge = {
+    challenge_id: string;
+    client_id: string;
+    nonce: string;
 };
 
 export type HealthResponse = {
@@ -17,6 +132,1229 @@ export type HealthResponse = {
 };
 
 export type HealthStatus = 'ok';
+
+export type LoginRequest = {
+    challenge_id: string;
+    credential: string;
+};
+
+export type LogoutResponse = {
+    signed_out: boolean;
+};
+
+export type MembershipRole = 'operator' | 'member';
+
+export type OrganizationMembership = {
+    name: string;
+    organization_id: string;
+    role: MembershipRole;
+};
+
+export type ReadinessResponse = {
+    account: CheckState;
+    account_configured: boolean;
+    backend: CheckState;
+    cases: string;
+    device_profile?: string | null;
+    execution_ready: boolean;
+    install: string;
+    reset: CheckState;
+    reset_configured: boolean;
+};
+
+export type SecretKind = 'account' | 'reset';
+
+export type SecretReferenceSummary = {
+    id: string;
+    kind: SecretKind;
+    label: string;
+};
+
+export type SessionResponse = {
+    csrf_token: string;
+    expires_at: string;
+    memberships: Array<OrganizationMembership>;
+    user: UserIdentity;
+};
+
+export type SettingsResponse = {
+    accepted_build_retention: string;
+    max_active_uploads: number;
+    max_apk_bytes: number;
+    memberships: Array<OrganizationMembership>;
+    session_ttl_seconds: number;
+    storage: string;
+    upload_ttl_seconds: number;
+};
+
+export type UpdateEnvironmentRequest = {
+    account_secret_reference_id?: string | null;
+    backend_origins: Array<string>;
+    expected_revision: number;
+    login_origins: Array<string>;
+    name: string;
+    reset_secret_reference_id?: string | null;
+};
+
+export type UploadContentRequest = {
+    file: Blob | File;
+};
+
+export type UploadResponse = {
+    actual_size?: number | null;
+    app_id: string;
+    build_id?: string | null;
+    expected_size: number;
+    expires_at: string;
+    id: string;
+    original_filename: string;
+    retry_after_seconds?: number | null;
+    state: UploadState;
+};
+
+export type UploadState = 'pending' | 'receiving' | 'uploaded' | 'finalized' | 'expired';
+
+export type UserIdentity = {
+    approval_status: ApprovalStatus;
+    display_name: string;
+    email: string;
+    id: string;
+};
+
+export type ValidationState = 'validating' | 'validated' | 'invalid' | 'unsupported' | 'error';
+
+export type ListAppsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        cursor?: string;
+        limit?: number;
+        organization_id?: string;
+    };
+    url: '/api/apps';
+};
+
+export type ListAppsErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type ListAppsError = ListAppsErrors[keyof ListAppsErrors];
+
+export type ListAppsResponses = {
+    /**
+     * Success
+     */
+    200: AppListResponse;
+};
+
+export type ListAppsResponse = ListAppsResponses[keyof ListAppsResponses];
+
+export type CreateAppData = {
+    body: CreateAppRequest;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/apps';
+};
+
+export type CreateAppErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type CreateAppError = CreateAppErrors[keyof CreateAppErrors];
+
+export type CreateAppResponses = {
+    /**
+     * Success
+     */
+    201: AppResponse;
+};
+
+export type CreateAppResponse = CreateAppResponses[keyof CreateAppResponses];
+
+export type GetAppData = {
+    body?: never;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}';
+};
+
+export type GetAppErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetAppError = GetAppErrors[keyof GetAppErrors];
+
+export type GetAppResponses = {
+    /**
+     * Success
+     */
+    200: AppResponse;
+};
+
+export type GetAppResponse = GetAppResponses[keyof GetAppResponses];
+
+export type CreateBuildUploadData = {
+    body: CreateBuildUploadRequest;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/build-uploads';
+};
+
+export type CreateBuildUploadErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type CreateBuildUploadError = CreateBuildUploadErrors[keyof CreateBuildUploadErrors];
+
+export type CreateBuildUploadResponses = {
+    /**
+     * Success
+     */
+    201: UploadResponse;
+};
+
+export type CreateBuildUploadResponse = CreateBuildUploadResponses[keyof CreateBuildUploadResponses];
+
+export type GetBuildUploadData = {
+    body?: never;
+    path: {
+        app_id: string;
+        upload_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/build-uploads/{upload_id}';
+};
+
+export type GetBuildUploadErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetBuildUploadError = GetBuildUploadErrors[keyof GetBuildUploadErrors];
+
+export type GetBuildUploadResponses = {
+    /**
+     * Success
+     */
+    200: UploadResponse;
+};
+
+export type GetBuildUploadResponse = GetBuildUploadResponses[keyof GetBuildUploadResponses];
+
+export type CompleteBuildUploadData = {
+    body?: never;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path: {
+        app_id: string;
+        upload_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/build-uploads/{upload_id}/complete';
+};
+
+export type CompleteBuildUploadErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type CompleteBuildUploadError = CompleteBuildUploadErrors[keyof CompleteBuildUploadErrors];
+
+export type CompleteBuildUploadResponses = {
+    /**
+     * Success
+     */
+    200: BuildResponse;
+    /**
+     * Validation in progress
+     */
+    202: BuildResponse;
+};
+
+export type CompleteBuildUploadResponse = CompleteBuildUploadResponses[keyof CompleteBuildUploadResponses];
+
+export type UploadBuildContentData = {
+    body: UploadContentRequest;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path: {
+        app_id: string;
+        upload_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/build-uploads/{upload_id}/content';
+};
+
+export type UploadBuildContentErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type UploadBuildContentError = UploadBuildContentErrors[keyof UploadBuildContentErrors];
+
+export type UploadBuildContentResponses = {
+    /**
+     * Success
+     */
+    200: UploadResponse;
+};
+
+export type UploadBuildContentResponse = UploadBuildContentResponses[keyof UploadBuildContentResponses];
+
+export type ListBuildsData = {
+    body?: never;
+    path: {
+        app_id: string;
+    };
+    query?: {
+        cursor?: string;
+        limit?: number;
+    };
+    url: '/api/apps/{app_id}/builds';
+};
+
+export type ListBuildsErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type ListBuildsError = ListBuildsErrors[keyof ListBuildsErrors];
+
+export type ListBuildsResponses = {
+    /**
+     * Success
+     */
+    200: BuildListResponse;
+};
+
+export type ListBuildsResponse = ListBuildsResponses[keyof ListBuildsResponses];
+
+export type GetBuildData = {
+    body?: never;
+    path: {
+        app_id: string;
+        build_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/builds/{build_id}';
+};
+
+export type GetBuildErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetBuildError = GetBuildErrors[keyof GetBuildErrors];
+
+export type GetBuildResponses = {
+    /**
+     * Success
+     */
+    200: BuildResponse;
+};
+
+export type GetBuildResponse = GetBuildResponses[keyof GetBuildResponses];
+
+export type UpdateEnvironmentData = {
+    body: UpdateEnvironmentRequest;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/environment';
+};
+
+export type UpdateEnvironmentErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type UpdateEnvironmentError = UpdateEnvironmentErrors[keyof UpdateEnvironmentErrors];
+
+export type UpdateEnvironmentResponses = {
+    /**
+     * Success
+     */
+    200: EnvironmentResponse;
+};
+
+export type UpdateEnvironmentResponse = UpdateEnvironmentResponses[keyof UpdateEnvironmentResponses];
+
+export type StartGoogleSignInData = {
+    body?: never;
+    headers: {
+        'X-Mobile-QA-Request': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/google/challenge';
+};
+
+export type StartGoogleSignInErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type StartGoogleSignInError = StartGoogleSignInErrors[keyof StartGoogleSignInErrors];
+
+export type StartGoogleSignInResponses = {
+    /**
+     * Success
+     */
+    200: GoogleLoginChallenge;
+};
+
+export type StartGoogleSignInResponse = StartGoogleSignInResponses[keyof StartGoogleSignInResponses];
+
+export type LoginData = {
+    body: LoginRequest;
+    headers: {
+        'X-Mobile-QA-Request': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/google/login';
+};
+
+export type LoginErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type LoginError = LoginErrors[keyof LoginErrors];
+
+export type LoginResponses = {
+    /**
+     * Success
+     */
+    200: SessionResponse;
+};
+
+export type LoginResponse = LoginResponses[keyof LoginResponses];
+
+export type LogoutData = {
+    body?: never;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/auth/logout';
+};
+
+export type LogoutErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type LogoutError = LogoutErrors[keyof LogoutErrors];
+
+export type LogoutResponses = {
+    /**
+     * Success
+     */
+    200: LogoutResponse;
+};
+
+export type LogoutResponse2 = LogoutResponses[keyof LogoutResponses];
+
+export type GetSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auth/session';
+};
+
+export type GetSessionErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetSessionError = GetSessionErrors[keyof GetSessionErrors];
+
+export type GetSessionResponses = {
+    /**
+     * Success
+     */
+    200: SessionResponse;
+};
+
+export type GetSessionResponse = GetSessionResponses[keyof GetSessionResponses];
 
 export type GetHealthData = {
     body?: never;
@@ -29,6 +1367,58 @@ export type GetHealthErrors = {
     /**
      * API error
      */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
     default: ApiError;
 };
 
@@ -36,9 +1426,166 @@ export type GetHealthError = GetHealthErrors[keyof GetHealthErrors];
 
 export type GetHealthResponses = {
     /**
-     * Application is alive
+     * Success
      */
     200: HealthResponse;
 };
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
+
+export type GetSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/settings';
+};
+
+export type GetSettingsErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetSettingsError = GetSettingsErrors[keyof GetSettingsErrors];
+
+export type GetSettingsResponses = {
+    /**
+     * Success
+     */
+    200: SettingsResponse;
+};
+
+export type GetSettingsResponse = GetSettingsResponses[keyof GetSettingsResponses];
+
+export type CreateWorkspaceData = {
+    body: CreateWorkspaceRequest;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/workspaces';
+};
+
+export type CreateWorkspaceErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    408: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    410: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    415: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type CreateWorkspaceError = CreateWorkspaceErrors[keyof CreateWorkspaceErrors];
+
+export type CreateWorkspaceResponses = {
+    /**
+     * Success
+     */
+    201: OrganizationMembership;
+};
+
+export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];

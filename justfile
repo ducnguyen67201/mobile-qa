@@ -75,3 +75,12 @@ device-local scenario="good":
 # Explicit Minitap run; model credentials come from the profile's Doppler config.
 device-local-agent model scenario="good":
     python3 scripts/local_device.py run --scenario {{quote(scenario)}} --model {{quote(model)}}
+
+setup-android:
+    python3 scripts/setup_android.py
+
+apk-fixtures:
+    python3 scripts/apk_fixtures.py
+
+smoke-app-setup:
+    python3 scripts/app_setup_smoke.py

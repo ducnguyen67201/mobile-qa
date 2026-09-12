@@ -7,9 +7,9 @@ cargo fmt during authoring. Apache attribution remains in LICENSE-LOCO and NOTIC
 Its native application paths now live together under apps/api. Root is a virtual
 Cargo workspace. Unneeded auth/mailers/posts/downloader features remain omitted.
 
-Card/Button are adapted from shadcn/ui (MIT), with local LICENSE-SHADCN:
-https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/new-york-v4/ui
-React19, Router8, Query5, Vite8 and Tailwind4 remain pinned by the web lockfile.
+The original foundation used shadcn Card/Button. Those copies were removed in the
+Mantine migration; LICENSE-SHADCN is retained for historical attribution. React19,
+Router8, Query5 and Vite8 remain pinned by the web lockfile.
 
 Browser transport now uses Utoipa5, replacing the initial ts-rs pipeline entirely.
 Pure Utoipa definitions export OpenAPI without application/DB dependencies:
@@ -73,3 +73,61 @@ extraction; our adapter also supplies the tools and execution context fields.
 A real offline graph tool call verifies the compatibility path before device use.
 Remove the adapter after a fixed SDK release passes that test and qualification.
 Downgrading was rejected because the resulting LangChain version had a known advisory.
+
+## Spec 03 additions
+
+Dashboard controls come from `@mantine/core`, `@mantine/hooks` and `@mantine/form` 9.6.1 (MIT),
+installed as packages rather than copied source. Product components import Mantine
+directly; `apps/web/src/theme.ts` centralizes colors and defaults. Plain product CSS
+does not use Mantine PostCSS mixins, so no additional PostCSS plugins are required.
+Tailwind, Radix, CVA and the local `cn` helper are removed. Lucide remains the icon
+package. Exact resolutions are in pnpm-lock.yaml. Official integration references:
+[Mantine Vite setup](https://mantine.dev/guides/vite/),
+[Drawer behavior](https://mantine.dev/core/drawer/),
+[theme](https://mantine.dev/theming/theme-object/),
+[DOM testing](https://mantine.dev/guides/vitest/),
+[disclosure state](https://mantine.dev/hooks/use-disclosure/),
+[form state](https://mantine.dev/form/use-form/).
+
+Rust uses Loco 1.1.0's app-session JWT and S3 storage driver, SeaORM entities/migrations,
+Axum multipart/cookies, SHA-256 and ZIP 8.6.0 for bounded archive checks. Concrete
+versions are in Cargo.lock. No new worker dependencies or handwritten Android parser.
+
+Android Build Tools 36.0.0 (`aapt2`, `apksigner`, `zipalign`), android-35 platform
+revision 2 and JDK17 are external explicit prerequisites. `scripts/setup_android.py`
+uses versioned Google archives and verifies checksums from the official
+[SDK repository index](https://dl.google.com/android/repository/repository2-3.xml).
+Recorded macOS Build Tools SHA-256:
+`04e7f3a72044de4926fa038fa0e251a37bba1e1c3fb8beab6f8401bfd9eb4bf3`;
+platform SHA-256:
+`0988cacad01b38a18a47bac14a0695f246bc76c1b06c0eeb8eb0dc825ab0c8e0`.
+See [Android command-line tools](https://developer.android.com/tools) for vendor
+provenance. These pins are intake tooling, not qualified device evidence.
+
+Hey API 0.99.0 needs two scoped integration adaptations: the Zod generator resolves
+OpenAPI binary strings as `Blob`, and the application client wrapper presents the
+original header record to generated request validators before the generated client
+normalizes headers. SDK serialization/fetch and generated success/error validation
+remain authoritative. Byte fields have explicit Rust schema bounds of 1–250 MiB,
+avoiding incompatible browser BigInt coercion for JSON byte counts. These paths are
+covered by real generated-client transport tests, including multipart serialization.
+
+The 2026-09-12 RustSec audit reports `RUSTSEC-2023-0071` in transitive `rsa 0.9.10`,
+introduced by Loco auth → jsonwebtoken's `rust_crypto` feature. There is no patched
+version in the inspected advisory database. App sessions use Loco's HMAC JWT API
+(HS512 default); Google identities use RSA public-key verification. Production does
+not invoke RSA private-key signing/decryption. The dependency audit is **not clean**,
+and the upstream advisory remains tracked rather than suppressed. Reassess it before
+introducing production private-key operations. See
+[RustSec advisory](https://rustsec.org/advisories/RUSTSEC-2023-0071.html).
+
+## Google identity
+
+`@react-oauth/google` 0.12.2 wraps the official GIS sign-in control. jsonwebtoken
+10.4.0 verifies Google RS256 tokens; reqwest 0.12 fetches the fixed JWKS URL with a
+timeout and bounded cache. Production performs RSA **public-key verification**, not
+RSA signing/decryption. The tracked RSA advisory remains open; test fixtures use
+only ephemeral synthetic signing material. No actual Google account/token is used
+by automated tests. References: [Google verification](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token),
+[Google setup](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid),
+[React wrapper](https://github.com/MomenSherif/react-oauth).

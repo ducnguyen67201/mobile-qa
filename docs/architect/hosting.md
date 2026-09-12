@@ -11,7 +11,7 @@ remains a separate qualification decision.
 |---|---|---|
 | Rust API and compiled React dashboard | One Railway application service | Loco already has same-origin static SPA configuration; keep separate source apps but one deployed image |
 | PostgreSQL | Railway database service | API connects privately; Python never receives database credentials |
-| APKs and report artifacts | Private S3-compatible storage when spec 03/04 requires it | Keep durable artifacts outside the application's ephemeral filesystem; provider remains undecided |
+| APKs and report artifacts | Railway private Buckets for hosted APKs; reports follow spec 04 | S3-compatible adapter exists; hosted round-trip and provisioning remain open |
 | Python Minitap worker and Android emulator | One separately qualified Linux x86_64 KVM host | Current harness owns the emulator locally; Railway device execution is not qualified |
 
 Railway supports container services and monorepos. Its documentation describes

@@ -1,14 +1,19 @@
 # 03 — App setup: UI and backend together
 
-Status: planned. Depends on: 01. Device preflight uses 02 once qualified. Owns: Rust app/build/auth modules, migrations, transport DTOs, frontend App screen.
+Status: local implementation verified; hosted and rendered acceptance open. Depends on: 01. Device preflight uses 02 once qualified. Owns: Rust app/build/auth modules, migrations, transport DTOs, frontend App screen.
+
+Implementation: [report](../../../.claude/PRPs/reports/03-app-setup-report.md) and
+[executed plan](../../../.claude/PRPs/plans/completed/03-app-setup.plan.md).
+Authentication, local upload/validation and persisted UI are verified. Device readiness
+remains unverified; the hosted adapter still needs an authorized bucket round-trip.
 
 ## Deliverable
 
-An authenticated user creates an app, uploads a test APK and sees whether it is ready to run on the supported device. Build each operation from database to API to UI before starting the next. Do not finish all backend endpoints or all UI screens in advance.
+An authenticated user creates an app, uploads a test APK and sees the actual APK validation status and separate remaining readiness checks. Build each operation from database to API to UI before starting the next. Do not finish all backend endpoints or all UI screens in advance.
 
 ## Ordered work
 
-1. **Auth and shell:** add authentication using the pinned framework's supported facilities (the foundation deliberately omitted auth), then add organization/project membership enforcement, and build the App / Tests / Runs / Settings navigation. Use an operator-provisioned pilot account initially; public registration and complex invitation flows can wait.
+1. **Auth and shell:** add Google-only sign-in with verified Google identity tokens and framework-issued app sessions, then add organization/project membership enforcement, and build the App / Tests / Runs / Settings navigation. Allow Google registration; gate workspace creation on account approval and scope all navigation to the selected workspace.
 2. **Create app:** migration and Rust service → typed create/detail endpoints → form and persisted detail page. Required fields: name, Android package, test-environment name and permitted backend/login origins. Package identity is checked against uploaded APK metadata.
 3. **Upload build:** private upload session → file transfer → explicit finalization → APK metadata/checksum validation → displayed build record. Retry finalization idempotently. A file visible in storage is not automatically an accepted build.
 4. **Configure test access:** store secret references and readiness metadata, display masked status, and let the operator verify the test account/reset path. Test definitions contain references, not credentials.
@@ -18,7 +23,7 @@ An authenticated user creates an app, uploads a test APK and sees whether it is 
 
 Initial entities: users, organizations, memberships, projects/apps, environments, builds and secret-reference metadata. Use immutable build IDs and content hashes; retain original filename as metadata only. Every customer record belongs to an organization/project.
 
-Proposed routes:
+Core implemented routes (full inventory lives in Rust):
 
 - `POST /api/apps`, `GET /api/apps/:app_id`
 - `POST /api/apps/:app_id/build-uploads`
@@ -30,11 +35,34 @@ Rust request/response DTOs and endpoint descriptions are authoritative. Consume 
 
 Use authenticated server-mediated uploads to local private storage for development. Pilot storage uses short-lived scoped object uploads or bounded streaming through the API. Both share the same upload-session/finalization semantics. Verify server-side ownership, actual byte size, hash and parsed APK metadata; never trust client-provided values alone.
 
+## Hosted APK storage choice
+
+Hosted selection: use Railway private Buckets for the first hosted APK store, then migrate
+objects to AWS S3 later. [Railway Buckets support S3-compatible access](https://docs.railway.com/storage-buckets).
+Local development/CI keep private local storage. Implement a backend adapter using
+Loco's S3-compatible driver; preserve object keys, immutable build IDs/checksums and
+the same upload/finalization API. Credentials remain API-only Doppler inputs.
+Railway application disk is temporary validation scratch, not durable APK storage.
+Hosted acceptance requires a real authorized object round-trip; no bucket was provisioned
+by this implementation. AWS migration must copy and checksum-verify existing objects before cutover,
+with source objects retained for rollback. This decision concerns APK storage, not a
+migration of the whole application host.
+
 ## Authentication details
 
 Do not copy a starter's browser-token storage choice without review. For the same-origin pilot, use short-lived server-validated authentication in Secure/HttpOnly cookies with appropriate SameSite behavior, CSRF protection and origin checks on mutations. Enforce session expiry/logout and server-side membership checks. A frontend route guard is only navigation behavior.
 
 If the pinned Loco starter cannot support this cleanly, record the specific gap and select a managed identity integration before customer use. Do not implement a new password system to save one dependency.
+
+## Dashboard component approach
+
+The dashboard uses **Mantine packaged components**, React Router and TanStack Query.
+AppShell and a mobile Drawer provide navigation for App / Tests / Runs / Settings.
+Screens import standard buttons, cards, forms, tables, badges, menus, drawers and
+feedback components directly from Mantine. Keep defaults/colors in `apps/web/src/theme.ts`
+and limit CSS to product surfaces. Mantine owns focus trapping, dismissal and control
+behavior. The user rejected maintaining copied shadcn primitives and long conditional
+Tailwind strings; those files/configuration have been removed. Do not add another UI kit.
 
 ## UI acceptance
 
@@ -49,3 +77,54 @@ If the pinned Loco starter cannot support this cleanly, record the specific gap 
 One meaningful browser smoke covers sign-in → create app → upload → persisted status. API tests prove a second organization's IDs cannot expose or mutate records/artifacts. Test duplicate upload finalization, malformed metadata and interrupted uploads. Keep generated CRUD tests only when they prove behavior we rely on.
 
 Done means genuine persisted setup with honest readiness, not a polished static dashboard. Full test editing, generation and live device streaming are deferred.
+
+## Implementation work (2026-09-12)
+
+Source authoring on `codex/03-app-setup` now covers the Google-authenticated cookie
+session, org/app scoping, app/environment records, immutable private upload attempts,
+real Android validation, build history, operator reference/observation commands and
+Mantine dashboard. The first product schema is one atomic SeaORM migration rather than
+three incremental empty-schema migrations. Operator workflows and settings live in
+[development](../development.md) and [environment](../environment.md).
+
+The original shadcn GAN design loop completed two source-only review iterations
+(7.27 → 7.87); those scores do not evaluate the subsequent Mantine refactor.
+This is provisional craft/accessibility evidence, not rendered quality verification.
+Consolidated generation, static/API/DOM checks, builds and HTTP smoke passed; evidence
+is recorded in [status](../status.md) and the PRP report. Hosted
+Railway round-trip, allowed rendered acceptance and later device checks remain open.
+
+## Google-only authentication correction
+
+The accepted sign-in method is Google only. GIS renders the sign-in control; the
+backend verifies RS256 signature, issuer, audience, expiry, verified email and the
+one-use browser-bound nonce before issuing the app session. Local passwords and
+reset-password flows are removed. Existing operator-managed membership grants are
+preserved. The workspace onboarding correction below supersedes the invitation-only policy. Migration 000002 preserves
+product records, removes password hashes and revokes earlier sessions. Real Google
+client registration and consent remain an explicit acceptance gate.
+
+## Workspace onboarding correction
+
+Any verified Google account can sign in without a manual invitation. New accounts
+start pending; existing accounts migrate as approved. Only approved accounts may
+view the Create Workspace screen or call its API. Approval is an operator/database
+setting, distinct from Google identity and workspace membership. Pending accounts
+see a clear status screen and can refresh approval.
+
+Users can create multiple workspaces and own each through an active operator
+membership. The app provides a workspace picker, with selection stored in
+`?workspace=<id>`. Apps, builds, uploads, environments and workspace settings remain
+scoped to that workspace. Switching drops detail/build/upload context, resets forms
+and pagination, and preserves selection across reloads and browser back/forward.
+Invalid workspace IDs and mismatched app links must not render another workspace's
+content. Existing records remain intact; organizations are the internal workspace
+storage representation. Device execution and team invitation UI remain deferred.
+
+Workspace selection lives in the sidebar. Desktop navigation can minimize to an
+icon rail with labelled tooltips and a workspace menu; expanding restores the full
+picker and labels. Mobile retains the full navigation in its dismissible drawer.
+Sidebar size is local UI state and does not change the selected workspace URL.
+Account identity and sign-out live at the bottom of the sidebar, below Settings.
+The minimized rail retains a Settings icon and avatar menu; the mobile drawer uses
+the same account controls. Sign-out state and failure handling remain in the app shell.

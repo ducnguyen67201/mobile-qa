@@ -35,7 +35,7 @@ describe('generated browser transport', () => {
     await expect(healthQuery.queryFn()).rejects.toThrow('Unexpected health response status (201)')
   })
   it('validates and preserves a structured non2xx error', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ code: 'unavailable', message: 'Try later', details: null }, { status: 503 })))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ code: 'unavailable', message: 'Try later', details: null, request_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' }, { status: 503 })))
     await expect(healthQuery.queryFn()).rejects.toMatchObject({ status: 503, message: 'Try later', body: { code: 'unavailable' } })
   })
   it.each([{}, { code: 1, message: {} }, { code: 'failure', message: 3 }, null])('does not trust malformed errors %j', async data => {

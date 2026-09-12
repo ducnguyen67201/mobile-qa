@@ -1,7 +1,8 @@
 # Mobile QA
 
-Local Loco API, React dashboard, deterministic fixture executor and explicit Android
-demo runner. The dashboard has a health check; auth, uploads and worker jobs are planned.
+Rust/Loco API, authenticated Mantine dashboard, app/APK setup and an explicit Android
+test runner. Main's Google sign-in, workspaces, app setup and uploads are preserved;
+Tests/Runs and UI-to-worker job dispatch remain planned.
 
 ```text
 apps/api/             Loco source, configuration, migrations and tests
@@ -103,7 +104,7 @@ Close any emulator on ports 5554/5555 first. The runner refuses to borrow or kil
 See [local device setup and recovery](docs/architect/device-qualification.md#local-mac-or-linux-development).
 
 Start at **[docs/architect](docs/architect/README.md)**, the source of truth for product,
-architecture, implementation specs and operations. This local scaffold is unauthenticated;
+architecture, implementation specs and operations. The dashboard uses Google sign-in and workspace authorization;
 production configuration support is not a deployed or qualified customer service.
-Rendered browser/keyboard/HMR acceptance remains pending due the browser tool's admin
-policy verification denial. Automated UI tests do not substitute for that observation.
+Main's dashboard acceptance and this branch's device evidence are recorded separately
+in [current status](docs/architect/status.md); hosted execution remains unqualified.

@@ -52,6 +52,9 @@ jobs:
               - 'infra/compose.yaml'
               - 'infra/postgres/**'
               - 'scripts/runtime.py'
+              - 'scripts/setup_android.py'
+              - 'scripts/apk_fixtures.py'
+              - 'scripts/app_setup_smoke.py'
             web:
               - '.github/workflows/**'
               - 'apps/web/**'
@@ -106,8 +109,15 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: python3 scripts/setup_android.py
+      - run: python3 scripts/apk_fixtures.py
       - run: python3 scripts/runtime.py check-api --api-only
       - run: cargo build --package mobile-qa --locked
+      - run: python3 scripts/app_setup_smoke.py
   web:
     needs: scope
     if: needs.scope.outputs.web == 'true'

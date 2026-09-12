@@ -19,6 +19,10 @@ cases = [
     (['infra/device-host/setup.sh', 'apps/api/src/app.rs'], ['api', 'worker']),
     (['scripts/test_ci_scope.py'], ['scope_tests']),
     (['scripts/local_device.py'], ['worker', 'demo']),
+    (['scripts/setup_android.py'], ['api']),
+    (['scripts/apk_fixtures.py'], ['api']),
+    (['scripts/app_setup_smoke.py'], ['api']),
+    (['apps/web/src/pages/Apps.tsx', 'apps/mobile-worker/src/mobile_qa_worker/qualification/sdk_adapter.py'], ['web', 'worker']),
     (['.github/workflows/ci.yaml'], list(filters)),
 ]
 # Resolve the exact installed matcher version from pnpm's locked dependency store.

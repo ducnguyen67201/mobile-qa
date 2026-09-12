@@ -1,20 +1,20 @@
 # System architecture
 
-Status: foundation and offline qualification harness implemented; live device qualification
-and customer workflows pending.
+Status: local app setup and Android test runner implemented; one live Minitap demo verified.
+Hosted acceptance, full device qualification and UI-to-worker job dispatch remain open.
 [Current status](status.md) separates these explicitly.
 
 ## Component ownership
 
 | Location | Responsibility | Current state |
 |---|---|---|
-| `apps/api` | Rust/Loco API, authorization, domain services, scheduling, verification and reports | Health route and framework wiring exist; product services planned |
-| `apps/api/migration` | SeaORM database migrations | Migrator and PostgreSQL integration exist; no product tables |
-| `apps/web` | React/Vite dashboard using React Router, TanStack Query, Tailwind and shadcn/ui | App health UI and Tests/Runs/Settings placeholders |
-| `apps/mobile-worker` | Python/uv adapter, device observations and evidence | Fake/import commands plus operator qualification harness; live device qualification pending |
-| `crates/contracts` | Pure Rust transport DTOs and browser endpoint declarations | Health, fixture and qualification contracts; no Loco/DB dependency |
+| `apps/api` | Rust/Loco API, authorization, domain services, scheduling, verification and reports | Auth, apps/environments, private APK intake and build history implemented; scheduling/reports planned |
+| `apps/api/migration` | SeaORM database migrations | Twelve product tables with tenant/lifecycle constraints; real PostgreSQL tests |
+| `apps/web` | React/Vite dashboard using React Router, TanStack Query, Mantine | Authenticated Mantine dashboard, App and Settings; Tests/Runs placeholders |
+| `apps/mobile-worker` | Python/uv adapter, device observations and evidence | Local ADB demo and live Minitap demo verified; network jobs planned |
+| `crates/contracts` | Pure Rust transport DTOs and browser endpoint declarations | Browser setup operations plus worker fixture and qualification contracts; no Loco/DB dependency |
 | `contracts` | Generated OpenAPI/JSON Schema and serialization fixtures | Derived from Rust, committed and checked for drift |
-| `infra` | Local infrastructure and future device-host provisioning | Local PostgreSQL and pinned device-host preparation; no cloud provisioning |
+| `infra` | Local infrastructure and future device-host provisioning | Isolated PostgreSQL and pinned Mac/Linux device-host setup |
 | `scripts` / `justfile` | Explicit development, generation and validation | Implemented; no check watchers |
 | `docs/architect` | Product/architecture/specification source of truth | This packet |
 
@@ -32,27 +32,40 @@ flowchart LR
     UI[React dashboard] -->|same-origin HTTP| API[Rust Loco API]
     API --> DB[(PostgreSQL / SeaORM)]
     D[Doppler] -->|process environment| API
-    API -. planned .-> O[(Private object storage)]
+    API -->|local verified / hosted adapter| O[(Private artifact storage)]
     W[Python worker] -. planned lease/events/results .-> API
-    W -. planned local ADB .-> E[Qualified Android emulator]
+    CLI[Explicit local command] --> W
+    W -->|local ADB| E[Android emulator]
     W -. planned scoped uploads .-> O
-    W -. planned inference .-> M[Model provider]
+    W -->|Minitap inference| M[Model provider]
+    D -->|SDK child environment| W
 ```
 
-Only the UI → health API and API → local DB paths are implemented. The fake worker
-consumes local fixtures independently. The explicit qualification harness can attempt
-local device control, but it has not been qualified on a real host and does not claim
-network jobs. Rust owns approvals and outcome aggregation. Agent completion alone cannot prove
+The UI/API app-setup flow, local persistence and artifact validation are implemented.
+Hosted S3-compatible storage is configured in code but has no authorized round-trip evidence.
+The explicit Python runner controls a local emulator, runs Minitap and independently
+verifies the controlled demo before reset. It does not claim API jobs or execute uploaded
+customer APKs. Tests/Runs remain main's placeholders; upload validation readiness must
+not be presented as execution readiness. Rust will own job approvals and outcome aggregation.
+Agent completion alone cannot prove
 a customer expectation passed. Planned results and immutable manifests follow
 [product rules](product.md) and [execution spec](implementation/04-execution-and-reports.md).
 
-Use Railway initially for one application deployment serving the API and compiled SPA,
-with PostgreSQL and private artifact storage as needed. Keep the qualified Linux emulator
-host separate; Railway KVM support is not verified. AWS is the later application
-migration target. See [hosting](hosting.md) for the selected direction and remaining work. Python initiates scoped HTTP worker calls;
+Use Railway first for the application, PostgreSQL and private storage, with a separate
+qualified Linux emulator host for the pilot. Local Mac runs use Hypervisor.Framework.
+See [hosting](hosting.md). In the planned production protocol Python initiates scoped HTTP worker calls;
 it does not receive database credentials. Keep one active case per device and exclusive
 test-account leases. Add capacity only after measured queue wait, reset reliability and
 cost justify it. [Spec 07](implementation/07-pilot-readiness-and-scale.md) owns scaling.
+
+## Artifact storage
+
+Spec 03 uses private local storage in development and Railway Buckets for hosted APKs,
+with AWS S3 as the later destination. Keep a local/S3-compatible adapter boundary and
+persist internal backend IDs plus object keys, never provider URLs in browser contracts.
+Only temporary upload/validation scratch lives on the API application's disk. Migration
+requires copying and checksum-verifying objects before switching the configured backend;
+existing build IDs/checksums remain stable. The adapter is implemented; hosted infrastructure has not been provisioned or verified. [Spec 03](implementation/03-app-setup-and-ui-backend.md) owns the details.
 
 ## Persistence and ORM
 
@@ -61,7 +74,7 @@ migrations as features arrive; do not introduce a parallel hand-maintained SQL a
 layer. SQLx is an upstream dependency of the ORM, not a second application data layer.
 The ORM reduces mapping and query boilerplate; it does not replace schema evolution,
 indexes, transaction design or business invariants. Database records are distinct from
-public transport DTOs. [Spec 03](implementation/03-app-setup-and-ui-backend.md) adds the
+public transport DTOs. [Spec 03](implementation/03-app-setup-and-ui-backend.md) owns the
 first product records; [spec 04](implementation/04-execution-and-reports.md) adds durable
 jobs and the narrow transactional claim/lease behavior.
 

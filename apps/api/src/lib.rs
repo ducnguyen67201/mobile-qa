@@ -1,7 +1,4 @@
-//! Loco API application. Only the health endpoint is implemented in this foundation.
-//! Empty modules preserve framework scaffolding locations; they are not implemented
-//! product services. See docs/architect/status.md before assuming a feature exists.
-
+//! Loco API: authenticated app setup and private, static APK intake.
 pub mod app;
 pub mod controllers;
 pub mod data;
@@ -11,3 +8,9 @@ pub mod models;
 pub mod tasks;
 pub mod views;
 pub mod workers;
+
+pub mod config;
+pub mod errors;
+pub mod middleware;
+pub mod services;
+pub mod storage;

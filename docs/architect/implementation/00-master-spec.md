@@ -1,7 +1,9 @@
 # Mobile QA MVP — master implementation spec
 
-Status: canonical implementation roadmap. Spec 01 has an implemented foundation;
-spec 02 has an offline-validated harness with live qualification pending; specs 03–07 are planned. [Current status and evidence](../status.md) own completion claims.
+Status: canonical implementation roadmap. Spec 01 foundation and spec 03 local app setup
+are implemented. Spec 02 has verified local ADB and one live Minitap demo; the full
+reliability campaign and cloud qualification remain open. Specs 04–07 remain planned.
+[Current status and evidence](../status.md) own completion claims.
 This roadmap owns sequencing; [system architecture](../system.md), [contracts](../contracts.md),
 [environment](../environment.md), and [development workflow](../development.md) own their current details.
 
@@ -19,7 +21,7 @@ This packet owns implementation order and stack decisions. The [product specific
 |---|---|---|
 | Application | Loco Rust monolith, its Axum foundation and SeaORM | Reuse application conventions and scaffolding |
 | Dashboard | Loco React/Vite starter, TypeScript strict, React Router, TanStack Query | Stay close to the starter; fast UI iteration |
-| Components | shadcn/ui and Tailwind | Assemble forms, navigation, tables and dialogs |
+| Components | Mantine packaged components | Assemble forms, navigation, tables and dialogs |
 | Shared contracts | Rust/Utoipa → OpenAPI → generated TypeScript SDK + Zod; worker DTOs → JSON Schema → Pydantic | Authoritative shapes, endpoint descriptions and runtime boundary validation |
 | Persistence | PostgreSQL | Product records, manifests, leases and durable jobs |
 | Execution | Python/uv adapter around a pinned Minitap mobile-use version | Reuse device interaction; keep Python narrowly scoped |

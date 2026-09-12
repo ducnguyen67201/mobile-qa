@@ -2,9 +2,10 @@
 
 import * as z from 'zod';
 
-import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
+import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetHealthData, GetHealthErrors, GetHealthResponses } from './types.gen';
+import type { CompleteBuildUploadData, CompleteBuildUploadErrors, CompleteBuildUploadResponses, CreateAppData, CreateAppErrors, CreateAppResponses, CreateBuildUploadData, CreateBuildUploadErrors, CreateBuildUploadResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, GetAppData, GetAppErrors, GetAppResponses, GetBuildData, GetBuildErrors, GetBuildResponses, GetBuildUploadData, GetBuildUploadErrors, GetBuildUploadResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, ListAppsData, ListAppsErrors, ListAppsResponses, ListBuildsData, ListBuildsErrors, ListBuildsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, StartGoogleSignInData, StartGoogleSignInErrors, StartGoogleSignInResponses, UpdateEnvironmentData, UpdateEnvironmentErrors, UpdateEnvironmentResponses, UploadBuildContentData, UploadBuildContentErrors, UploadBuildContentResponses } from './types.gen';
+import { zCompleteBuildUploadHeaders, zCompleteBuildUploadPath, zCreateAppBody, zCreateAppHeaders, zCreateBuildUploadBody, zCreateBuildUploadHeaders, zCreateBuildUploadPath, zCreateWorkspaceBody, zCreateWorkspaceHeaders, zGetAppPath, zGetBuildPath, zGetBuildUploadPath, zListAppsQuery, zListBuildsPath, zListBuildsQuery, zLoginBody, zLoginHeaders, zLogoutHeaders, zStartGoogleSignInHeaders, zUpdateEnvironmentBody, zUpdateEnvironmentHeaders, zUpdateEnvironmentPath, zUploadBuildContentBody, zUploadBuildContentHeaders, zUploadBuildContentPath } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -20,6 +21,235 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
 
+export const listApps = <ThrowOnError extends boolean = false>(options?: Options<ListAppsData, ThrowOnError>): RequestResult<ListAppsResponses, ListAppsErrors, ThrowOnError> => (options?.client ?? client).get<ListAppsResponses, ListAppsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zListAppsQuery.optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps',
+    ...options
+});
+
+export const createApp = <ThrowOnError extends boolean = false>(options: Options<CreateAppData, ThrowOnError>): RequestResult<CreateAppResponses, CreateAppErrors, ThrowOnError> => (options.client ?? client).post<CreateAppResponses, CreateAppErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zCreateAppBody,
+        headers: zCreateAppHeaders,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getApp = <ThrowOnError extends boolean = false>(options: Options<GetAppData, ThrowOnError>): RequestResult<GetAppResponses, GetAppErrors, ThrowOnError> => (options.client ?? client).get<GetAppResponses, GetAppErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetAppPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}',
+    ...options
+});
+
+export const createBuildUpload = <ThrowOnError extends boolean = false>(options: Options<CreateBuildUploadData, ThrowOnError>): RequestResult<CreateBuildUploadResponses, CreateBuildUploadErrors, ThrowOnError> => (options.client ?? client).post<CreateBuildUploadResponses, CreateBuildUploadErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zCreateBuildUploadBody,
+        headers: zCreateBuildUploadHeaders,
+        path: zCreateBuildUploadPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/build-uploads',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getBuildUpload = <ThrowOnError extends boolean = false>(options: Options<GetBuildUploadData, ThrowOnError>): RequestResult<GetBuildUploadResponses, GetBuildUploadErrors, ThrowOnError> => (options.client ?? client).get<GetBuildUploadResponses, GetBuildUploadErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetBuildUploadPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/build-uploads/{upload_id}',
+    ...options
+});
+
+export const completeBuildUpload = <ThrowOnError extends boolean = false>(options: Options<CompleteBuildUploadData, ThrowOnError>): RequestResult<CompleteBuildUploadResponses, CompleteBuildUploadErrors, ThrowOnError> => (options.client ?? client).post<CompleteBuildUploadResponses, CompleteBuildUploadErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        headers: zCompleteBuildUploadHeaders,
+        path: zCompleteBuildUploadPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/build-uploads/{upload_id}/complete',
+    ...options
+});
+
+export const uploadBuildContent = <ThrowOnError extends boolean = false>(options: Options<UploadBuildContentData, ThrowOnError>): RequestResult<UploadBuildContentResponses, UploadBuildContentErrors, ThrowOnError> => (options.client ?? client).put<UploadBuildContentResponses, UploadBuildContentErrors, ThrowOnError>({
+    ...formDataBodySerializer,
+    requestValidator: async (data) => await z.object({
+        body: zUploadBuildContentBody,
+        headers: zUploadBuildContentHeaders,
+        path: zUploadBuildContentPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/build-uploads/{upload_id}/content',
+    ...options,
+    headers: {
+        'Content-Type': null,
+        ...options.headers
+    }
+});
+
+export const listBuilds = <ThrowOnError extends boolean = false>(options: Options<ListBuildsData, ThrowOnError>): RequestResult<ListBuildsResponses, ListBuildsErrors, ThrowOnError> => (options.client ?? client).get<ListBuildsResponses, ListBuildsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zListBuildsPath,
+        query: zListBuildsQuery.optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/builds',
+    ...options
+});
+
+export const getBuild = <ThrowOnError extends boolean = false>(options: Options<GetBuildData, ThrowOnError>): RequestResult<GetBuildResponses, GetBuildErrors, ThrowOnError> => (options.client ?? client).get<GetBuildResponses, GetBuildErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetBuildPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/builds/{build_id}',
+    ...options
+});
+
+export const updateEnvironment = <ThrowOnError extends boolean = false>(options: Options<UpdateEnvironmentData, ThrowOnError>): RequestResult<UpdateEnvironmentResponses, UpdateEnvironmentErrors, ThrowOnError> => (options.client ?? client).patch<UpdateEnvironmentResponses, UpdateEnvironmentErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zUpdateEnvironmentBody,
+        headers: zUpdateEnvironmentHeaders,
+        path: zUpdateEnvironmentPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/environment',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const startGoogleSignIn = <ThrowOnError extends boolean = false>(options: Options<StartGoogleSignInData, ThrowOnError>): RequestResult<StartGoogleSignInResponses, StartGoogleSignInErrors, ThrowOnError> => (options.client ?? client).post<StartGoogleSignInResponses, StartGoogleSignInErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        headers: zStartGoogleSignInHeaders,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/auth/google/challenge',
+    ...options
+});
+
+export const login = <ThrowOnError extends boolean = false>(options: Options<LoginData, ThrowOnError>): RequestResult<LoginResponses, LoginErrors, ThrowOnError> => (options.client ?? client).post<LoginResponses, LoginErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zLoginBody,
+        headers: zLoginHeaders,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/auth/google/login',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const logout = <ThrowOnError extends boolean = false>(options: Options<LogoutData, ThrowOnError>): RequestResult<LogoutResponses, LogoutErrors, ThrowOnError> => (options.client ?? client).post<LogoutResponses, LogoutErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        headers: zLogoutHeaders,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/auth/logout',
+    ...options
+});
+
+export const getSession = <ThrowOnError extends boolean = false>(options?: Options<GetSessionData, ThrowOnError>): RequestResult<GetSessionResponses, GetSessionErrors, ThrowOnError> => (options?.client ?? client).get<GetSessionResponses, GetSessionErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/auth/session',
+    ...options
+});
+
 export const getHealth = <ThrowOnError extends boolean = false>(options?: Options<GetHealthData, ThrowOnError>): RequestResult<GetHealthResponses, GetHealthErrors, ThrowOnError> => (options?.client ?? client).get<GetHealthResponses, GetHealthErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
@@ -28,4 +258,39 @@ export const getHealth = <ThrowOnError extends boolean = false>(options?: Option
     }).parseAsync(data),
     url: '/api/health',
     ...options
+});
+
+export const getSettings = <ThrowOnError extends boolean = false>(options?: Options<GetSettingsData, ThrowOnError>): RequestResult<GetSettingsResponses, GetSettingsErrors, ThrowOnError> => (options?.client ?? client).get<GetSettingsResponses, GetSettingsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/settings',
+    ...options
+});
+
+export const createWorkspace = <ThrowOnError extends boolean = false>(options: Options<CreateWorkspaceData, ThrowOnError>): RequestResult<CreateWorkspaceResponses, CreateWorkspaceErrors, ThrowOnError> => (options.client ?? client).post<CreateWorkspaceResponses, CreateWorkspaceErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zCreateWorkspaceBody,
+        headers: zCreateWorkspaceHeaders,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/workspaces',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });

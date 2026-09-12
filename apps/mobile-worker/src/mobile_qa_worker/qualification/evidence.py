@@ -113,6 +113,8 @@ class Evidence:
         data = result.model_dump(mode="json")
         report = (
             f"# Qualification attempt {result.attempt_id}\n\n"
+            f"Navigation: {result.device_inventory.get('navigation_driver', 'unspecified')}\n\n"
+            "ADB demo navigation verifies the real device path, not AI-agent reliability.\n\n"
             f"Outcome: {data['outcome']}\n\nReason: {result.reason_code}\n\n"
             f"Reset: {data['reset']}\n\nExpected: {result.expected_behavior}\n\n"
             f"Observed: {result.observed_behavior}\n\n"

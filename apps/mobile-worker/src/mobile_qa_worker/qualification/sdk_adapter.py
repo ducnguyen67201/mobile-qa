@@ -1,12 +1,10 @@
 """Only this subprocess imports Minitap. Its output never decides the QA verdict."""
 
 import asyncio
-import importlib
 import importlib.metadata
 import os
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 from mobile_qa_worker.qualification.config import Profile, QualificationError, parse_request
 from mobile_qa_worker.qualification.evidence import atomic_json
@@ -85,60 +83,62 @@ async def execute(request_path: Path, result_path: Path) -> None:
     os.environ["ANDROID_USER_HOME"] = str(profile.state_root / "android")
     if importlib.metadata.version("minitap-mobile-use") != "4.0.0":
         raise QualificationError("sdk_version_mismatch")
-    # Explicit Any is limited to the inspected, partly untyped third-party SDK seam.
-    # Every file crossing back to our parent process is validated separately.
+    # Import only after credentials and telemetry settings are isolated. These are
+    # the pinned SDK's real types, so our calls remain visible to the type checker.
     from uuid import UUID
 
     from langchain_core.callbacks import AsyncCallbackHandler
-    from langchain_core.outputs import LLMResult
+    from langchain_core.messages import AIMessage
+    from langchain_core.outputs import ChatGeneration, LLMResult
+    from minitap.mobile_use.config import LLM, LLMConfig, LLMConfigUtils, LLMWithFallback
+    from minitap.mobile_use.sdk import Agent
+    from minitap.mobile_use.sdk.builders.agent_config_builder import AgentConfigBuilder
+    from minitap.mobile_use.sdk.types import AgentProfile, DevicePlatform, TaskRequest
 
     recorder = UsageRecorder(profile.model)
 
     class Callbacks(AsyncCallbackHandler):
         async def on_chat_model_start(
             self,
-            serialized: dict[str, Any],
-            messages: list[list[Any]],
+            serialized: object,
+            messages: object,
             *,
             run_id: UUID,
-            **kwargs: Any,
+            **kwargs: object,
         ) -> None:
             recorder.start(str(run_id))
 
-        async def on_llm_end(self, response: LLMResult, *, run_id: UUID, **kwargs: Any) -> None:
+        async def on_llm_end(self, response: LLMResult, *, run_id: UUID, **kwargs: object) -> None:
             try:
-                payload: Any = response.llm_output or {}
-                usage: object = payload.get("token_usage")
+                usage: object = (response.llm_output or {}).get("token_usage")
                 if response.generations:
-                    generation: Any = response.generations[0][0]
-                    usage = (
-                        getattr(getattr(generation, "message", None), "usage_metadata", None)
-                        or usage
-                    )
+                    generation = response.generations[0][0]
+                    if isinstance(generation, ChatGeneration) and isinstance(
+                        generation.message, AIMessage
+                    ):
+                        usage = generation.message.usage_metadata or usage
                 recorder.end(str(run_id), usage)
             except (AttributeError, IndexError, TypeError, ValueError):
                 recorder.start(str(run_id))
 
-    sdk: Any = importlib.import_module("minitap.mobile_use.sdk")
-    types: Any = importlib.import_module("minitap.mobile_use.sdk.types")
-    builders: Any = importlib.import_module("minitap.mobile_use.sdk.builders.agent_config_builder")
-    config: Any = importlib.import_module("minitap.mobile_use.config")
-    node = {
-        "provider": "openai",
-        "model": profile.model,
-        "fallback": {"provider": "openai", "model": profile.model},
-    }
-    llm = config.LLMConfig.model_validate(
-        {
-            **{n: node for n in ("planner", "orchestrator", "contextor", "cortex", "executor")},
-            "utils": {"outputter": node, "hopper": node},
-        }
+    node = LLMWithFallback(
+        provider="openai",
+        model=profile.model,
+        fallback=LLM(provider="openai", model=profile.model),
     )
-    agent_profile = types.AgentProfile(name="qualification", llm_config=llm)
-    builder = builders.AgentConfigBuilder().for_device(
-        platform=types.DevicePlatform.ANDROID, device_id=request.serial
+    llm = LLMConfig(
+        planner=node,
+        orchestrator=node,
+        contextor=node,
+        cortex=node,
+        executor=node,
+        utils=LLMConfigUtils(outputter=node, hopper=node),
     )
-    agent = sdk.Agent(
+    agent_profile = AgentProfile(name="qualification", llm_config=llm)
+    builder = AgentConfigBuilder().for_device(
+        platform=DevicePlatform.ANDROID, device_id=request.serial
+    )
+    agent = Agent(
         config=builder.add_profile(agent_profile)
         .with_default_profile("qualification")
         .with_graph_config_callbacks([Callbacks()])
@@ -155,7 +155,7 @@ async def execute(request_path: Path, result_path: Path) -> None:
         atomic_json(result_path.parent / "navigation.started", {"phase": "navigation"})
         await asyncio.wait_for(
             agent.run_task(
-                request=types.TaskRequest(
+                request=TaskRequest[None](
                     goal=goal,
                     task_name=str(request.attempt_id),
                     max_steps=profile.max_steps,
@@ -168,6 +168,5 @@ async def execute(request_path: Path, result_path: Path) -> None:
         )
         status = "completed"
     finally:
-        stop = cast(Callable[[], None], agent.stop_current_task)
-        stop()
+        agent.stop_current_task()
         atomic_json(result_path, {"status": status, "usage": recorder.result()})

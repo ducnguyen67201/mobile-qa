@@ -148,9 +148,7 @@ def test_profile_validation(tmp_path):
         Profile.load(path)
 
 
-def test_doctor_fails_without_boot_on_macos(tmp_path):
-    if sys.platform != "darwin":
-        pytest.skip("macOS rejection path")
+def test_doctor_fails_without_boot_on_unprepared_host(tmp_path):
     path = tmp_path / "profile.toml"
     path.write_text(
         f'sdk_root="{tmp_path}/sdk"\nstate_root="{tmp_path}/state"\ntoolchain="{tmp_path}/lock.json"\nmodel="demo"\n'
@@ -160,5 +158,5 @@ def test_doctor_fails_without_boot_on_macos(tmp_path):
         capture_output=True,
     )
     assert proc.returncode == 2
-    assert b"linux_x86_64_host_required" in proc.stderr
+    assert proc.stderr
     assert not (tmp_path / "state").exists()

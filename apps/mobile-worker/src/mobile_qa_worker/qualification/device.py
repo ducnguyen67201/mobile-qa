@@ -20,8 +20,20 @@ from mobile_qa_worker.qualification.config import (
     json_object,
 )
 from mobile_qa_worker.qualification.evidence import Evidence, sha256
+from mobile_qa_worker.qualification.host import native_abi
 from mobile_qa_worker.qualification.process import command, stop_group
 from mobile_qa_worker.qualification.verifier import Observation, observe, validate_png
+
+
+def assert_ports_available(ports: tuple[int, ...] = (5554, 5555)) -> None:
+    """Prove we can listen, without treating a closed TCP connection as a live owner."""
+    for port in ports:
+        with socket.socket() as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(("127.0.0.1", port))
+            # listen also rejects a competing owner on platforms that permit bind
+            # with SO_REUSEADDR. We never set SO_REUSEPORT or contact that owner.
+            sock.listen(1)
 
 
 def host_environment(profile: Profile) -> dict[str, str]:
@@ -40,11 +52,12 @@ def host_environment(profile: Profile) -> dict[str, str]:
 
 
 def doctor(profile: Profile) -> dict[str, str]:
-    if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
-        raise QualificationError("linux_x86_64_host_required")
-    if not os.access("/dev/kvm", os.R_OK | os.W_OK):
+    if profile.abi != native_abi():
+        raise QualificationError("host_image_architecture_mismatch")
+    linux = platform.system() == "Linux"
+    if linux and not os.access("/dev/kvm", os.R_OK | os.W_OK):
         raise QualificationError("kvm_unavailable")
-    inventory: dict[str, str] = {}
+    inventory = {"host_os": platform.system(), "host_arch": platform.machine()}
     manifest = json_object(profile.toolchain)
     packages = manifest.get("packages")
     if not isinstance(packages, list):
@@ -56,6 +69,8 @@ def doctor(profile: Profile) -> dict[str, str]:
         name, revision = values_map.get("path"), values_map.get("revision")
         if not isinstance(name, str) or not isinstance(revision, str):
             raise QualificationError("invalid_toolchain")
+        if name.startswith("system-images;") and name != profile.system_image:
+            continue
         properties = profile.sdk_root / name.replace(";", "/") / "source.properties"
         values = dict(
             line.split("=", 1) for line in properties.read_text().splitlines() if "=" in line
@@ -64,9 +79,16 @@ def doctor(profile: Profile) -> dict[str, str]:
         if actual != revision:
             raise QualificationError("toolchain_revision_mismatch")
         inventory[name] = actual
+    if profile.system_image not in inventory:
+        raise QualificationError("system_image_not_pinned")
     accel = command([str(profile.sdk_root / "emulator/emulator"), "-accel-check"], 20).decode()
-    if "KVM" not in accel or "usable" not in accel:
-        raise QualificationError("kvm_unavailable")
+    expected = "KVM" if linux else "Hypervisor.Framework"
+    # The Mac tool reports a numeric success status and OS version, not Linux's
+    # "installed and usable" sentence. Check the status rather than prose.
+    lines = [line.strip() for line in accel.splitlines() if line.strip()]
+    if len(lines) < 3 or lines[:2] != ["accel:", "0"] or expected not in accel:
+        raise QualificationError("hardware_acceleration_unavailable")
+    inventory["accelerator"] = expected
     if shutil.disk_usage(profile.sdk_root).free < profile.disk_min_bytes:
         raise QualificationError("insufficient_disk")
     return inventory
@@ -90,12 +112,10 @@ class Device:
         )
 
     def boot(self, timeout: int | None = None) -> None:
-        for port in (5554, 5555):
-            with socket.socket() as sock:
-                try:
-                    sock.bind(("127.0.0.1", port))
-                except OSError as exc:
-                    raise QualificationError("emulator_port_owned_elsewhere") from exc
+        try:
+            assert_ports_available()
+        except OSError as exc:
+            raise QualificationError("emulator_port_owned_elsewhere") from exc
         if self.current.exists():
             raise QualificationError("dirty_avd_requires_recovery")
         self.current.mkdir(mode=0o700)
@@ -107,7 +127,7 @@ class Device:
                 "--name",
                 "mobile-qa-owned",
                 "--package",
-                "system-images;android-35;google_apis;x86_64",
+                self.profile.system_image,
                 "--path",
                 str(self.current / "phone.avd"),
                 "--device",
@@ -140,16 +160,19 @@ class Device:
                     "mobile-qa-owned",
                     "-port",
                     "5554",
-                    "-no-window",
+                    *(["-no-window"] if self.profile.headless else []),
+                    "-accel",
+                    "on",
                     "-no-audio",
+                    "-no-metrics",
+                    "-crash-report-mode",
+                    "disabled",
                     "-no-snapshot",
                     "-wipe-data",
                     "-gpu",
-                    "swiftshader_indirect",
+                    "auto" if platform.system() == "Darwin" else "swiftshader_indirect",
                     "-timezone",
-                    "UTC",
-                    "-prop",
-                    "persist.sys.locale=en-US",
+                    "Etc/UTC",
                 ],
                 env=self.env,
                 stdin=subprocess.DEVNULL,
@@ -180,7 +203,8 @@ class Device:
                             .strip(),
                             "locale": self.adb("shell", "getprop", "persist.sys.locale")
                             .decode()
-                            .strip(),
+                            .strip()
+                            or self.adb("shell", "getprop", "ro.product.locale").decode().strip(),
                             "timezone": self.adb("shell", "getprop", "persist.sys.timezone")
                             .decode()
                             .strip(),
@@ -192,9 +216,9 @@ class Device:
                     )
                     if (
                         self.inventory["api"] != "35"
-                        or self.inventory["abi"] != "x86_64"
+                        or self.inventory["abi"] != self.profile.abi
                         or self.inventory["locale"] != "en-US"
-                        or self.inventory["timezone"] != "UTC"
+                        or self.inventory["timezone"] not in ("UTC", "Etc/UTC")
                         or "420" not in self.inventory["density"]
                     ):
                         raise QualificationError("device_profile_mismatch")
@@ -221,7 +245,7 @@ class Device:
                     for name in names
                     if name.startswith("lib/") and name.endswith(".so")
                 }
-                if abis and "x86_64" not in abis:
+                if abis and self.profile.abi not in abis:
                     raise QualificationError("unsupported_abi")
         except zipfile.BadZipFile as exc:
             raise QualificationError("invalid_apk") from exc
@@ -237,6 +261,9 @@ class Device:
             raise QualificationError("unsupported_sdk")
         if b"Success" not in self.adb("install", str(apk), timeout=self.profile.install_seconds):
             raise QualificationError("install_failed")
+        # The controlled fixture uses this explicit ADB tunnel on both hosts.
+        # It does not depend on a freshly booted guest's Wi-Fi/DNS readiness.
+        self.adb("reverse", "tcp:8765", "tcp:8765")
         return digest
 
     def launch(self) -> None:
@@ -319,12 +346,17 @@ class Device:
             stop_group(self.child)
             self.child = None
         # Reuse requires the emulator ports to be free, not just a reaped Popen.
-        for port in (5554, 5555):
-            with socket.socket() as sock:
-                try:
-                    sock.bind(("127.0.0.1", port))
-                except OSError as exc:
+        # macOS can release its listeners shortly after the process group exits.
+        # A live listener must still block reuse; closed TCP sessions must not.
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                assert_ports_available()
+                return
+            except OSError as exc:
+                if time.monotonic() >= deadline:
                     raise QualificationError("emulator_still_running") from exc
+                time.sleep(0.1)
 
     def discard(self) -> None:
         if self.child is not None:

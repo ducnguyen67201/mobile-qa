@@ -56,6 +56,8 @@ def test_sdk_exact_public_seam(tmp_path, monkeypatch):
         f'sdk_root="{tmp_path}/sdk"\nstate_root="{tmp_path}/state"\ntoolchain="{tmp_path}/lock.json"\nmodel="demo"\n'
     )
     seen = []
+    usage = UsageRecorder("demo")
+    monkeypatch.setattr(sdk_adapter, "UsageRecorder", lambda model: usage)
 
     class Builder:
         def for_device(self, **kwargs):
@@ -69,6 +71,7 @@ def test_sdk_exact_public_seam(tmp_path, monkeypatch):
             return self
 
         def with_graph_config_callbacks(self, c):
+            seen.append(c[0])
             return self
 
         def build(self):
@@ -87,28 +90,29 @@ def test_sdk_exact_public_seam(tmp_path, monkeypatch):
         def stop_current_task(self):
             seen.append("stop")
 
+    class TaskRequest:
+        def __class_getitem__(cls, item):
+            return lambda **kwargs: kwargs
+
     modules = {
         "minitap.mobile_use.sdk": SimpleNamespace(Agent=Agent),
         "minitap.mobile_use.sdk.types": SimpleNamespace(
             DevicePlatform=SimpleNamespace(ANDROID="android"),
             AgentProfile=lambda **k: k,
-            TaskRequest=lambda **k: k,
+            TaskRequest=TaskRequest,
         ),
         "minitap.mobile_use.sdk.builders.agent_config_builder": SimpleNamespace(
             AgentConfigBuilder=Builder
         ),
         "minitap.mobile_use.config": SimpleNamespace(
-            LLMConfig=SimpleNamespace(model_validate=lambda d: d)
+            LLM=lambda **k: k,
+            LLMWithFallback=lambda **k: k,
+            LLMConfigUtils=lambda **k: k,
+            LLMConfig=lambda **k: k,
         ),
     }
-    original = sdk_adapter.importlib.import_module
-    monkeypatch.setattr(
-        sdk_adapter.importlib,
-        "import_module",
-        lambda name, *args, **kwargs: modules[name]
-        if name in modules
-        else original(name, *args, **kwargs),
-    )
+    for name, module in modules.items():
+        monkeypatch.setitem(sys.modules, name, module)
     monkeypatch.setattr(sdk_adapter.importlib.metadata, "version", lambda name: "4.0.0")
     monkeypatch.setattr(sdk_adapter, "prepare_environment", lambda p: None)
     asyncio.run(sdk_adapter.execute(request, tmp_path / "child-result.json"))
@@ -116,3 +120,129 @@ def test_sdk_exact_public_seam(tmp_path, monkeypatch):
     assert seen[-1] == "stop"
     assert "expected_outcome" not in str(seen)
     assert json.loads((tmp_path / "child-result.json").read_text())["status"] == "completed"
+
+    # Exercise the real callback against LangChain's typed responses. Missing usage
+    # stays unknown; valid message metadata takes precedence over provider fallback.
+    from uuid import uuid4
+
+    from langchain_core.messages import AIMessage
+    from langchain_core.outputs import ChatGeneration, Generation, LLMResult
+
+    callback = seen[1]
+    identity = uuid4()
+    asyncio.run(callback.on_chat_model_start({}, [], run_id=identity))
+    asyncio.run(callback.on_llm_end(LLMResult(generations=[]), run_id=identity))
+    asyncio.run(
+        callback.on_llm_end(
+            LLMResult(
+                generations=[
+                    [
+                        ChatGeneration(
+                            message=AIMessage(
+                                content="done",
+                                usage_metadata={
+                                    "input_tokens": 10,
+                                    "output_tokens": 2,
+                                    "total_tokens": 12,
+                                },
+                            )
+                        )
+                    ]
+                ],
+                llm_output={"token_usage": {"prompt_tokens": 99, "completion_tokens": 99}},
+            ),
+            run_id=identity,
+        )
+    )
+    asyncio.run(
+        callback.on_llm_end(
+            LLMResult(
+                generations=[[Generation(text="done")]],
+                llm_output={"token_usage": {"prompt_tokens": 3, "completion_tokens": 1}},
+            ),
+            run_id=uuid4(),
+        )
+    )
+    asyncio.run(callback.on_llm_end(LLMResult(generations=[[]]), run_id=uuid4()))
+    assert usage.result() == {
+        "model": "demo",
+        "calls": 3,
+        "unknown_calls": 1,
+        "input_tokens": 13,
+        "output_tokens": 3,
+    }
+
+
+def test_sdk_stub_surface_matches_installed_package(tmp_path):
+    # Import the actual SDK in an isolated process: no Agent construction, secrets,
+    # network connections, or persistent upstream import side effects in pytest.
+    from pathlib import Path
+
+    stubs = Path(__file__).resolve().parents[1] / "typings/minitap/mobile_use"
+    code = r"""
+import ast
+import importlib
+import inspect
+import os
+import socket
+import sys
+from pathlib import Path
+from unittest.mock import patch
+
+os.environ['MOBILE_USE_TELEMETRY_ENABLED'] = 'false'
+os.environ['PYTHON_DOTENV_DISABLED'] = '1'
+
+def blocked(*args, **kwargs):
+    raise AssertionError('SDK compatibility check attempted network access')
+
+with (
+    patch.object(socket.socket, 'connect', blocked),
+    patch.object(socket.socket, 'connect_ex', blocked),
+    patch.object(socket, 'create_connection', blocked),
+):
+    root = Path(sys.argv[1])
+    for path in root.rglob('*.pyi'):
+        suffix = path.relative_to(root).with_suffix('').parts
+        if suffix[-1] == '__init__':
+            suffix = suffix[:-1]
+        module = importlib.import_module('.'.join(('minitap', 'mobile_use', *suffix)))
+        tree = ast.parse(path.read_text())
+        namespace = dict(vars(module))
+        for declaration in tree.body:
+            if isinstance(declaration, (ast.Import, ast.ImportFrom)):
+                exec(ast.unparse(declaration), namespace)
+        for cls in tree.body:
+            if not isinstance(cls, ast.ClassDef):
+                continue
+            actual = getattr(module, cls.name)
+            for member in cls.body:
+                if isinstance(member, ast.AnnAssign) and isinstance(member.target, ast.Name):
+                    field = actual.model_fields[member.target.id]
+                    label = (cls.name, member.target.id)
+                    assert field.is_required() == (member.value is None), label
+                    if member.value is not None and not (
+                        isinstance(member.value, ast.Constant) and member.value.value is Ellipsis
+                    ):
+                        assert field.default == ast.literal_eval(member.value)
+                    # The generic output_format refers to the class type parameter;
+                    # all concrete model field types must match the wheel exactly.
+                    if member.target.id != 'output_format':
+                        expected = eval(ast.unparse(member.annotation), namespace)
+                        assert field.annotation == expected, (cls.name, member.target.id)
+                if not isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                method = getattr(actual, member.name)
+                asynchronous = isinstance(member, ast.AsyncFunctionDef)
+                assert inspect.iscoroutinefunction(method) == asynchronous
+                signature = inspect.signature(method)
+                positional = [arg.arg for arg in member.args.args if arg.arg != 'self']
+                keywords = [arg.arg for arg in member.args.kwonlyargs]
+                # The stub's supported call must be accepted by the real method.
+                signature.bind(
+                    None, *[object() for _ in positional], **dict.fromkeys(keywords, object())
+                )
+                for name in positional + keywords:
+                    assert name in signature.parameters, (cls.name, member.name, name)
+    print('Pinned SDK signatures and model fields match adapter stubs')
+"""
+    subprocess.run([sys.executable, "-c", code, str(stubs)], cwd=tmp_path, check=True)

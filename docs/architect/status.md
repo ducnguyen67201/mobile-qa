@@ -43,7 +43,7 @@ also successful when inspected; this is not a claim of a separate human review.
 | Item | Status / next evidence |
 |---|---|
 | Spec 01 rendered browser/keyboard/Retry/HMR acceptance | Pending: browser tool could not verify admin policy; no bypass attempted |
-| Spec 02 real Android/cloud qualification | Harness implemented and offline checks passed; live host/device/model qualification pending |
+| Spec 02 real Android/cloud qualification | Local Mac ADB demo verified; full Minitap/cloud qualification pending |
 | Spec 03 auth/app creation/APK upload | Planned; current scaffold is unauthenticated |
 | Spec 04 worker HTTP leases/runs/evidence reports | Planned; local fake protocol is not a scheduler |
 | Spec 05 versioned case/suite/plan editor and approvals | Planned |
@@ -75,7 +75,9 @@ Minitap import and both Android APK builds passed. Android lint checks both debu
 flavors; expected fixture/version warnings remain. No API/web runtime source changed;
 their full suites were not rerun for this phase. Hosted CI has not run on this branch.
 
-No cloud host, emulator execution, model call or real device evidence has been produced.
+At that initial checkpoint, no cloud host, emulator execution, model call or real device
+evidence had been produced. The native local-device follow-up below supersedes the local
+device status; it does not close Minitap/cloud qualification.
 Phase 02 remains unqualified and phase 04 real execution remains gated. Host access or
 region/AMI/network, the approved model, current rates, spend and shutdown deadline are
 still operator inputs. A launch template is not an approved launch packet. Phase 03
@@ -92,3 +94,39 @@ migration when needed. [Hosting](hosting.md) records the service layout, portabi
 constraints and deployment work still to implement. Railway KVM/device execution is
 not verified; selecting Railway does not close the phase 02 device-host gate. This
 follow-up changes documentation only and has created no provider resources.
+
+## Native local-device follow-up
+
+The runner now has macOS ARM64/Intel and Linux x86_64 host selection, pinned native
+Android images, platform acceleration checks and real boot identity for crash recovery.
+Explicit device-local setup/build/run commands share the supervisor, assertions and
+cleanup with cloud qualification. Default ADB demo navigation uses a real emulator
+without model calls; explicit agent mode uses Minitap and Doppler. Reports identify
+which navigation path ran. API worker leases and customer APK execution remain planned.
+
+Observed on macOS 15.7 / ARM64: all 100 worker tests, strict Pyright, Ruff, 11 CI scope
+cases, both demo APK builds and Android flavor lint passed after the implementation.
+Native doctor verified the pinned Android API 35 ARM64 image and Hypervisor.Framework.
+Real ADB demo outcomes (reports remain private under `.private/artifacts/local-device`):
+
+| Scenario | Outcome | Reset | Attempt |
+|---|---|---|---|
+| Good APK | passed | verified_clean | `4b52a6a0-d97a-4b3a-9362-af43bc4c0d67` |
+| Broken APK | failed | verified_clean | `06e29435-7652-4a79-bc91-c36ca7c483c7` |
+| Backend unavailable | blocked | verified_clean | `76de6d90-8ef9-435f-945c-faad66fc487c` |
+| SIGINT during navigation | inconclusive / cancelled | verified_clean | `cb812944-46d7-4497-9ab2-f957a6d41a7e` |
+
+The interruption probe signalled the actual local launcher after navigation started,
+waited for its result, and verified the dirty marker was absent and emulator ports
+were available. The wrapper replaces itself with the supervisor so it cannot kill
+that supervisor while Ctrl-C cleanup is in progress.
+
+The local runs exposed and corrected Mac acceleration-output parsing, timezone/locale
+handling, unattended emulator prompts, stale TCP connection checks, fixture-network
+startup races and input focus timing. Earlier failed attempts were retained; completed
+ADB-only quarantine was recovered explicitly using matching result/profile evidence.
+Cold boots in these accepted runs took about 45–46 seconds; full reset took 55–57 seconds.
+These timings describe this Mac, not a cloud capacity promise.
+
+No model calls or cloud resources were used. Minitap mode is implemented but its live
+11-attempt qualification remains pending, as do HTTP worker leases and dashboard jobs.

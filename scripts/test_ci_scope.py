@@ -18,6 +18,7 @@ cases = [
     (['apps/web/src/pages/Home.tsx'], ['web']),
     (['infra/device-host/setup.sh', 'apps/api/src/app.rs'], ['api', 'worker']),
     (['scripts/test_ci_scope.py'], ['scope_tests']),
+    (['scripts/local_device.py'], ['worker', 'demo']),
     (['.github/workflows/ci.yaml'], list(filters)),
 ]
 # Resolve the exact installed matcher version from pnpm's locked dependency store.

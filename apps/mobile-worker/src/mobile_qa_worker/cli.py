@@ -42,7 +42,7 @@ def main() -> int:
     fake.add_argument("fixture", type=Path)
     commands.add_parser("sdk-import", help="Import installed SDK only; never create an Agent")
     doctor = commands.add_parser(
-        "device-doctor", help="Inspect Linux/KVM and pinned tools; no boot/model"
+        "device-doctor", help="Inspect native host acceleration and pinned tools; no boot/model"
     )
     doctor.add_argument("--profile", type=Path, required=True)
     device = commands.add_parser("device-run", help="Execute one explicit controlled attempt")
@@ -53,6 +53,19 @@ def main() -> int:
         "device-recover", help="Recover quarantined state after host reboot"
     )
     recovery.add_argument("--profile", type=Path, required=True)
+    recovery.add_argument(
+        "--local-result",
+        type=Path,
+        help="Completed ADB demo result permits explicit same-boot recovery; never agent runs",
+    )
+    local = commands.add_parser("device-local", help="Run the real demo phone locally")
+    local.add_argument("--profile", type=Path, required=True)
+    local.add_argument("--scenario", choices=["good", "broken", "unavailable"], default="good")
+    local.add_argument(
+        "--agent", action="store_true", help="Use Minitap; requires --model and Doppler"
+    )
+    local.add_argument("--model", help="Explicit OpenAI model for this agent attempt")
+    local.add_argument("--headless", action="store_true")
     child = commands.add_parser("_sdk-run", help=argparse.SUPPRESS)
     child.add_argument("--request", type=Path, required=True)
     child.add_argument("--result", type=Path, required=True)

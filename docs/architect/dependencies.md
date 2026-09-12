@@ -39,7 +39,13 @@ https://github.com/minitap-ai/mobile-use
 Inspected revision12a1dbd3774e96fbc6029ba4d2a7801aeb527764 is not asserted identical
 to the published wheel. Import seam is minitap.mobile_use.sdk.Agent; construction
 initializes telemetry, so setup never constructs it. Telemetry is disabled before
-explicit import. The SDK extra keeps fake development independent. The existing
+explicit import. The adapter uses function-local direct imports and upstream typed
+Agent, builder, model configuration and TaskRequest classes; no dynamic Any-typed
+module facade. The pinned wheel lacks a typing marker and has incomplete return
+annotations, so `apps/mobile-worker/typings` describes only the consumed SDK surface;
+a compatibility test checks it against the installed package. Task return values
+remain opaque `object` because our verifier owns the verdict. Callback metadata is
+narrowed before use, and SDK output still never decides the QA verdict. The SDK extra keeps fake development independent. The existing
 python-dotenv1.2.2 override and pytest9.0.3 update are preserved for audit compatibility.
 
 PostgreSQL17-alpine is digest-pinned in infra/compose.yaml. Rust1.95.0, Node24.14.1,

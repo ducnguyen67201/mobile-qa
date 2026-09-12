@@ -1,5 +1,6 @@
 """Explicit one-attempt supervisor. Dirty state survives crashes; no blind replay."""
 
+import logging
 import os
 import signal
 import subprocess
@@ -11,7 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 from mobile_qa_worker.generated.models import QualificationRequest, QualificationResult
 from mobile_qa_worker.qualification.config import (
@@ -21,16 +22,12 @@ from mobile_qa_worker.qualification.config import (
     parse_request,
 )
 from mobile_qa_worker.qualification.device import Device, doctor
-from mobile_qa_worker.qualification.evidence import Evidence, atomic_json, sha256
+from mobile_qa_worker.qualification.evidence import Evidence, atomic_json, sha256, validate_result
+from mobile_qa_worker.qualification.host import boot_id
 from mobile_qa_worker.qualification.process import host_lock, stop_group
 from mobile_qa_worker.qualification.verifier import verdict
 
 ROOT = Path(__file__).resolve().parents[5]
-
-
-def boot_id() -> str:
-    path = Path("/proc/sys/kernel/random/boot_id")
-    return path.read_text().strip() if path.exists() else "non-linux-test"
 
 
 @contextmanager
@@ -137,8 +134,13 @@ def fixture_ready() -> None:
 
 
 def run_attempt(
-    request: QualificationRequest, *, interrupt_after: float | None = None
+    request: QualificationRequest,
+    *,
+    interrupt_after: float | None = None,
+    driver: Literal["minitap", "adb-demo"] = "minitap",
 ) -> QualificationResult:
+    if driver not in ("minitap", "adb-demo"):
+        raise QualificationError("invalid_navigation_driver")
     request = parse_request(request.model_dump_json())
     profile = Profile.load(Path(request.profile_path))
     started_at = datetime.now(UTC)
@@ -160,6 +162,7 @@ def run_attempt(
         try:
             with cancellation(profile.attempt_seconds):
                 inventory = doctor(profile)
+                inventory["navigation_driver"] = driver
                 fixture_ready()
                 atomic_json(
                     dirty,
@@ -172,9 +175,11 @@ def run_attempt(
                 )
                 dirty_written = True
                 begin = time.monotonic()
+                logging.info("Booting a fresh Android phone")
                 device.boot()
                 phases["boot"] = int((time.monotonic() - begin) * 1000)
                 begin = time.monotonic()
+                logging.info("Installing and opening the demo APK")
                 observed_hash = device.install(Path(request.apk_path), request.expected_apk_sha256)
                 phases["install"] = int((time.monotonic() - begin) * 1000)
                 inventory.update(device.inventory)
@@ -187,7 +192,13 @@ def run_attempt(
                     device.start_recording()
                     stage = "execution"
                     begin = time.monotonic()
-                    usage = run_sdk(request, profile, evidence, interrupt_after)
+                    logging.info("Running %s navigation and persistence checks", driver)
+                    if driver == "adb-demo":
+                        from mobile_qa_worker.qualification.local import navigate_demo
+
+                        navigate_demo(device, task)
+                    else:
+                        usage = run_sdk(request, profile, evidence, interrupt_after)
                     phases["navigation"] = int((time.monotonic() - begin) * 1000)
                     created = device.capture("created", task)
                     if not created.task_present:
@@ -221,6 +232,7 @@ def run_attempt(
                         raise QualificationError("sdk_cleanup_unconfirmed")
                     device.discard()
                     # Prove fresh app state independently, then leave all owned devices stopped.
+                    logging.info("Booting a second fresh phone to verify reset")
                     device.boot(timeout=profile.cleanup_seconds)
                     device.install(Path(request.apk_path), request.expected_apk_sha256)
                     device.launch()
@@ -242,8 +254,15 @@ def run_attempt(
                     device.discard()
                     dirty.unlink()
                     reset = "verified_clean"
-            except (QualificationError, OSError):
+            except (QualificationError, OSError) as exc:
                 reset = "quarantined"
+                try:
+                    evidence.event(
+                        "cleanup",
+                        str(exc) if isinstance(exc, QualificationError) else "host_io_error",
+                    )
+                except (QualificationError, OSError):
+                    pass
                 try:
                     device.stop()
                 except (QualificationError, OSError):
@@ -310,13 +329,30 @@ def run_attempt(
     )
 
 
-def recover(profile: Profile) -> None:
+def recover(
+    profile: Profile, *, local_result: Path | None = None, profile_path: Path | None = None
+) -> None:
     """Recovery requires host service stop first; never kill a PID from stale JSON."""
     with host_lock(profile.state_root) as dirty:
         if not dirty.exists():
             return
         if json_object(dirty).get("boot_id") == boot_id():
-            raise QualificationError("reboot_required_for_crash_recovery")
+            # An explicit, completed ADB-only demo has no model/SDK descendants.
+            # Its exact result + profile allow same-boot recovery after an emulator
+            # failure. Interrupted runs without a result and all agent runs still
+            # require reboot; a free port alone is not evidence of SDK termination.
+            if local_result is None or profile_path is None:
+                raise QualificationError("reboot_required_for_crash_recovery")
+            result = validate_result(local_result.read_text())
+            if (
+                result.device_inventory.get("navigation_driver") != "adb-demo"
+                or str(result.attempt_id) != json_object(dirty).get("attempt_id")
+                or result.model_profile_sha256 != sha256(profile_path)
+                or Profile.load(profile_path) != profile
+                or result.reset.value != "quarantined"
+                or result.usage
+            ):
+                raise QualificationError("local_recovery_evidence_mismatch")
         # Refuse recovery while any target port is occupied. Operator/systemd owns
         # killing stale cgroups; this command never guesses process identity from a PID.
         recovery_evidence = Evidence(profile.state_root / ("recovery-" + str(time.time_ns())))

@@ -12,10 +12,21 @@ import zipfile
 
 
 def install(lock_path: Path, root: Path, demo_only: bool = False) -> None:
+    system, machine = platform.system(), platform.machine().lower()
+    if not (
+        (system == "Darwin" and machine in ("arm64", "aarch64", "x86_64", "amd64"))
+        or (system == "Linux" and machine in ("x86_64", "amd64"))
+    ):
+        raise ValueError("Unsupported host: use native macOS or Linux x86_64")
     host = "macosx" if platform.system() == "Darwin" else "linux"
     arch = "aarch64" if platform.machine() in ("arm64", "aarch64") else "x64"
+    abi = "arm64-v8a" if arch == "aarch64" else "x86_64"
     root.mkdir(parents=True, exist_ok=True)
     for package in json.loads(lock_path.read_text())["packages"]:
+        if package["path"].startswith("system-images;") and not package[
+            "path"
+        ].endswith(";" + abi):
+            continue
         if demo_only and package["path"] not in (
             "platforms;android-35",
             "build-tools;35.0.0",
@@ -39,6 +50,7 @@ def install(lock_path: Path, root: Path, demo_only: bool = False) -> None:
                 + str(target)
             )
         with tempfile.TemporaryDirectory(prefix="mobile-qa-install-") as temp:
+            print("Installing " + package["path"], flush=True)
             folder = Path(temp)
             path = folder / "archive.zip"
             with (

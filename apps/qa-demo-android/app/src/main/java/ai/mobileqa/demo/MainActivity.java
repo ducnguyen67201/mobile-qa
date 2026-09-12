@@ -29,7 +29,9 @@ public final class MainActivity extends Activity {
             boolean ready = false;
             HttpURLConnection connection = null;
             try {
-                connection = (HttpURLConnection) new URL("http://10.0.2.2:8765/session").openConnection();
+                // The runner establishes an ADB reverse tunnel before launch. This
+                // fixture must not depend on cold-boot Wi-Fi initialization timing.
+                connection = (HttpURLConnection) new URL("http://127.0.0.1:8765/session").openConnection();
                 connection.setConnectTimeout(3000);
                 connection.setReadTimeout(3000);
                 ready = connection.getResponseCode() == 200;

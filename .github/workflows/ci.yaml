@@ -36,6 +36,7 @@ jobs:
               - 'apps/qa-demo-android/**'
               - 'infra/device-host/toolchain.lock.json'
               - 'infra/device-host/install_tools.py'
+              - 'scripts/local_device.py'
             scope_tests:
               - '.github/workflows/**'
               - 'scripts/test_ci_scope.py'
@@ -68,6 +69,7 @@ jobs:
               - 'contracts/worker.schema.json'
               - 'contracts/fixtures/**'
               - 'scripts/sdk_smoke.py'
+              - 'scripts/local_device.py'
               - 'crates/contracts/Cargo.toml'
               - 'crates/contracts/src/lib.rs'
             # Generator inputs and generated-only edits still need drift validation.

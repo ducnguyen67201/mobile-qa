@@ -24,13 +24,13 @@ assume packaging the emulator in Docker supplies those host capabilities.
 [runner limitations](https://docs.railway.com/guides/github-actions-runners),
 [nested virtualization support answer](https://station.railway.com/questions/enable-nested-virtualization-support-in-de9f4c0f).
 
-The existing phase 02 doctor deliberately rejects a host without usable KVM. Retain
-that requirement. Railway can become a device-host candidate if it confirms support
+The phase 02 doctor requires usable KVM on Linux; native Mac development uses Apple's
+Hypervisor.Framework with a matching image. Railway can become a device-host candidate if it confirms support
 for the selected runtime and the full boot/reset/cancellation campaign passes there.
 Otherwise use an existing suitable host or select a separate device provider; this
 hosting preference does not select or authorize an AWS device instance. A managed
 remote phone would require a separate adapter assessment because today's harness owns
-a local emulator and systemd process tree.
+a local emulator and owned process groups (with systemd containment on cloud Linux).
 
 ## Deployment work to implement
 

@@ -32,6 +32,41 @@ def test_lock_metadata_is_namespaced_and_pinned():
             assert len(archive["sha1"]) == 40
 
 
+@pytest.mark.parametrize("machine,wanted", [("arm64", "arm64-v8a"), ("x86_64", "x86_64")])
+def test_installer_only_selects_native_system_image(tmp_path, monkeypatch, machine, wanted):
+    module = installer()
+    monkeypatch.setattr(module.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(module.platform, "machine", lambda: machine)
+    archive = tmp_path / "image.zip"
+    with zipfile.ZipFile(archive, "w") as zipped:
+        zipped.writestr("image/source.properties", b"Pkg.Revision=9")
+    digest = hashlib.sha1(archive.read_bytes()).hexdigest()
+    lock = tmp_path / "lock.json"
+    lock.write_text(
+        json.dumps(
+            {
+                "packages": [
+                    {
+                        "path": f"system-images;android-35;google_apis;{abi}",
+                        "package_xml": "<metadata/>",
+                        "archives": [{"host": "all", "arch": "all", "url": abi, "sha1": digest}],
+                    }
+                    for abi in ("x86_64", "arm64-v8a")
+                ]
+            }
+        )
+    )
+    calls = []
+
+    def download(url, **kwargs):
+        calls.append(url)
+        return archive.open("rb")
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", download)
+    module.install(lock, tmp_path / "sdk")
+    assert calls == [wanted]
+
+
 @pytest.mark.parametrize("case", ["valid", "checksum", "traversal"])
 def test_install_checks_archive_and_preserves_managed_metadata(tmp_path, monkeypatch, case):
     module = installer()

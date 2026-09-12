@@ -24,6 +24,8 @@ class Profile:
     state_root: Path
     model: str
     toolchain: Path
+    system_image: str = "system-images;android-35;google_apis;x86_64"
+    headless: bool = True
     doppler_project: str = "mobile-qa"
     doppler_config: str = "dev"
     boot_seconds: int = 180
@@ -44,10 +46,13 @@ class Profile:
         required = {"sdk_root", "state_root", "model", "toolchain"}
         if not required <= raw.keys() or raw.keys() - cls.__dataclass_fields__.keys():
             raise QualificationError("invalid_profile_fields")
-        for name in required | {"doppler_project", "doppler_config"}:
+        strings = required | {"doppler_project", "doppler_config", "system_image"}
+        for name in strings:
             if name in raw and (not isinstance(raw[name], str) or not raw[name]):
                 raise QualificationError("invalid_profile_string")
-        for name in raw.keys() - required - {"doppler_project", "doppler_config"}:
+        if "headless" in raw and type(raw["headless"]) is not bool:
+            raise QualificationError("invalid_profile_headless")
+        for name in raw.keys() - strings - {"headless"}:
             value = raw[name]
             if type(value) is not int or not 1 <= value <= 53687091200:
                 raise QualificationError("invalid_profile_limit")
@@ -58,6 +63,11 @@ class Profile:
                 raise QualificationError("profile_paths_must_be_absolute_without_symlinks")
             raw[name] = value
         profile = cls(**cast(dict[str, object], raw))  # type: ignore[arg-type]
+        if profile.system_image not in (
+            "system-images;android-35;google_apis;x86_64",
+            "system-images;android-35;google_apis;arm64-v8a",
+        ):
+            raise QualificationError("unsupported_system_image")
         if profile.state_root == Path("/") or len(profile.state_root.parts) < 4:
             raise QualificationError("unsafe_state_root")
         if profile.model == "REQUIRED_APPROVED_MODEL_ID":
@@ -73,6 +83,10 @@ class Profile:
         ):
             raise QualificationError("invalid_execution_budget")
         return profile
+
+    @property
+    def abi(self) -> str:
+        return self.system_image.rsplit(";", 1)[1]
 
 
 def parse_request(raw: str) -> QualificationRequest:

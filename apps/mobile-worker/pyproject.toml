@@ -26,6 +26,7 @@ extend-exclude = ["src/mobile_qa_worker/generated"]
 select = ["E", "F", "I", "UP", "B"]
 [tool.pyright]
 typeCheckingMode = "strict"
+stubPath = "typings"
 include = ["src/mobile_qa_worker"]
 exclude = ["src/mobile_qa_worker/generated"]
 venvPath = "."

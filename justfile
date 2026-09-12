@@ -59,3 +59,19 @@ device-smoke request:
 
 device-qualify config:
     uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker device-qualify --config {{quote(config)}}
+
+# Explicit real-device development. Ordinary dev/check/smoke never boots a phone.
+device-local-setup:
+    uv sync --project apps/mobile-worker --frozen --extra sdk
+    python3 scripts/local_device.py setup
+
+device-local-build:
+    python3 scripts/local_device.py build
+
+# Real emulator + deterministic demo taps, no model credentials or API calls.
+device-local scenario="good":
+    python3 scripts/local_device.py run --scenario {{quote(scenario)}}
+
+# Explicit Minitap run; model credentials come from the profile's Doppler config.
+device-local-agent model scenario="good":
+    python3 scripts/local_device.py run --scenario {{quote(scenario)}} --model {{quote(model)}}

@@ -9,3 +9,8 @@
 .env.*
 /.private/
 .DS_Store
+
+/apps/qa-demo-android/.gradle/
+/apps/qa-demo-android/**/build/
+/apps/qa-demo-android/local.properties
+/apps/mobile-worker/dist/

@@ -75,3 +75,13 @@ introduce secret downloads, mounted env files, or tokens in build artifacts.
 References: [Doppler CLI](https://docs.doppler.com/docs/cli),
 [Doppler configuration](https://docs.doppler.com/docs/environment-based-configuration),
 [Vite envDir](https://vite.dev/config/shared-options#envdir).
+
+## Phase 02 SDK child
+
+The explicit device runner injects `OPENAI_API_KEY` through Doppler into its SDK child.
+The approved model ID lives in the nonsecret device profile. The child drops unrelated
+server credentials and tracing exports before SDK import, forces telemetry=false and
+PYTHON_DOTENV_DISABLED=1, and uses a private cwd with no env file. Emulator, fixture
+backend, doctor and offline checks never fetch model secrets. See
+[device qualification](device-qualification.md). No model key has been populated or
+paid model call authorized by implementing this harness.

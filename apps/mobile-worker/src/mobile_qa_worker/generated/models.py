@@ -7,12 +7,83 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel
+from typing_extensions import TypeAliasType
 
 
 class Outcome(StrEnum):
     passed = 'passed'
     failed = 'failed'
     blocked = 'blocked'
+
+
+class QualificationArtifact1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    bytes: Annotated[int, Field(ge=1, le=262144000)]
+    mime: str
+    name: str
+    path: str
+    sha256: Annotated[str, Field(pattern='^[0-9a-f]{64}$')]
+    status: Literal['available']
+
+
+class QualificationArtifact2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str
+    reason: str
+    status: Literal['unavailable']
+
+
+class QualificationArtifact(RootModel[QualificationArtifact1 | QualificationArtifact2]):
+    root: QualificationArtifact1 | QualificationArtifact2
+
+
+class QualificationOutcome(StrEnum):
+    passed = 'passed'
+    failed = 'failed'
+    blocked = 'blocked'
+    inconclusive = 'inconclusive'
+
+
+class QualificationRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    activity: Annotated[str, Field(pattern='^ai\\.mobileqa\\.demo/\\.MainActivity$')]
+    apk_path: str
+    attempt_id: UUID
+    case_id: Annotated[str, Field(pattern='^persist-task-v1$')]
+    expected_apk_sha256: Annotated[str, Field(pattern='^[0-9a-f]{64}$')]
+    output_root: str
+    package: Annotated[str, Field(pattern='^ai\\.mobileqa\\.demo$')]
+    profile_path: str
+    serial: Annotated[str, Field(pattern='^emulator-5554$')]
+    version: Annotated[int, Field(ge=1, le=1)]
+
+
+class QualificationReset(StrEnum):
+    verified_clean = 'verified_clean'
+    quarantined = 'quarantined'
+    not_started = 'not_started'
+
+
+PhaseMsAdditionalProperty = TypeAliasType(
+    "PhaseMsAdditionalProperty", Annotated[int, Field(ge=0)]
+)
+
+
+class QualificationUsage(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    calls: Annotated[int, Field(ge=0, le=10000)]
+    input_tokens: Annotated[int | None, Field(ge=0)] = None
+    model: str
+    output_tokens: Annotated[int | None, Field(ge=0)] = None
+    unknown_calls: Annotated[int, Field(ge=0, le=10000)]
 
 
 class Scenario1(BaseModel):
@@ -71,10 +142,42 @@ class FakeExecutionResult(BaseModel):
     version: Annotated[int, Field(ge=1, le=1)]
 
 
+class QualificationResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    artifacts: list[QualificationArtifact]
+    attempt_id: UUID
+    case_id: str
+    device_inventory: dict[str, str]
+    ended_at: AwareDatetime
+    expected_behavior: str
+    model_profile_sha256: str
+    observed_behavior: str
+    observed_build_sha256: str | None = None
+    outcome: QualificationOutcome
+    phase_ms: dict[str, PhaseMsAdditionalProperty]
+    reason_code: str
+    requested_build_sha256: str
+    reset: QualificationReset
+    started_at: AwareDatetime
+    usage: list[QualificationUsage]
+    version: Annotated[int, Field(ge=1, le=1)]
+
+
+class QualificationContracts(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request: QualificationRequest
+    result: QualificationResult
+
+
 class WorkerContracts(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     probe: ContractProbe
+    qualification: QualificationContracts
     request: FakeExecutionRequest
     result: FakeExecutionResult

@@ -3,6 +3,7 @@
 `fake` emits one JSON result and exits. `sdk-import` checks only package compatibility;
 only scripts/sdk_smoke.py additionally blocks socket connections during that import.
 Neither command constructs an agent or executes a customer test.
+Explicit device commands qualify the controlled demo; they are never run by ordinary checks.
 """
 
 import argparse
@@ -40,8 +41,27 @@ def main() -> int:
     fake = commands.add_parser("fake", help="Run a local fixture without SDK/device/model access")
     fake.add_argument("fixture", type=Path)
     commands.add_parser("sdk-import", help="Import installed SDK only; never create an Agent")
+    doctor = commands.add_parser(
+        "device-doctor", help="Inspect Linux/KVM and pinned tools; no boot/model"
+    )
+    doctor.add_argument("--profile", type=Path, required=True)
+    device = commands.add_parser("device-run", help="Execute one explicit controlled attempt")
+    device.add_argument("--request", type=Path, required=True)
+    campaign = commands.add_parser("device-qualify", help="Run controlled qualification campaign")
+    campaign.add_argument("--config", type=Path, required=True)
+    recovery = commands.add_parser(
+        "device-recover", help="Recover quarantined state after host reboot"
+    )
+    recovery.add_argument("--profile", type=Path, required=True)
+    child = commands.add_parser("_sdk-run", help=argparse.SUPPRESS)
+    child.add_argument("--request", type=Path, required=True)
+    child.add_argument("--result", type=Path, required=True)
     args = parser.parse_args()
     try:
+        if args.command.startswith("device-") or args.command == "_sdk-run":
+            from mobile_qa_worker.qualification.commands import dispatch
+
+            return dispatch(args)
         if args.command == "sdk-import":
             print(json.dumps(sdk_import(), sort_keys=True))
         else:

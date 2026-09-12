@@ -1,12 +1,18 @@
 # 02 — Cloud phone and execution feasibility
 
-Status: planned; no paid infrastructure provisioned. Depends on: minimal source setup. Blocks: real execution in spec 04. Owns: `apps/mobile-worker/`, device-host configuration under `infra/`, qualification records.
+Status: harness implemented; offline checks passed; live qualification pending. No paid infrastructure provisioned. Depends on: minimal source setup. Blocks: real execution in spec 04. Owns: `apps/mobile-worker/`, device-host configuration under `infra/`, qualification records.
+
+Detailed [phase 02 implementation plan](../../../.claude/PRPs/plans/02-cloud-phone-and-feasibility.plan.md) prepared against merged scaffold `d137e35` on 2026-09-12. Implementation and offline validation are recorded in the [report](../../../.claude/PRPs/reports/02-cloud-phone-and-feasibility-report.md); cloud qualification remains pending. The packet specifies a controlled demo APK, an independent persistence verifier, strict qualification contracts, process cleanup, affected CI and an authorization gate before paid execution. This document remains the architecture authority.
 
 ## Decision
 
 Start with **one Android emulator on one Linux cloud host**, with the Python worker on that same host. The customer uploads an APK; they do not install a local testing framework. This is a virtual phone, and reports must identify it as an emulator.
 
-Proposed provider baseline: an AWS EC2 M8i instance with nested virtualization explicitly enabled. Start sizing evaluation at 4 vCPU/16 GiB for one emulator plus worker; this is a resource hypothesis, not a throughput guarantee. Before creation, confirm the exact instance SKU, region capacity, virtualization support, current price and authorized spend. AWS documents nested virtualization on selected C8i/M8i/R8i families; do not assume every EC2 instance supports it. [AWS launch note](https://aws.amazon.com/about-aws/whats-new/2026/02/amazon-ec2-nested-virtualization-on-virtual/), [configuration instructions](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/amazon-ec2-nested-virtualization.html)
+The application will start on Railway, with AWS as a later migration target; see
+[hosting](../hosting.md). This does not resolve the emulator host: Railway KVM support
+is unverified, and the current doctor requires it.
+
+Optional separate device-host candidate: an AWS EC2 M8i instance with nested virtualization explicitly enabled. Start sizing evaluation at 4 vCPU/16 GiB for one emulator plus worker; this is a resource hypothesis, not a throughput guarantee. Before creation, confirm the exact instance SKU, region capacity, virtualization support, current price and authorized spend. AWS documents nested virtualization on selected C8i/M8i/R8i families; do not assume every EC2 instance supports it. [AWS launch note](https://aws.amazon.com/about-aws/whats-new/2026/02/amazon-ec2-nested-virtualization-on-virtual/), [configuration instructions](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/amazon-ec2-nested-virtualization.html)
 
 An existing qualified KVM-capable host is equally suitable. A managed device provider is a fallback to evaluate if self-hosted qualification is too costly; it must expose the control, reset, evidence and isolation capabilities our adapter needs. Do not assume all Appium/device-farm sessions support this SDK's device interface.
 
@@ -16,7 +22,7 @@ Use a controlled demo app with an x86_64-compatible APK and a known requirement:
 
 Prepare three scenarios: a known-good build, a seeded persistence defect, and an unavailable login/backend prerequisite. The expected classifications are pass, fail and blocked. Run each three times from reset state as an early engineering check. Preserve every result; this is not the larger pilot reliability evaluation.
 
-## Cloud boot runbook to implement
+## Cloud boot requirements
 
 1. **Provision host:** Linux x86_64, encrypted disk, restricted operator access, instance identity with narrow artifact permissions, and explicit nested virtualization. Keep ADB/emulator control ports off the public network.
 2. **Verify acceleration:** check usable `/dev/kvm`, user permissions and the pinned emulator's acceleration diagnostic. Fail preflight if acceleration is unavailable. Linux emulator acceleration uses KVM. [Android acceleration documentation](https://developer.android.com/studio/run/emulator-acceleration)

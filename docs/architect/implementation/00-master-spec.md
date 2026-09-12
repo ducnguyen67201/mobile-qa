@@ -1,7 +1,7 @@
 # Mobile QA MVP — master implementation spec
 
 Status: canonical implementation roadmap. Spec 01 has an implemented foundation;
-specs 02–07 are planned. [Current status and evidence](../status.md) own completion claims.
+spec 02 has an offline-validated harness with live qualification pending; specs 03–07 are planned. [Current status and evidence](../status.md) own completion claims.
 This roadmap owns sequencing; [system architecture](../system.md), [contracts](../contracts.md),
 [environment](../environment.md), and [development workflow](../development.md) own their current details.
 
@@ -24,7 +24,7 @@ This packet owns implementation order and stack decisions. The [product specific
 | Persistence | PostgreSQL | Product records, manifests, leases and durable jobs |
 | Execution | Python/uv adapter around a pinned Minitap mobile-use version | Reuse device interaction; keep Python narrowly scoped |
 | Artifacts | Local private directory in development; private S3-compatible storage for pilot | APKs, screenshots, logs and available recordings |
-| Hosting | One Rust app + PostgreSQL + storage; separate Linux device host | Scale scarce device capacity independently |
+| Hosting | Railway application + PostgreSQL initially; separate qualified Linux device host; AWS later | Move quickly while retaining portable deployment boundaries; see [hosting](../hosting.md) |
 
 Start with the starter's routing rather than replacing it with TanStack Router. No SSR or production Node server is required for this dashboard. Loco background workers run Rust code; our Python device worker needs the explicit HTTP lease protocol in spec 04. No second agent framework is needed to control the same device loop.
 

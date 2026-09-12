@@ -4,7 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.12,<3.14"
 dependencies = ["pydantic>=2.11,<3"]
 [project.optional-dependencies]
-sdk = ["minitap-mobile-use==4.0.0"]
+sdk = ["minitap-mobile-use==4.0.0", "langchain-core==1.6.3"]
 [dependency-groups]
 dev = [
     "datamodel-code-generator==0.76.0",

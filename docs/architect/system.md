@@ -1,6 +1,7 @@
 # System architecture
 
-Status: foundation implemented; device execution and customer workflows planned.
+Status: foundation and offline qualification harness implemented; live device qualification
+and customer workflows pending.
 [Current status](status.md) separates these explicitly.
 
 ## Component ownership
@@ -10,10 +11,10 @@ Status: foundation implemented; device execution and customer workflows planned.
 | `apps/api` | Rust/Loco API, authorization, domain services, scheduling, verification and reports | Health route and framework wiring exist; product services planned |
 | `apps/api/migration` | SeaORM database migrations | Migrator and PostgreSQL integration exist; no product tables |
 | `apps/web` | React/Vite dashboard using React Router, TanStack Query, Tailwind and shadcn/ui | App health UI and Tests/Runs/Settings placeholders |
-| `apps/mobile-worker` | Python/uv adapter, device observations and evidence | Deterministic fake executor and import-only Minitap seam; real adapter planned |
-| `crates/contracts` | Pure Rust transport DTOs and browser endpoint declarations | Health and fixture contracts; no Loco/DB dependency |
+| `apps/mobile-worker` | Python/uv adapter, device observations and evidence | Fake/import commands plus operator qualification harness; live device qualification pending |
+| `crates/contracts` | Pure Rust transport DTOs and browser endpoint declarations | Health, fixture and qualification contracts; no Loco/DB dependency |
 | `contracts` | Generated OpenAPI/JSON Schema and serialization fixtures | Derived from Rust, committed and checked for drift |
-| `infra` | Local infrastructure and future device-host provisioning | Isolated local PostgreSQL only |
+| `infra` | Local infrastructure and future device-host provisioning | Local PostgreSQL and pinned device-host preparation; no cloud provisioning |
 | `scripts` / `justfile` | Explicit development, generation and validation | Implemented; no check watchers |
 | `docs/architect` | Product/architecture/specification source of truth | This packet |
 
@@ -39,13 +40,16 @@ flowchart LR
 ```
 
 Only the UI → health API and API → local DB paths are implemented. The fake worker
-consumes local fixtures independently; it does not yet claim network jobs or control a
-phone. Rust owns approvals and outcome aggregation. Agent completion alone cannot prove
+consumes local fixtures independently. The explicit qualification harness can attempt
+local device control, but it has not been qualified on a real host and does not claim
+network jobs. Rust owns approvals and outcome aggregation. Agent completion alone cannot prove
 a customer expectation passed. Planned results and immutable manifests follow
 [product rules](product.md) and [execution spec](implementation/04-execution-and-reports.md).
 
-Use one application deployment with PostgreSQL and private storage, plus a separate
-qualified Linux emulator host for the pilot. Python initiates scoped HTTP worker calls;
+Use Railway initially for one application deployment serving the API and compiled SPA,
+with PostgreSQL and private artifact storage as needed. Keep the qualified Linux emulator
+host separate; Railway KVM support is not verified. AWS is the later application
+migration target. See [hosting](hosting.md) for the selected direction and remaining work. Python initiates scoped HTTP worker calls;
 it does not receive database credentials. Keep one active case per device and exclusive
 test-account leases. Add capacity only after measured queue wait, reset reliability and
 cost justify it. [Spec 07](implementation/07-pilot-readiness-and-scale.md) owns scaling.

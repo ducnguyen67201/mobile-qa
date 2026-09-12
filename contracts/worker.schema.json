@@ -6,6 +6,9 @@
     "probe": {
       "$ref": "#/$defs/ContractProbe"
     },
+    "qualification": {
+      "$ref": "#/$defs/QualificationContracts"
+    },
     "request": {
       "$ref": "#/$defs/FakeExecutionRequest"
     },
@@ -16,7 +19,8 @@
   "required": [
     "request",
     "result",
-    "probe"
+    "probe",
+    "qualification"
   ],
   "$defs": {
     "ContractProbe": {
@@ -117,6 +121,297 @@
         "passed",
         "failed",
         "blocked"
+      ]
+    },
+    "QualificationArtifact": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "type": "integer",
+              "format": "uint32",
+              "maximum": 262144000,
+              "minimum": 1
+            },
+            "mime": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "status": {
+              "type": "string",
+              "const": "available"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "name",
+            "path",
+            "mime",
+            "bytes",
+            "sha256"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "name",
+            "reason"
+          ]
+        }
+      ]
+    },
+    "QualificationContracts": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "$ref": "#/$defs/QualificationRequest"
+        },
+        "result": {
+          "$ref": "#/$defs/QualificationResult"
+        }
+      },
+      "required": [
+        "request",
+        "result"
+      ]
+    },
+    "QualificationOutcome": {
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "blocked",
+        "inconclusive"
+      ]
+    },
+    "QualificationRequest": {
+      "type": "object",
+      "properties": {
+        "activity": {
+          "type": "string",
+          "pattern": "^ai\\.mobileqa\\.demo/\\.MainActivity$"
+        },
+        "apk_path": {
+          "type": "string"
+        },
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "case_id": {
+          "type": "string",
+          "pattern": "^persist-task-v1$"
+        },
+        "expected_apk_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "output_root": {
+          "type": "string"
+        },
+        "package": {
+          "type": "string",
+          "pattern": "^ai\\.mobileqa\\.demo$"
+        },
+        "profile_path": {
+          "type": "string"
+        },
+        "serial": {
+          "type": "string",
+          "pattern": "^emulator-5554$"
+        },
+        "version": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 1,
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "attempt_id",
+        "case_id",
+        "apk_path",
+        "expected_apk_sha256",
+        "package",
+        "activity",
+        "serial",
+        "profile_path",
+        "output_root"
+      ]
+    },
+    "QualificationReset": {
+      "type": "string",
+      "enum": [
+        "verified_clean",
+        "quarantined",
+        "not_started"
+      ]
+    },
+    "QualificationResult": {
+      "type": "object",
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QualificationArtifact"
+          }
+        },
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "case_id": {
+          "type": "string"
+        },
+        "device_inventory": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "ended_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expected_behavior": {
+          "type": "string"
+        },
+        "model_profile_sha256": {
+          "type": "string"
+        },
+        "observed_behavior": {
+          "type": "string"
+        },
+        "observed_build_sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcome": {
+          "$ref": "#/$defs/QualificationOutcome"
+        },
+        "phase_ms": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "reason_code": {
+          "type": "string"
+        },
+        "requested_build_sha256": {
+          "type": "string"
+        },
+        "reset": {
+          "$ref": "#/$defs/QualificationReset"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "usage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QualificationUsage"
+          }
+        },
+        "version": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 1,
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "attempt_id",
+        "case_id",
+        "outcome",
+        "reason_code",
+        "expected_behavior",
+        "observed_behavior",
+        "started_at",
+        "ended_at",
+        "requested_build_sha256",
+        "device_inventory",
+        "model_profile_sha256",
+        "reset",
+        "phase_ms",
+        "artifacts",
+        "usage"
+      ]
+    },
+    "QualificationUsage": {
+      "type": "object",
+      "properties": {
+        "calls": {
+          "type": "integer",
+          "format": "uint32",
+          "maximum": 10000,
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "model": {
+          "type": "string"
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "unknown_calls": {
+          "type": "integer",
+          "format": "uint32",
+          "maximum": 10000,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "calls",
+        "unknown_calls"
       ]
     },
     "Scenario": {

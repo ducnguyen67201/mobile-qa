@@ -23,12 +23,22 @@ jobs:
       web: ${{ steps.paths.outputs.web }}
       worker: ${{ steps.paths.outputs.worker }}
       contracts: ${{ steps.paths.outputs.contracts }}
+      demo: ${{ steps.paths.outputs.demo }}
+      scope_tests: ${{ steps.paths.outputs.scope_tests }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: paths
         with:
           filters: |
+            demo:
+              - '.github/workflows/**'
+              - 'apps/qa-demo-android/**'
+              - 'infra/device-host/toolchain.lock.json'
+              - 'infra/device-host/install_tools.py'
+            scope_tests:
+              - '.github/workflows/**'
+              - 'scripts/test_ci_scope.py'
             api:
               - '.github/workflows/**'
               - 'Cargo.toml'
@@ -38,7 +48,8 @@ jobs:
               - 'apps/api/**'
               - 'crates/contracts/**'
               - 'contracts/fixtures/**'
-              - 'infra/**'
+              - 'infra/compose.yaml'
+              - 'infra/postgres/**'
               - 'scripts/runtime.py'
             web:
               - '.github/workflows/**'
@@ -52,6 +63,8 @@ jobs:
               - '.github/workflows/**'
               - 'apps/mobile-worker/**'
               - 'crates/contracts/src/worker.rs'
+              - 'crates/contracts/src/worker/**'
+              - 'infra/device-host/**'
               - 'contracts/worker.schema.json'
               - 'contracts/fixtures/**'
               - 'scripts/sdk_smoke.py'
@@ -123,7 +136,7 @@ jobs:
           version: 0.12.1
           enable-cache: true
           cache-dependency-glob: apps/mobile-worker/uv.lock
-      - run: uv sync --project apps/mobile-worker --frozen
+      - run: uv sync --project apps/mobile-worker --frozen --extra sdk
       - run: uv run --no-sync --project apps/mobile-worker --frozen ruff check apps/mobile-worker
       - run: cd apps/mobile-worker && uv run --no-sync --frozen pyright
       - run: uv run --no-sync --project apps/mobile-worker --frozen pytest apps/mobile-worker/tests
@@ -158,3 +171,45 @@ jobs:
       - run: cargo test --package mobile-qa-contracts --locked
       - run: python3 scripts/contracts.py --check
       - run: python3 -m unittest scripts.test_contracts
+
+  demo:
+    needs: scope
+    if: needs.scope.outputs.demo == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .private/android-sdk
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: demo-${{ runner.os }}-${{ hashFiles('infra/device-host/toolchain.lock.json', 'apps/qa-demo-android/**/*.gradle', 'apps/qa-demo-android/gradle/wrapper/*') }}
+      - run: python3 infra/device-host/install_tools.py --sdk-root "$GITHUB_WORKSPACE/.private/android-sdk" --demo-only
+      - name: Build and lint controlled APKs only
+        run: |
+          export ANDROID_HOME="$GITHUB_WORKSPACE/.private/android-sdk"
+          cd apps/qa-demo-android
+          ./gradlew --no-daemon :app:assembleGoodDebug :app:assembleBrokenDebug :app:lintGoodDebug :app:lintBrokenDebug
+  scope_tests:
+    needs: scope
+    if: needs.scope.outputs.scope_tests == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.12.1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: pnpm --dir apps/web install --frozen-lockfile --ignore-scripts
+      - run: uv sync --project apps/mobile-worker --frozen
+      - run: uv run --no-sync --project apps/mobile-worker --frozen python scripts/test_ci_scope.py

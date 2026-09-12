@@ -18,8 +18,9 @@ product. Update this record when the decision changes; implementation state belo
 | A10 | Doppler process injection; no env files | Keep runtime secrets outside source and browser processes; local checks require no secret access | [Environment](environment.md) |
 | A11 | Prove one authored case before test generation | Establish install/reset/evidence/verdict behavior before automating test authoring | [Roadmap](implementation/00-master-spec.md) |
 | A12 | docs/architect is the documentation authority | Keep a portable, versioned source of truth in the actual repository | [Index](README.md) |
+| A13 | Railway application hosting first; AWS later when needed | Portable application image and PostgreSQL; Android/KVM hosting remains separately gated | [Hosting](hosting.md) |
 
 No second general agent framework, queue platform or orchestration service is required
 for the first implementation. Revisit these only with a concrete unmet requirement and
-measured benefit. Cloud provider/SKU, model choice, price and qualified emulator profile
-are still proposed or gated in their owning specs; this record does not approve spending.
+measured benefit. The application hosting direction is selected; device provider/SKU, model choice, price
+and qualified emulator profile are still proposed or gated in their owning specs; this record does not approve spending.

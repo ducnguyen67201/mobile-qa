@@ -80,3 +80,13 @@ verification previously denied access: do not use alternate browser/Playwright/H
 workarounds to evade it. Rendered keyboard/Retry/HMR acceptance remains explicitly
 unverified until approved browser access is available. Endpoint smoke is a separate
 existing automated check, not a claim of rendered browser acceptance.
+
+## Explicit qualification commands
+
+`just device-doctor profile`, `just device-smoke request`, and `just device-qualify config`
+are opt-in operator commands, never dependencies of setup/check/build/smoke. The Android
+fixture has its own pinned Gradle wrapper under apps/qa-demo-android. Worker checks install
+the optional SDK for strict type resolution but never run a model/device. Demo-only CI
+builds/lints APKs, no emulator. Device-host infrastructure selects worker checks; PostgreSQL
+infrastructure selects API checks. CI filter tests run only for changed workflow/filter tests.
+See [device qualification](device-qualification.md) for host prerequisites and result semantics.

@@ -50,6 +50,12 @@ build:
 smoke:
     python3 scripts/runtime.py smoke
 
-device-smoke:
-    @echo "Spec 02 device qualification is not implemented. No device or cloud action was taken."
-    @exit 2
+# Explicit device work only; never dependencies of setup/check/build/smoke.
+device-doctor profile:
+    uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker device-doctor --profile {{quote(profile)}}
+
+device-smoke request:
+    uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker device-run --request {{quote(request)}}
+
+device-qualify config:
+    uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker device-qualify --config {{quote(config)}}

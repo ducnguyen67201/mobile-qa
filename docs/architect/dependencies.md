@@ -44,3 +44,13 @@ python-dotenv1.2.2 override and pytest9.0.3 update are preserved for audit compa
 
 PostgreSQL17-alpine is digest-pinned in infra/compose.yaml. Rust1.95.0, Node24.14.1,
 pnpm11.16.0 and uv0.12.1 are retained. Lockfiles own exact resolutions; [status](status.md) owns validation evidence; no global editor/tool configuration is modified.
+
+## Phase 02 qualification dependencies
+
+Minitap remains pinned to4.0.0. langchain-core1.6.3 is declared directly in the sdk extra
+for the completion-usage callback (same existing transitive resolution). No second agent
+framework is added. The tiny Java/Views demo adds an isolated AGP8.13.0/Gradle8.13/JDK17
+build, compile/target35 and Build Tools35.0.0. Gradle wrapper files come from the upstream
+v8.13.0 tag; retain their license headers. Android archive metadata and vendor checksums
+are pinned in infra/device-host/toolchain.lock.json. Required vendor licenses still apply;
+no installer silently accepts SDK terms or modifies a user's existing SDK.

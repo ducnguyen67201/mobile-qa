@@ -1,0 +1,8 @@
+# Shared Rust workspace only; runnable application code lives in apps/api.
+# Keep the contracts member independent of Loco/SeaORM for lightweight generation.
+[workspace]
+members = ["apps/api", "apps/api/migration", "crates/contracts"]
+resolver = "2"
+
+[workspace.dependencies]
+loco-rs = { version = "=1.1.0", default-features = false, features = ["cli", "with-db", "worker"] }

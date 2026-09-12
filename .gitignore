@@ -1,0 +1,11 @@
+/target/
+/apps/web/node_modules/
+/apps/web/dist/
+/apps/mobile-worker/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+.env
+.env.*
+/.private/
+.DS_Store

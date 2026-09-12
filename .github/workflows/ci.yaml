@@ -1,0 +1,160 @@
+# Select affected apps plus contract consumers; do not attach checks to local edits.
+# PR selection covers the entire PR diff, so earlier changes do not lose coverage.
+# These are file/package filters, not automatic per-function test dependency analysis.
+name: Foundation checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+# Stop superseded PR work while allowing main-branch validation to finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  scope:
+    permissions:
+      contents: read
+      pull-requests: read
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.paths.outputs.api }}
+      web: ${{ steps.paths.outputs.web }}
+      worker: ${{ steps.paths.outputs.worker }}
+      contracts: ${{ steps.paths.outputs.contracts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: paths
+        with:
+          filters: |
+            api:
+              - '.github/workflows/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+              - '.cargo/**'
+              - 'apps/api/**'
+              - 'crates/contracts/**'
+              - 'contracts/fixtures/**'
+              - 'infra/**'
+              - 'scripts/runtime.py'
+            web:
+              - '.github/workflows/**'
+              - 'apps/web/**'
+              - '.node-version'
+              - 'crates/contracts/src/browser.rs'
+              - 'contracts/browser.openapi.json'
+              - 'crates/contracts/Cargo.toml'
+              - 'crates/contracts/src/lib.rs'
+            worker:
+              - '.github/workflows/**'
+              - 'apps/mobile-worker/**'
+              - 'crates/contracts/src/worker.rs'
+              - 'contracts/worker.schema.json'
+              - 'contracts/fixtures/**'
+              - 'scripts/sdk_smoke.py'
+              - 'crates/contracts/Cargo.toml'
+              - 'crates/contracts/src/lib.rs'
+            # Generator inputs and generated-only edits still need drift validation.
+            # This does not imply every app suite depends on every generator dependency.
+            contracts:
+              - '.github/workflows/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+              - '.cargo/**'
+              - 'crates/contracts/**'
+              - 'contracts/browser.openapi.json'
+              - 'contracts/worker.schema.json'
+              - 'contracts/fixtures/**'
+              - 'apps/web/src/api/generated/**'
+              - 'apps/mobile-worker/src/mobile_qa_worker/generated/**'
+              - 'scripts/contracts.py'
+              - 'scripts/test_contracts.py'
+              - 'apps/web/openapi-ts.config.ts'
+              - 'apps/web/package.json'
+              - 'apps/web/pnpm-lock.yaml'
+              - 'apps/web/pnpm-workspace.yaml'
+              - '.node-version'
+              - 'apps/mobile-worker/pyproject.toml'
+              - 'apps/mobile-worker/uv.lock'
+              - 'apps/mobile-worker/.python-version'
+  api:
+    needs: scope
+    if: needs.scope.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: python3 scripts/runtime.py check-api --api-only
+      - run: cargo build --package mobile-qa --locked
+  web:
+    needs: scope
+    if: needs.scope.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm --dir apps/web install --frozen-lockfile --ignore-scripts
+      - run: pnpm --dir apps/web typecheck
+      - run: pnpm --dir apps/web lint
+      - run: pnpm --dir apps/web test
+      - run: pnpm --dir apps/web build
+  worker:
+    needs: scope
+    if: needs.scope.outputs.worker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.12.1
+          enable-cache: true
+          cache-dependency-glob: apps/mobile-worker/uv.lock
+      - run: uv sync --project apps/mobile-worker --frozen
+      - run: uv run --no-sync --project apps/mobile-worker --frozen ruff check apps/mobile-worker
+      - run: cd apps/mobile-worker && uv run --no-sync --frozen pyright
+      - run: uv run --no-sync --project apps/mobile-worker --frozen pytest apps/mobile-worker/tests
+  # The pure contract job needs generators, but no PostgreSQL or device/model access.
+  contracts:
+    needs: scope
+    if: needs.scope.outputs.contracts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.12.1
+          enable-cache: true
+          cache-dependency-glob: apps/mobile-worker/uv.lock
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm --dir apps/web install --frozen-lockfile --ignore-scripts
+      - run: uv sync --project apps/mobile-worker --frozen
+      - run: cargo fmt --package mobile-qa-contracts -- --check
+      - run: cargo clippy --package mobile-qa-contracts --all-targets --locked -- -D warnings
+      - run: cargo test --package mobile-qa-contracts --locked
+      - run: python3 scripts/contracts.py --check
+      - run: python3 -m unittest scripts.test_contracts

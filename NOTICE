@@ -1,0 +1,6 @@
+Loco application scaffold adapted from loco-rs/loco v1.1.0,
+commit ba726cc4d938d43309bf27bacfe27461f9c782fb.
+Copyright Loco contributors. Licensed under Apache License 2.0 (LICENSE-LOCO).
+Changed: minimal no-auth app, isolated DB, contract crate and explicit tooling.
+
+Card and Button primitives adapted from shadcn/ui, MIT license; see LICENSE-SHADCN.

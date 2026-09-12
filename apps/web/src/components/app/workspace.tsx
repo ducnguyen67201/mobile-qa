@@ -1,18 +1,64 @@
-import { Alert, Button, Group, NativeSelect, Stack, Text } from '@mantine/core'
+import { ActionIcon, Alert, Button, Menu, NativeSelect, Stack, Text, Tooltip } from '@mantine/core'
+import { Building2, Check, Layers3 } from 'lucide-react'
 import { Link, Navigate, Outlet, useLocation } from 'react-router'
 import { useSession } from './session'
 import { useWorkspace, workspaceHref } from '@/hooks/use-workspace'
 
-export function WorkspaceSwitcher() {
+export function WorkspaceSwitcher({
+  minimized = false,
+  close,
+}: {
+  minimized?: boolean
+  close?: () => void
+}) {
   const session = useSession()
   const { workspace, select } = useWorkspace()
+  if (minimized)
+    return (
+      <Menu position="right-start" width={240}>
+        <Menu.Target>
+          <Tooltip label={workspace?.name ?? 'Workspaces'} position="right" withArrow>
+            <ActionIcon
+              aria-label="Switch workspace"
+              className="nav-icon"
+              variant="subtle"
+              size={44}
+              mx="auto"
+            >
+              <Building2 size={20} />
+            </ActionIcon>
+          </Tooltip>
+        </Menu.Target>
+        <Menu.Dropdown>
+          <Menu.Label>Workspaces</Menu.Label>
+          {session.memberships.map((m) => (
+            <Menu.Item
+              key={m.organization_id}
+              onClick={() => select(m.organization_id)}
+              rightSection={
+                workspace?.organization_id === m.organization_id ? <Check size={14} /> : undefined
+              }
+            >
+              {m.name}
+            </Menu.Item>
+          ))}
+          <Menu.Divider />
+          <Menu.Item component={Link} to="/workspaces" leftSection={<Layers3 size={16} />}>
+            Manage workspaces
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
+    )
   return (
-    <Group gap="sm" wrap="nowrap">
+    <Stack gap="xs">
       <NativeSelect
         aria-label="Current workspace"
         value={workspace?.organization_id ?? ''}
         onChange={(event) => {
-          if (event.currentTarget.value) select(event.currentTarget.value)
+          if (event.currentTarget.value) {
+            select(event.currentTarget.value)
+            close?.()
+          }
         }}
         data={[
           { value: '', label: 'Choose workspace', disabled: true },
@@ -22,12 +68,20 @@ export function WorkspaceSwitcher() {
           })),
         ]}
         disabled={!session.memberships.length}
-        maw={{ base: 180, sm: 260 }}
+        classNames={{ input: 'nav-workspace-input' }}
       />
-      <Button component={Link} to="/workspaces" variant="subtle" size="xs">
+      <Button
+        component={Link}
+        to="/workspaces"
+        onClick={close}
+        variant="subtle"
+        size="xs"
+        c="var(--workspace-nav-muted)"
+        leftSection={<Layers3 size={14} />}
+      >
         Workspaces
       </Button>
-    </Group>
+    </Stack>
   )
 }
 

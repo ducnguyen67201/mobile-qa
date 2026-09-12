@@ -141,3 +141,12 @@ The restarted local app was verified through real Google sign-in: the existing
 account lands on its workspace URL, the chooser shows its owned workspace, and
 the approved Create Workspace form renders. Creation/switching across two workspaces
 and pending-account gating are covered by automated route and DOM tests.
+
+### Sidebar workspace controls
+
+Workspace selection now lives in the sidebar. Desktop navigation minimizes to an
+80px icon rail, with tooltips, a workspace menu and an expand control; expanded
+navigation is 256px. Mantine disclosure state is separate from the mobile drawer.
+Browser verification covers collapse, workspace menu selection and expansion while
+preserving the selected URL. All 65 web tests, TypeScript, ESLint, production build
+and frontend audit pass. The existing nonblocking bundle warning remains.

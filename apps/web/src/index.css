@@ -104,3 +104,24 @@ h3 {
     transition: none;
   }
 }
+
+/* Sidebar controls use the same contrast and active treatment at either width. */
+.workspace-nav .nav-icon {
+  color: var(--workspace-nav-text);
+}
+.workspace-nav .nav-icon:hover {
+  background: #ffffff0d;
+}
+.workspace-nav .nav-icon[data-active] {
+  background: var(--workspace-accent);
+  color: var(--workspace-nav);
+}
+.workspace-nav .nav-workspace-input {
+  background: #ffffff0d;
+  border-color: #ffffff30;
+  color: var(--workspace-nav-text);
+}
+.workspace-nav .nav-workspace-input option {
+  background: var(--workspace-nav);
+  color: var(--workspace-nav-text);
+}

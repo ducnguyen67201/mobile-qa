@@ -120,3 +120,8 @@ and pagination, and preserves selection across reloads and browser back/forward.
 Invalid workspace IDs and mismatched app links must not render another workspace's
 content. Existing records remain intact; organizations are the internal workspace
 storage representation. Device execution and team invitation UI remain deferred.
+
+Workspace selection lives in the sidebar. Desktop navigation can minimize to an
+icon rail with labelled tooltips and a workspace menu; expanding restores the full
+picker and labels. Mobile retains the full navigation in its dismissible drawer.
+Sidebar size is local UI state and does not change the selected workspace URL.

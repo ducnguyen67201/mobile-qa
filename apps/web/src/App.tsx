@@ -1,129 +1,29 @@
 import { useEffect } from 'react'
 import {
   AppShell,
-  Anchor,
   Avatar,
   Badge,
   Box,
   Burger,
   Button,
   Container,
-  Divider,
   Drawer,
   Group,
   Menu,
-  NavLink,
-  Paper,
-  Stack,
   Text,
-  ThemeIcon,
   useMantineTheme,
 } from '@mantine/core'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router'
+import { Outlet, useLocation, useNavigate } from 'react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  AppWindow,
-  ArrowUpRight,
-  ChevronDown,
-  FlaskConical,
-  Layers3,
-  LogOut,
-  Play,
-  Settings2,
-  ShieldCheck,
-} from 'lucide-react'
+import { ChevronDown, LogOut } from 'lucide-react'
 import { useSession } from '@/components/app/session'
 import { ErrorNotice } from '@/components/app/feedback'
-import { useWorkspace } from '@/hooks/use-workspace'
-import { WorkspaceSwitcher } from '@/components/app/workspace'
+import { Navigation, navigationLinks } from '@/components/app/navigation'
 import { signOut } from '@/api/setup'
 
-const links = [
-  { to: '/apps', label: 'Apps', icon: AppWindow },
-  { to: '/tests', label: 'Tests', icon: FlaskConical },
-  { to: '/runs', label: 'Runs', icon: Play },
-  { to: '/settings', label: 'Settings', icon: Settings2 },
-]
-
-function Navigation({ close }: { close: () => void }) {
-  const { pathname } = useLocation()
-  const { href } = useWorkspace()
-  return (
-    <Stack h="100%" justify="space-between" gap="xl">
-      <Stack gap="xl">
-        <Anchor component={Link} to={href('/apps')} underline="never" c="inherit" onClick={close}>
-          <Group gap="sm">
-            <ThemeIcon color="forest.2" c="forest.9" size={36} radius="md">
-              <Layers3 size={20} />
-            </ThemeIcon>
-            <Text fw={600} size="lg">
-              Mobile QA
-            </Text>
-            <Text size="xs" c="var(--workspace-nav-muted)">
-              Pilot
-            </Text>
-          </Group>
-        </Anchor>
-        <Box component="nav" aria-label="Workspace navigation">
-          <Text size="xs" tt="uppercase" lts=".15em" c="var(--workspace-nav-muted)" mb="md" px="sm">
-            Workspace
-          </Text>
-          <Stack gap="xs">
-            {links.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                component={Link}
-                to={href(to)}
-                label={label}
-                active={pathname.startsWith(to)}
-                aria-current={pathname.startsWith(to) ? 'page' : undefined}
-                leftSection={<Icon size={18} />}
-                onClick={close}
-                py="sm"
-                rightSection={
-                  (label === 'Tests' || label === 'Runs') && (
-                    <Text size="xs" opacity={0.65}>
-                      Soon
-                    </Text>
-                  )
-                }
-              />
-            ))}
-          </Stack>
-        </Box>
-      </Stack>
-      <Stack gap="md">
-        <Paper withBorder p="md" radius="lg" className="nav-note">
-          <ShieldCheck size={22} color="var(--workspace-accent)" />
-          <Text size="sm" fw={500} mt="sm">
-            A reliable first step.
-          </Text>
-          <Text size="xs" c="var(--workspace-nav-muted)" mt="xs">
-            Connect your app. Validate a build. Start with evidence.
-          </Text>
-          <Anchor
-            component={Link}
-            to={href('/settings')}
-            c="var(--workspace-accent)"
-            size="xs"
-            mt="md"
-            onClick={close}
-          >
-            <Group gap={6}>
-              Workspace details <ArrowUpRight size={12} />
-            </Group>
-          </Anchor>
-        </Paper>
-        <Text size="xs" c="var(--workspace-nav-muted)">
-          ANDROID QUALITY WORKSPACE
-        </Text>
-      </Stack>
-    </Stack>
-  )
-}
-
 export function App() {
+  const [minimized, { toggle: toggleSidebar }] = useDisclosure(false)
   const [mobileOpen, { close: closeNavigation, toggle: toggleNavigation }] = useDisclosure(false)
   const { breakpoints } = useMantineTheme()
   const desktop = useMediaQuery(`(min-width: ${breakpoints.sm})`)
@@ -147,7 +47,7 @@ export function App() {
     <AppShell
       layout="alt"
       header={{ height: 72 }}
-      navbar={{ width: 256, breakpoint: 'sm', collapsed: { mobile: true } }}
+      navbar={{ width: minimized ? 80 : 256, breakpoint: 'sm', collapsed: { mobile: true } }}
       padding={0}
     >
       <a className="skip-link" href="#main">
@@ -155,11 +55,11 @@ export function App() {
       </a>
       <AppShell.Navbar
         component="aside"
-        p="lg"
+        p={minimized ? 'sm' : 'lg'}
         className="workspace-nav"
         style={{ overflowY: 'auto' }}
       >
-        <Navigation close={closeNavigation} />
+        <Navigation close={closeNavigation} minimized={minimized} toggle={toggleSidebar} />
       </AppShell.Navbar>
       <Drawer
         opened={mobileOpen && !desktop}
@@ -182,12 +82,10 @@ export function App() {
               size="sm"
               aria-label="Toggle navigation"
             />
-            <WorkspaceSwitcher />
-            <Divider orientation="vertical" />
             <Text size="xs" fw={500}>
               {pathname.startsWith('/workspaces')
                 ? 'Workspaces'
-                : links.find((link) => pathname.startsWith(link.to))?.label ?? 'Apps'}
+                : (navigationLinks.find((link) => pathname.startsWith(link.to))?.label ?? 'Apps')}
             </Text>
           </Group>
           <Menu position="bottom-end" width={260}>

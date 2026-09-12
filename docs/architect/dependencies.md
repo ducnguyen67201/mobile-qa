@@ -7,9 +7,9 @@ cargo fmt during authoring. Apache attribution remains in LICENSE-LOCO and NOTIC
 Its native application paths now live together under apps/api. Root is a virtual
 Cargo workspace. Unneeded auth/mailers/posts/downloader features remain omitted.
 
-Card/Button are adapted from shadcn/ui (MIT), with local LICENSE-SHADCN:
-https://github.com/shadcn-ui/ui/tree/main/apps/v4/registry/new-york-v4/ui
-React19, Router8, Query5, Vite8 and Tailwind4 remain pinned by the web lockfile.
+The original foundation used shadcn Card/Button. Those copies were removed in the
+Mantine migration; LICENSE-SHADCN is retained for historical attribution. React19,
+Router8, Query5 and Vite8 remain pinned by the web lockfile.
 
 Browser transport now uses Utoipa5, replacing the initial ts-rs pipeline entirely.
 Pure Utoipa definitions export OpenAPI without application/DB dependencies:
@@ -44,3 +44,50 @@ python-dotenv1.2.2 override and pytest9.0.3 update are preserved for audit compa
 
 PostgreSQL17-alpine is digest-pinned in infra/compose.yaml. Rust1.95.0, Node24.14.1,
 pnpm11.16.0 and uv0.12.1 are retained. Lockfiles own exact resolutions; [status](status.md) owns validation evidence; no global editor/tool configuration is modified.
+
+## Spec 03 additions
+
+Dashboard controls come from `@mantine/core`, `@mantine/hooks` and `@mantine/form` 9.6.1 (MIT),
+installed as packages rather than copied source. Product components import Mantine
+directly; `apps/web/src/theme.ts` centralizes colors and defaults. Plain product CSS
+does not use Mantine PostCSS mixins, so no additional PostCSS plugins are required.
+Tailwind, Radix, CVA and the local `cn` helper are removed. Lucide remains the icon
+package. Exact resolutions are in pnpm-lock.yaml. Official integration references:
+[Mantine Vite setup](https://mantine.dev/guides/vite/),
+[Drawer behavior](https://mantine.dev/core/drawer/),
+[theme](https://mantine.dev/theming/theme-object/),
+[DOM testing](https://mantine.dev/guides/vitest/),
+[disclosure state](https://mantine.dev/hooks/use-disclosure/),
+[form state](https://mantine.dev/form/use-form/).
+
+Rust uses Loco 1.1.0's auth/hash/JWT and S3 storage driver, SeaORM entities/migrations,
+Axum multipart/cookies, SHA-256 and ZIP 8.6.0 for bounded archive checks. Concrete
+versions are in Cargo.lock. No new worker dependencies or handwritten Android parser.
+
+Android Build Tools 36.0.0 (`aapt2`, `apksigner`, `zipalign`), android-35 platform
+revision 2 and JDK17 are external explicit prerequisites. `scripts/setup_android.py`
+uses versioned Google archives and verifies checksums from the official
+[SDK repository index](https://dl.google.com/android/repository/repository2-3.xml).
+Recorded macOS Build Tools SHA-256:
+`04e7f3a72044de4926fa038fa0e251a37bba1e1c3fb8beab6f8401bfd9eb4bf3`;
+platform SHA-256:
+`0988cacad01b38a18a47bac14a0695f246bc76c1b06c0eeb8eb0dc825ab0c8e0`.
+See [Android command-line tools](https://developer.android.com/tools) for vendor
+provenance. These pins are intake tooling, not qualified device evidence.
+
+Hey API 0.99.0 needs two scoped integration adaptations: the Zod generator resolves
+OpenAPI binary strings as `Blob`, and the application client wrapper presents the
+original header record to generated request validators before the generated client
+normalizes headers. SDK serialization/fetch and generated success/error validation
+remain authoritative. Byte fields have explicit Rust schema bounds of 1–250 MiB,
+avoiding incompatible browser BigInt coercion for JSON byte counts. These paths are
+covered by real generated-client transport tests, including multipart serialization.
+
+The 2026-09-12 RustSec audit reports `RUSTSEC-2023-0071` in transitive `rsa 0.9.10`,
+introduced by Loco auth → jsonwebtoken's `rust_crypto` feature. There is no patched
+version in the inspected advisory database. This app uses Loco's HMAC-only JWT API
+(HS512 default) and never invokes RSA private-key operations; the vulnerable signing/
+decryption path is outside this authentication flow. The dependency audit is therefore
+**not clean**, and the upstream advisory remains tracked rather than suppressed.
+Reassess it before introducing asymmetric keys or changing auth providers. See
+[RustSec advisory](https://rustsec.org/advisories/RUSTSEC-2023-0071.html).

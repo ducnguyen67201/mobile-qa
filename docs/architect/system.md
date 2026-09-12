@@ -1,17 +1,17 @@
 # System architecture
 
-Status: foundation implemented; device execution and customer workflows planned.
+Status: foundation and local app setup implemented; hosted acceptance and device execution remain open.
 [Current status](status.md) separates these explicitly.
 
 ## Component ownership
 
 | Location | Responsibility | Current state |
 |---|---|---|
-| `apps/api` | Rust/Loco API, authorization, domain services, scheduling, verification and reports | Health route and framework wiring exist; product services planned |
-| `apps/api/migration` | SeaORM database migrations | Migrator and PostgreSQL integration exist; no product tables |
-| `apps/web` | React/Vite dashboard using React Router, TanStack Query, Tailwind and shadcn/ui | App health UI and Tests/Runs/Settings placeholders |
+| `apps/api` | Rust/Loco API, authorization, domain services, scheduling, verification and reports | Auth, apps/environments, private APK intake and build history implemented; scheduling/reports planned |
+| `apps/api/migration` | SeaORM database migrations | Twelve product tables with tenant/lifecycle constraints; real PostgreSQL tests |
+| `apps/web` | React/Vite dashboard using React Router, TanStack Query, Mantine | Authenticated Mantine dashboard, App and Settings; Tests/Runs placeholders |
 | `apps/mobile-worker` | Python/uv adapter, device observations and evidence | Deterministic fake executor and import-only Minitap seam; real adapter planned |
-| `crates/contracts` | Pure Rust transport DTOs and browser endpoint declarations | Health and fixture contracts; no Loco/DB dependency |
+| `crates/contracts` | Pure Rust transport DTOs and browser endpoint declarations | 15 browser operations and worker fixture contracts; no Loco/DB dependency |
 | `contracts` | Generated OpenAPI/JSON Schema and serialization fixtures | Derived from Rust, committed and checked for drift |
 | `infra` | Local infrastructure and future device-host provisioning | Isolated local PostgreSQL only |
 | `scripts` / `justfile` | Explicit development, generation and validation | Implemented; no check watchers |
@@ -31,14 +31,15 @@ flowchart LR
     UI[React dashboard] -->|same-origin HTTP| API[Rust Loco API]
     API --> DB[(PostgreSQL / SeaORM)]
     D[Doppler] -->|process environment| API
-    API -. planned .-> O[(Private object storage)]
+    API -->|local verified / hosted adapter| O[(Private artifact storage)]
     W[Python worker] -. planned lease/events/results .-> API
     W -. planned local ADB .-> E[Qualified Android emulator]
     W -. planned scoped uploads .-> O
     W -. planned inference .-> M[Model provider]
 ```
 
-Only the UI → health API and API → local DB paths are implemented. The fake worker
+The UI/API app-setup flow, local persistence and artifact validation are implemented.
+Hosted S3-compatible storage is configured in code but has no authorized round-trip evidence. The fake worker
 consumes local fixtures independently; it does not yet claim network jobs or control a
 phone. Rust owns approvals and outcome aggregation. Agent completion alone cannot prove
 a customer expectation passed. Planned results and immutable manifests follow
@@ -50,6 +51,15 @@ it does not receive database credentials. Keep one active case per device and ex
 test-account leases. Add capacity only after measured queue wait, reset reliability and
 cost justify it. [Spec 07](implementation/07-pilot-readiness-and-scale.md) owns scaling.
 
+## Artifact storage
+
+Spec 03 uses private local storage in development and Railway Buckets for hosted APKs,
+with AWS S3 as the later destination. Keep a local/S3-compatible adapter boundary and
+persist internal backend IDs plus object keys, never provider URLs in browser contracts.
+Only temporary upload/validation scratch lives on the API application's disk. Migration
+requires copying and checksum-verifying objects before switching the configured backend;
+existing build IDs/checksums remain stable. The adapter is implemented; hosted infrastructure has not been provisioned or verified. [Spec 03](implementation/03-app-setup-and-ui-backend.md) owns the details.
+
 ## Persistence and ORM
 
 Use SeaORM through Loco with PostgreSQL. Add entities/domain services and versioned
@@ -57,7 +67,7 @@ migrations as features arrive; do not introduce a parallel hand-maintained SQL a
 layer. SQLx is an upstream dependency of the ORM, not a second application data layer.
 The ORM reduces mapping and query boilerplate; it does not replace schema evolution,
 indexes, transaction design or business invariants. Database records are distinct from
-public transport DTOs. [Spec 03](implementation/03-app-setup-and-ui-backend.md) adds the
+public transport DTOs. [Spec 03](implementation/03-app-setup-and-ui-backend.md) owns the
 first product records; [spec 04](implementation/04-execution-and-reports.md) adds durable
 jobs and the narrow transactional claim/lease behavior.
 

@@ -1,6 +1,6 @@
 //! Real foundation endpoints: liveness plus structured API fallback errors.
 //! Tests in apps/api/tests/health.rs compare registered behavior with Rust's OpenAPI
-//! declaration. Authentication, app setup and device readiness are not implemented here.
+//! declaration. App setup routes live in the setup module.
 
 use axum::{http::StatusCode, Json};
 use loco_rs::prelude::*;
@@ -24,6 +24,7 @@ async fn unknown() -> (StatusCode, Json<ApiError>) {
             code: "not_found".into(),
             message: "API route not found".into(),
             details: None,
+            request_id: uuid::Uuid::new_v4(),
         }),
     )
 }
@@ -36,6 +37,7 @@ async fn method_not_allowed() -> (StatusCode, Json<ApiError>) {
             code: "method_not_allowed".into(),
             message: "HTTP method not allowed".into(),
             details: None,
+            request_id: uuid::Uuid::new_v4(),
         }),
     )
 }

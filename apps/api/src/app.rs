@@ -1,5 +1,5 @@
 //! Connect this application to Loco's startup, routing and migration hooks.
-//! Product rules belong in future feature services, not in these framework hooks.
+//! Product rules belong in feature services, not in these framework hooks.
 
 // Adapted from Loco v1.1.0 base_template (Apache-2.0); see NOTICE.
 use crate::controllers;
@@ -33,12 +33,29 @@ impl Hooks for App {
     ) -> Result<BootResult> {
         create_app::<Self, Migrator>(mode, environment, config).await
     }
-    // No custom integrations need initialization in the foundation.
+    // CLI startup uses load_config directly; auth must also exist outside the test boot hook.
+    async fn load_config(environment: &Environment) -> Result<Config> {
+        let mut config = environment.load()?;
+        crate::config::configure_auth(environment, &mut config)?;
+        Ok(config)
+    }
+    async fn after_context(ctx: AppContext) -> Result<AppContext> {
+        ctx.shared_store.insert(crate::config::Setup::new(&ctx)?);
+        Ok(ctx)
+    }
+    async fn after_routes(router: axum::Router, _ctx: &AppContext) -> Result<axum::Router> {
+        Ok(router.layer(axum::middleware::from_fn(
+            crate::middleware::request_context,
+        )))
+    }
+    // Device workers are a separate future protocol.
     async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn Initializer>>> {
         Ok(vec![])
     }
     fn routes(_ctx: &AppContext) -> AppRoutes {
-        AppRoutes::with_default_routes().add_route(controllers::health::routes())
+        AppRoutes::with_default_routes()
+            .add_route(controllers::health::routes())
+            .add_route(controllers::setup::routes())
         // routes-inject (do not remove)
     }
     // No Rust background jobs are registered yet. This hook will not launch the
@@ -46,11 +63,12 @@ impl Hooks for App {
     async fn connect_workers(_ctx: &AppContext, _queue: &Queue) -> Result<()> {
         Ok(())
     }
-    fn register_tasks(_tasks: &mut Tasks) {
+    fn register_tasks(tasks: &mut Tasks) {
+        tasks.register(crate::tasks::operator::Operator);
+        tasks.register(crate::tasks::cleanup::Cleanup);
         // tasks-inject (do not remove)
     }
-    // Required framework hooks remain no-ops: there are no product tables or seed
-    // records yet. Do not add destructive resets to normal application startup.
+    // Explicit provisioning owns account creation. Startup never resets or seeds customer data.
     async fn truncate(_ctx: &AppContext) -> Result<()> {
         Ok(())
     }

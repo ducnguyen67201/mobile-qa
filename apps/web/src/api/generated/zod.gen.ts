@@ -5,7 +5,66 @@ import * as z from 'zod';
 export const zApiError = z.object({
     code: z.string(),
     details: z.unknown().optional(),
-    message: z.string()
+    message: z.string(),
+    request_id: z.uuid()
+});
+
+export const zApkMetadata = z.object({
+    min_sdk: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    native_abis: z.array(z.string()),
+    package_name: z.string(),
+    signature_verified: z.boolean(),
+    target_sdk: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish(),
+    version_code: z.string(),
+    version_name: z.string().nullish()
+});
+
+export const zAppSummary = z.object({
+    android_package: z.string(),
+    created_at: z.iso.datetime(),
+    environment_name: z.string(),
+    id: z.uuid(),
+    name: z.string(),
+    organization_id: z.uuid()
+});
+
+export const zAppListResponse = z.object({
+    items: z.array(zAppSummary),
+    next_cursor: z.string().nullish()
+});
+
+export const zCheckKind = z.enum([
+    'backend',
+    'account',
+    'reset'
+]);
+
+export const zCheckState = z.enum([
+    'not_checked',
+    'operator_reported_ok',
+    'operator_reported_blocked'
+]);
+
+export const zCreateAppRequest = z.object({
+    android_package: z.string(),
+    backend_origins: z.array(z.string()),
+    environment_name: z.string(),
+    login_origins: z.array(z.string()),
+    name: z.string(),
+    organization_id: z.uuid()
+});
+
+export const zCreateBuildUploadRequest = z.object({
+    expected_size: z.int().gte(1).lte(262144000),
+    original_filename: z.string()
+});
+
+export const zEnvironmentCheck = z.object({
+    checked_at: z.iso.datetime().nullish(),
+    checked_by: z.uuid().nullish(),
+    kind: zCheckKind,
+    note: z.string().nullish(),
+    state: zCheckState
 });
 
 export const zHealthStatus = z.enum(['ok']);
@@ -16,7 +75,314 @@ export const zHealthResponse = z.object({
     version: z.string()
 });
 
+export const zLoginRequest = z.object({
+    email: z.string(),
+    password: z.string()
+});
+
+export const zLogoutResponse = z.object({
+    signed_out: z.boolean()
+});
+
+export const zMembershipRole = z.enum(['operator', 'member']);
+
+export const zOrganizationMembership = z.object({
+    name: z.string(),
+    organization_id: z.uuid(),
+    role: zMembershipRole
+});
+
+export const zReadinessResponse = z.object({
+    account: zCheckState,
+    account_configured: z.boolean(),
+    backend: zCheckState,
+    cases: z.string(),
+    device_profile: z.string().nullish(),
+    execution_ready: z.boolean(),
+    install: z.string(),
+    reset: zCheckState,
+    reset_configured: z.boolean()
+});
+
+export const zSecretKind = z.enum(['account', 'reset']);
+
+export const zSecretReferenceSummary = z.object({
+    id: z.uuid(),
+    kind: zSecretKind,
+    label: z.string()
+});
+
+export const zEnvironmentResponse = z.object({
+    account_secret_reference_id: z.uuid().nullish(),
+    backend_origins: z.array(z.string()),
+    checks: z.array(zEnvironmentCheck),
+    id: z.uuid(),
+    login_origins: z.array(z.string()),
+    name: z.string(),
+    reset_secret_reference_id: z.uuid().nullish(),
+    revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    secret_references: z.array(zSecretReferenceSummary)
+});
+
+export const zAppResponse = z.object({
+    android_package: z.string(),
+    created_at: z.iso.datetime(),
+    environment: zEnvironmentResponse,
+    id: z.uuid(),
+    name: z.string(),
+    organization_id: z.uuid(),
+    readiness: zReadinessResponse
+});
+
+export const zSettingsResponse = z.object({
+    accepted_build_retention: z.string(),
+    max_active_uploads: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    max_apk_bytes: z.int().gte(1).lte(262144000),
+    memberships: z.array(zOrganizationMembership),
+    session_ttl_seconds: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    storage: z.string(),
+    upload_ttl_seconds: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+export const zUpdateEnvironmentRequest = z.object({
+    account_secret_reference_id: z.uuid().nullish(),
+    backend_origins: z.array(z.string()),
+    expected_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    login_origins: z.array(z.string()),
+    name: z.string(),
+    reset_secret_reference_id: z.uuid().nullish()
+});
+
+export const zUploadContentRequest = z.object({
+    file: z.instanceof(Blob)
+});
+
+export const zUploadState = z.enum([
+    'pending',
+    'receiving',
+    'uploaded',
+    'finalized',
+    'expired'
+]);
+
+export const zUploadResponse = z.object({
+    actual_size: z.int().gte(1).lte(262144000).nullish(),
+    app_id: z.uuid(),
+    build_id: z.uuid().nullish(),
+    expected_size: z.int().gte(1).lte(262144000),
+    expires_at: z.iso.datetime(),
+    id: z.uuid(),
+    original_filename: z.string(),
+    retry_after_seconds: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish(),
+    state: zUploadState
+});
+
+export const zUserIdentity = z.object({
+    display_name: z.string(),
+    email: z.string(),
+    id: z.uuid()
+});
+
+export const zSessionResponse = z.object({
+    csrf_token: z.string(),
+    expires_at: z.iso.datetime(),
+    memberships: z.array(zOrganizationMembership),
+    user: zUserIdentity
+});
+
+export const zValidationState = z.enum([
+    'validating',
+    'validated',
+    'invalid',
+    'unsupported',
+    'error'
+]);
+
+export const zBuildValidation = z.object({
+    completed_at: z.iso.datetime().nullish(),
+    intake_policy_version: z.string(),
+    message: z.string().nullish(),
+    reason_code: z.string().nullish(),
+    started_at: z.iso.datetime(),
+    state: zValidationState,
+    validator_version: z.string()
+});
+
+export const zBuildResponse = z.object({
+    app_id: z.uuid(),
+    byte_size: z.int().gte(1).lte(262144000),
+    can_retry_validation: z.boolean(),
+    created_at: z.iso.datetime(),
+    id: z.uuid(),
+    metadata: zApkMetadata.nullish(),
+    original_filename: z.string(),
+    readiness: zReadinessResponse,
+    sha256: z.string(),
+    upload_id: z.uuid(),
+    validation: zBuildValidation
+});
+
+export const zBuildListResponse = z.object({
+    items: z.array(zBuildResponse),
+    next_cursor: z.string().nullish()
+});
+
+export const zListAppsQuery = z.object({
+    cursor: z.string().optional(),
+    limit: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).optional(),
+    organization_id: z.uuid().optional()
+});
+
 /**
- * Application is alive
+ * Success
+ */
+export const zListAppsResponse = zAppListResponse;
+
+export const zCreateAppBody = zCreateAppRequest;
+
+export const zCreateAppHeaders = z.object({
+    'X-CSRF-Token': z.string()
+});
+
+/**
+ * Success
+ */
+export const zCreateAppResponse = zAppResponse;
+
+export const zGetAppPath = z.object({
+    app_id: z.uuid()
+});
+
+/**
+ * Success
+ */
+export const zGetAppResponse = zAppResponse;
+
+export const zCreateBuildUploadBody = zCreateBuildUploadRequest;
+
+export const zCreateBuildUploadHeaders = z.object({
+    'X-CSRF-Token': z.string()
+});
+
+export const zCreateBuildUploadPath = z.object({
+    app_id: z.uuid()
+});
+
+/**
+ * Success
+ */
+export const zCreateBuildUploadResponse = zUploadResponse;
+
+export const zGetBuildUploadPath = z.object({
+    app_id: z.uuid(),
+    upload_id: z.uuid()
+});
+
+/**
+ * Success
+ */
+export const zGetBuildUploadResponse = zUploadResponse;
+
+export const zCompleteBuildUploadHeaders = z.object({
+    'X-CSRF-Token': z.string()
+});
+
+export const zCompleteBuildUploadPath = z.object({
+    app_id: z.uuid(),
+    upload_id: z.uuid()
+});
+
+/**
+ * Success
+ */
+export const zCompleteBuildUploadResponse = zBuildResponse;
+
+export const zUploadBuildContentBody = zUploadContentRequest;
+
+export const zUploadBuildContentHeaders = z.object({
+    'X-CSRF-Token': z.string()
+});
+
+export const zUploadBuildContentPath = z.object({
+    app_id: z.uuid(),
+    upload_id: z.uuid()
+});
+
+/**
+ * Success
+ */
+export const zUploadBuildContentResponse = zUploadResponse;
+
+export const zListBuildsPath = z.object({
+    app_id: z.uuid()
+});
+
+export const zListBuildsQuery = z.object({
+    cursor: z.string().optional(),
+    limit: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).optional()
+});
+
+/**
+ * Success
+ */
+export const zListBuildsResponse = zBuildListResponse;
+
+export const zGetBuildPath = z.object({
+    app_id: z.uuid(),
+    build_id: z.uuid()
+});
+
+/**
+ * Success
+ */
+export const zGetBuildResponse = zBuildResponse;
+
+export const zUpdateEnvironmentBody = zUpdateEnvironmentRequest;
+
+export const zUpdateEnvironmentHeaders = z.object({
+    'X-CSRF-Token': z.string()
+});
+
+export const zUpdateEnvironmentPath = z.object({
+    app_id: z.uuid()
+});
+
+/**
+ * Success
+ */
+export const zUpdateEnvironmentResponse = zEnvironmentResponse;
+
+export const zLoginBody = zLoginRequest;
+
+export const zLoginHeaders = z.object({
+    'X-Mobile-QA-Request': z.string()
+});
+
+/**
+ * Success
+ */
+export const zLoginResponse = zSessionResponse;
+
+export const zLogoutHeaders = z.object({
+    'X-CSRF-Token': z.string()
+});
+
+/**
+ * Success
+ */
+export const zLogoutResponse2 = zLogoutResponse;
+
+/**
+ * Success
+ */
+export const zGetSessionResponse = zSessionResponse;
+
+/**
+ * Success
  */
 export const zGetHealthResponse = zHealthResponse;
+
+/**
+ * Success
+ */
+export const zGetSettingsResponse = zSettingsResponse;

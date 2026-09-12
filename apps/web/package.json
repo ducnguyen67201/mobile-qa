@@ -13,19 +13,19 @@
     "generate:sdk": "openapi-ts"
   },
   "dependencies": {
+    "@mantine/core": "9.6.1",
+    "@mantine/form": "9.6.1",
+    "@mantine/hooks": "9.6.1",
     "@tanstack/react-query": "^5",
-    "class-variance-authority": "^0.7",
-    "clsx": "^2",
+    "lucide-react": "^1.44.0",
     "react": "^19",
     "react-dom": "^19",
     "react-router": "^8.3.0",
-    "tailwind-merge": "^3",
     "zod": "4.6.2"
   },
   "devDependencies": {
     "@eslint/js": "^9",
     "@hey-api/openapi-ts": "0.99.0",
-    "@tailwindcss/vite": "^4",
     "@testing-library/jest-dom": "^6",
     "@testing-library/react": "^16",
     "@testing-library/user-event": "^14",
@@ -36,7 +36,6 @@
     "eslint": "^9",
     "globals": "^16",
     "jsdom": "^27",
-    "tailwindcss": "^4",
     "typescript": "^5",
     "typescript-eslint": "^8",
     "vite": "^8.2.1",

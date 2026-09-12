@@ -7,3 +7,13 @@ const staleResponse: HealthResponse = { status: 'ok' }
 const unexpectedBody: GetHealthData['body'] = { anything: true }
 void staleResponse
 void unexpectedBody
+
+// Build metadata and binary inputs must remain generated from Rust transport source.
+import type { BuildResponse, UploadBuildContentData, CompleteBuildUploadResponses } from '../api/generated/types.gen'
+import { build } from './fixtures'
+export const persistedBuild: BuildResponse = build
+export const binaryUpload: UploadBuildContentData['body'] = { file: new Blob(['synthetic']) }
+export const completeStatuses: (keyof CompleteBuildUploadResponses)[] = [200, 202]
+// @ts-expect-error A completed build cannot be fabricated from a success boolean.
+const staleBuild: BuildResponse = { success: true }
+void staleBuild

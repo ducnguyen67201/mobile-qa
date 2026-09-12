@@ -15,7 +15,7 @@ pipeline; Schemars → Pydantic is the worker pipeline. `just types` writes gene
 outputs only when contents change. Never handwrite equivalent consumer shapes.
 Keep actual API method/path/input/output/error agreement covered by real route tests.
 Use generated Zod at success/error boundaries; do not trust SDK static types alone.
-Preserve Loco scaffold markers. No domain framework/device/model/auth in this phase.
+Preserve Loco scaffold markers. Spec 03 adds authentication/app/build setup; no device/model execution or domain framework.
 No global configuration changes. Keep secrets/artifacts out of Git. Do not touch
 parent sources/. Coordinate shared files before parallel edits. Respect the existing
 browser admin-policy denial; no alternate-access workaround for manual UI inspection.

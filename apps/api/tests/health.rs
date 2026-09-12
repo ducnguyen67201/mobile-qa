@@ -11,7 +11,7 @@ use sea_orm::{ConnectionTrait, DbBackend, Statement};
 async fn registered_handler_agrees_with_openapi_and_database() {
     let spec = serde_json::to_value(browser::openapi()).unwrap();
     let paths = spec["paths"].as_object().unwrap();
-    assert_eq!(paths.len(), 1);
+    assert_eq!(paths.len(), 14);
     let operation = &paths[HEALTH_PATH]["get"];
     assert_eq!(operation["operationId"], "getHealth");
     assert!(operation.get("requestBody").is_none());
@@ -36,9 +36,8 @@ async fn registered_handler_agrees_with_openapi_and_database() {
         });
         let wrong_method = request.post(HEALTH_PATH).await;
         assert_eq!(wrong_method.status_code(), 405);
-        assert_eq!(wrong_method.json::<ApiError>(), ApiError {
-            code: "method_not_allowed".into(), message: "HTTP method not allowed".into(), details: None,
-        });
+        assert_eq!(wrong_method.json::<ApiError>().code, "method_not_allowed");
+        assert_eq!(wrong_method.json::<ApiError>().request_id.to_string(), wrong_method.header("x-request-id"));
         let unknown = request.get("/api/missing").await;
         unknown.assert_status_not_found();
         assert_eq!(unknown.json::<ApiError>().code, "not_found");

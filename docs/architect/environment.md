@@ -75,3 +75,27 @@ introduce secret downloads, mounted env files, or tokens in build artifacts.
 References: [Doppler CLI](https://docs.doppler.com/docs/cli),
 [Doppler configuration](https://docs.doppler.com/docs/environment-based-configuration),
 [Vite envDir](https://vite.dev/config/shared-options#envdir).
+
+## Spec 03 process settings
+
+Production additionally requires `JWT_SECRET` (base64 of at least 64 random bytes),
+`ARTIFACT_S3_ENDPOINT` (HTTPS), `ARTIFACT_S3_REGION`, `ARTIFACT_S3_BUCKET`,
+`ARTIFACT_S3_ACCESS_KEY_ID` and `ARTIFACT_S3_SECRET_ACCESS_KEY`. Supply these through
+Doppler only to the API. They have not been provisioned by this change. Production
+uses private Railway Buckets with the logical backend `pilot`; an AWS S3 migration
+copies immutable object keys/bytes and verifies stored SHA-256 before switching that
+backend's endpoint/credentials. PostgreSQL stores metadata; APK bytes stay in storage.
+
+Development/test always use private local disk and ephemeral JWT keys, even if the
+parent has production credentials. Restart requires a new login and retains app/build
+records. Dev artifacts live in ignored `.private/artifacts`; production scratch uses
+`ARTIFACT_SCRATCH_DIR` or a process-host temporary directory. Scratch is disposable.
+`MOBILE_QA_ANDROID_SDK` may select an explicitly installed read-only SDK; the default
+is ignored `.private/android-sdk`. `JAVA_HOME` must select JDK 17. Validators receive
+only this Java location plus a fixed PATH/locale, never the API secret environment.
+
+Operator tasks consume `MOBILE_QA_OPERATOR_PASSWORD` or `MOBILE_QA_SECRET_LOCATOR`
+only when needed. Passwords and locator values must not appear in task arguments.
+Local synthetic smoke passes generated credentials directly in its subprocess
+environment. `MOBILE_QA_TEST_SCOPE` is a test-only UUID that lets the owned HTTP
+smoke process restart against the same private scratch/artifact directory.

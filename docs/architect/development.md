@@ -80,3 +80,54 @@ verification previously denied access: do not use alternate browser/Playwright/H
 workarounds to evade it. Rendered keyboard/Retry/HMR acceptance remains explicitly
 unverified until approved browser access is available. Endpoint smoke is a separate
 existing automated check, not a claim of rendered browser acceptance.
+
+## App setup development and operator commands
+
+Install a JDK 17 and set `JAVA_HOME` in the invoking shell. Explicitly run
+`just setup-android` to install pinned Build Tools 36.0.0 and platform android-35
+under ignored `.private/android-sdk`, then `just apk-fixtures` after authoring and
+before the final API test pass. Installation uses Google's versioned SDK archives;
+it changes no global SDK configuration. API startup and tests never download tools.
+The synthetic resource-only APK and ephemeral signing key prove intake, not execution.
+
+After finishing source/test/config edits: `just types`, `cargo fmt --all`,
+`just apk-fixtures`, `just check-contracts`, `just check-web`, `just check-api`,
+`just build`, `just smoke`, `just smoke-app-setup`. Rerun only failed/invalidated
+checks. The second smoke owns isolated test accounts/API processes, verifies real
+HTTP upload and validation, restarts the API, and checks persisted data and tenant
+isolation. It does not inspect a rendered browser or reset a database.
+
+Run explicit Loco tasks from `apps/api` with process injection appropriate to the
+environment, for example `doppler run --no-fallback --forward-signals --
+../../target/debug/mobile-qa-cli task operator action:provision email:<email>
+name:<name> organization:<name> --environment development`. Inject
+`MOBILE_QA_OPERATOR_PASSWORD`; never place it in the arguments. The task prints only
+new user/org IDs. Other operator actions require `actor:<user-id>` and
+`organization:<org-id>` of an active operator:
+
+- `reset-password user:<id>`: updates the hash and revokes existing sessions.
+- `membership user:<id> role:member|operator active:true|false`: manage org access.
+- `grant` / `revoke-grant user:<id> app:<id>`: manage explicit member app access.
+- `reference app:<id> kind:account|reset label:<label>`: records an injected
+  `MOBILE_QA_SECRET_LOCATOR` beginning `doppler://`, prints only reference ID.
+- `observe app:<id> revision:<n> kind:backend|account|reset
+  state:operator_reported_ok|operator_reported_blocked [note:<safe-note>]`: records
+  an operator observation at the current environment revision. Never include
+  credentials in notes. Editing the environment invalidates old observations.
+
+`task artifact-cleanup` is dry-run by default. `apply:true` deletes expired upload
+attempts and stale scratch after a safety hour, keeping every referenced build object
+and active lease. It also expires old session/rate-limit rows. Run it as an explicitly
+scheduled operator action; no background scheduler or accepted-build retention is
+configured. Hosted cleanup/round-trip and rendered acceptance remain separate gates.
+
+### Browser state ownership
+
+Use Mantine `useDisclosure` for controlled drawers and `useForm` for field values,
+normalization and submission. Generated SDK/Zod boundaries remain authoritative for
+wire validation. TanStack Query owns saved apps/builds/session data and mutation
+status; router search parameters own selected build/upload IDs. `useApkUpload` owns
+transient file selection, request phases, cancellation and saved-upload reconciliation.
+Keep this workflow outside presentation components. Use plain React state for small
+independent values; add memoization/context only when there is a concrete sharing or
+identity requirement. Do not recreate the removed SidebarContext state container.

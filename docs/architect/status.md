@@ -150,3 +150,7 @@ navigation is 256px. Mantine disclosure state is separate from the mobile drawer
 Browser verification covers collapse, workspace menu selection and expansion while
 preserving the selected URL. All 65 web tests, TypeScript, ESLint, production build
 and frontend audit pass. The existing nonblocking bundle warning remains.
+
+Settings and the account identity/sign-out menu now sit at the bottom of the
+sidebar, including its minimized layout. The account menu was verified in the
+browser; 65 web tests, TypeScript, ESLint, build and frontend audit pass.

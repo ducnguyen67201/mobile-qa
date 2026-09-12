@@ -125,3 +125,6 @@ Workspace selection lives in the sidebar. Desktop navigation can minimize to an
 icon rail with labelled tooltips and a workspace menu; expanding restores the full
 picker and labels. Mobile retains the full navigation in its dismissible drawer.
 Sidebar size is local UI state and does not change the selected workspace URL.
+Account identity and sign-out live at the bottom of the sidebar, below Settings.
+The minimized rail retains a Settings icon and avatar menu; the mobile drawer uses
+the same account controls. Sign-out state and failure handling remain in the app shell.

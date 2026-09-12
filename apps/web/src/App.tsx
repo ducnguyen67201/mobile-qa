@@ -1,23 +1,18 @@
 import { useEffect } from 'react'
 import {
   AppShell,
-  Avatar,
   Badge,
   Box,
   Burger,
-  Button,
   Container,
   Drawer,
   Group,
-  Menu,
   Text,
   useMantineTheme,
 } from '@mantine/core'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, LogOut } from 'lucide-react'
-import { useSession } from '@/components/app/session'
 import { ErrorNotice } from '@/components/app/feedback'
 import { Navigation, navigationLinks } from '@/components/app/navigation'
 import { signOut } from '@/api/setup'
@@ -31,7 +26,6 @@ export function App() {
   useEffect(() => {
     if (desktop) closeNavigation()
   }, [desktop, closeNavigation])
-  const session = useSession()
   const client = useQueryClient()
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -59,7 +53,13 @@ export function App() {
         className="workspace-nav"
         style={{ overflowY: 'auto' }}
       >
-        <Navigation close={closeNavigation} minimized={minimized} toggle={toggleSidebar} />
+        <Navigation
+          close={closeNavigation}
+          minimized={minimized}
+          toggle={toggleSidebar}
+          signOut={() => logout.mutate()}
+          signingOut={logout.isPending}
+        />
       </AppShell.Navbar>
       <Drawer
         opened={mobileOpen && !desktop}
@@ -68,9 +68,14 @@ export function App() {
         size={300}
         title="Workspace"
         hiddenFrom="sm"
+        styles={{ body: { display: 'flex', minHeight: 'calc(100dvh - 80px)' } }}
         classNames={{ content: 'workspace-nav', header: 'workspace-nav' }}
       >
-        <Navigation close={closeNavigation} />
+        <Navigation
+          close={closeNavigation}
+          signOut={() => logout.mutate()}
+          signingOut={logout.isPending}
+        />
       </Drawer>
       <AppShell.Header px={{ base: 'md', sm: 'xl' }} bg="var(--mantine-color-body)">
         <Group justify="space-between" h="100%" wrap="nowrap">
@@ -88,40 +93,6 @@ export function App() {
                 : (navigationLinks.find((link) => pathname.startsWith(link.to))?.label ?? 'Apps')}
             </Text>
           </Group>
-          <Menu position="bottom-end" width={260}>
-            <Menu.Target>
-              <Button
-                variant="subtle"
-                color="forest"
-                aria-label={`Open account menu for ${session.user.display_name}`}
-                leftSection={
-                  <Avatar size={28} radius="xl">
-                    {session.user.display_name.slice(0, 1).toUpperCase()}
-                  </Avatar>
-                }
-                rightSection={<ChevronDown size={14} />}
-              >
-                <Text size="xs" truncate maw={160} visibleFrom="sm">
-                  {session.user.display_name}
-                </Text>
-              </Button>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Label>
-                <Text size="xs" className="identifier">
-                  {session.user.email}
-                </Text>
-              </Menu.Label>
-              <Menu.Divider />
-              <Menu.Item
-                leftSection={<LogOut size={16} />}
-                onClick={() => logout.mutate()}
-                disabled={logout.isPending}
-              >
-                {logout.isPending ? 'Signing out…' : 'Sign out'}
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
         </Group>
       </AppShell.Header>
       <AppShell.Main id="main" tabIndex={-1}>

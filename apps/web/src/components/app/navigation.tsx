@@ -4,7 +4,7 @@ import {
   Box,
   Group,
   NavLink,
-  Paper,
+  Divider,
   Stack,
   Text,
   ThemeIcon,
@@ -13,38 +13,42 @@ import {
 import { Link, useLocation } from 'react-router'
 import {
   AppWindow,
-  ArrowUpRight,
   FlaskConical,
   Layers3,
   PanelLeftClose,
   PanelLeftOpen,
   Play,
   Settings2,
-  ShieldCheck,
 } from 'lucide-react'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { WorkspaceSwitcher } from './workspace'
+import { AccountMenu } from './account-menu'
+
+const settingsLink = { to: '/settings', label: 'Settings', icon: Settings2 }
 
 export const navigationLinks = [
   { to: '/apps', label: 'Apps', icon: AppWindow },
   { to: '/tests', label: 'Tests', icon: FlaskConical },
   { to: '/runs', label: 'Runs', icon: Play },
-  { to: '/settings', label: 'Settings', icon: Settings2 },
+  settingsLink,
 ]
 
 export function Navigation({
   close,
   minimized = false,
   toggle,
+  signOut,
+  signingOut,
 }: {
   close: () => void
   minimized?: boolean
   toggle?: () => void
+  signOut: () => void
+  signingOut: boolean
 }) {
-  const { pathname } = useLocation()
   const { href } = useWorkspace()
   return (
-    <Stack h="100%" justify="space-between" gap="xl">
+    <Stack h="100%" flex={1} justify="space-between" gap="xl">
       <Stack gap="xl">
         <Anchor
           component={Link}
@@ -85,77 +89,18 @@ export function Navigation({
             </Text>
           )}
           <Stack gap="xs" align={minimized ? 'center' : undefined}>
-            {navigationLinks.map(({ to, label, icon: Icon }) => {
-              const active = pathname.startsWith(to)
-              return minimized ? (
-                <Tooltip key={to} label={label} position="right" withArrow>
-                  <ActionIcon
-                    component={Link}
-                    to={href(to)}
-                    aria-label={label}
-                    aria-current={active ? 'page' : undefined}
-                    data-active={active || undefined}
-                    className="nav-icon"
-                    variant="subtle"
-                    size={44}
-                    onClick={close}
-                  >
-                    <Icon size={20} />
-                  </ActionIcon>
-                </Tooltip>
-              ) : (
-                <NavLink
-                  key={to}
-                  component={Link}
-                  to={href(to)}
-                  label={label}
-                  active={active}
-                  aria-current={active ? 'page' : undefined}
-                  leftSection={<Icon size={18} />}
-                  onClick={close}
-                  py="sm"
-                  rightSection={
-                    (label === 'Tests' || label === 'Runs') && (
-                      <Text size="xs" opacity={0.65}>
-                        Soon
-                      </Text>
-                    )
-                  }
-                />
-              )
-            })}
+            {navigationLinks
+              .filter((link) => link.to !== '/settings')
+              .map((link) => (
+                <NavigationItem key={link.to} link={link} minimized={minimized} close={close} />
+              ))}
           </Stack>
         </Box>
       </Stack>
       <Stack gap="md">
-        {!minimized && (
-          <>
-            <Paper withBorder p="md" radius="lg" className="nav-note">
-              <ShieldCheck size={22} color="var(--workspace-accent)" />
-              <Text size="sm" fw={500} mt="sm">
-                A reliable first step.
-              </Text>
-              <Text size="xs" c="var(--workspace-nav-muted)" mt="xs">
-                Connect your app. Validate a build. Start with evidence.
-              </Text>
-              <Anchor
-                component={Link}
-                to={href('/settings')}
-                c="var(--workspace-accent)"
-                size="xs"
-                mt="md"
-                onClick={close}
-              >
-                <Group gap={6}>
-                  Workspace details <ArrowUpRight size={12} />
-                </Group>
-              </Anchor>
-            </Paper>
-            <Text size="xs" c="var(--workspace-nav-muted)">
-              ANDROID QUALITY WORKSPACE
-            </Text>
-          </>
-        )}
+        <Box component="nav" aria-label="Account navigation">
+          <NavigationItem link={settingsLink} minimized={minimized} close={close} />
+        </Box>
         {toggle && (
           <Tooltip
             label={minimized ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -175,7 +120,62 @@ export function Navigation({
             </ActionIcon>
           </Tooltip>
         )}
+        <Divider color="#ffffff20" />
+        <AccountMenu minimized={minimized} signOut={signOut} signingOut={signingOut} />
       </Stack>
     </Stack>
+  )
+}
+
+function NavigationItem({
+  link: { to, label, icon: Icon },
+  minimized,
+  close,
+}: {
+  link: (typeof navigationLinks)[number]
+  minimized: boolean
+  close: () => void
+}) {
+  const { pathname } = useLocation()
+  const { href } = useWorkspace()
+  const active = pathname.startsWith(to)
+  if (minimized)
+    return (
+      <Tooltip label={label} position="right" withArrow>
+        <ActionIcon
+          component={Link}
+          to={href(to)}
+          aria-label={label}
+          aria-current={active ? 'page' : undefined}
+          data-active={active || undefined}
+          className="nav-icon"
+          variant="subtle"
+          size={44}
+          onClick={close}
+          mx="auto"
+          display="flex"
+        >
+          <Icon size={20} />
+        </ActionIcon>
+      </Tooltip>
+    )
+  return (
+    <NavLink
+      component={Link}
+      to={href(to)}
+      label={label}
+      active={active}
+      aria-current={active ? 'page' : undefined}
+      leftSection={<Icon size={18} />}
+      onClick={close}
+      py="sm"
+      rightSection={
+        (label === 'Tests' || label === 'Runs') && (
+          <Text size="xs" opacity={0.65}>
+            Soon
+          </Text>
+        )
+      }
+    />
   )
 }

@@ -125,3 +125,10 @@ h3 {
   background: var(--workspace-nav);
   color: var(--workspace-nav-text);
 }
+.workspace-nav .nav-account {
+  color: var(--workspace-nav-text);
+  border-radius: var(--mantine-radius-md);
+}
+.workspace-nav .nav-account:hover {
+  background: #ffffff0d;
+}

@@ -2,12 +2,12 @@
 
 Source-only review of the authored frontend. No browser, runtime, build, tests, formatting or exports were run. Scores are provisional assessments of implementation intent, not observations of rendered quality. Generated bindings are deliberately awaiting the root's consolidated generation window. Rendered acceptance remains open.
 
-| Dimension | Score | Weight | Evidence |
-| --- | ---: | ---: | --- |
-| Design quality | 8.0 | .35 | Coherent forest/ivory theme, restrained accents, spacious empty state, clear main/aside composition and status/identity separation. Small secondary text needs refinement. |
-| Originality | 7.3 | .30 | Appropriate Android workbench identity and evidence-first language; no invented metrics. Primarily conventional cards and sidebar, with purposeful rather than decorative customization. |
-| Craft | 6.7 | .25 | Real Radix primitives, labeled inputs, skip link, focusable errors, reduced-motion treatment and mobile sheet. Missing useful navigation/account labels, stale status coordination and misleading durations reduce polish. |
-| Functionality | 6.0 | .10 | Broad generated SDK/Zod integration and upload reconciliation are present, but three concrete user-facing defects below block acceptance. |
+| Dimension      | Score | Weight | Evidence                                                                                                                                                                                                                   |
+| -------------- | ----: | -----: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Design quality |   8.0 |    .35 | Coherent forest/ivory theme, restrained accents, spacious empty state, clear main/aside composition and status/identity separation. Small secondary text needs refinement.                                                 |
+| Originality    |   7.3 |    .30 | Appropriate Android workbench identity and evidence-first language; no invented metrics. Primarily conventional cards and sidebar, with purposeful rather than decorative customization.                                   |
+| Craft          |   6.7 |    .25 | Real Radix primitives, labeled inputs, skip link, focusable errors, reduced-motion treatment and mobile sheet. Missing useful navigation/account labels, stale status coordination and misleading durations reduce polish. |
+| Functionality  |   6.0 |    .10 | Broad generated SDK/Zod integration and upload reconciliation are present, but three concrete user-facing defects below block acceptance.                                                                                  |
 
 **Weighted score: 7.27 / 10. Result: revise.** The numerical threshold cannot override functional blockers.
 

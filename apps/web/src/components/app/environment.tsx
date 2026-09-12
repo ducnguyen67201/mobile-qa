@@ -15,7 +15,11 @@ import {
 } from '@mantine/core'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Globe2, Pencil, ShieldCheck } from 'lucide-react'
-import type { AppResponse, EnvironmentResponse, UpdateEnvironmentRequest } from '@/api/generated/types.gen'
+import type {
+  AppResponse,
+  EnvironmentResponse,
+  UpdateEnvironmentRequest,
+} from '@/api/generated/types.gen'
 import { saveEnvironment } from '@/api/setup'
 import { ErrorNotice, formatDate } from './feedback'
 import { parseOrigins } from './app-form'
@@ -32,7 +36,12 @@ export function EnvironmentCard({ app }: { app: AppResponse }) {
               Environment
             </Title>
           </Group>
-          <Button size="xs" variant="subtle" onClick={openEditor} leftSection={<Pencil size={12} />}>
+          <Button
+            size="xs"
+            variant="subtle"
+            onClick={openEditor}
+            leftSection={<Pencil size={12} />}
+          >
             Edit
           </Button>
         </Group>
@@ -138,10 +147,16 @@ function EnvironmentForm({
           withAsterisk={false}
           data-autofocus
         />
-        <Textarea label="Backend origins" required withAsterisk={false} {...form.getInputProps('backend')} />
+        <Textarea
+          label="Backend origins"
+          required
+          withAsterisk={false}
+          {...form.getInputProps('backend')}
+        />
         <Textarea label="Login origins" {...form.getInputProps('login')} />
         <Text size="xs" c="dimmed">
-          At least one backend origin is required. One origin per line, without paths or credentials.
+          At least one backend origin is required. One origin per line, without paths or
+          credentials.
         </Text>
         {(
           [

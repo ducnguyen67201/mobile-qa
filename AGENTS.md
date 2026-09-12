@@ -1,4 +1,5 @@
 # Mobile QA foundation
+
 Read [docs/architect/README.md](docs/architect/README.md) before planning or implementation.
 It is the canonical documentation authority. Update the owning document in the same PR
 as a material change; use status.md to distinguish implemented behavior from planned work.

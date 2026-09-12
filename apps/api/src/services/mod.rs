@@ -7,3 +7,19 @@ pub mod uploads;
 pub mod google;
 
 pub mod workspaces;
+
+pub mod execution_store;
+
+pub mod test_definitions;
+
+pub mod runs;
+
+pub mod scheduler;
+
+pub mod worker_auth;
+
+pub mod run_artifacts;
+
+pub mod verification;
+
+pub mod execution_wakeup;

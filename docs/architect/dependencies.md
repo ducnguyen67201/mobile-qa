@@ -61,7 +61,6 @@ v8.13.0 tag; retain their license headers. Android archive metadata and vendor c
 are pinned in infra/device-host/toolchain.lock.json. Required vendor licenses still apply;
 no installer silently accepts SDK terms or modifies a user's existing SDK.
 
-
 The first live Minitap demo exposed private ToolNode API drift: Minitap 4.0.0
 omits both the config argument to state extraction and the tools list in ToolRuntime.
 `qualification/sdk_compat.py` supplies a typed ExecutorToolNode subclass only inside
@@ -131,3 +130,11 @@ only ephemeral synthetic signing material. No actual Google account/token is use
 by automated tests. References: [Google verification](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token),
 [Google setup](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid),
 [React wrapper](https://github.com/MomenSherif/react-oauth).
+
+## Execution evidence parser
+
+Phase 04 adds a direct `quick-xml = 0.41.0` API dependency using the version already
+present in Cargo.lock. The deterministic UI verifier bounds input, node count and
+depth and rejects document type declarations/custom entities. This is a parser for
+retained Android hierarchy evidence, not a general customer-supplied script engine.
+The worker retains pinned Minitap 4.0.0 and the existing compatibility guard.

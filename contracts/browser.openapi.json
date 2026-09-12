@@ -1900,6 +1900,482 @@
         ]
       }
     },
+    "/api/apps/{app_id}/execution-plan": {
+      "get": {
+        "tags": [],
+        "operationId": "getExecutionPlan",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "build_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
+    "/api/apps/{app_id}/runs": {
+      "get": {
+        "tags": [],
+        "operationId": "listRuns",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [],
+        "operationId": "createRun",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
     "/api/auth/google/challenge": {
       "post": {
         "tags": [],
@@ -2740,6 +3216,447 @@
         }
       }
     },
+    "/api/runs/{run_id}": {
+      "get": {
+        "tags": [],
+        "operationId": "getRun",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
+    "/api/runs/{run_id}/artifacts/{artifact_id}/content": {
+      "get": {
+        "tags": [],
+        "operationId": "getRunArtifact",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
+    "/api/runs/{run_id}/cancel": {
+      "post": {
+        "tags": [],
+        "operationId": "cancelRun",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
     "/api/settings": {
       "get": {
         "tags": [],
@@ -3089,6 +4006,14 @@
   },
   "components": {
     "schemas": {
+      "ActionKind": {
+        "type": "string",
+        "enum": [
+          "navigate",
+          "restart_app",
+          "checkpoint"
+        ]
+      },
       "ApiError": {
         "type": "object",
         "required": [
@@ -3253,12 +4178,159 @@
         },
         "additionalProperties": false
       },
+      "ApprovalPurpose": {
+        "type": "string",
+        "enum": [
+          "business",
+          "executability"
+        ]
+      },
       "ApprovalStatus": {
         "type": "string",
         "enum": [
           "pending",
           "approved"
         ]
+      },
+      "ArtifactReceipt": {
+        "type": "object",
+        "required": [
+          "artifact"
+        ],
+        "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/RunArtifact"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ArtifactRequest": {
+        "type": "object",
+        "required": [
+          "generation",
+          "checkpoint_id",
+          "name",
+          "mime",
+          "byte_size",
+          "sha256"
+        ],
+        "properties": {
+          "byte_size": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "checkpoint_id": {
+            "type": "string"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AttemptReceipt": {
+        "type": "object",
+        "required": [
+          "attempt"
+        ],
+        "properties": {
+          "attempt": {
+            "$ref": "#/components/schemas/AttemptResponse"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AttemptResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "case_version_id",
+          "generation",
+          "number",
+          "state",
+          "cleanup",
+          "checks",
+          "artifacts",
+          "usage",
+          "events"
+        ],
+        "properties": {
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunArtifact"
+            }
+          },
+          "case_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckResult"
+            }
+          },
+          "cleanup": {
+            "$ref": "#/components/schemas/CleanupState"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionEvent"
+            }
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "outcome": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Outcome"
+              }
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/JobState"
+          },
+          "usage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelUsage"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "BuildListResponse": {
         "type": "object",
@@ -3390,6 +4462,90 @@
         },
         "additionalProperties": false
       },
+      "CaseDefinition": {
+        "type": "object",
+        "required": [
+          "key",
+          "version",
+          "title",
+          "requirement",
+          "provenance",
+          "package",
+          "adapter",
+          "preconditions",
+          "actions",
+          "checks",
+          "budget"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestAction"
+            }
+          },
+          "adapter": {
+            "type": "string"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/ExecutionBudget"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpectedCheck"
+            }
+          },
+          "key": {
+            "type": "string"
+          },
+          "package": {
+            "type": "string"
+          },
+          "preconditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "provenance": {
+            "type": "string"
+          },
+          "requirement": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "CaseSelection": {
+        "type": "object",
+        "required": [
+          "case_version_id",
+          "data_variant",
+          "required"
+        ],
+        "properties": {
+          "case_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data_variant": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "CheckKind": {
         "type": "string",
         "enum": [
@@ -3398,6 +4554,52 @@
           "reset"
         ]
       },
+      "CheckMethod": {
+        "type": "string",
+        "enum": [
+          "ui_property_equals_v1",
+          "ui_element_presence_v1",
+          "manual"
+        ]
+      },
+      "CheckResult": {
+        "type": "object",
+        "required": [
+          "check_id",
+          "expected",
+          "outcome",
+          "reason",
+          "artifact_ids"
+        ],
+        "properties": {
+          "artifact_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "check_id": {
+            "type": "string"
+          },
+          "expected": {
+            "type": "string"
+          },
+          "observed": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "CheckState": {
         "type": "string",
         "enum": [
@@ -3405,6 +4607,119 @@
           "operator_reported_ok",
           "operator_reported_blocked"
         ]
+      },
+      "ClaimRequest": {
+        "type": "object",
+        "required": [
+          "version",
+          "claim_id",
+          "profile_id"
+        ],
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profile_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "ClaimResponse": {
+        "type": "object",
+        "required": [
+          "poll_after_seconds"
+        ],
+        "properties": {
+          "lease": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExecutionLease"
+              }
+            ]
+          },
+          "poll_after_seconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "CleanupRequest": {
+        "type": "object",
+        "required": [
+          "generation",
+          "stopped",
+          "reset",
+          "evidence_reference",
+          "boot_id"
+        ],
+        "properties": {
+          "boot_id": {
+            "type": "string"
+          },
+          "evidence_reference": {
+            "type": "string"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reset": {
+            "$ref": "#/components/schemas/CleanupState"
+          },
+          "stopped": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CleanupState": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "verified_clean",
+          "quarantined"
+        ]
+      },
+      "CompleteRequest": {
+        "type": "object",
+        "required": [
+          "generation",
+          "execution_outcome",
+          "reason",
+          "usage"
+        ],
+        "properties": {
+          "execution_outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "usage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelUsage"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "CreateAppRequest": {
         "type": "object",
@@ -3464,6 +4779,29 @@
         },
         "additionalProperties": false
       },
+      "CreateRunRequest": {
+        "type": "object",
+        "required": [
+          "build_id",
+          "plan_version_id",
+          "environment_revision"
+        ],
+        "properties": {
+          "build_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environment_revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "plan_version_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateWorkspaceRequest": {
         "type": "object",
         "required": [
@@ -3482,6 +4820,97 @@
           }
         },
         "additionalProperties": false
+      },
+      "DefinitionApproval": {
+        "type": "object",
+        "required": [
+          "purpose",
+          "actor_id",
+          "content_hash",
+          "approved_at"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approved_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "content_hash": {
+            "type": "string"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/ApprovalPurpose"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DefinitionImport": {
+        "type": "object",
+        "required": [
+          "app_id",
+          "definition"
+        ],
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/TestDefinition"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DefinitionKind": {
+        "type": "string",
+        "enum": [
+          "case",
+          "suite",
+          "plan"
+        ]
+      },
+      "DefinitionResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "app_id",
+          "content_hash",
+          "definition",
+          "approvals"
+        ],
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DefinitionApproval"
+            }
+          },
+          "content_hash": {
+            "type": "string"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/TestDefinition"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Driver": {
+        "type": "string",
+        "enum": [
+          "fake",
+          "minitap"
+        ]
       },
       "EnvironmentCheck": {
         "type": "object",
@@ -3583,6 +5012,263 @@
         },
         "additionalProperties": false
       },
+      "EventReceipt": {
+        "type": "object",
+        "required": [
+          "last_sequence"
+        ],
+        "properties": {
+          "last_sequence": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "EventRequest": {
+        "type": "object",
+        "required": [
+          "generation",
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionEvent"
+            }
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "EvidenceState": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "sealed",
+          "unavailable"
+        ]
+      },
+      "ExecutionBudget": {
+        "type": "object",
+        "required": [
+          "duration_seconds",
+          "max_steps",
+          "artifact_bytes"
+        ],
+        "properties": {
+          "artifact_bytes": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "max_steps": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExecutionEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "sequence",
+          "action_id",
+          "phase",
+          "message"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "message": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExecutionLease": {
+        "type": "object",
+        "required": [
+          "attempt_id",
+          "run_id",
+          "generation",
+          "lease_token",
+          "expires_at",
+          "manifest",
+          "case_index"
+        ],
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "case_index": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lease_token": {
+            "type": "string"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/RunManifest"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExecutionProfile": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "driver",
+          "package",
+          "adapter",
+          "device_identity",
+          "image",
+          "model",
+          "qualified",
+          "qualification_reference",
+          "max_apk_bytes"
+        ],
+        "properties": {
+          "adapter": {
+            "type": "string"
+          },
+          "device_identity": {
+            "type": "string"
+          },
+          "driver": {
+            "$ref": "#/components/schemas/Driver"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "image": {
+            "type": "string"
+          },
+          "max_apk_bytes": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "model": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "package": {
+            "type": "string"
+          },
+          "qualification_reference": {
+            "type": "string"
+          },
+          "qualified": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExpectedCheck": {
+        "type": "object",
+        "required": [
+          "id",
+          "checkpoint_id",
+          "description",
+          "method",
+          "resource_id",
+          "text_filter",
+          "property",
+          "expected",
+          "ready_resource_id",
+          "prerequisite_check_ids",
+          "required",
+          "observation_seconds"
+        ],
+        "properties": {
+          "checkpoint_id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "expected": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "method": {
+            "$ref": "#/components/schemas/CheckMethod"
+          },
+          "observation_seconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "prerequisite_check_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "property": {
+            "$ref": "#/components/schemas/UiProperty"
+          },
+          "ready_resource_id": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "resource_id": {
+            "type": "string"
+          },
+          "text_filter": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "GoogleLoginChallenge": {
         "type": "object",
         "required": [
@@ -3630,6 +5316,52 @@
           "ok"
         ]
       },
+      "JobState": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "leased",
+          "running",
+          "finalizing",
+          "finished",
+          "cancel_requested",
+          "recovery_required"
+        ]
+      },
+      "LeaseRequest": {
+        "type": "object",
+        "required": [
+          "generation"
+        ],
+        "properties": {
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LeaseStatusResponse": {
+        "type": "object",
+        "required": [
+          "state",
+          "expires_at",
+          "cancel_requested"
+        ],
+        "properties": {
+          "cancel_requested": {
+            "type": "boolean"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/JobState"
+          }
+        },
+        "additionalProperties": false
+      },
       "LoginRequest": {
         "type": "object",
         "required": [
@@ -3668,6 +5400,46 @@
           "member"
         ]
       },
+      "ModelUsage": {
+        "type": "object",
+        "required": [
+          "model",
+          "calls",
+          "unknown_calls"
+        ],
+        "properties": {
+          "calls": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "input_tokens": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "model": {
+            "type": "string"
+          },
+          "output_tokens": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "unknown_calls": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
       "OrganizationMembership": {
         "type": "object",
         "required": [
@@ -3685,6 +5457,111 @@
           },
           "role": {
             "$ref": "#/components/schemas/MembershipRole"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Outcome": {
+        "type": "string",
+        "enum": [
+          "passed",
+          "failed",
+          "blocked",
+          "inconclusive",
+          "skipped",
+          "canceled"
+        ]
+      },
+      "PlanDefinition": {
+        "type": "object",
+        "required": [
+          "key",
+          "version",
+          "title",
+          "suite_version_ids",
+          "cases",
+          "profile_id",
+          "budget",
+          "diagnostic_retries",
+          "exclusions"
+        ],
+        "properties": {
+          "budget": {
+            "$ref": "#/components/schemas/ExecutionBudget"
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseSelection"
+            }
+          },
+          "diagnostic_retries": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "exclusions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "key": {
+            "type": "string"
+          },
+          "profile_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "suite_version_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "title": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlanPreviewResponse": {
+        "type": "object",
+        "required": [
+          "blockers"
+        ],
+        "properties": {
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "manifest": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RunManifest"
+              }
+            ]
+          },
+          "plan": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DefinitionResponse"
+              }
+            ]
           }
         },
         "additionalProperties": false
@@ -3731,6 +5608,213 @@
           },
           "reset_configured": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResolvedCase": {
+        "type": "object",
+        "required": [
+          "definition_id",
+          "content_hash",
+          "data_variant",
+          "required",
+          "case"
+        ],
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/CaseDefinition"
+          },
+          "content_hash": {
+            "type": "string"
+          },
+          "data_variant": {
+            "type": "string"
+          },
+          "definition_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RunArtifact": {
+        "type": "object",
+        "required": [
+          "id",
+          "attempt_id",
+          "checkpoint_id",
+          "name",
+          "mime",
+          "byte_size",
+          "sha256",
+          "state"
+        ],
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "byte_size": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "checkpoint_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/EvidenceState"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RunListResponse": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunResponse"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "RunManifest": {
+        "type": "object",
+        "required": [
+          "app_id",
+          "build_id",
+          "build_sha256",
+          "build_bytes",
+          "plan_version_id",
+          "plan_hash",
+          "environment_revision",
+          "profile",
+          "cases",
+          "budget",
+          "diagnostic_retries",
+          "exclusions"
+        ],
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/ExecutionBudget"
+          },
+          "build_bytes": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "build_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "build_sha256": {
+            "type": "string"
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolvedCase"
+            }
+          },
+          "diagnostic_retries": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "environment_revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "exclusions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "plan_hash": {
+            "type": "string"
+          },
+          "plan_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ExecutionProfile"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RunResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "manifest",
+          "state",
+          "summary",
+          "created_at",
+          "attempts"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttemptResponse"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/RunManifest"
+          },
+          "state": {
+            "$ref": "#/components/schemas/JobState"
+          },
+          "summary": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -3838,6 +5922,126 @@
           }
         },
         "additionalProperties": false
+      },
+      "SuiteDefinition": {
+        "type": "object",
+        "required": [
+          "key",
+          "version",
+          "title",
+          "cases"
+        ],
+        "properties": {
+          "cases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseSelection"
+            }
+          },
+          "key": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "TestAction": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "instruction",
+          "checkpoint_id"
+        ],
+        "properties": {
+          "checkpoint_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "instruction": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ActionKind"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TestDefinition": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "content",
+              "kind"
+            ],
+            "properties": {
+              "content": {
+                "$ref": "#/components/schemas/CaseDefinition"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "case"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "content",
+              "kind"
+            ],
+            "properties": {
+              "content": {
+                "$ref": "#/components/schemas/SuiteDefinition"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "suite"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "content",
+              "kind"
+            ],
+            "properties": {
+              "content": {
+                "$ref": "#/components/schemas/PlanDefinition"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "plan"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "UiProperty": {
+        "type": "string",
+        "enum": [
+          "text",
+          "content_description",
+          "checked",
+          "enabled"
+        ]
       },
       "UpdateEnvironmentRequest": {
         "type": "object",

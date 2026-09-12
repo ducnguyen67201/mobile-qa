@@ -27,6 +27,8 @@ def java_environment() -> dict[str, str]:
             )
             if homebrew.is_dir():
                 env["JAVA_HOME"] = str(homebrew.resolve())
+    # Select one SDK even when a host exports the deprecated location alias.
+    env.pop("ANDROID_SDK_ROOT", None)
     env["ANDROID_HOME"] = str(SDK)
     return env
 

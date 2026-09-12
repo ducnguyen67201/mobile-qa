@@ -21,10 +21,17 @@ function show(path: string) {
 function fixtureFetch(currentBuild: BuildResponse = build, currentUpload: UploadResponse = upload) {
   return vi.fn(async (request: Request) => {
     const url = new URL(request.url)
+    if (url.pathname.endsWith('/execution-plan'))
+      return Response.json({
+        plan: null,
+        manifest: null,
+        blockers: ['An operator must import and approve a release check'],
+      })
     if (url.pathname.endsWith('/session')) return Response.json(session)
     if (url.pathname.endsWith('/settings')) return Response.json(settings)
     if (url.pathname.endsWith(`/apps/${appId}`)) return Response.json(app)
-    if (url.pathname.endsWith('/builds')) return Response.json({ items: [currentBuild], next_cursor: null })
+    if (url.pathname.endsWith('/builds'))
+      return Response.json({ items: [currentBuild], next_cursor: null })
     if (url.pathname.endsWith(`/builds/${buildId}`) || url.pathname.endsWith('/complete'))
       return Response.json(currentBuild)
     if (url.pathname.includes('/build-uploads/')) return Response.json(currentUpload)
@@ -77,7 +84,9 @@ it('recovers a sealed upload after reload without retransmitting bytes', async (
   expect(
     requests
       .slice(0, completeAt)
-      .some((request) => request.url.endsWith(`/build-uploads/${uploadId}`) && request.method === 'GET'),
+      .some(
+        (request) => request.url.endsWith(`/build-uploads/${uploadId}`) && request.method === 'GET',
+      ),
   ).toBe(true)
   expect(requests.some((request) => request.method === 'PUT')).toBe(false)
   expect(
@@ -107,18 +116,24 @@ it('reconciles a lost completion response before retrying the same upload', asyn
   expect(await screen.findByText('Upload needs attention')).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Validate stored APK' }))
   await waitFor(() =>
-    expect(fetchMock.mock.calls.filter(([request]) => request.url.endsWith('/complete'))).toHaveLength(2),
+    expect(
+      fetchMock.mock.calls.filter(([request]) => request.url.endsWith('/complete')),
+    ).toHaveLength(2),
   )
   const mutations = fetchMock.mock.calls
     .map(([request]) => request)
     .filter((request) => request.method !== 'GET')
-  expect(mutations.every((request) => request.url.endsWith(`/build-uploads/${uploadId}/complete`))).toBe(true)
+  expect(
+    mutations.every((request) => request.url.endsWith(`/build-uploads/${uploadId}/complete`)),
+  ).toBe(true)
   const requests = fetchMock.mock.calls.map(([request]) => request)
   const firstComplete = requests.findIndex((request) => request.url.endsWith('/complete'))
   expect(
     requests
       .slice(firstComplete + 1, -1)
-      .some((request) => request.method === 'GET' && request.url.endsWith(`/build-uploads/${uploadId}`)),
+      .some(
+        (request) => request.method === 'GET' && request.url.endsWith(`/build-uploads/${uploadId}`),
+      ),
   ).toBe(true)
 })
 it('updates history when selected detail changes from validating to terminal while polling', async () => {
@@ -141,7 +156,10 @@ it('updates history when selected detail changes from validating to terminal whi
       if (path.endsWith('/builds'))
         return Response.json({
           items: [
-            { ...build, validation: { ...build.validation, state: terminal ? 'validated' : 'validating' } },
+            {
+              ...build,
+              validation: { ...build.validation, state: terminal ? 'validated' : 'validating' },
+            },
           ],
           next_cursor: null,
         })

@@ -1,6 +1,5 @@
 /** Generated SDK calls are the only transport; every response is checked at runtime. */
 import { queryOptions } from '@tanstack/react-query'
-import type { z } from 'zod'
 import * as sdk from './generated/sdk.gen'
 import * as schemas from './generated/zod.gen'
 import type {
@@ -8,28 +7,13 @@ import type {
   UpdateEnvironmentRequest,
   LoginRequest,
 } from './generated/types.gen'
-import { apiClient } from './runtime'
-let csrfToken = ''
-export function forgetSession() {
-  csrfToken = ''
-}
-const headers = () => ({ 'X-CSRF-Token': csrfToken })
-const options = { client: apiClient, throwOnError: true as const }
-async function checked<T>(
-  promise: Promise<{ data: unknown; response: Response }>,
-  schema: z.ZodType<T>,
-  statuses: readonly number[] = [200],
-): Promise<T> {
-  const result = await promise
-  if (!statuses.includes(result.response.status))
-    throw new Error(`Unexpected API response status (${result.response.status})`)
-  return schema.parse(result.data)
-}
+import { checked, headers, options, setCsrfToken, forgetSession } from './session-transport'
+export { forgetSession } from './session-transport'
 export const sessionQuery = queryOptions({
   queryKey: ['session'],
   queryFn: async () => {
     const session = await checked(sdk.getSession(options), schemas.zSessionResponse)
-    csrfToken = session.csrf_token
+    setCsrfToken(session.csrf_token)
     return session
   },
   retry: false,
@@ -53,7 +37,7 @@ export async function signIn(body: LoginRequest) {
     }),
     schemas.zSessionResponse,
   )
-  csrfToken = session.csrf_token
+  setCsrfToken(session.csrf_token)
   return session
 }
 export async function signOut() {

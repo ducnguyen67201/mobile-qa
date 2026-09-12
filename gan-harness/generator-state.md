@@ -6,10 +6,9 @@ Initial authoring cycle complete; evaluator review pending. Official shadcn/ui n
 
 Functional scope authored: session guard/sign-in/logout, apps/create, environment revisions/reference selection, settings, uploads and recovery, build history/deep links/status, honest readiness. Auth guard/empty-state/create-sheet/placeholder DOM tests, stored-build status/upload-recovery DOM tests, and real generated SDK fetch-boundary tests are authored. Source review corrected nested main landmarks and recovery of saved build links. No checks, builds, runtime, or browser inspection executed. Rendered acceptance remains open due to existing policy denial.
 
-
 ## Iteration 02 response
-All iteration 01 findings addressed in source: backend origins required with matching create/edit guidance; exact duration formatting (30-minute expiry retained); terminal detail status invalidates history and validating rows poll including unselected rows; account menu and workspace navigation are labeled; core metadata uses readable small text; long environment labels wrap; changing app resets page state/cursors via keyed content; identifier wrapping is explicit and prose uses normal word wrapping. Added required-origin, exact-duration, selected-terminal consistency, and unselected polling regression test sources. Checks remain deferred until the root's final validation window.
 
+All iteration 01 findings addressed in source: backend origins required with matching create/edit guidance; exact duration formatting (30-minute expiry retained); terminal detail status invalidates history and validating rows poll including unselected rows; account menu and workspace navigation are labeled; core metadata uses readable small text; long environment labels wrap; changing app resets page state/cursors via keyed content; identifier wrapping is explicit and prose uses normal word wrapping. Added required-origin, exact-duration, selected-terminal consistency, and unselected polling regression test sources. Checks remain deferred until the root's final validation window.
 
 Iteration 02 evaluator result: provisional source-only PASS, 7.87/10 (see feedback/iteration-02.md). Selected-detail regression additionally simulates validating → terminal on a subsequent polling request. No runtime/rendered quality claim; final validation and rendered acceptance remain pending.
 

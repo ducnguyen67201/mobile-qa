@@ -40,35 +40,35 @@ Before: operator runs `fake fixture.json` → predetermined JSON, no device.
 
 After: operator prepares a host → runs `device-doctor` → runs `device-qualify` → receives `campaign.json` and `report.md` with links to per-attempt evidence → shuts down the host.
 
-| Touchpoint | Before | After | Failure behavior |
-|---|---|---|---|
-| `fake`, `sdk-import` | Implemented | Preserved | Same JSON/exit conventions |
-| `just device-smoke` | Exits 2, explicitly unimplemented | One explicit controlled attempt, arguments required | No hidden provisioning/install/model choice |
-| New `device-doctor` | None | Read-only tooling/KVM/device profile report | Nonzero, actionable reason, no model import |
-| New `device-qualify` | None | Nine ordered attempts plus interruption/recovery probes | Keep all attempts; any mismatch makes campaign nonzero |
-| Evidence | No actual observations | Private manifest, expected/observed comparison, PNG/XML, logs, SDK trace, optional video | Missing evidence has a reason; no invented green |
+| Touchpoint           | Before                            | After                                                                                    | Failure behavior                                       |
+| -------------------- | --------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `fake`, `sdk-import` | Implemented                       | Preserved                                                                                | Same JSON/exit conventions                             |
+| `just device-smoke`  | Exits 2, explicitly unimplemented | One explicit controlled attempt, arguments required                                      | No hidden provisioning/install/model choice            |
+| New `device-doctor`  | None                              | Read-only tooling/KVM/device profile report                                              | Nonzero, actionable reason, no model import            |
+| New `device-qualify` | None                              | Nine ordered attempts plus interruption/recovery probes                                  | Keep all attempts; any mismatch makes campaign nonzero |
+| Evidence             | No actual observations            | Private manifest, expected/observed comparison, PNG/XML, logs, SDK trace, optional video | Missing evidence has a reason; no invented green       |
 
 ## Mandatory reading and unified discovery
 
 Line numbers refer to the inspected baseline. All paths are relative to the repository root unless marked SDK.
 
-| Priority/category | File:lines | Pattern / reason |
-|---|---|---|
-| P0 Authority | `AGENTS.md:1-30`, `docs/architect/README.md` | Finish authoring before checks; canonical docs and app ownership |
-| P0 Scope | `docs/architect/implementation/02-cloud-phone-and-feasibility.md` | One Android emulator, independent evidence, reset, three repeats |
-| P0 Contracts | `docs/architect/contracts.md`, `crates/contracts/src/worker.rs:1-129` | Rust source; generated strict Pydantic; fixture-only types |
-| P0 Entry/error/logging | `apps/mobile-worker/src/mobile_qa_worker/cli.py:19-60` | Lazy SDK import, version guard, JSON stdout, sanitized logging, exit 2 |
-| P0 Services/data flow | `apps/mobile-worker/src/mobile_qa_worker/fake.py:12-47` | Small functions; validate JSON on input and output |
-| P0 Tests | `apps/mobile-worker/tests/test_fake.py:22-49,95-123` | Parametrized boundaries, subprocess CLI, no SDK in fake mode |
-| P0 Configuration/dependencies | `apps/mobile-worker/pyproject.toml:1-39`, `apps/mobile-worker/uv.lock` | Python 3.12+, optional SDK 4.0.0; Ruff/Pyright strict; dotenv override |
-| P0 Generation | `crates/contracts/src/bin/export.rs:5-26`, `scripts/contracts.py:13-15,49-66` | One worker schema root; staged generation; content-only writes |
-| P1 Ownership/lifecycle | `scripts/runtime.py:68-103` | Private logs, owned process groups, bounded TERM/KILL cleanup |
-| P1 CLI recipe | `justfile` | Explicit setup/check/dev; `device-smoke` is the intentional placeholder |
-| P1 CI | `.github/workflows/ci.yaml:21-83` and worker/contracts jobs | Whole-PR dependency filters; current `infra/**` unnecessarily selects API |
-| P1 Configuration | `docs/architect/environment.md`, `.gitignore` | Doppler-only secrets, `.private/` excluded; no env files |
-| P1 Status/next boundary | `docs/architect/status.md`, `docs/architect/implementation/04-execution-and-reports.md` | No HTTP leasing yet; do not turn fixture protocol into scheduler |
-| P2 Import smoke | `scripts/sdk_smoke.py:1-18` | Socket-blocked import only; preserve this low-cost check |
-| P2 Documentation | `docs/architect/commenting.md`, `docs/architect/dependencies.md` | Explain real/scaffold/experiment boundaries and upstream notices |
+| Priority/category             | File:lines                                                                              | Pattern / reason                                                          |
+| ----------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| P0 Authority                  | `AGENTS.md:1-30`, `docs/architect/README.md`                                            | Finish authoring before checks; canonical docs and app ownership          |
+| P0 Scope                      | `docs/architect/implementation/02-cloud-phone-and-feasibility.md`                       | One Android emulator, independent evidence, reset, three repeats          |
+| P0 Contracts                  | `docs/architect/contracts.md`, `crates/contracts/src/worker.rs:1-129`                   | Rust source; generated strict Pydantic; fixture-only types                |
+| P0 Entry/error/logging        | `apps/mobile-worker/src/mobile_qa_worker/cli.py:19-60`                                  | Lazy SDK import, version guard, JSON stdout, sanitized logging, exit 2    |
+| P0 Services/data flow         | `apps/mobile-worker/src/mobile_qa_worker/fake.py:12-47`                                 | Small functions; validate JSON on input and output                        |
+| P0 Tests                      | `apps/mobile-worker/tests/test_fake.py:22-49,95-123`                                    | Parametrized boundaries, subprocess CLI, no SDK in fake mode              |
+| P0 Configuration/dependencies | `apps/mobile-worker/pyproject.toml:1-39`, `apps/mobile-worker/uv.lock`                  | Python 3.12+, optional SDK 4.0.0; Ruff/Pyright strict; dotenv override    |
+| P0 Generation                 | `crates/contracts/src/bin/export.rs:5-26`, `scripts/contracts.py:13-15,49-66`           | One worker schema root; staged generation; content-only writes            |
+| P1 Ownership/lifecycle        | `scripts/runtime.py:68-103`                                                             | Private logs, owned process groups, bounded TERM/KILL cleanup             |
+| P1 CLI recipe                 | `justfile`                                                                              | Explicit setup/check/dev; `device-smoke` is the intentional placeholder   |
+| P1 CI                         | `.github/workflows/ci.yaml:21-83` and worker/contracts jobs                             | Whole-PR dependency filters; current `infra/**` unnecessarily selects API |
+| P1 Configuration              | `docs/architect/environment.md`, `.gitignore`                                           | Doppler-only secrets, `.private/` excluded; no env files                  |
+| P1 Status/next boundary       | `docs/architect/status.md`, `docs/architect/implementation/04-execution-and-reports.md` | No HTTP leasing yet; do not turn fixture protocol into scheduler          |
+| P2 Import smoke               | `scripts/sdk_smoke.py:1-18`                                                             | Socket-blocked import only; preserve this low-cost check                  |
+| P2 Documentation              | `docs/architect/commenting.md`, `docs/architect/dependencies.md`                        | Explain real/scaffold/experiment boundaries and upstream notices          |
 
 **Eight-category finding:** naming uses snake_case functions/modules and PascalCase generated models; there is no worker repository/service class hierarchy or structured tracing subsystem to mirror. Use small modules/functions with dependency injection at the SDK and process boundaries. Logging today is standard `logging`; SDK logging differs and must be contained.
 
@@ -80,20 +80,20 @@ Read source without constructing Agent or initiating network/device work. SDK be
 
 Pinned distribution: `minitap-mobile-use==4.0.0`, wheel SHA-256 `65e6a8aa447d25257a6dbe99723f2ca5092d901ee447e78be44385144bb7b99e` in `uv.lock`. Current documentation can describe newer behavior; installed source is the integration authority.
 
-| Topic | Primary source | Finding |
-|---|---|---|
-| SDK installation | [Minitap installation](https://www.minitap.ai/docs/mobile-use-sdk/installation) | Python 3.12+ and local ADB/device access; library import is not execution |
-| Agent lifecycle | SDK `sdk/agent.py:92-245,531-574,763-794` | `Agent(config=...)`, `await init()`, `await run_task(request=...)`; `stop_current_task()` requests cancellation |
-| Configuration | SDK `sdk/types/agent.py:94-125`; `sdk/builders/agent_config_builder.py:62-72,99-128,223-264,359-416` | Explicit device/platform/profile; callbacks; builder validation can touch provider credentials |
-| Task limits and traces | SDK `sdk/types/task.py:63-115`; `sdk/agent.py:1118-1160` | Max steps, trace paths and unique task name; traces finalize after execution and may fail independently |
-| Result semantics | SDK `sdk/agent.py:693-717`; `sdk/types/task.py:177-207` | `run_task` returns content, not a promised TaskResult object; completed status reflects execution, not business truth |
-| Environment/logging | SDK `config.py:15-45,131-198`; `utils/logger.py:50-71` | SDK reads dotenv/Pydantic env file and writes logs relative to cwd; stdout contains SDK log text |
-| Usage | SDK builder `with_graph_config_callbacks`; installed `langchain_core/callbacks/base.py:655-665` | Callback can observe LLM completion; normalized usage requires guarded parsing, deduplication and explicit missing values |
-| Cloud KVM | [AWS nested virtualization](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/amazon-ec2-nested-virtualization.html) | M8i is supported; launch explicitly enables nested virtualization. Verify actual region/type before purchase |
-| Android acceleration | [Android acceleration](https://developer.android.com/studio/run/emulator-acceleration) | Linux requires usable KVM and permissions; a CPU flag alone is insufficient |
-| Emulator lifecycle | [Android command line](https://developer.android.com/studio/run/emulator-commandline) | Docs announce `android emulator` transition; pin the tool invocation. `-no-snapshot` prevents snapshot load/save; wipe does not clear a separate SD card |
-| Evidence/control | [ADB](https://developer.android.com/tools/adb) | Explicit serial, `exec-out screencap -p`, bounded screenrecord; video has duration/rotation limits |
-| Demo build | [AGP 8.13 compatibility](https://developer.android.com/build/releases/agp-8-13-0-release-notes) | Pin AGP 8.13.0, Gradle 8.13, JDK 17, Build Tools 35.0.0; compile/target API 35 |
+| Topic                  | Primary source                                                                                                         | Finding                                                                                                                                                  |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SDK installation       | [Minitap installation](https://www.minitap.ai/docs/mobile-use-sdk/installation)                                        | Python 3.12+ and local ADB/device access; library import is not execution                                                                                |
+| Agent lifecycle        | SDK `sdk/agent.py:92-245,531-574,763-794`                                                                              | `Agent(config=...)`, `await init()`, `await run_task(request=...)`; `stop_current_task()` requests cancellation                                          |
+| Configuration          | SDK `sdk/types/agent.py:94-125`; `sdk/builders/agent_config_builder.py:62-72,99-128,223-264,359-416`                   | Explicit device/platform/profile; callbacks; builder validation can touch provider credentials                                                           |
+| Task limits and traces | SDK `sdk/types/task.py:63-115`; `sdk/agent.py:1118-1160`                                                               | Max steps, trace paths and unique task name; traces finalize after execution and may fail independently                                                  |
+| Result semantics       | SDK `sdk/agent.py:693-717`; `sdk/types/task.py:177-207`                                                                | `run_task` returns content, not a promised TaskResult object; completed status reflects execution, not business truth                                    |
+| Environment/logging    | SDK `config.py:15-45,131-198`; `utils/logger.py:50-71`                                                                 | SDK reads dotenv/Pydantic env file and writes logs relative to cwd; stdout contains SDK log text                                                         |
+| Usage                  | SDK builder `with_graph_config_callbacks`; installed `langchain_core/callbacks/base.py:655-665`                        | Callback can observe LLM completion; normalized usage requires guarded parsing, deduplication and explicit missing values                                |
+| Cloud KVM              | [AWS nested virtualization](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/amazon-ec2-nested-virtualization.html) | M8i is supported; launch explicitly enables nested virtualization. Verify actual region/type before purchase                                             |
+| Android acceleration   | [Android acceleration](https://developer.android.com/studio/run/emulator-acceleration)                                 | Linux requires usable KVM and permissions; a CPU flag alone is insufficient                                                                              |
+| Emulator lifecycle     | [Android command line](https://developer.android.com/studio/run/emulator-commandline)                                  | Docs announce `android emulator` transition; pin the tool invocation. `-no-snapshot` prevents snapshot load/save; wipe does not clear a separate SD card |
+| Evidence/control       | [ADB](https://developer.android.com/tools/adb)                                                                         | Explicit serial, `exec-out screencap -p`, bounded screenrecord; video has duration/rotation limits                                                       |
+| Demo build             | [AGP 8.13 compatibility](https://developer.android.com/build/releases/agp-8-13-0-release-notes)                        | Pin AGP 8.13.0, Gradle 8.13, JDK 17, Build Tools 35.0.0; compile/target API 35                                                                           |
 
 ### KEY_INSIGHT / APPLIES_TO / GOTCHA
 
@@ -114,25 +114,25 @@ Managed device farms remain a fallback if KVM or reset cannot qualify. Do not im
 
 ### Ownership and proposed file map
 
-| File or tightly scoped group | Action | Purpose |
-|---|---|---|
-| `crates/contracts/src/worker/qualification.rs` | CREATE | Namespaced qualification request/result/evidence wire types |
-| `crates/contracts/src/worker.rs` | UPDATE | Declare qualification module and add its export root; keep fake types unchanged |
-| `crates/contracts/tests/qualification.rs` | CREATE | Version/range/result invariant tests |
-| `contracts/worker.schema.json`, `apps/mobile-worker/src/mobile_qa_worker/generated/models.py` | GENERATE | Existing pipeline only |
-| `apps/mobile-worker/src/mobile_qa_worker/cli.py` | UPDATE | Explicit doctor/run/campaign/internal-child commands; preserve fake/import |
-| `apps/mobile-worker/src/mobile_qa_worker/qualification/{__init__,config,device,runner,sdk_adapter,evidence,verifier,campaign}.py` | CREATE | Small operator harness modules; no generic plugin framework |
-| `apps/mobile-worker/tests/test_{qualification,device,verifier,sdk_adapter,campaign}.py` | CREATE | Offline behavior, process and contract coverage |
-| `apps/mobile-worker/tests/fixtures/qualification/` | CREATE | Minimal XML and SDK callback payload fixtures, no binaries/secrets |
-| `apps/mobile-worker/pyproject.toml`, `apps/mobile-worker/uv.lock` | UPDATE | Declare direct callback dependency in sdk extra at existing locked version; add coverage markers if needed |
-| `apps/qa-demo-android/{settings.gradle,build.gradle,gradle.properties,gradlew,gradlew.bat,gradle/wrapper/gradle-wrapper.properties,gradle/wrapper/gradle-wrapper.jar}` | CREATE | Isolated fixture-only Android project/wrapper; no root build coupling |
-| `apps/qa-demo-android/app/build.gradle`, `app/src/main/AndroidManifest.xml`, `app/src/main/java/ai/mobileqa/demo/MainActivity.java`, `app/src/main/res/values/ids.xml` | CREATE | One screen, persistence variants, stable accessible IDs |
-| `infra/device-host/{toolchain.lock.json,profile.toml,setup.sh,mobile-qa-device.service,launch.example.json}` | CREATE | Nonsecret toolchain/profile, idempotent bootstrap, designated service, reviewable launch example |
-| `infra/device-host/fixture_backend.py` | CREATE | Loopback-only controlled session endpoint; no product backend |
-| `justfile`, `.gitignore`, `.github/workflows/ci.yaml` | UPDATE | Explicit device commands, fixture outputs ignored, affected CI routing |
-| `scripts/test_ci_scope.py` | CREATE | Small explicit path-selection regression tests against the actual filter config |
-| `docs/architect/{device-qualification.md,environment.md,development.md,status.md,dependencies.md,README.md}` | CREATE/UPDATE | Operating runbook, secrets, evidence and provenance |
-| `AGENTS.md` | UPDATE | Clarify old “no device/model in this phase” constraint was phase 01; qualification is explicit, fake/check paths remain offline |
+| File or tightly scoped group                                                                                                                                           | Action        | Purpose                                                                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `crates/contracts/src/worker/qualification.rs`                                                                                                                         | CREATE        | Namespaced qualification request/result/evidence wire types                                                                     |
+| `crates/contracts/src/worker.rs`                                                                                                                                       | UPDATE        | Declare qualification module and add its export root; keep fake types unchanged                                                 |
+| `crates/contracts/tests/qualification.rs`                                                                                                                              | CREATE        | Version/range/result invariant tests                                                                                            |
+| `contracts/worker.schema.json`, `apps/mobile-worker/src/mobile_qa_worker/generated/models.py`                                                                          | GENERATE      | Existing pipeline only                                                                                                          |
+| `apps/mobile-worker/src/mobile_qa_worker/cli.py`                                                                                                                       | UPDATE        | Explicit doctor/run/campaign/internal-child commands; preserve fake/import                                                      |
+| `apps/mobile-worker/src/mobile_qa_worker/qualification/{__init__,config,device,runner,sdk_adapter,evidence,verifier,campaign}.py`                                      | CREATE        | Small operator harness modules; no generic plugin framework                                                                     |
+| `apps/mobile-worker/tests/test_{qualification,device,verifier,sdk_adapter,campaign}.py`                                                                                | CREATE        | Offline behavior, process and contract coverage                                                                                 |
+| `apps/mobile-worker/tests/fixtures/qualification/`                                                                                                                     | CREATE        | Minimal XML and SDK callback payload fixtures, no binaries/secrets                                                              |
+| `apps/mobile-worker/pyproject.toml`, `apps/mobile-worker/uv.lock`                                                                                                      | UPDATE        | Declare direct callback dependency in sdk extra at existing locked version; add coverage markers if needed                      |
+| `apps/qa-demo-android/{settings.gradle,build.gradle,gradle.properties,gradlew,gradlew.bat,gradle/wrapper/gradle-wrapper.properties,gradle/wrapper/gradle-wrapper.jar}` | CREATE        | Isolated fixture-only Android project/wrapper; no root build coupling                                                           |
+| `apps/qa-demo-android/app/build.gradle`, `app/src/main/AndroidManifest.xml`, `app/src/main/java/ai/mobileqa/demo/MainActivity.java`, `app/src/main/res/values/ids.xml` | CREATE        | One screen, persistence variants, stable accessible IDs                                                                         |
+| `infra/device-host/{toolchain.lock.json,profile.toml,setup.sh,mobile-qa-device.service,launch.example.json}`                                                           | CREATE        | Nonsecret toolchain/profile, idempotent bootstrap, designated service, reviewable launch example                                |
+| `infra/device-host/fixture_backend.py`                                                                                                                                 | CREATE        | Loopback-only controlled session endpoint; no product backend                                                                   |
+| `justfile`, `.gitignore`, `.github/workflows/ci.yaml`                                                                                                                  | UPDATE        | Explicit device commands, fixture outputs ignored, affected CI routing                                                          |
+| `scripts/test_ci_scope.py`                                                                                                                                             | CREATE        | Small explicit path-selection regression tests against the actual filter config                                                 |
+| `docs/architect/{device-qualification.md,environment.md,development.md,status.md,dependencies.md,README.md}`                                                           | CREATE/UPDATE | Operating runbook, secrets, evidence and provenance                                                                             |
+| `AGENTS.md`                                                                                                                                                            | UPDATE        | Clarify old “no device/model in this phase” constraint was phase 01; qualification is explicit, fake/check paths remain offline |
 
 An added file is justified by ownership or meaningful test boundaries, not a required file quota. Keep root manifests and web/API runtime unchanged. `scripts/contracts.py` already walks schema definitions through WorkerContracts and should need no change.
 
@@ -173,15 +173,15 @@ Add `pub mod qualification;` under worker.rs, with `QualificationContracts` reac
 
 Use integer counts with explicit safe bounds or canonical decimal strings for potentially large token/cost counters; use integer micro-USD or Decimal-derived strings for estimates, never floating-point money. Optional usage/cost fields distinguish unavailable from measured zero. Worker-local process handles/settings use dataclasses, not duplicate transport models. Campaign oracle/aggregation remains Python-local in phase 02 and is explicitly experimental.
 
-| Condition | Outcome / reason | Required distinction |
-|---|---|---|
-| Created task proven and survives verified reopen | passed / persistence_observed | All required evidence present |
-| Created task proven, ready app reopens, exact task is absent | failed / persistence_lost | A real violated expectation, independent of SDK claim |
-| Backend 503/login prerequisite unavailable | blocked / prerequisite_unavailable | Capture actual unavailable screen; no model call needed |
-| APK unsupported/invalid, KVM unavailable, install fails before test | blocked / device_or_build_unavailable | Setup category, not an app defect |
-| SDK timeout/error, step budget exhausted, missing decisive evidence, creation not proven | inconclusive / specific reason | Never convert uncertainty to a failed assertion or pass |
-| Cancellation during execution | inconclusive / cancelled | Preserve partial artifacts; no automatic replay |
-| Cleanup fails after observed verdict | Preserve observed outcome, reset=quarantined | Campaign fails and device cannot be reused |
+| Condition                                                                                | Outcome / reason                             | Required distinction                                    |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------- |
+| Created task proven and survives verified reopen                                         | passed / persistence_observed                | All required evidence present                           |
+| Created task proven, ready app reopens, exact task is absent                             | failed / persistence_lost                    | A real violated expectation, independent of SDK claim   |
+| Backend 503/login prerequisite unavailable                                               | blocked / prerequisite_unavailable           | Capture actual unavailable screen; no model call needed |
+| APK unsupported/invalid, KVM unavailable, install fails before test                      | blocked / device_or_build_unavailable        | Setup category, not an app defect                       |
+| SDK timeout/error, step budget exhausted, missing decisive evidence, creation not proven | inconclusive / specific reason               | Never convert uncertainty to a failed assertion or pass |
+| Cancellation during execution                                                            | inconclusive / cancelled                     | Preserve partial artifacts; no automatic replay         |
+| Cleanup fails after observed verdict                                                     | Preserve observed outcome, reset=quarantined | Campaign fails and device cannot be reused              |
 
 A single-run CLI returns 0 when it durably writes a valid terminal result, even for failed/blocked/inconclusive; invalid invocation or inability to persist a result exits 2. Campaign returns 0 only for all expected classifications plus recovery/cleanup acceptance, 1 for qualification mismatch/quarantine, 2 for invalid setup. Document both conventions. Do not parse noisy SDK stdout as result JSON; use a private child-result file, validated by the parent.
 
@@ -279,6 +279,7 @@ Repository pattern: not applicable; no DB in this phase. Service pattern: small 
 ## Step-by-step tasks
 
 ### Task 1 — Freeze scope and host/toolchain inputs
+
 - **ACTION:** Update phase ownership comments; author profile, toolchain manifest, bootstrap/runbook and launch packet format.
 - **IMPLEMENT:** Candidate Linux Ubuntu 24.04 x86_64 on M8i 4-vCPU/16-GiB sizing; Android API35 Google APIs x86_64, portrait 1080×1920/420dpi/en-US/UTC. Resolve actual downloadable emulator/platform-tools/command-line-tools/system-image revisions from official Android repository metadata during dependency preparation; store exact URLs, checksums and installed revisions, not `latest`. Use the existing emulator binary interface only when the pinned release supports its documented flags; record that the newer CLI transition is not yet qualified. Provisioning inputs remain explicit region/AMI/network/identity/expiry/spend fields, not invented IDs.
 - **MIRROR:** environment.md and explicit setup.py install separation.
@@ -287,6 +288,7 @@ Repository pattern: not applicable; no DB in this phase. Service pattern: small 
 - **VALIDATE:** At final verification, checksum/version mismatch and missing KVM/profile fail before model import; no setup command creates paid resources. Reject unresolved lock placeholders before declaring code ready.
 
 ### Task 2 — Define qualification wire contracts
+
 - **ACTION:** Add qualification.rs, root reachability and Rust contract tests.
 - **IMPLEMENT:** Request/result/evidence/usage structures above, semantic validators, version and path/hash bounds. Preserve fake enum/model semantics. Add matching strict JSON fixtures under worker test fixtures; no HTTP job identifiers or lease fields.
 - **MIRROR:** worker.rs Serde/Schemars patterns; schema export root.
@@ -295,6 +297,7 @@ Repository pattern: not applicable; no DB in this phase. Service pattern: small 
 - **VALIDATE:** After all tasks are authored, run existing generation once; cross-language version/enum/hash/time/result invariants; fake contract fixtures unchanged; browser generated output has no diff.
 
 ### Task 3 — Author the demo APK and controlled backend
+
 - **ACTION:** Add the fixture Android app and loopback backend.
 - **IMPLEMENT:** Good/broken persistence variants, stable IDs, fixture session gate, no auto-backup; single Java activity and minimal resources. Pin Gradle wrapper with distribution SHA; AGP8.13.0/Gradle8.13/JDK17/BuildTools35.0.0, compile/target35, min26. Flavor controls persistence implementation only, not UI or package. Backend has explicit `--mode ready|unavailable`, loopback binding and no hidden mutation endpoint. Wrapper/build caches and APKs ignored; record build hashes rather than commit APKs.
 - **MIRROR:** apps ownership; stdlib CLI handling.
@@ -303,6 +306,7 @@ Repository pattern: not applicable; no DB in this phase. Service pattern: small 
 - **VALIDATE:** Final Gradle assemble/lint; final real-device campaign proves both variants and backend503. Inspect APK manifest and native-library metadata. No new demo framework test boilerplate required.
 
 ### Task 4 — Implement profile, ADB preflight and reset
+
 - **ACTION:** Add config.py and device.py with injected command runner.
 - **IMPLEMENT:** Validate owned state root, Linux/KVM, pinned tools, disk, serial, ADB state, boot property, package manager and PNG; parse APK package/minSdk/native libraries/checksum; install and launch; configure/read back device profile; fresh attempt AVD writable directory with no reusable SD card/snapshots. Recovery discards only owned state after stopping owned processes. Backend resets independently.
 - **MIRROR:** subprocess ownership and frozen configuration.
@@ -311,6 +315,7 @@ Repository pattern: not applicable; no DB in this phase. Service pattern: small 
 - **VALIDATE:** Offline command transcripts cover offline/unauthorized/wrongserial, incompatible APK, corrupt PNG, timeout, permission/disk failure and unrelated-device protection. Live doctor proves exact toolchain/profile.
 
 ### Task 5 — Implement SDK process boundary and usage
+
 - **ACTION:** Add sdk_adapter.py and `_sdk-run` command, declare callback dependency without upgrading unrelated pins.
 - **IMPLEMENT:** Exact integration described above; lazy imports, allowlisted environment, telemetry disabled, clean cwd/TMPDIR, explicit noninteractive model profile, graph callbacks, private child-result file, typed SDK port and process termination protocol. SDK output is diagnostic only.
 - **MIRROR:** cli.sdk_import and frozen sdk extra.
@@ -319,6 +324,7 @@ Repository pattern: not applicable; no DB in this phase. Service pattern: small 
 - **VALIDATE:** Mock SDK configuration call sequence, no constructor/import in fake/doctor; contaminated stdout, absent credentials, callback duplicates/missing usage, disabled dotenv/telemetry and no SDK file writes outside private attempt root.
 
 ### Task 6 — Implement assertion and evidence writer
+
 - **ACTION:** Add verifier.py and evidence.py.
 - **IMPLEMENT:** Classify only from package-scoped stable UI evidence before and after deterministic reopen. Record exact task text, hierarchy/PNG checksums and missing reasons; safe relative artifact paths; atomic final JSON and readable Markdown. Trace _PASS and agent output never participate in business classification. Track monotonic durations and explicit cost coverage.
 - **MIRROR:** strict generated input/output; private output directory conventions.
@@ -327,6 +333,7 @@ Repository pattern: not applicable; no DB in this phase. Service pattern: small 
 - **VALIDATE:** Decision table below, path traversal/symlink refusal, malformed hierarchy, missing PNG, timestamp/hash checks, disk-full/partial-write behavior and reports that remain readable without the SDK installed.
 
 ### Task 7 — Implement supervisor and CLI
+
 - **ACTION:** Add runner.py and public device-doctor/device-run command dispatch.
 - **IMPLEMENT:** Validate request → acquire host lock → dirty marker → clean boot/install → backend/initial evidence → SDK navigation → independent assertion → evidence persistence → verified reset or quarantine → final result. Launch SDK through Doppler only for actual navigation; close stdin; owned process groups and bounded cleanup. Host systemd unit runs the supervisor as the device user with KVM access, no automatic restart and cgroup cleanup.
 - **MIRROR:** runtime.py lifecycle, CLI safe errors and JSON exit semantics.
@@ -335,6 +342,7 @@ Repository pattern: not applicable; no DB in this phase. Service pattern: small 
 - **VALIDATE:** Offline subprocess probes for TERM/KILL escalation, surviving child group, second invocation busy, stale marker recovery, no unrelated process termination, no external calls in unit tests.
 
 ### Task 8 — Implement campaign and measurement
+
 - **ACTION:** Add campaign.py plus explicit device-qualify command.
 - **IMPLEMENT:** Cycle good/ready, broken/ready, good/unavailable three times (nine distinct attempts) with fresh reset each time. Keep expected classification in campaign oracle only. Add interruption during navigation and a post-recovery good attempt. Include contamination sentinel probe proving recovery clears task/session data. Keep attempts immutable and retain mismatches, trace gaps, usage coverage, transfer duration and cost estimate with rate source/date. Campaign stops on quarantine or exceeded budget.
 - **MIRROR:** parametrized scenario tests, exact-run identifiers.
@@ -343,6 +351,7 @@ Repository pattern: not applicable; no DB in this phase. Service pattern: small 
 - **VALIDATE:** Offline oracle does not leak into child request; campaign exit1 for any mismatch/cleanup failure, missing attempt or missing decisive evidence. Live nine-run classification and recovery gates mandatory.
 
 ### Task 9 — Wire explicit commands and affected CI
+
 - **ACTION:** Replace device-smoke stub, add recipes and narrow device checks.
 - **IMPLEMENT:** Public CLI surface specified below; no device command is a dependency of setup/check/build/smoke. Split API `infra/**` into `infra/compose.yaml` and `infra/postgres/**`; map `infra/device-host/**` into qualification/offline-worker checks. Add `crates/contracts/src/worker/**` to worker filter. Add a demo-build job only for demo/build-toolchain inputs, using JDK17 and pinned Android tools, no emulator or model. Keep whole-PR comparison and cancellation. The current worker CI installs only base/dev dependencies: update its explicit sync to include `--extra sdk` so strict Pyright resolves the new SDK/callback imports; cache this environment. Installing SDK is not permission to import it during fake tests or run it. Add path regression tests reading actual filter YAML (use existing pinned PyYAML in worker dev environment) and select them when CI/filter fixtures change. Shared workflow edits will trigger the existing broad jobs for this PR; normal later device-only edits must not.
 - **MIRROR:** current dorny path filters and explicit justfile commands.
@@ -351,6 +360,7 @@ Repository pattern: not applicable; no DB in this phase. Service pattern: small 
 - **VALIDATE:** Paths matrix: device infra → qualification checks, not API; ordinary Python → worker only; demo → demo build; Postgres → API; qualification Rust source → contracts+worker+API, not web; docs → no app jobs. Include deletions and multiple changed paths.
 
 ### Task 10 — Update docs and record gates
+
 - **ACTION:** Add canonical device-qualification runbook and update index/env/development/status/provenance/AGENTS.
 - **IMPLEMENT:** Exact install/doctor/run/collect/reset/stop commands; new model key owner; experimental result semantics; provider/model choices and unresolved cloud runtime inputs; raw evidence privacy; limitations; approval packet; record open phase01 browser gate. Document cost formula: active+idle host time × current hourly rate + storage/IP/transfer + observed model charges, with coverage and separate human time. No fabricated numeric quote.
 - **MIRROR:** canonical docs and readable comments.
@@ -359,6 +369,7 @@ Repository pattern: not applicable; no DB in this phase. Service pattern: small 
 - **VALIDATE:** Link/status review after all docs are written; source docs, CLI help and acceptance rules agree.
 
 ### Task 11 — Run one offline verification phase
+
 - **ACTION:** Finish authoring, then generate/install declared dependency changes explicitly and execute scoped commands below.
 - **IMPLEMENT:** Run contract generation once, scoped checks/builds, offline harness tests and import smoke. Batch corrections; rerun only failed/invalidated checks. Record which checks ran and any blocked device checks.
 - **MIRROR:** AGENTS and development.md.
@@ -367,6 +378,7 @@ Repository pattern: not applicable; no DB in this phase. Service pattern: small 
 - **VALIDATE:** Commands succeed with no cloud/model access; only expected generated outputs differ; git diff reviewed.
 
 ### Task 12 — Execute authorized cloud qualification
+
 - **ACTION:** Once launch packet/spend/access is approved, provision or use the designated host, run the campaign and publish a local qualification record.
 - **IMPLEMENT:** Exact approved SKU/region/AMI, `NestedVirtualization=enabled`, encrypted disk, metadata v2, least-privilege identity, no public ADB/emulator ports. Prefer existing SSM access, otherwise restricted operator SSH. Apply bounded host runtime shutdown and explicit operator stop checklist; budgets/alerts alone are not a hard stop. Verify KVM and toolchain before SDK calls. Collect/hash evidence, stop host, confirm retained-disk charges/cleanup and record costs/latencies/mismatches. Retain failures for follow-up.
 - **MIRROR:** spec02 acceptance and canonical environment policy.
@@ -393,24 +405,24 @@ uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker device-q
 
 ## Testing strategy
 
-| Test | Input | Expected | Edge? |
-|---|---|---|---|
-| Strict contract | version bool/string/2, malformed UUID/hash, extra field | Reject before touching device | Yes |
-| Truth over agent claim | SDK “success” + created row then missing after ready reopen | failed | Core |
-| Correct persistence | Exact unique row survives | passed with full evidence | Core |
-| Creation never happened | Missing row before reopen | inconclusive | Core |
-| Prerequisite unavailable | Actual503 and unavailable UI | blocked; no model call | Core |
-| Ambiguous observation | Empty/truncated XML, wrong package, missing screenshot | inconclusive | Yes |
-| Device unavailable | no KVM, wrong ABI/serial, boot/install timeout | blocked with setup reason | Yes |
-| Cancellation | Child ignores TERM or leaves descendant | bounded kill, quarantine until recovery, partial evidence | Yes |
-| Concurrent attempt | Lock already held | reject, do not touch owned or unrelated device | Yes |
-| Dirty recovery | Old task/session, stale PID marker | explicit reset proof before reuse | Yes |
-| Evidence integrity | symlink escape, partial write, disk full | refuse unsafe path, never false finalized success | Yes |
-| SDK containment | stdout noise, import dotenv, missing key | private logs, clean env/cwd, predictable setup result | Yes |
-| Usage accounting | duplicate callback, unknown usage, fallback model | dedup; explicit coverage; no zero substitution | Yes |
-| Campaign isolation | expected verdict present only in oracle | not passed to SDK/verifier | Core |
-| Existing fake regression | no SDK installed/network blocked | existing fixture CLI unchanged | Core |
-| CI selection | added/deleted paths and whole PR list | exact affected set | Core |
+| Test                     | Input                                                       | Expected                                                  | Edge? |
+| ------------------------ | ----------------------------------------------------------- | --------------------------------------------------------- | ----- |
+| Strict contract          | version bool/string/2, malformed UUID/hash, extra field     | Reject before touching device                             | Yes   |
+| Truth over agent claim   | SDK “success” + created row then missing after ready reopen | failed                                                    | Core  |
+| Correct persistence      | Exact unique row survives                                   | passed with full evidence                                 | Core  |
+| Creation never happened  | Missing row before reopen                                   | inconclusive                                              | Core  |
+| Prerequisite unavailable | Actual503 and unavailable UI                                | blocked; no model call                                    | Core  |
+| Ambiguous observation    | Empty/truncated XML, wrong package, missing screenshot      | inconclusive                                              | Yes   |
+| Device unavailable       | no KVM, wrong ABI/serial, boot/install timeout              | blocked with setup reason                                 | Yes   |
+| Cancellation             | Child ignores TERM or leaves descendant                     | bounded kill, quarantine until recovery, partial evidence | Yes   |
+| Concurrent attempt       | Lock already held                                           | reject, do not touch owned or unrelated device            | Yes   |
+| Dirty recovery           | Old task/session, stale PID marker                          | explicit reset proof before reuse                         | Yes   |
+| Evidence integrity       | symlink escape, partial write, disk full                    | refuse unsafe path, never false finalized success         | Yes   |
+| SDK containment          | stdout noise, import dotenv, missing key                    | private logs, clean env/cwd, predictable setup result     | Yes   |
+| Usage accounting         | duplicate callback, unknown usage, fallback model           | dedup; explicit coverage; no zero substitution            | Yes   |
+| Campaign isolation       | expected verdict present only in oracle                     | not passed to SDK/verifier                                | Core  |
+| Existing fake regression | no SDK installed/network blocked                            | existing fixture CLI unchanged                            | Core  |
+| CI selection             | added/deleted paths and whole PR list                       | exact affected set                                        | Core  |
 
 No remote-device tests in ordinary pytest. Tests inject command/SDK adapters and temporary filesystem roots. Platform-specific process tests may skip on Windows with a reason; Linux CI must execute them. A dedicated explicit live command owns the device campaign; do not hide it behind pytest collection or default fixtures.
 
@@ -466,17 +478,17 @@ Manual/live acceptance, after authorization:
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation / stop condition |
-|---|---|---|---|
-| Nested KVM/renderer too slow or unavailable | Medium | Blocks real runner | Hard doctor gate; measure, then change approved host/provider if needed |
-| Agent fails to create exact task consistently | Medium | Feasibility rejected | Preserve mismatches; improve bounded prompt/profile or reject before product integration |
-| SDK traces/logs claim success without assertion | High | False confidence | Independent verifier and explicit raw trace labeling |
-| SDK cancellation leaves processes/device actions | Medium | Contamination | Owned groups+cgroup containment, dirty marker, verified reset, no blind replay |
-| Toolchain image revisions drift | Medium | Irreproducible outcomes | URL/checksum/revision lock; reject different installed inventory |
-| Current model selection unavailable/expensive | Medium | Blocks/bloats experiment | Explicit runtime profile, approved budget, callback coverage, no automatic provider selection |
-| Demo verifier mistaken for generic customer testing | Medium | Wrong product promise | Document exact assertion and fixture limits; qualify customer scenarios separately |
-| Shared CI files select too much work | High today | Wasted CI | Narrow infra map with tests; no unrequested whole monorepo redesign |
-| Cloud budget/credentials absent | Known input gate | Live validation pending | Finish code/offline checks/launch packet first; never mark phase qualified early |
+| Risk                                                | Likelihood       | Impact                   | Mitigation / stop condition                                                                   |
+| --------------------------------------------------- | ---------------- | ------------------------ | --------------------------------------------------------------------------------------------- |
+| Nested KVM/renderer too slow or unavailable         | Medium           | Blocks real runner       | Hard doctor gate; measure, then change approved host/provider if needed                       |
+| Agent fails to create exact task consistently       | Medium           | Feasibility rejected     | Preserve mismatches; improve bounded prompt/profile or reject before product integration      |
+| SDK traces/logs claim success without assertion     | High             | False confidence         | Independent verifier and explicit raw trace labeling                                          |
+| SDK cancellation leaves processes/device actions    | Medium           | Contamination            | Owned groups+cgroup containment, dirty marker, verified reset, no blind replay                |
+| Toolchain image revisions drift                     | Medium           | Irreproducible outcomes  | URL/checksum/revision lock; reject different installed inventory                              |
+| Current model selection unavailable/expensive       | Medium           | Blocks/bloats experiment | Explicit runtime profile, approved budget, callback coverage, no automatic provider selection |
+| Demo verifier mistaken for generic customer testing | Medium           | Wrong product promise    | Document exact assertion and fixture limits; qualify customer scenarios separately            |
+| Shared CI files select too much work                | High today       | Wasted CI                | Narrow infra map with tests; no unrequested whole monorepo redesign                           |
+| Cloud budget/credentials absent                     | Known input gate | Live validation pending  | Finish code/offline checks/launch packet first; never mark phase qualified early              |
 
 ## Next step
 

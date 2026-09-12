@@ -9,7 +9,11 @@ void staleResponse
 void unexpectedBody
 
 // Build metadata and binary inputs must remain generated from Rust transport source.
-import type { BuildResponse, UploadBuildContentData, CompleteBuildUploadResponses } from '../api/generated/types.gen'
+import type {
+  BuildResponse,
+  UploadBuildContentData,
+  CompleteBuildUploadResponses,
+} from '../api/generated/types.gen'
 import { build } from './fixtures'
 export const persistedBuild: BuildResponse = build
 export const binaryUpload: UploadBuildContentData['body'] = { file: new Blob(['synthetic']) }

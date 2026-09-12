@@ -10,7 +10,159 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel
 from typing_extensions import TypeAliasType
 
 
+class ActionKind(StrEnum):
+    navigate = 'navigate'
+    restart_app = 'restart_app'
+    checkpoint = 'checkpoint'
+
+
+class ArtifactRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    byte_size: Annotated[int, Field(ge=0)]
+    checkpoint_id: str
+    generation: int
+    mime: str
+    name: str
+    sha256: str
+
+
+class CheckMethod(StrEnum):
+    ui_property_equals_v1 = 'ui_property_equals_v1'
+    ui_element_presence_v1 = 'ui_element_presence_v1'
+    manual = 'manual'
+
+
+class ClaimRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    claim_id: UUID
+    profile_id: UUID
+    version: Annotated[int, Field(ge=0, le=255)]
+
+
+class CleanupState(StrEnum):
+    pending = 'pending'
+    verified_clean = 'verified_clean'
+    quarantined = 'quarantined'
+
+
+class Driver(StrEnum):
+    fake = 'fake'
+    minitap = 'minitap'
+
+
+class EventReceipt(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    last_sequence: Annotated[int, Field(ge=0)]
+
+
+class EvidenceState(StrEnum):
+    pending = 'pending'
+    sealed = 'sealed'
+    unavailable = 'unavailable'
+
+
+class ExecutionBudget(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    artifact_bytes: Annotated[int, Field(ge=0)]
+    duration_seconds: Annotated[int, Field(ge=0)]
+    max_steps: Annotated[int, Field(ge=0)]
+
+
+class ExecutionEvent(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    action_id: str
+    id: UUID
+    message: str
+    phase: str
+    sequence: Annotated[int, Field(ge=0)]
+
+
+class ExecutionProfile(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    adapter: str
+    device_identity: str
+    driver: Driver
+    id: UUID
+    image: str
+    max_apk_bytes: Annotated[int, Field(ge=0)]
+    model: str
+    name: str
+    package: str
+    qualification_reference: str
+    qualified: bool
+
+
+class JobState(StrEnum):
+    queued = 'queued'
+    leased = 'leased'
+    running = 'running'
+    finalizing = 'finalizing'
+    finished = 'finished'
+    cancel_requested = 'cancel_requested'
+    recovery_required = 'recovery_required'
+
+
+class LeaseRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    generation: int
+
+
+class LeaseStatusResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    cancel_requested: bool
+    expires_at: AwareDatetime
+    state: JobState
+
+
+class ModelUsage(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    calls: Annotated[int, Field(ge=0)]
+    input_tokens: Annotated[int | None, Field(ge=0)] = None
+    model: str
+    output_tokens: Annotated[int | None, Field(ge=0)] = None
+    unknown_calls: Annotated[int, Field(ge=0)]
+
+
+class NavigationRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    attempt_id: UUID
+    instruction: str
+    max_steps: Annotated[int, Field(ge=0)]
+    package: str
+    profile_path: str
+    serial: str
+
+
 class Outcome(StrEnum):
+    passed = 'passed'
+    failed = 'failed'
+    blocked = 'blocked'
+    inconclusive = 'inconclusive'
+    skipped = 'skipped'
+    canceled = 'canceled'
+
+
+class Outcome2(StrEnum):
     passed = 'passed'
     failed = 'failed'
     blocked = 'blocked'
@@ -86,6 +238,21 @@ class QualificationUsage(BaseModel):
     unknown_calls: Annotated[int, Field(ge=0, le=10000)]
 
 
+class RunArtifact(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    attempt_id: UUID
+    byte_size: Annotated[int, Field(ge=0)]
+    checkpoint_id: str
+    id: UUID
+    mime: str
+    name: str
+    reason: str | None = None
+    sha256: str
+    state: EvidenceState
+
+
 class Scenario1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -111,6 +278,63 @@ class Scenario(RootModel[Scenario1 | Scenario2 | Scenario3]):
     root: Scenario1 | Scenario2 | Scenario3
 
 
+class TestAction(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    checkpoint_id: str
+    id: str
+    instruction: str
+    kind: ActionKind
+
+
+class UiProperty(StrEnum):
+    text = 'text'
+    content_description = 'content_description'
+    checked = 'checked'
+    enabled = 'enabled'
+
+
+class ArtifactReceipt(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    artifact: RunArtifact
+
+
+class CheckResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    artifact_ids: list[UUID]
+    check_id: str
+    expected: str
+    observed: str | None = None
+    outcome: Outcome
+    reason: str
+
+
+class CleanupRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    boot_id: str
+    evidence_reference: str
+    generation: int
+    reset: CleanupState
+    stopped: bool
+
+
+class CompleteRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    execution_outcome: Outcome
+    generation: int
+    reason: str
+    usage: list[ModelUsage]
+
+
 class ContractProbe(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -121,6 +345,32 @@ class ContractProbe(BaseModel):
     optional_note: str | None = None
     run_id: UUID
     scenario: Scenario
+
+
+class EventRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    events: list[ExecutionEvent]
+    generation: int
+
+
+class ExpectedCheck(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    checkpoint_id: str
+    description: str
+    expected: str
+    id: str
+    method: CheckMethod
+    observation_seconds: Annotated[int, Field(ge=0)]
+    prerequisite_check_ids: list[str]
+    property: UiProperty
+    ready_resource_id: str
+    required: bool
+    resource_id: str
+    text_filter: str
 
 
 class FakeExecutionRequest(BaseModel):
@@ -137,9 +387,22 @@ class FakeExecutionResult(BaseModel):
         extra='forbid',
     )
     message: str
-    outcome: Outcome
+    outcome: Outcome2
     run_id: UUID
     version: Annotated[int, Field(ge=1, le=1)]
+
+
+class LocalExecutionResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    boot_id: str
+    evidence_reference: str
+    outcome: Outcome
+    reason: str
+    reset: CleanupState
+    stopped: bool
+    usage: list[ModelUsage]
 
 
 class QualificationResult(BaseModel):
@@ -165,6 +428,41 @@ class QualificationResult(BaseModel):
     version: Annotated[int, Field(ge=1, le=1)]
 
 
+class AttemptResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    artifacts: list[RunArtifact]
+    case_version_id: UUID
+    checks: list[CheckResult]
+    cleanup: CleanupState
+    events: list[ExecutionEvent]
+    generation: int
+    id: UUID
+    number: Annotated[int, Field(ge=0)]
+    outcome: Outcome | None = None
+    reason: str | None = None
+    state: JobState
+    usage: list[ModelUsage]
+
+
+class CaseDefinition(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    actions: list[TestAction]
+    adapter: str
+    budget: ExecutionBudget
+    checks: list[ExpectedCheck]
+    key: str
+    package: str
+    preconditions: list[str]
+    provenance: str
+    requirement: str
+    title: str
+    version: Annotated[int, Field(ge=0)]
+
+
 class QualificationContracts(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -173,10 +471,97 @@ class QualificationContracts(BaseModel):
     result: QualificationResult
 
 
+class ResolvedCase(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    case: CaseDefinition
+    content_hash: str
+    data_variant: str
+    definition_id: UUID
+    required: bool
+
+
+class RunManifest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    app_id: UUID
+    budget: ExecutionBudget
+    build_bytes: Annotated[int, Field(ge=0)]
+    build_id: UUID
+    build_sha256: str
+    cases: list[ResolvedCase]
+    diagnostic_retries: Annotated[int, Field(ge=0, le=255)]
+    environment_revision: int
+    exclusions: list[str]
+    plan_hash: str
+    plan_version_id: UUID
+    profile: ExecutionProfile
+
+
+class AttemptReceipt(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    attempt: AttemptResponse
+
+
+class ExecutionJob(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    attempt_id: UUID
+    case_index: Annotated[int, Field(ge=0)]
+    manifest: RunManifest
+
+
+class ExecutionLease(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    attempt_id: UUID
+    case_index: Annotated[int, Field(ge=0)]
+    expires_at: AwareDatetime
+    generation: int
+    lease_token: str
+    manifest: RunManifest
+    run_id: UUID
+
+
+class ClaimResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    lease: ExecutionLease | None = None
+    poll_after_seconds: Annotated[int, Field(ge=0)]
+
+
+class ExecutionContracts(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    artifact_receipt: ArtifactReceipt
+    artifact_request: ArtifactRequest
+    attempt_receipt: AttemptReceipt
+    claim_request: ClaimRequest
+    claim_response: ClaimResponse
+    cleanup: CleanupRequest
+    completion: CompleteRequest
+    event_receipt: EventReceipt
+    events: EventRequest
+    job: ExecutionJob
+    lease_request: LeaseRequest
+    lease_status: LeaseStatusResponse
+    local_result: LocalExecutionResult
+    navigation: NavigationRequest
+
+
 class WorkerContracts(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
+    execution: ExecutionContracts
     probe: ContractProbe
     qualification: QualificationContracts
     request: FakeExecutionRequest

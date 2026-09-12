@@ -19,11 +19,23 @@ export class ApiClientError extends Error {
 
 // Same-origin transport works through Vite's dev proxy and the future Rust static host.
 // Do not put a provider key or Doppler secret in browser configuration.
-const transportClient = createClient({ baseUrl: window.location.origin, credentials: 'same-origin' })
+const transportClient = createClient({
+  baseUrl: window.location.origin,
+  credentials: 'same-origin',
+})
 // Pinned client 0.99 normalizes headers to Headers before invoking its generated
 // z.object validator. Preserve the SDK's original header record for validation;
 // serialization, auth, fetch and error handling still belong to the generated client.
-const requestMethods = new Set(['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'request'])
+const requestMethods = new Set([
+  'get',
+  'post',
+  'put',
+  'patch',
+  'delete',
+  'head',
+  'options',
+  'request',
+])
 export const apiClient: Client = new Proxy(transportClient, {
   get(target, property, receiver) {
     const value = Reflect.get(target, property, receiver)

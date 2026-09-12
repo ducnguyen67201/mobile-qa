@@ -17,16 +17,16 @@ This packet owns implementation order and stack decisions. The [product specific
 
 ## Baseline decisions
 
-| Area | Build with | Reason |
-|---|---|---|
-| Application | Loco Rust monolith, its Axum foundation and SeaORM | Reuse application conventions and scaffolding |
-| Dashboard | Loco React/Vite starter, TypeScript strict, React Router, TanStack Query | Stay close to the starter; fast UI iteration |
-| Components | Mantine packaged components | Assemble forms, navigation, tables and dialogs |
-| Shared contracts | Rust/Utoipa → OpenAPI → generated TypeScript SDK + Zod; worker DTOs → JSON Schema → Pydantic | Authoritative shapes, endpoint descriptions and runtime boundary validation |
-| Persistence | PostgreSQL | Product records, manifests, leases and durable jobs |
-| Execution | Python/uv adapter around a pinned Minitap mobile-use version | Reuse device interaction; keep Python narrowly scoped |
-| Artifacts | Local private directory in development; private S3-compatible storage for pilot | APKs, screenshots, logs and available recordings |
-| Hosting | Railway application + PostgreSQL initially; separate qualified Linux device host; AWS later | Move quickly while retaining portable deployment boundaries; see [hosting](../hosting.md) |
+| Area             | Build with                                                                                   | Reason                                                                                    |
+| ---------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Application      | Loco Rust monolith, its Axum foundation and SeaORM                                           | Reuse application conventions and scaffolding                                             |
+| Dashboard        | Loco React/Vite starter, TypeScript strict, React Router, TanStack Query                     | Stay close to the starter; fast UI iteration                                              |
+| Components       | Mantine packaged components                                                                  | Assemble forms, navigation, tables and dialogs                                            |
+| Shared contracts | Rust/Utoipa → OpenAPI → generated TypeScript SDK + Zod; worker DTOs → JSON Schema → Pydantic | Authoritative shapes, endpoint descriptions and runtime boundary validation               |
+| Persistence      | PostgreSQL                                                                                   | Product records, manifests, leases and durable jobs                                       |
+| Execution        | Python/uv adapter around a pinned Minitap mobile-use version                                 | Reuse device interaction; keep Python narrowly scoped                                     |
+| Artifacts        | Local private directory in development; private S3-compatible storage for pilot              | APKs, screenshots, logs and available recordings                                          |
+| Hosting          | Railway application + PostgreSQL initially; separate qualified Linux device host; AWS later  | Move quickly while retaining portable deployment boundaries; see [hosting](../hosting.md) |
 
 Start with the starter's routing rather than replacing it with TanStack Router. No SSR or production Node server is required for this dashboard. Loco background workers run Rust code; our Python device worker needs the explicit HTTP lease protocol in spec 04. No second agent framework is needed to control the same device loop.
 
@@ -34,15 +34,15 @@ Runnable applications live under `apps/api`, `apps/web` and `apps/mobile-worker`
 
 ## Ordered smaller specs
 
-| Order | Spec | Observable completion |
-|---|---|---|
-| 1 | [Source setup and fast development](01-source-setup-and-fast-dev.md) | Working starter, one typed endpoint, cached checks, fake-worker development |
-| 2 | [Cloud phone and execution feasibility](02-cloud-phone-and-feasibility.md) | Real emulator runs a fixed case and captures trustworthy evidence |
-| 3 | [App setup and first UI/backend slice](03-app-setup-and-ui-backend.md) | Sign in, create app, upload APK, see real readiness status |
-| 4 | [Run one test and report](04-execution-and-reports.md) | Browser → durable job → Python → phone → persisted report |
-| 5 | [Test cases, suites and plans](05-test-library-and-plans.md) | Edit, review, version and rerun approved definitions |
-| 6 | [Generate tests](06-test-generation.md) | Sources become reviewable drafts that can actually execute |
-| 7 | [Regression, pilot readiness and scaling](07-pilot-readiness-and-scale.md) | New-build comparison, recovery, measured reliability and costs |
+| Order | Spec                                                                       | Observable completion                                                       |
+| ----- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 1     | [Source setup and fast development](01-source-setup-and-fast-dev.md)       | Working starter, one typed endpoint, cached checks, fake-worker development |
+| 2     | [Cloud phone and execution feasibility](02-cloud-phone-and-feasibility.md) | Real emulator runs a fixed case and captures trustworthy evidence           |
+| 3     | [App setup and first UI/backend slice](03-app-setup-and-ui-backend.md)     | Sign in, create app, upload APK, see real readiness status                  |
+| 4     | [Run one test and report](04-execution-and-reports.md)                     | Browser → durable job → Python → phone → persisted report                   |
+| 5     | [Test cases, suites and plans](05-test-library-and-plans.md)               | Edit, review, version and rerun approved definitions                        |
+| 6     | [Generate tests](06-test-generation.md)                                    | Sources become reviewable drafts that can actually execute                  |
+| 7     | [Regression, pilot readiness and scaling](07-pilot-readiness-and-scale.md) | New-build comparison, recovery, measured reliability and costs              |
 
 Dependencies: 01 → 02 and 03; both 02 and 03 → 04 → 05 → 06 → 07. Work on the small App screen can continue while infrastructure access is pending, but device qualification gates real execution. Avoid completing a large UI before proving the runner.
 
@@ -50,14 +50,14 @@ Dependencies: 01 → 02 and 03; both 02 and 03 → 04 → 05 → 06 → 07. Work
 
 Complete spec 01 and its post-implementation verification first. It establishes the shared scaffold, package versions, development commands and contract export conventions. Do not have several contributors scaffold or replace the application independently.
 
-| Wave | Work that can run concurrently | Gate before proceeding |
-|---|---|---|
-| A | Spec 01 only | Complete setup, then verify the starter and export path |
-| B | Spec 02 cloud/device adapter + spec 03 app setup | Device qualification and persisted app/build setup both complete |
-| C | Spec 04 divided into Rust scheduling/report APIs, Python protocol integration, and Runs UI | Agree on the protocol first; integrate all three and verify the real end-to-end workflow |
-| D | Spec 05 test library + the independent operational subset of spec 07 | Approved/versioned cases and plans work; operational work cannot claim pilot readiness |
-| E | Spec 06 generation + remaining independent deployment/retention work from spec 07 | Generated drafts execute through the same approved workflow |
-| F | Remaining spec 07 regression integration and pilot qualification | Completed system passes the full pilot acceptance gate |
+| Wave | Work that can run concurrently                                                             | Gate before proceeding                                                                   |
+| ---- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| A    | Spec 01 only                                                                               | Complete setup, then verify the starter and export path                                  |
+| B    | Spec 02 cloud/device adapter + spec 03 app setup                                           | Device qualification and persisted app/build setup both complete                         |
+| C    | Spec 04 divided into Rust scheduling/report APIs, Python protocol integration, and Runs UI | Agree on the protocol first; integrate all three and verify the real end-to-end workflow |
+| D    | Spec 05 test library + the independent operational subset of spec 07                       | Approved/versioned cases and plans work; operational work cannot claim pilot readiness   |
+| E    | Spec 06 generation + remaining independent deployment/retention work from spec 07          | Generated drafts execute through the same approved workflow                              |
+| F    | Remaining spec 07 regression integration and pilot qualification                           | Completed system passes the full pilot acceptance gate                                   |
 
 For a small team, use two workstreams after setup: **device/worker** and **product UI/backend**. Split into three for spec 04 only if coordination is useful. These are scheduling recommendations, not instructions to launch agents or paid cloud resources now.
 
@@ -119,14 +119,14 @@ Runtime secrets use [Doppler](../environment.md); no env files or examples.
 
 ## Risks and decision gates
 
-| Risk | Resolve before |
-|---|---|
-| APK ABI, emulator detection, Play services or login incompatibility | Promising a pilot configuration; spec 02 |
-| Upstream SDK evidence/reset/cancellation behavior differs from documentation | Building execution integration; spec 02 |
-| Loco scaffold and generated types do not integrate cleanly | Domain scaffolding; spec 01 |
-| Worker reports false passes or reruns uncertain mutations | Customer use; specs 04 and 07 |
-| First customer needs iOS/physical devices | Selling Android coverage as sufficient |
-| Device/model/human time makes the offer uneconomic | Fixed-price expansion; spec 07 |
+| Risk                                                                         | Resolve before                           |
+| ---------------------------------------------------------------------------- | ---------------------------------------- |
+| APK ABI, emulator detection, Play services or login incompatibility          | Promising a pilot configuration; spec 02 |
+| Upstream SDK evidence/reset/cancellation behavior differs from documentation | Building execution integration; spec 02  |
+| Loco scaffold and generated types do not integrate cleanly                   | Domain scaffolding; spec 01              |
+| Worker reports false passes or reruns uncertain mutations                    | Customer use; specs 04 and 07            |
+| First customer needs iOS/physical devices                                    | Selling Android coverage as sufficient   |
+| Device/model/human time makes the offer uneconomic                           | Fixed-price expansion; spec 07           |
 
 This specification does not authorize a cloud purchase. During implementation, prepare the provider configuration and current cost estimate before requesting authorization to create paid resources. Until then, local execution and fake-worker development remain useful.
 

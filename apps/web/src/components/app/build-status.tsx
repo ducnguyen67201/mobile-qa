@@ -1,4 +1,15 @@
-import { Alert, Badge, Box, Card, Divider, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core'
+import {
+  Alert,
+  Badge,
+  Box,
+  Card,
+  Divider,
+  Group,
+  SimpleGrid,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core'
 import { Check, Circle, CircleAlert, Clock3, FileCheck2, Smartphone } from 'lucide-react'
 import type { BuildResponse, ReadinessResponse, ValidationState } from '@/api/generated/types.gen'
 import { formatBytes, formatDate } from './feedback'
@@ -20,7 +31,8 @@ const colors: Record<ValidationState, string> = {
 const explanations: Record<ValidationState, string> = {
   validated:
     'Package identity, integrity, signature and intake compatibility have been checked. Device installation has not been checked.',
-  error: 'The validation service could not complete its checks. Retry validation using the same stored file.',
+  error:
+    'The validation service could not complete its checks. Retry validation using the same stored file.',
   unsupported: 'Upload a standalone APK compatible with the supported intake policy.',
   invalid: 'Correct the reported issue, then upload a new signed APK.',
   validating: 'You can leave this page. The saved status is available when you return.',
@@ -47,14 +59,22 @@ export function BuildDetail({ build }: { build: BuildResponse }) {
     ['Package', metadata?.package_name ?? 'Not available'],
     [
       'Version',
-      metadata ? `${metadata.version_name ?? 'Unnamed'} (${metadata.version_code})` : 'Not available',
+      metadata
+        ? `${metadata.version_name ?? 'Unnamed'} (${metadata.version_code})`
+        : 'Not available',
     ],
     ['File size', formatBytes(build.byte_size)],
     ['Uploaded', formatDate(build.created_at)],
     ['Minimum Android API', metadata?.min_sdk ?? 'Not available'],
     ['Target Android API', metadata?.target_sdk ?? 'Not specified'],
-    ['Native ABIs', metadata ? metadata.native_abis.join(', ') || 'No native libraries' : 'Not available'],
-    ['Signature', metadata ? (metadata.signature_verified ? 'Verified' : 'Not verified') : 'Not available'],
+    [
+      'Native ABIs',
+      metadata ? metadata.native_abis.join(', ') || 'No native libraries' : 'Not available',
+    ],
+    [
+      'Signature',
+      metadata ? (metadata.signature_verified ? 'Verified' : 'Not verified') : 'Not available',
+    ],
   ]
 
   return (
@@ -72,7 +92,13 @@ export function BuildDetail({ build }: { build: BuildResponse }) {
         {build.original_filename}
       </Text>
       <Divider my="lg" />
-      <Alert color={colors[build.validation.state]} title={message} role="status" aria-live="polite" mb="lg">
+      <Alert
+        color={colors[build.validation.state]}
+        title={message}
+        role="status"
+        aria-live="polite"
+        mb="lg"
+      >
         {explanations[build.validation.state]}
       </Alert>
       <SimpleGrid component="dl" cols={{ base: 1, xs: 2 }} spacing="lg" m={0}>
@@ -81,7 +107,14 @@ export function BuildDetail({ build }: { build: BuildResponse }) {
             <Text component="dt" size="xs" c="dimmed">
               {label}
             </Text>
-            <Text component="dd" size="sm" fw={500} m={0} mt={4} style={{ overflowWrap: 'anywhere' }}>
+            <Text
+              component="dd"
+              size="sm"
+              fw={500}
+              m={0}
+              mt={4}
+              style={{ overflowWrap: 'anywhere' }}
+            >
               {value}
             </Text>
           </Box>
@@ -97,7 +130,8 @@ export function BuildDetail({ build }: { build: BuildResponse }) {
         </Text>
       </Box>
       <Text size="xs" c="dimmed" mt="lg" className="identifier">
-        Validator {build.validation.validator_version} · Policy {build.validation.intake_policy_version}
+        Validator {build.validation.validator_version} · Policy{' '}
+        {build.validation.intake_policy_version}
         {build.validation.reason_code ? ` · ${build.validation.reason_code}` : ''}
       </Text>
     </Card>
@@ -141,8 +175,8 @@ export function ReadinessCard({ readiness }: { readiness: ReadinessResponse }) {
       </Stack>
       <Divider my="md" />
       <Text size="xs" c="dimmed">
-        Device checks are not available yet. A validated APK is the first step; it is not confirmation that
-        your app is ready to run.
+        Device checks are not available yet. A validated APK is the first step; it is not
+        confirmation that your app is ready to run.
       </Text>
     </Card>
   )

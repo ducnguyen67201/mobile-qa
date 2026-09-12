@@ -757,6 +757,7 @@ pub struct BrowserApi;
 
 pub fn openapi() -> utoipa::openapi::OpenApi {
     let mut api = BrowserApi::openapi();
+    api.merge(crate::execution_api::ExecutionApi::openapi());
     if let Some(components) = api.components.as_mut() {
         components.add_security_scheme(
             "session_cookie",

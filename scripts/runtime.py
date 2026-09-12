@@ -4,6 +4,7 @@
 `smoke` exercises the built foundation without fetching secrets or running a device.
 Only stop services this invocation started. Never delete the persistent DB volume.
 """
+
 import argparse
 import json
 import os
@@ -27,7 +28,11 @@ def run(command, **kwargs):
 @contextmanager
 def database():
     """Borrow an existing Compose database, or start and later stop our own instance."""
-    running = run(COMPOSE + ["ps", "--status", "running", "-q", "postgres"], capture_output=True, text=True).stdout.strip()
+    running = run(
+        COMPOSE + ["ps", "--status", "running", "-q", "postgres"],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     owned = not running
     try:
         if owned:
@@ -45,7 +50,9 @@ def ensure_ports():
             try:
                 sock.bind(("127.0.0.1", port))
             except OSError as exc:
-                raise RuntimeError(f"Port {port} is occupied; stop its owner or use that running service.") from exc
+                raise RuntimeError(
+                    f"Port {port} is occupied; stop its owner or use that running service."
+                ) from exc
 
 
 def wait_http(url, children, timeout=60):
@@ -75,7 +82,29 @@ def services(built=False):
     private = ROOT / ".private"
     private.mkdir(mode=0o700, exist_ok=True)
     private.chmod(0o700)
-    commands = [([str(ROOT / "target/debug/mobile-qa-cli"), "start", "--environment", "development"] if built else ["cargo", "run", "--locked", "--bin", "mobile-qa-cli", "--", "start", "--environment", "development"]), ["pnpm", "--dir", "apps/web", "dev"]]
+    commands = [
+        (
+            [
+                str(ROOT / "target/debug/mobile-qa-cli"),
+                "start",
+                "--environment",
+                "development",
+            ]
+            if built
+            else [
+                "cargo",
+                "run",
+                "--locked",
+                "--bin",
+                "mobile-qa-cli",
+                "--",
+                "start",
+                "--environment",
+                "development",
+            ]
+        ),
+        ["pnpm", "--dir", "apps/web", "dev"],
+    ]
     children = []
     handles = []
     try:
@@ -83,10 +112,25 @@ def services(built=False):
             # Inject only into the API child. Vite and local verification do not
             # receive secrets fetched by Doppler. No secret files or restart watcher.
             if name == "api" and not built:
-                command = ["doppler", "run", "--no-fallback", "--forward-signals", "--", *command]
+                command = [
+                    "doppler",
+                    "run",
+                    "--no-fallback",
+                    "--forward-signals",
+                    "--",
+                    *command,
+                ]
             handle = (private / f"{name}.log").open("w")
             handles.append(handle)
-            children.append(subprocess.Popen(command, cwd=(ROOT / "apps/api" if name == "api" else ROOT), stdout=handle, stderr=subprocess.STDOUT, start_new_session=True))
+            children.append(
+                subprocess.Popen(
+                    command,
+                    cwd=(ROOT / "apps/api" if name == "api" else ROOT),
+                    stdout=handle,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                )
+            )
         yield children
     finally:
         # Each child owns a process group, including Cargo/Doppler descendants.
@@ -118,20 +162,67 @@ def smoke():
             started = wait_http("http://127.0.0.1:5150/api/health", children)
             wait_http("http://127.0.0.1:5173/api/health", children)
             for port in (5150, 5173):
-                with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health") as response:
-                    assert json.load(response) == {"status": "ok", "service": "mobile-qa", "version": "0.1.0"}
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/api/health"
+                ) as response:
+                    assert json.load(response) == {
+                        "status": "ok",
+                        "service": "mobile-qa",
+                        "version": "0.1.0",
+                    }
             try:
                 urllib.request.urlopen("http://127.0.0.1:5150/api/missing")
             except urllib.error.HTTPError as error:
                 assert error.code == 404
             else:
                 raise AssertionError("Unknown API route must return 404")
-            output = run(COMPOSE + ["exec", "-T", "postgres", "psql", "-U", "mobile_qa", "-d", "mobile_qa_development", "-Atc", "SELECT current_database(), to_regclass('seaql_migrations');"], capture_output=True, text=True).stdout.strip()
+            output = run(
+                COMPOSE
+                + [
+                    "exec",
+                    "-T",
+                    "postgres",
+                    "psql",
+                    "-U",
+                    "mobile_qa",
+                    "-d",
+                    "mobile_qa_development",
+                    "-Atc",
+                    "SELECT current_database(), to_regclass('seaql_migrations');",
+                ],
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
             assert output == "mobile_qa_development|seaql_migrations", output
             for kind in ("pass", "fail", "blocked"):
-                run(["uv", "run", "--no-sync", "--project", "apps/mobile-worker", "--frozen", "mobile-qa-worker", "fake", f"contracts/fixtures/{kind}.json"])
+                run(
+                    [
+                        "uv",
+                        "run",
+                        "--no-sync",
+                        "--project",
+                        "apps/mobile-worker",
+                        "--frozen",
+                        "mobile-qa-worker",
+                        "fake",
+                        f"contracts/fixtures/{kind}.json",
+                    ]
+                )
             # Block network socket connections during the import-only SDK smoke.
-            run(["uv", "run", "--no-sync", "--project", "apps/mobile-worker", "--frozen", "--extra", "sdk", "python", "scripts/sdk_smoke.py"])
+            run(
+                [
+                    "uv",
+                    "run",
+                    "--no-sync",
+                    "--project",
+                    "apps/mobile-worker",
+                    "--frozen",
+                    "--extra",
+                    "sdk",
+                    "python",
+                    "scripts/sdk_smoke.py",
+                ]
+            )
             print(f"Smoke passed; warm built API ready in {started:.3f}s")
     finally:
         if moved:
@@ -141,18 +232,37 @@ def smoke():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=["dev", "smoke", "check-api"])
-    parser.add_argument("--api-only", action="store_true", help="Check API/migration packages, not contract tests (CI scope)")
+    parser.add_argument(
+        "--api-only",
+        action="store_true",
+        help="Check API/migration packages, not contract tests (CI scope)",
+    )
     args = parser.parse_args()
     if args.api_only and args.mode != "check-api":
         parser.error("--api-only requires check-api")
     if args.mode == "check-api":
         # CI selects API/migration only. Local `just check-api` retains the full
         # Rust workspace option; the CI contract job owns contract tests separately.
-        packages = ["--package", "mobile-qa", "--package", "migration"] if args.api_only else ["--workspace"]
+        packages = (
+            ["--package", "mobile-qa", "--package", "migration"]
+            if args.api_only
+            else ["--workspace"]
+        )
         format_packages = packages if args.api_only else ["--all"]
         with database():
             run(["cargo", "fmt", *format_packages, "--", "--check"])
-            run(["cargo", "clippy", *packages, "--all-targets", "--locked", "--", "-D", "warnings"])
+            run(
+                [
+                    "cargo",
+                    "clippy",
+                    *packages,
+                    "--all-targets",
+                    "--locked",
+                    "--",
+                    "-D",
+                    "warnings",
+                ]
+            )
             run(["cargo", "test", *packages, "--locked"])
     elif args.mode == "smoke":
         smoke()
@@ -160,7 +270,10 @@ def main():
         with database(), services() as children:
             start = wait_http("http://127.0.0.1:5150/api/health", children, timeout=900)
             wait_http("http://127.0.0.1:5173", children)
-            print(f"Ready at http://127.0.0.1:5173 (API startup {start:.3f}s). Ctrl-C stops owned services.", flush=True)
+            print(
+                f"Ready at http://127.0.0.1:5173 (API startup {start:.3f}s). Ctrl-C stops owned services.",
+                flush=True,
+            )
             while all(child.poll() is None for child in children):
                 time.sleep(1)
             raise RuntimeError("A development service exited. Inspect .private logs.")

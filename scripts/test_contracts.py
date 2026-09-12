@@ -1,4 +1,5 @@
 """Regression check for content-only generation and nonmutating drift detection."""
+
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,7 +9,10 @@ from scripts.contracts import synchronize
 
 class ExportTests(unittest.TestCase):
     def test_content_sync_preserves_mtime_and_detects_add_change_delete(self):
-        with tempfile.TemporaryDirectory() as left, tempfile.TemporaryDirectory() as right:
+        with (
+            tempfile.TemporaryDirectory() as left,
+            tempfile.TemporaryDirectory() as right,
+        ):
             staged, dest = Path(left), Path(right)
             source = staged / "apps/web/src/api/generated/types.gen.ts"
             source.parent.mkdir(parents=True)

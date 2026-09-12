@@ -18,9 +18,9 @@ server:
       must_exist: true
       precompressed: false
       folder:
-        uri: "/"
-        path: "../web/dist"
-      fallback: "../web/dist/index.html"
+        uri: '/'
+        path: '../web/dist'
+      fallback: '../web/dist/index.html'
 database:
   uri: <%= get_env(name="DATABASE_URL") %>
   enable_logging: false

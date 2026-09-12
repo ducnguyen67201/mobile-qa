@@ -6,17 +6,17 @@ Hosted acceptance, full device qualification and UI-to-worker job dispatch remai
 
 ## Component ownership
 
-| Location | Responsibility | Current state |
-|---|---|---|
-| `apps/api` | Rust/Loco API, authorization, domain services, scheduling, verification and reports | Auth, apps/environments, private APK intake and build history implemented; scheduling/reports planned |
-| `apps/api/migration` | SeaORM database migrations | Twelve product tables with tenant/lifecycle constraints; real PostgreSQL tests |
-| `apps/web` | React/Vite dashboard using React Router, TanStack Query, Mantine | Authenticated Mantine dashboard, App and Settings; Tests/Runs placeholders |
-| `apps/mobile-worker` | Python/uv adapter, device observations and evidence | Local ADB demo and live Minitap demo verified; network jobs planned |
-| `crates/contracts` | Pure Rust transport DTOs and browser endpoint declarations | Browser setup operations plus worker fixture and qualification contracts; no Loco/DB dependency |
-| `contracts` | Generated OpenAPI/JSON Schema and serialization fixtures | Derived from Rust, committed and checked for drift |
-| `infra` | Local infrastructure and future device-host provisioning | Isolated PostgreSQL and pinned Mac/Linux device-host setup |
-| `scripts` / `justfile` | Explicit development, generation and validation | Implemented; no check watchers |
-| `docs/architect` | Product/architecture/specification source of truth | This packet |
+| Location               | Responsibility                                                                      | Current state                                                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `apps/api`             | Rust/Loco API, authorization, domain services, scheduling, verification and reports | Auth, apps/environments, private APK intake and build history implemented; scheduling/reports planned |
+| `apps/api/migration`   | SeaORM database migrations                                                          | Twelve product tables with tenant/lifecycle constraints; real PostgreSQL tests                        |
+| `apps/web`             | React/Vite dashboard using React Router, TanStack Query, Mantine                    | Authenticated Mantine dashboard, App and Settings; Tests/Runs placeholders                            |
+| `apps/mobile-worker`   | Python/uv adapter, device observations and evidence                                 | Local ADB demo and live Minitap demo verified; network jobs planned                                   |
+| `crates/contracts`     | Pure Rust transport DTOs and browser endpoint declarations                          | Browser setup operations plus worker fixture and qualification contracts; no Loco/DB dependency       |
+| `contracts`            | Generated OpenAPI/JSON Schema and serialization fixtures                            | Derived from Rust, committed and checked for drift                                                    |
+| `infra`                | Local infrastructure and future device-host provisioning                            | Isolated PostgreSQL and pinned Mac/Linux device-host setup                                            |
+| `scripts` / `justfile` | Explicit development, generation and validation                                     | Implemented; no check watchers                                                                        |
+| `docs/architect`       | Product/architecture/specification source of truth                                  | This packet                                                                                           |
 
 Root Cargo.toml is a virtual workspace. Keep runnable applications under apps and shared
 code outside it. Each language uses its native tooling and locked dependencies. Loco's
@@ -87,3 +87,17 @@ jobs and the narrow transactional claim/lease behavior.
   emulator before committing to real execution; no cloud device is provisioned yet.
 - [Product](product.md): Android-first operated pilot; iOS, broad fleets and App Store
   submission are outside the current implementation boundary.
+
+## Execution ownership
+
+Rust owns immutable test definitions/approvals, manifests, queue attempts, worker
+identity, physical-resource reservations, event deduplication and evidence verdicts.
+The Python polling supervisor owns execution/cleanup on its host. A database lease
+expiry invalidates completion authority while keeping reservations quarantined until
+physical recovery; it cannot stop a surviving device process by itself.
+
+The first adapter is the controlled persistence demo. Semantic navigate actions use
+Minitap; process restart and evidence checkpoints are explicit supervisor operations.
+Rust re-evaluates the supported UI checks from retained hierarchy bytes; SDK completion
+is not a pass assertion. React polls the report API and displays required coverage,
+missing evidence, cancellation and cleanup independently of worker exit status.

@@ -75,6 +75,25 @@ def prepare_environment(directory: Path) -> None:
 async def execute(request_path: Path, result_path: Path) -> None:
     request = parse_request(request_path.read_text())
     profile = Profile.load(Path(request.profile_path))
+    goal = (
+        f"Create exactly one task with the exact text qa-{request.attempt_id}. "
+        "Press Save, verify the task is displayed in the list, then stop. "
+        "Do not delete tasks, close the app, or change any settings."
+    )
+    await navigate(
+        profile, request.serial, request.package, str(request.attempt_id), result_path, goal
+    )
+
+
+async def navigate(
+    profile: Profile,
+    serial: str,
+    package: str,
+    attempt_id: str,
+    result_path: Path,
+    goal: str,
+) -> None:
+    """Shared pinned SDK seam; the caller owns the approved navigation instruction."""
     prepare_environment(result_path.parent)
     # Keep SDK ADB helpers on the same pinned tools/user state as the supervisor.
     os.environ["PATH"] = (
@@ -137,9 +156,7 @@ async def execute(request_path: Path, result_path: Path) -> None:
         utils=LLMConfigUtils(outputter=node, hopper=node),
     )
     agent_profile = AgentProfile(name="qualification", llm_config=llm)
-    builder = AgentConfigBuilder().for_device(
-        platform=DevicePlatform.ANDROID, device_id=request.serial
-    )
+    builder = AgentConfigBuilder().for_device(platform=DevicePlatform.ANDROID, device_id=serial)
     agent = Agent(
         config=builder.add_profile(agent_profile)
         .with_default_profile("qualification")
@@ -149,21 +166,16 @@ async def execute(request_path: Path, result_path: Path) -> None:
     status = "error"
     try:
         await asyncio.wait_for(agent.init(), timeout=profile.init_seconds)
-        goal = (
-            f"Create exactly one task with the exact text qa-{request.attempt_id}. "
-            "Press Save, verify the task is displayed in the list, then stop. "
-            "Do not delete tasks, close the app, or change any settings."
-        )
         atomic_json(result_path.parent / "navigation.started", {"phase": "navigation"})
         await asyncio.wait_for(
             agent.run_task(
                 request=TaskRequest[None](
                     goal=goal,
-                    task_name=str(request.attempt_id),
+                    task_name=str(attempt_id),
                     max_steps=profile.max_steps,
                     record_trace=True,
                     trace_path=result_path.parent / "traces",
-                    locked_app_package=request.package,
+                    locked_app_package=package,
                 )
             ),
             timeout=profile.navigation_seconds,

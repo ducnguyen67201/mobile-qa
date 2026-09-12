@@ -3,6 +3,9 @@
   "title": "WorkerContracts",
   "type": "object",
   "properties": {
+    "execution": {
+      "$ref": "#/$defs/ExecutionContracts"
+    },
     "probe": {
       "$ref": "#/$defs/ContractProbe"
     },
@@ -17,12 +20,384 @@
     }
   },
   "required": [
+    "execution",
     "request",
     "result",
     "probe",
     "qualification"
   ],
   "$defs": {
+    "ActionKind": {
+      "type": "string",
+      "enum": [
+        "navigate",
+        "restart_app",
+        "checkpoint"
+      ]
+    },
+    "ArtifactReceipt": {
+      "type": "object",
+      "properties": {
+        "artifact": {
+          "$ref": "#/$defs/RunArtifact"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "artifact"
+      ]
+    },
+    "ArtifactRequest": {
+      "type": "object",
+      "properties": {
+        "byte_size": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "checkpoint_id": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "checkpoint_id",
+        "name",
+        "mime",
+        "byte_size",
+        "sha256"
+      ]
+    },
+    "AttemptReceipt": {
+      "type": "object",
+      "properties": {
+        "attempt": {
+          "$ref": "#/$defs/AttemptResponse"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "attempt"
+      ]
+    },
+    "AttemptResponse": {
+      "type": "object",
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RunArtifact"
+          }
+        },
+        "case_version_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CheckResult"
+          }
+        },
+        "cleanup": {
+          "$ref": "#/$defs/CleanupState"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExecutionEvent"
+          }
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "number": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Outcome"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/JobState"
+        },
+        "usage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelUsage"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "case_version_id",
+        "generation",
+        "number",
+        "state",
+        "cleanup",
+        "checks",
+        "artifacts",
+        "usage",
+        "events"
+      ]
+    },
+    "CaseDefinition": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TestAction"
+          }
+        },
+        "adapter": {
+          "type": "string"
+        },
+        "budget": {
+          "$ref": "#/$defs/ExecutionBudget"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExpectedCheck"
+          }
+        },
+        "key": {
+          "type": "string"
+        },
+        "package": {
+          "type": "string"
+        },
+        "preconditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "provenance": {
+          "type": "string"
+        },
+        "requirement": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "version",
+        "title",
+        "requirement",
+        "provenance",
+        "package",
+        "adapter",
+        "preconditions",
+        "actions",
+        "checks",
+        "budget"
+      ]
+    },
+    "CheckMethod": {
+      "type": "string",
+      "enum": [
+        "ui_property_equals_v1",
+        "ui_element_presence_v1",
+        "manual"
+      ]
+    },
+    "CheckResult": {
+      "type": "object",
+      "properties": {
+        "artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "check_id": {
+          "type": "string"
+        },
+        "expected": {
+          "type": "string"
+        },
+        "observed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcome": {
+          "$ref": "#/$defs/Outcome"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "check_id",
+        "expected",
+        "outcome",
+        "reason",
+        "artifact_ids"
+      ]
+    },
+    "ClaimRequest": {
+      "type": "object",
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "profile_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "version": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "claim_id",
+        "profile_id"
+      ]
+    },
+    "ClaimResponse": {
+      "type": "object",
+      "properties": {
+        "lease": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExecutionLease"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "poll_after_seconds": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "poll_after_seconds"
+      ]
+    },
+    "CleanupRequest": {
+      "type": "object",
+      "properties": {
+        "boot_id": {
+          "type": "string"
+        },
+        "evidence_reference": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "reset": {
+          "$ref": "#/$defs/CleanupState"
+        },
+        "stopped": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "stopped",
+        "reset",
+        "evidence_reference",
+        "boot_id"
+      ]
+    },
+    "CleanupState": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "verified_clean",
+        "quarantined"
+      ]
+    },
+    "CompleteRequest": {
+      "type": "object",
+      "properties": {
+        "execution_outcome": {
+          "$ref": "#/$defs/Outcome"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "usage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelUsage"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "execution_outcome",
+        "reason",
+        "usage"
+      ]
+    },
     "ContractProbe": {
       "type": "object",
       "properties": {
@@ -63,6 +438,356 @@
         "counter"
       ]
     },
+    "Driver": {
+      "type": "string",
+      "enum": [
+        "fake",
+        "minitap"
+      ]
+    },
+    "EventReceipt": {
+      "type": "object",
+      "properties": {
+        "last_sequence": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "last_sequence"
+      ]
+    },
+    "EventRequest": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExecutionEvent"
+          }
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "events"
+      ]
+    },
+    "EvidenceState": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "sealed",
+        "unavailable"
+      ]
+    },
+    "ExecutionBudget": {
+      "type": "object",
+      "properties": {
+        "artifact_bytes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "duration_seconds": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "max_steps": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "duration_seconds",
+        "max_steps",
+        "artifact_bytes"
+      ]
+    },
+    "ExecutionContracts": {
+      "type": "object",
+      "properties": {
+        "artifact_receipt": {
+          "$ref": "#/$defs/ArtifactReceipt"
+        },
+        "artifact_request": {
+          "$ref": "#/$defs/ArtifactRequest"
+        },
+        "attempt_receipt": {
+          "$ref": "#/$defs/AttemptReceipt"
+        },
+        "claim_request": {
+          "$ref": "#/$defs/ClaimRequest"
+        },
+        "claim_response": {
+          "$ref": "#/$defs/ClaimResponse"
+        },
+        "cleanup": {
+          "$ref": "#/$defs/CleanupRequest"
+        },
+        "completion": {
+          "$ref": "#/$defs/CompleteRequest"
+        },
+        "event_receipt": {
+          "$ref": "#/$defs/EventReceipt"
+        },
+        "events": {
+          "$ref": "#/$defs/EventRequest"
+        },
+        "job": {
+          "$ref": "#/$defs/ExecutionJob"
+        },
+        "lease_request": {
+          "$ref": "#/$defs/LeaseRequest"
+        },
+        "lease_status": {
+          "$ref": "#/$defs/LeaseStatusResponse"
+        },
+        "local_result": {
+          "$ref": "#/$defs/LocalExecutionResult"
+        },
+        "navigation": {
+          "$ref": "#/$defs/NavigationRequest"
+        }
+      },
+      "required": [
+        "job",
+        "navigation",
+        "local_result",
+        "claim_request",
+        "claim_response",
+        "lease_request",
+        "lease_status",
+        "events",
+        "event_receipt",
+        "artifact_request",
+        "artifact_receipt",
+        "completion",
+        "cleanup",
+        "attempt_receipt"
+      ]
+    },
+    "ExecutionEvent": {
+      "type": "object",
+      "properties": {
+        "action_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "message": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "sequence": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sequence",
+        "action_id",
+        "phase",
+        "message"
+      ]
+    },
+    "ExecutionJob": {
+      "type": "object",
+      "properties": {
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "case_index": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "manifest": {
+          "$ref": "#/$defs/RunManifest"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "manifest",
+        "case_index"
+      ]
+    },
+    "ExecutionLease": {
+      "type": "object",
+      "properties": {
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "case_index": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "lease_token": {
+          "type": "string"
+        },
+        "manifest": {
+          "$ref": "#/$defs/RunManifest"
+        },
+        "run_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "run_id",
+        "generation",
+        "lease_token",
+        "expires_at",
+        "manifest",
+        "case_index"
+      ]
+    },
+    "ExecutionProfile": {
+      "type": "object",
+      "properties": {
+        "adapter": {
+          "type": "string"
+        },
+        "device_identity": {
+          "type": "string"
+        },
+        "driver": {
+          "$ref": "#/$defs/Driver"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "image": {
+          "type": "string"
+        },
+        "max_apk_bytes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "model": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "package": {
+          "type": "string"
+        },
+        "qualification_reference": {
+          "type": "string"
+        },
+        "qualified": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "driver",
+        "package",
+        "adapter",
+        "device_identity",
+        "image",
+        "model",
+        "qualified",
+        "qualification_reference",
+        "max_apk_bytes"
+      ]
+    },
+    "ExpectedCheck": {
+      "type": "object",
+      "properties": {
+        "checkpoint_id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "expected": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "method": {
+          "$ref": "#/$defs/CheckMethod"
+        },
+        "observation_seconds": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "prerequisite_check_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "property": {
+          "$ref": "#/$defs/UiProperty"
+        },
+        "ready_resource_id": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "text_filter": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "checkpoint_id",
+        "description",
+        "method",
+        "resource_id",
+        "text_filter",
+        "property",
+        "expected",
+        "ready_resource_id",
+        "prerequisite_check_ids",
+        "required",
+        "observation_seconds"
+      ]
+    },
     "FakeExecutionRequest": {
       "type": "object",
       "properties": {
@@ -94,7 +819,7 @@
           "type": "string"
         },
         "outcome": {
-          "$ref": "#/$defs/Outcome"
+          "$ref": "#/$defs/Outcome2"
         },
         "run_id": {
           "type": "string",
@@ -115,7 +840,178 @@
         "message"
       ]
     },
+    "JobState": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "leased",
+        "running",
+        "finalizing",
+        "finished",
+        "cancel_requested",
+        "recovery_required"
+      ]
+    },
+    "LeaseRequest": {
+      "type": "object",
+      "properties": {
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation"
+      ]
+    },
+    "LeaseStatusResponse": {
+      "type": "object",
+      "properties": {
+        "cancel_requested": {
+          "type": "boolean"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "state": {
+          "$ref": "#/$defs/JobState"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "expires_at",
+        "cancel_requested"
+      ]
+    },
+    "LocalExecutionResult": {
+      "type": "object",
+      "properties": {
+        "boot_id": {
+          "type": "string"
+        },
+        "evidence_reference": {
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/Outcome"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "reset": {
+          "$ref": "#/$defs/CleanupState"
+        },
+        "stopped": {
+          "type": "boolean"
+        },
+        "usage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelUsage"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "reason",
+        "usage",
+        "reset",
+        "stopped",
+        "boot_id",
+        "evidence_reference"
+      ]
+    },
+    "ModelUsage": {
+      "type": "object",
+      "properties": {
+        "calls": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "model": {
+          "type": "string"
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "unknown_calls": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "calls",
+        "unknown_calls"
+      ]
+    },
+    "NavigationRequest": {
+      "type": "object",
+      "properties": {
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "instruction": {
+          "type": "string"
+        },
+        "max_steps": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "package": {
+          "type": "string"
+        },
+        "profile_path": {
+          "type": "string"
+        },
+        "serial": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "profile_path",
+        "serial",
+        "package",
+        "instruction",
+        "max_steps"
+      ]
+    },
     "Outcome": {
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "blocked",
+        "inconclusive",
+        "skipped",
+        "canceled"
+      ]
+    },
+    "Outcome2": {
       "type": "string",
       "enum": [
         "passed",
@@ -414,6 +1310,156 @@
         "unknown_calls"
       ]
     },
+    "ResolvedCase": {
+      "type": "object",
+      "properties": {
+        "case": {
+          "$ref": "#/$defs/CaseDefinition"
+        },
+        "content_hash": {
+          "type": "string"
+        },
+        "data_variant": {
+          "type": "string"
+        },
+        "definition_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "required": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "definition_id",
+        "content_hash",
+        "data_variant",
+        "required",
+        "case"
+      ]
+    },
+    "RunArtifact": {
+      "type": "object",
+      "properties": {
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "byte_size": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "checkpoint_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/EvidenceState"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "attempt_id",
+        "checkpoint_id",
+        "name",
+        "mime",
+        "byte_size",
+        "sha256",
+        "state"
+      ]
+    },
+    "RunManifest": {
+      "type": "object",
+      "properties": {
+        "app_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "budget": {
+          "$ref": "#/$defs/ExecutionBudget"
+        },
+        "build_bytes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "build_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "build_sha256": {
+          "type": "string"
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResolvedCase"
+          }
+        },
+        "diagnostic_retries": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "environment_revision": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "plan_hash": {
+          "type": "string"
+        },
+        "plan_version_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "profile": {
+          "$ref": "#/$defs/ExecutionProfile"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "app_id",
+        "build_id",
+        "build_sha256",
+        "build_bytes",
+        "plan_version_id",
+        "plan_hash",
+        "environment_revision",
+        "profile",
+        "cases",
+        "budget",
+        "diagnostic_retries",
+        "exclusions"
+      ]
+    },
     "Scenario": {
       "oneOf": [
         {
@@ -455,6 +1501,39 @@
             "kind"
           ]
         }
+      ]
+    },
+    "TestAction": {
+      "type": "object",
+      "properties": {
+        "checkpoint_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "instruction": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ActionKind"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "instruction",
+        "checkpoint_id"
+      ]
+    },
+    "UiProperty": {
+      "type": "string",
+      "enum": [
+        "text",
+        "content_description",
+        "checked",
+        "enabled"
       ]
     }
   }

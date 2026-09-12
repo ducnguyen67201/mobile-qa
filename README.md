@@ -17,12 +17,20 @@ Cargo.toml            Virtual workspace (API, migration, contracts)
 ## Start
 
 Prerequisites: Rust1.95.0 with rustfmt/Clippy, Node24.14.1, pnpm11.16.0, uv0.12.1,
-just1.56+, Python3.12 (uv can provision), Docker with Compose.
+just1.56+, Python3.12 (uv can provision), Docker with Compose, and the Doppler CLI.
 
 ```sh
 just setup
+doppler login
+doppler setup
 just dev
 ```
+
+Run `doppler setup` from this repository root and select its project/config. Local
+credentials and directory selection are managed by the Doppler CLI; no token belongs
+in Git. `just dev` injects secrets only into the API child using
+`doppler run --no-fallback --forward-signals`. No `.env` or secret export file is used.
+See [environment setup](docs/environment.md) for required variable names and deployment.
 
 Open http://127.0.0.1:5173. API uses5150; PostgreSQL uses55432, all loopback only.
 Ctrl-C stops only child services and the PostgreSQL instance this command started.
@@ -52,7 +60,7 @@ blocked import-only Minitap4.0.0 seam; it never constructs an Agent.
 
 For individual services use `just dev-web`, `just dev-api`, `just dev-worker-fake`.
 API needs DB first: `docker compose -f infra/compose.yaml up -d --wait postgres`.
-For the Loco CLI directly: `cd apps/api && cargo loco start --environment development`.
+For the Loco CLI directly: `cd apps/api && doppler run --no-fallback --forward-signals -- cargo loco start --environment development`.
 API configuration paths resolve from apps/api. Only explicit API starts compile Rust;
 Vite HMR never invokes typechecking/lint/tests/generation or a Rust rebuild watcher.
 

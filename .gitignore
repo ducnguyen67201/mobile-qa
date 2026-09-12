@@ -7,6 +7,5 @@
 **/.ruff_cache/
 .env
 .env.*
-!.env.example
 /.private/
 .DS_Store

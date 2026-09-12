@@ -15,3 +15,8 @@ Preserve Loco scaffold markers. No domain framework/device/model/auth in this ph
 No global configuration changes. Keep secrets/artifacts out of Git. Do not touch
 parent sources/. Coordinate shared files before parallel edits. Respect the existing
 browser admin-policy denial; no alternate-access workaround for manual UI inspection.
+
+Runtime secrets come from Doppler process injection. Do not create .env files or env
+examples, download secrets to files, or commit tokens. Vite env-file loading is disabled.
+Only wrap secret-consuming server processes; local checks/fake runs remain Doppler-free.
+See docs/environment.md. Do not change the user's Doppler auth/config without scope.

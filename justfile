@@ -13,7 +13,7 @@ dev-web:
     pnpm --dir apps/web dev
 
 dev-api:
-    cd apps/api && cargo run --locked --bin mobile-qa-cli -- start --environment development
+    cd apps/api && doppler run --no-fallback --forward-signals -- cargo run --locked --bin mobile-qa-cli -- start --environment development
 
 dev-worker-fake:
     uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker fake contracts/fixtures/pass.json

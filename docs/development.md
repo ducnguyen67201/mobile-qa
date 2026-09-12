@@ -14,7 +14,7 @@ commands use --no-sync. Moved virtual environments can be refreshed explicitly w
 
 | Command | Work |
 |---|---|
-| dev | Isolated PostgreSQL, explicit API startup, Vite; owned-child cleanup |
+| dev | Isolated PostgreSQL, Doppler-injected API startup, Vite; owned-child cleanup |
 | types | Pure Rust exporter, local Hey API SDK/Zod, worker Pydantic; content-only writes |
 | check-contracts | Temporary regeneration/drift + content-sync test |
 | check-web | Strict tsc including generator config, ESLint, Vitest |
@@ -28,7 +28,9 @@ root. Test binaries resolve apps/api/config from their Cargo package directory.
 Production static assets resolve ../web/dist. Worker tests resolve root fixtures;
 ordinary fake commands can run from the root with an explicit --project.
 
-Development and test use fixed local database URLs, ignoring inherited DATABASE_URL.
+Runtime secrets use [Doppler injection](environment.md), with no env files. Only the
+API child is wrapped; checks/fake runs need no Doppler access. Development and test
+use fixed local database URLs, ignoring inherited DATABASE_URL.
 All destructive flags stay false; integration uses the existing mobile_qa_test DB
 without create/drop helpers. Compose project mobile-qa-local binds loopback, initializes
 the separate test database and persists its named volume. Startup never resets that

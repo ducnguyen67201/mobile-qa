@@ -67,6 +67,10 @@ def services(built=False):
     handles = []
     try:
         for name, command in zip(("api", "web"), commands, strict=True):
+            # Inject only into the API child. Vite and local verification do not
+            # receive secrets fetched by Doppler. No secret files or restart watcher.
+            if name == "api" and not built:
+                command = ["doppler", "run", "--no-fallback", "--forward-signals", "--", *command]
             handle = (private / f"{name}.log").open("w")
             handles.append(handle)
             children.append(subprocess.Popen(command, cwd=(ROOT / "apps/api" if name == "api" else ROOT), stdout=handle, stderr=subprocess.STDOUT, start_new_session=True))

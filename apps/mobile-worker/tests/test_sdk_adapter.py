@@ -115,6 +115,7 @@ def test_sdk_exact_public_seam(tmp_path, monkeypatch):
         monkeypatch.setitem(sys.modules, name, module)
     monkeypatch.setattr(sdk_adapter.importlib.metadata, "version", lambda name: "4.0.0")
     monkeypatch.setattr(sdk_adapter, "prepare_environment", lambda p: None)
+    monkeypatch.setattr(sdk_adapter, "install_tool_runtime_compat", lambda: None)
     asyncio.run(sdk_adapter.execute(request, tmp_path / "child-result.json"))
     assert seen[0] == {"platform": "android", "device_id": "emulator-5554"}
     assert seen[-1] == "stop"
@@ -243,6 +244,38 @@ with (
                 )
                 for name in positional + keywords:
                     assert name in signature.parameters, (cls.name, member.name, name)
-    print('Pinned SDK signatures and model fields match adapter stubs')
+    # An actual offline graph catches private-method compatibility failures that
+    # importing the SDK and mocking Agent cannot expose. No model/device is used.
+    import asyncio
+    from langchain_core.messages import AIMessage, ToolMessage
+    from langchain_core.tools import tool
+    from langgraph.graph import StateGraph, MessagesState, START, END
+    from mobile_qa_worker.qualification.sdk_compat import install_tool_runtime_compat
+    from minitap.mobile_use.graph import graph as sdk_graph
+
+    install_tool_runtime_compat()
+    calls = []
+
+    @tool
+    def record_value(value: str) -> str:
+        'Record a harmless value for the offline compatibility test.'
+        calls.append(value)
+        return 'recorded:' + value
+
+    graph = StateGraph(MessagesState)
+    graph.add_node('execute', sdk_graph.ExecutorToolNode([record_value], messages_key='messages'))
+    graph.add_edge(START, 'execute')
+    graph.add_edge('execute', END)
+    result = asyncio.run(graph.compile().ainvoke({'messages': [AIMessage(
+        content='', tool_calls=[{
+            'name': 'record_value', 'args': {'value': 'demo'}, 'id': 'offline-call',
+            'type': 'tool_call',
+        }],
+    )]}))
+    assert calls == ['demo']
+    message = result['messages'][-1]
+    assert isinstance(message, ToolMessage)
+    assert message.content == 'recorded:demo' and message.status == 'success'
+    print('Pinned SDK signatures, model fields and offline tool execution passed')
 """
     subprocess.run([sys.executable, "-c", code, str(stubs)], cwd=tmp_path, check=True)

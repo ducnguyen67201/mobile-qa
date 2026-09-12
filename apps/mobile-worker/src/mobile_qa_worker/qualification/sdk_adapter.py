@@ -8,6 +8,7 @@ from typing import cast
 
 from mobile_qa_worker.qualification.config import Profile, QualificationError, parse_request
 from mobile_qa_worker.qualification.evidence import atomic_json
+from mobile_qa_worker.qualification.sdk_compat import install_tool_runtime_compat
 
 
 class UsageRecorder:
@@ -95,6 +96,7 @@ async def execute(request_path: Path, result_path: Path) -> None:
     from minitap.mobile_use.sdk.builders.agent_config_builder import AgentConfigBuilder
     from minitap.mobile_use.sdk.types import AgentProfile, DevicePlatform, TaskRequest
 
+    install_tool_runtime_compat()
     recorder = UsageRecorder(profile.model)
 
     class Callbacks(AsyncCallbackHandler):

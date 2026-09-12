@@ -60,3 +60,16 @@ build, compile/target35 and Build Tools35.0.0. Gradle wrapper files come from th
 v8.13.0 tag; retain their license headers. Android archive metadata and vendor checksums
 are pinned in infra/device-host/toolchain.lock.json. Required vendor licenses still apply;
 no installer silently accepts SDK terms or modifies a user's existing SDK.
+
+
+The first live Minitap demo exposed private ToolNode API drift: Minitap 4.0.0
+omits both the config argument to state extraction and the tools list in ToolRuntime.
+`qualification/sdk_compat.py` supplies a typed ExecutorToolNode subclass only inside
+the isolated SDK process and selects it in Minitap's graph factory. It is guarded
+against the exact Minitap 4.0.0 / langgraph-prebuilt 1.1.0 pair; no installed package
+files are modified. The subclass preserves sequential execution and error handling.
+[Upstream fix #214](https://github.com/minitap-ai/mobile-use/pull/214) tracks state
+extraction; our adapter also supplies the tools and execution context fields.
+A real offline graph tool call verifies the compatibility path before device use.
+Remove the adapter after a fixed SDK release passes that test and qualification.
+Downgrading was rejected because the resulting LangChain version had a known advisory.

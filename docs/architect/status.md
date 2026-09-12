@@ -130,3 +130,26 @@ These timings describe this Mac, not a cloud capacity promise.
 
 No model calls or cloud resources were used. Minitap mode is implemented but its live
 11-attempt qualification remains pending, as do HTTP worker leases and dashboard jobs.
+
+
+## First live Minitap demo
+
+On 2026-09-12, a visible macOS ARM64 demo using Minitap 4.0.0 and OpenAI gpt-4.1
+passed the create/save/reopen persistence test and verified a clean device reset.
+Credentials were injected from Doppler `mobile-qa / dev_personal`; no key was stored
+in the repo. Attempt `ee08c402-43ae-40d3-b462-cac4753356da` recorded 8 model calls,
+34,817 input tokens and 941 output tokens, with no unknown usage calls. Private
+screenshots, video, SDK traces and the report remain under `.private/artifacts/local-device`.
+
+The preceding attempt `6e3fb69e-e33f-4ebc-91a5-ead5011f7c31` was inconclusive due to
+Minitap/LangGraph ToolRuntime incompatibility; its clean reset passed. It made 5 model
+calls (22,297 input / 605 output tokens), retained in its SDK child result. Parent
+inconclusive reports currently omit usage when the SDK process exits nonzero; that
+failure-path usage aggregation remains an accounting limitation.
+
+A typed, version-guarded SDK compatibility subclass now supplies the required config,
+tools and execution context without changing installed packages or dependency locks.
+Strict Pyright, focused Ruff and all 4 adapter tests passed, including a real offline
+Minitap tool execution through LangGraph. See dependencies.md for scope and removal.
+This single live demo does not complete the full 11-attempt reliability campaign,
+cloud-host qualification, customer APK execution or dashboard job integration.

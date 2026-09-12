@@ -1,4 +1,8 @@
-"""Import-only gate: block outbound network before loading the optional SDK."""
+"""Check SDK import compatibility with Python socket connections blocked.
+
+This narrow guard covers the import path only; it is not a sandbox for arbitrary
+SDK execution. Never construct Agent here or treat import success as phone readiness.
+"""
 import json
 import socket
 from unittest.mock import patch

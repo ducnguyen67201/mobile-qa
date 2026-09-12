@@ -1,4 +1,9 @@
-"""Explicit local fixture and SDK-import commands."""
+"""Explicit developer commands, not a long-running production worker.
+
+`fake` emits one JSON result and exits. `sdk-import` checks only package compatibility;
+only scripts/sdk_smoke.py additionally blocks socket connections during that import.
+Neither command constructs an agent or executes a customer test.
+"""
 
 import argparse
 import importlib
@@ -12,6 +17,11 @@ from mobile_qa_worker.fake import execute, parse_request
 
 
 def sdk_import() -> dict[str, str]:
+    """Verify the pinned SDK import seam without constructing its stateful Agent.
+
+    Telemetry must be disabled before import. This proves neither device compatibility
+    nor model availability; real execution qualification is a separate milestone.
+    """
     os.environ["MOBILE_USE_TELEMETRY_ENABLED"] = "false"
     version = importlib.metadata.version("minitap-mobile-use")
     if version != "4.0.0":
@@ -38,6 +48,8 @@ def main() -> int:
             fixture = Path(str(args.fixture))
             request = parse_request(fixture.read_text())
             print(execute(request).model_dump_json())
+        # Exit status reports CLI success, not whether the simulated test passed.
+        # Consumers read outcome from JSON; setup/invalid input exits 2 below.
         return 0
     except (ValueError, OSError, ImportError, importlib.metadata.PackageNotFoundError) as exc:
         # Avoid dumping fixture payloads, paths or credentials into logs.

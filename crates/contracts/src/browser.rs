@@ -1,7 +1,12 @@
-//! Browser endpoint declaration and transport schemas. No Loco, Axum or DB dependency.
+//! Browser HTTP contract exported to OpenAPI, then to TypeScript SDK/Zod code.
+//!
+//! The only declared operation today is GET /api/health. Route implementations live
+//! in apps/api; integration tests keep them aligned with this independent declaration.
+//! These transport shapes are not SeaORM entities or an authentication policy.
 use serde::{Deserialize, Serialize};
 use utoipa::{OpenApi, ToSchema};
 
+// Shared with route registration; changing it also requires the declaration below.
 pub const HEALTH_PATH: &str = "/api/health";
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -10,6 +15,7 @@ pub enum HealthStatus {
     Ok,
 }
 
+// Application liveness only: this does not prove database or device readiness.
 #[derive(Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct HealthResponse {
@@ -18,6 +24,8 @@ pub struct HealthResponse {
     pub version: String,
 }
 
+// Public error envelope. The browser validates it before trusting code/message.
+// Keep credentials, raw upstream bodies and internal diagnostics out of these fields.
 #[derive(Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ApiError {
@@ -37,6 +45,7 @@ pub struct ApiError {
         (status = "default", description = "API error", body = ApiError)
     )
 )]
+// Metadata anchor for Utoipa; this function is never registered as the HTTP handler.
 #[allow(dead_code)]
 fn health_endpoint() {}
 
@@ -48,6 +57,7 @@ fn health_endpoint() {}
 )]
 pub struct BrowserApi;
 
+/// Build the exportable document without starting Loco or connecting to PostgreSQL.
 pub fn openapi() -> utoipa::openapi::OpenApi {
     BrowserApi::openapi()
 }

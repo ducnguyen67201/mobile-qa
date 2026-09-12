@@ -1,3 +1,7 @@
+//! Real route/OpenAPI/PostgreSQL agreement test, not a mocked database check.
+//! scripts/runtime.py starts isolated Compose PostgreSQL; test config cannot use an
+//! inherited production DATABASE_URL. The SELECT below inspects migration bookkeeping.
+
 use loco_rs::testing::prelude::*;
 use mobile_qa::app::App;
 use mobile_qa_contracts::browser::{self, ApiError, HealthResponse, HealthStatus, HEALTH_PATH};

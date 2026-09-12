@@ -1,3 +1,9 @@
+"""Python half of the shared fixture contract and local CLI checks.
+
+No device SDK is needed. These tests prove deterministic simulation, strict wire
+validation and useful exit behavior; they do not qualify the real mobile runner.
+"""
+
 import json
 import subprocess
 import sys

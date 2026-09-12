@@ -1,3 +1,6 @@
+# Explicit commands only: finish the scoped edits before types/check/build/smoke.
+# setup installs dependencies; dev starts services; neither attaches check watchers.
+# Command behavior and environment selection: docs/architect/development.md.
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
 default:

@@ -1,1 +1,2 @@
-// Reserved Loco generator module. No domain implementation in spec 01.
+//! Reserved for custom Loco startup integrations; currently empty.
+//! Use only when an implemented feature needs a lifecycle-managed dependency.

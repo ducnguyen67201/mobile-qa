@@ -24,3 +24,7 @@ Runtime secrets come from Doppler process injection. Do not create .env files or
 examples, download secrets to files, or commit tokens. Vite env-file loading is disabled.
 Only wrap secret-consuming server processes; local checks/fake runs remain Doppler-free.
 See docs/architect/environment.md. Do not change the user's Doppler auth/config without scope.
+
+Comments must make scaffold/fake/generated boundaries and non-obvious rules clear.
+Follow docs/architect/commenting.md; explain purpose and constraints without narrating
+every line. Keep comments aligned with implementation and preserve generator markers.

@@ -16,6 +16,7 @@ Start here before planning or changing the application.
 | How do we develop, validate and scope CI? | [Development workflow](development.md) |
 | How do secrets and environment selection work? | [Doppler environment](environment.md) |
 | Why did we choose this approach? | [Decision record](decisions.md) |
+| How should humans and AI document code? | [Commenting conventions](commenting.md) |
 | Which upstream packages and adaptations are in use? | [Dependency provenance](dependencies.md) |
 
 ## Authority and maintenance

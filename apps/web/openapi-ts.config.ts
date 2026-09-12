@@ -1,3 +1,5 @@
+// Generator configuration, not a live API connection. scripts/contracts.py supplies
+// temporary output paths for drift checks; edit this file instead of generated code.
 import { defineConfig } from '@hey-api/openapi-ts'
 import { fileURLToPath } from 'node:url'
 

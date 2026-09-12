@@ -1,3 +1,6 @@
+# Isolated local configuration, intentionally independent of Doppler DATABASE_URL.
+# Fixed loopback credentials belong to the disposable Compose DB, not production.
+# Static files stay disabled so source development/tests do not require a web build.
 logger:
   enable: false
   pretty_backtrace: false

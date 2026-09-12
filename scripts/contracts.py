@@ -1,4 +1,9 @@
-"""Explicit Rust → OpenAPI/Hey API and worker schema/Pydantic pipeline, with drift detection."""
+"""Generate both consumer contracts from Rust without starting the application.
+
+All output is staged first. Normal mode updates only different generated files;
+--check reports drift without changing the checkout. Neither mode installs tools.
+Run explicitly after authoring the complete scope, never on save or through a watcher.
+"""
 import argparse
 import os
 import subprocess
@@ -6,10 +11,12 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# Only these generated locations are owned by synchronization/deletion below.
 OUTPUTS = ("apps/web/src/api/generated", "contracts/browser.openapi.json", "contracts/worker.schema.json", "apps/mobile-worker/src/mobile_qa_worker/generated/models.py")
 
 
 def files(base: Path) -> dict[str, bytes]:
+    """Read managed output bytes keyed by repo-relative path, independent of mtimes."""
     result: dict[str, bytes] = {}
     for name in OUTPUTS:
         path = base / name
@@ -21,6 +28,11 @@ def files(base: Path) -> dict[str, bytes]:
 
 
 def synchronize(staged: Path, destination: Path, check: bool) -> list[str]:
+    """Compare the whole generated set, including new and removed files.
+
+    Preserve identical files and their mtimes to avoid unnecessary rebuilds. Check
+    mode returns the same drift list but must never mutate the destination.
+    """
     expected, current = files(staged), files(destination)
     changed = sorted(name for name in expected.keys() | current.keys() if expected.get(name) != current.get(name))
     if not check:
@@ -40,6 +52,8 @@ def main() -> int:
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="mobile-qa-contracts-") as temp:
         staged = Path(temp)
+        # Export pure Rust schemas first, then generate browser and Python consumers.
+        # The app/database/device SDK are not involved in any of these stages.
         subprocess.run(["cargo", "run", "--locked", "--quiet", "-p", "mobile-qa-contracts", "--bin", "export-contracts", "--", str(staged)], cwd=ROOT, check=True)
         subprocess.run(["pnpm", "generate:sdk"], cwd=ROOT / "apps/web", env=os.environ | {"MOBILE_QA_OPENAPI_INPUT": str(staged / OUTPUTS[1]), "MOBILE_QA_SDK_OUTPUT": str(staged / OUTPUTS[0])}, check=True)
         output = staged / OUTPUTS[3]

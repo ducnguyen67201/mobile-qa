@@ -14,6 +14,8 @@ it('shows loading then ready', async () => {
   vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(done => { resolve = done })))
   show()
   expect(screen.getByRole('status')).toHaveTextContent('Connecting…')
+  // Generated request validation is asynchronous: fetch has not necessarily run
+  // when render returns, so wait before resolving the response promise.
   await waitFor(() => expect(fetch).toHaveBeenCalledOnce())
   resolve?.(Response.json({ status: 'ok', service: 'mobile-qa', version: '0.1.0' }))
   expect(await screen.findByText('Ready')).toBeInTheDocument()

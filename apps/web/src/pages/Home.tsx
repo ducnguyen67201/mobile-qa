@@ -1,3 +1,5 @@
+// Foundation App screen: proves navigation and a validated health request only.
+// "Ready" means the API answered; it does not mean an APK/account/device is ready.
 import { useQuery } from '@tanstack/react-query'
 import { healthQuery } from '../api/queries'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card'

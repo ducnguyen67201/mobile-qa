@@ -1,3 +1,5 @@
+# Local development/test PostgreSQL only. Never use these public fixture credentials
+# for a deployed database. Bind loopback and preserve the volume across dev sessions.
 name: mobile-qa-local
 services:
   postgres:

@@ -1,3 +1,6 @@
+//! Rust half of the shared fixture compatibility checks.
+//! The Python tests read the same JSON files; these are transport tests, not device QA.
+
 use mobile_qa_contracts::worker::{ContractProbe, FakeExecutionRequest};
 use serde_json::{json, Value};
 fn fixture(name: &str) -> Value {

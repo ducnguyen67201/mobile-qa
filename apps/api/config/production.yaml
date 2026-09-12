@@ -1,3 +1,6 @@
+# Future deployment configuration, not proof that a production service exists.
+# HOST and DATABASE_URL come from Doppler process injection; never add values here.
+# Relative web asset paths assume the API process runs from apps/api.
 logger:
   enable: true
   pretty_backtrace: false

@@ -1,3 +1,5 @@
+// Keep scaffold markers for future route insertion. Only Home currently calls the API;
+// Tests, Runs and Settings are honest placeholders, not mocked product implementations.
 import { createBrowserRouter, type RouteObject } from 'react-router'
 import { App } from './App'
 import { Home } from './pages/Home'

@@ -1,3 +1,4 @@
+"""Regression check for content-only generation and nonmutating drift detection."""
 import tempfile
 import unittest
 from pathlib import Path

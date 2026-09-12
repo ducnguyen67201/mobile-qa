@@ -1,1 +1,2 @@
-// Reserved Loco generator module. No domain implementation in spec 01.
+//! Reserved for Loco background jobs written in Rust. No jobs are registered.
+//! This module does not own the separate Python/mobile device worker process.

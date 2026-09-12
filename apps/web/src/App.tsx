@@ -1,3 +1,4 @@
+// Shared navigation shell. A visible route does not mean its product feature exists yet.
 import { NavLink, Outlet } from 'react-router'
 export function App() {
   return <div className="min-h-screen">

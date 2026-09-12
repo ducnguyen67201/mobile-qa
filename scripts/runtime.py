@@ -1,4 +1,9 @@
-"""Explicit local process ownership; no watchers and no volume deletion."""
+"""Own local dev/check processes for explicit just commands.
+
+`dev` starts Doppler-injected API plus Vite; `check-api` owns a temporary DB session;
+`smoke` exercises the built foundation without fetching secrets or running a device.
+Only stop services this invocation started. Never delete the persistent DB volume.
+"""
 import argparse
 import json
 import os
@@ -21,6 +26,7 @@ def run(command, **kwargs):
 
 @contextmanager
 def database():
+    """Borrow an existing Compose database, or start and later stop our own instance."""
     running = run(COMPOSE + ["ps", "--status", "running", "-q", "postgres"], capture_output=True, text=True).stdout.strip()
     owned = not running
     try:
@@ -33,6 +39,7 @@ def database():
 
 
 def ensure_ports():
+    """Refuse occupied dev ports; never kill an unrelated process to claim a port."""
     for port in (5150, 5173):
         with socket.socket() as sock:
             try:
@@ -42,6 +49,7 @@ def ensure_ports():
 
 
 def wait_http(url, children, timeout=60):
+    """Wait for HTTP readiness, failing early if one of our child services exits."""
     start = time.monotonic()
     while time.monotonic() - start < timeout:
         if any(child.poll() is not None for child in children):
@@ -58,6 +66,11 @@ def wait_http(url, children, timeout=60):
 
 @contextmanager
 def services(built=False):
+    """Start owned API/Vite process groups and always clean them up on exit.
+
+    built=True is the secret-free smoke path: it requires an existing debug binary.
+    Normal development compiles the API explicitly once, with Doppler injection.
+    """
     ensure_ports()
     private = ROOT / ".private"
     private.mkdir(mode=0o700, exist_ok=True)
@@ -76,6 +89,8 @@ def services(built=False):
             children.append(subprocess.Popen(command, cwd=(ROOT / "apps/api" if name == "api" else ROOT), stdout=handle, stderr=subprocess.STDOUT, start_new_session=True))
         yield children
     finally:
+        # Each child owns a process group, including Cargo/Doppler descendants.
+        # Stop the group so an interrupted command cannot leave a server behind.
         for child in reversed(children):
             if child.poll() is None:
                 os.killpg(child.pid, signal.SIGTERM)
@@ -89,6 +104,7 @@ def services(built=False):
 
 
 def smoke():
+    """Check local wiring and fixtures, not rendered UI or real device execution."""
     # Hide dist while starting development to prove no static build dependency.
     dist, hidden = ROOT / "apps/web/dist", ROOT / ".private/dist-smoke"
     hidden.parent.mkdir(mode=0o700, exist_ok=True)
@@ -130,6 +146,8 @@ def main():
     if args.api_only and args.mode != "check-api":
         parser.error("--api-only requires check-api")
     if args.mode == "check-api":
+        # CI selects API/migration only. Local `just check-api` retains the full
+        # Rust workspace option; the CI contract job owns contract tests separately.
         packages = ["--package", "mobile-qa", "--package", "migration"] if args.api_only else ["--workspace"]
         format_packages = packages if args.api_only else ["--all"]
         with database():

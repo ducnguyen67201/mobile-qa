@@ -1,3 +1,5 @@
+// Mock only fetch: exercise the actual generated SDK plus our validation boundary.
+// This proves transport handling, not live server or device availability.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getHealth } from './generated/sdk.gen'
 import { healthQuery } from './queries'

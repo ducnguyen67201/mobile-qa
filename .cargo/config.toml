@@ -1,2 +1,3 @@
+# Run this alias from apps/api so Loco finds its relative configuration files.
 [alias]
 loco = "run --package mobile-qa --bin mobile-qa-cli --"

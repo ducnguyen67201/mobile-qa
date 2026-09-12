@@ -1,3 +1,6 @@
+# Select affected apps plus contract consumers; do not attach checks to local edits.
+# PR selection covers the entire PR diff, so earlier changes do not lose coverage.
+# These are file/package filters, not automatic per-function test dependency analysis.
 name: Foundation checks
 on:
   push:
@@ -5,6 +8,7 @@ on:
   pull_request:
 permissions:
   contents: read
+# Stop superseded PR work while allowing main-branch validation to finish.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -53,6 +57,8 @@ jobs:
               - 'scripts/sdk_smoke.py'
               - 'crates/contracts/Cargo.toml'
               - 'crates/contracts/src/lib.rs'
+            # Generator inputs and generated-only edits still need drift validation.
+            # This does not imply every app suite depends on every generator dependency.
             contracts:
               - '.github/workflows/**'
               - 'Cargo.toml'
@@ -121,6 +127,7 @@ jobs:
       - run: uv run --no-sync --project apps/mobile-worker --frozen ruff check apps/mobile-worker
       - run: cd apps/mobile-worker && uv run --no-sync --frozen pyright
       - run: uv run --no-sync --project apps/mobile-worker --frozen pytest apps/mobile-worker/tests
+  # The pure contract job needs generators, but no PostgreSQL or device/model access.
   contracts:
     needs: scope
     if: needs.scope.outputs.contracts == 'true'

@@ -121,12 +121,17 @@ def smoke():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=["dev", "smoke", "check-api"])
+    parser.add_argument("--api-only", action="store_true", help="Check API/migration packages, not contract tests (CI scope)")
     args = parser.parse_args()
+    if args.api_only and args.mode != "check-api":
+        parser.error("--api-only requires check-api")
     if args.mode == "check-api":
+        packages = ["--package", "mobile-qa", "--package", "migration"] if args.api_only else ["--workspace"]
+        format_packages = packages if args.api_only else ["--all"]
         with database():
-            run(["cargo", "fmt", "--all", "--", "--check"])
-            run(["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"])
-            run(["cargo", "test", "--workspace", "--locked"])
+            run(["cargo", "fmt", *format_packages, "--", "--check"])
+            run(["cargo", "clippy", *packages, "--all-targets", "--locked", "--", "-D", "warnings"])
+            run(["cargo", "test", *packages, "--locked"])
     elif args.mode == "smoke":
         smoke()
     else:

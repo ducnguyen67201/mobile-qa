@@ -36,12 +36,42 @@ volume. Existing Compose PostgreSQL is left running; commands stop only what the
 Logs truncate on explicit startup. Keep secrets/customer data out of source and logs.
 .private/artifacts is reserved only; no storage API is included.
 
-CI runs pull_request and pushes to main, avoiding duplicate feature push jobs. Docs-only
-changes skip app builds. apps/api/infra changes check Rust/database; apps/web changes
-check/build web; apps/mobile-worker changes check Python. Shared contracts, generator
-configuration/manifests/locks and tooling trigger drift plus all affected consumers.
-The contracts job installs both Node and Python generators; it does not start a DB.
-Caches key Cargo/pnpm/uv by locks/toolchain. No cloud/device/model tests run in CI.
+CI runs pull_request and pushes to main. Superseded PR runs are cancelled. Paths are
+compared against the whole PR base, including additions/deletions, rather than only the
+last commit: a still-failing earlier change must not disappear from required coverage.
+Root docs-only changes skip app builds. The path map lives in .github/workflows/ci.yaml.
+
+| Changed surface | CI checks |
+|---|---|
+| apps/api source/config/migration/tests | API and migration format/Clippy/tests; API build |
+| apps/web ordinary source/tests | Web typecheck/lint/tests/build |
+| apps/mobile-worker ordinary source/tests | Worker Ruff/Pyright/tests |
+| Rust browser DTOs or browser OpenAPI | API (Rust source), web consumer and contract checks |
+| Rust worker DTOs or worker schema | API (Rust source), worker consumer and contract checks |
+| Common Rust contract module/manifest | All contract consumers and contract checks |
+| Web generator/config/dependency inputs | Web and contract checks; no Python/API app suite |
+| Python generator/dependency inputs | Worker and contract checks; no web/API app suite |
+| Root Rust lock/toolchain/workspace | API and contract checks; no web/Python app suite |
+| Contract fixtures | Rust contract tests, API package checks and worker tests |
+| CI workflow | All jobs, to verify the pipeline itself |
+
+Generated-output edits always trigger drift checks. The contracts job has its own
+Rust checks and tests, plus Node/Python generation, without starting PostgreSQL. An
+API-only job does not run the contract test suite or build the exporter. Shared Rust
+source still compiles as an API dependency. Compiler and package caches remain enabled.
+
+The minimum safe typechecking unit today is an app/project or Rust crate, not one file.
+A changed public signature can invalidate unchanged callers. Tests currently run within
+the affected app (one API integration target, a small web suite, one worker suite).
+When those suites grow, add named integration targets for each API feature and an explicit
+feature-to-tests dependency map; shared routers/auth/database setup must select all API
+tests. Browser related-test selection must include import dependents and fall back to the
+app suite for config/deleted/shared files. Do not silently claim file-level dependency
+analysis: that is not implemented. Extract Rust crates or TS project references only when
+measured check time warrants them; a folder alone is not a compilation boundary.
+
+No cloud/device/model tests run in CI. Local commands retain the explicit full-final-check
+option; nothing starts checks during editing.
 
 The refactor report records actual local gates and timings. Browser admin policy
 verification previously denied access: do not use alternate browser/Playwright/HTTP

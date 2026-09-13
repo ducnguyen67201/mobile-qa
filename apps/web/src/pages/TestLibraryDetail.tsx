@@ -91,18 +91,21 @@ function EntryWorkspace({
       {entry.isError && <ErrorNotice error={entry.error} retry={() => void entry.refetch()} />}
       {entry.data && (
         <>
-          <PageHeading
-            eyebrow={
-              entry.data.kind === 'plan'
-                ? 'Release plan'
-                : entry.data.kind === 'suite'
-                  ? 'Reusable coverage'
-                  : 'Test case'
-            }
-            title={entry.data.title || 'Untitled draft'}
-            description={entry.data.key}
-          />
-          <EntryLifecycle entry={entry.data} />
+          {entry.data.kind === 'case' ? (
+            <Group justify="space-between" gap="sm">
+              <Title order={1} size="h3">
+                {entry.data.title || 'Untitled task'}
+              </Title>
+              <EntryLifecycle entry={entry.data} />
+            </Group>
+          ) : (
+            <PageHeading
+              eyebrow={entry.data.kind === 'plan' ? 'Release plan' : 'Reusable coverage'}
+              title={entry.data.title || 'Untitled draft'}
+              description={entry.data.key}
+            />
+          )}
+          {entry.data.kind !== 'case' && <EntryLifecycle entry={entry.data} />}
           {entry.data.archived_at && (
             <Alert color="orange" title="Archived entry">
               History is preserved. This entry and plans that depend on it cannot enter new runs

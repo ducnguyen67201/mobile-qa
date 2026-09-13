@@ -280,7 +280,14 @@ export function PhoneWorkspace({
               )}
             <Card withBorder radius="xl" p="sm" className={classes.phone}>
               {frame ? (
-                <div style={{ position: 'relative', lineHeight: 0 }}>
+                <div
+                  style={{
+                    position: 'relative',
+                    lineHeight: 0,
+                    width: `min(100%, calc((100dvh - 240px) * ${frame.width / frame.height}))`,
+                    marginInline: 'auto',
+                  }}
+                >
                   <img
                     src={`data:image/png;base64,${frame.png_base64}`}
                     alt="Current screen of your Android app"
@@ -309,7 +316,7 @@ export function PhoneWorkspace({
                     ))}
                 </div>
               ) : (
-                <Stack align="center" justify="center" style={{ minHeight: 430 }}>
+                <Stack align="center" justify="center" className={classes.placeholder}>
                   {!done &&
                     !choices.data?.blockers.length &&
                     (id || create.isPending || autoOpen) && <Loader aria-label="Opening phone" />}

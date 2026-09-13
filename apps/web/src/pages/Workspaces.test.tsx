@@ -110,6 +110,7 @@ it('creates a workspace for an approved account and navigates using its refreshe
   await screen.findByText('Your first app belongs here.')
   expect(payload).toEqual({ id: expect.any(String), name: 'Second workspace' })
   expect(router.state.location.search).toBe(`?workspace=${secondId}`)
+  await userEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
   expect(screen.getByLabelText('Current workspace')).toHaveValue(secondId)
 })
 it('switches app lists by URL, preserves navigation context, and restores browser history', async () => {
@@ -123,6 +124,7 @@ it('switches app lists by URL, preserves navigation context, and restores browse
   await userEvent.click(screen.getByRole('button', { name: 'Create app' }))
   await screen.findByLabelText('App name')
   await userEvent.keyboard('{Escape}')
+  await userEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
   await userEvent.selectOptions(screen.getByLabelText('Current workspace'), secondId)
   await screen.findByText('Your first app belongs here.')
   expect(screen.queryByText(app.name)).not.toBeInTheDocument()
@@ -197,7 +199,8 @@ it('clears app-specific parameters when switching workspace from a detail page',
     `/apps/${app.id}?workspace=${secondId}&build=${buildId}&upload=${buildId}`,
   )
   await screen.findByText('This app belongs to a different workspace.')
-  await userEvent.selectOptions(screen.getByLabelText('Current workspace'), orgId)
+  await userEvent.click(screen.getByRole('button', { name: 'Switch workspace' }))
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Fixture workspace' }))
   await screen.findByRole('heading', { name: app.name })
   expect(router.state.location.pathname).toBe('/apps')
   expect(router.state.location.search).toBe(`?workspace=${orgId}`)

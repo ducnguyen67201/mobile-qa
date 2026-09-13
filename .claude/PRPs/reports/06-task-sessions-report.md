@@ -135,3 +135,17 @@ phone, selects a control, sends a generated-contract task request, observes the
 returned frame update and confirms unsaved draft edits remain intact. The existing
 bundle-size warning remains. Rendered browser acceptance remains pending; these
 DOM checks do not claim visual or real-device acceptance for the new layout.
+
+### Full-width workspace follow-up
+
+Task and case routes now use the full content width with equal task/preview
+columns and 16px desktop outer padding. The right panel fills the available
+viewport height, and captures scale within it. The sidebar defaults to a 64px icon
+rail with an expand control; the header is 48px. Case titles use a compact toolbar,
+and task routes omit the decorative footer.
+
+TypeScript, ESLint and production build passed. The browser suite initially passed
+91/94 tests; three workspace tests assumed an expanded sidebar. Those interactions
+were updated for the compact default, including switching via its menu, and all
+eight workspace tests passed on rerun. TypeScript and affected lint passed again.
+No runtime logic or transport contracts changed. Visual acceptance is still pending.

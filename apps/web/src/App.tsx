@@ -11,14 +11,14 @@ import {
   useMantineTheme,
 } from '@mantine/core'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
-import { Outlet, useLocation, useNavigate } from 'react-router'
+import { matchPath, Outlet, useLocation, useNavigate } from 'react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ErrorNotice } from '@/components/app/feedback'
 import { Navigation, navigationLinks } from '@/components/app/navigation'
 import { signOut } from '@/api/setup'
 
 export function App() {
-  const [minimized, { toggle: toggleSidebar }] = useDisclosure(false)
+  const [minimized, { toggle: toggleSidebar }] = useDisclosure(true)
   const [mobileOpen, { close: closeNavigation, toggle: toggleNavigation }] = useDisclosure(false)
   const { breakpoints } = useMantineTheme()
   const desktop = useMediaQuery(`(min-width: ${breakpoints.sm})`)
@@ -29,6 +29,9 @@ export function App() {
   const client = useQueryClient()
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const taskWorkspace = !!(
+    matchPath('/apps/:app_id/try', pathname) || matchPath('/tests/:app_id/:entry_id', pathname)
+  )
   const logout = useMutation({
     mutationFn: signOut,
     onSuccess: () => {
@@ -40,8 +43,8 @@ export function App() {
   return (
     <AppShell
       layout="alt"
-      header={{ height: 72 }}
-      navbar={{ width: minimized ? 80 : 256, breakpoint: 'sm', collapsed: { mobile: true } }}
+      header={{ height: 48 }}
+      navbar={{ width: minimized ? 64 : 224, breakpoint: 'sm', collapsed: { mobile: true } }}
       padding={0}
     >
       <a className="skip-link" href="#main">
@@ -49,7 +52,7 @@ export function App() {
       </a>
       <AppShell.Navbar
         component="aside"
-        p={minimized ? 'sm' : 'lg'}
+        p={minimized ? 10 : 'md'}
         className="workspace-nav"
         style={{ overflowY: 'auto' }}
       >
@@ -96,7 +99,12 @@ export function App() {
         </Group>
       </AppShell.Header>
       <AppShell.Main id="main" tabIndex={-1}>
-        <Container size="xl" px={{ base: 'lg', sm: 36, lg: 48 }} py={{ base: 32, sm: 48 }}>
+        <Container
+          fluid={taskWorkspace}
+          size="xl"
+          px={taskWorkspace ? { base: 12, sm: 16 } : { base: 'lg', sm: 36, lg: 48 }}
+          py={taskWorkspace ? 16 : { base: 32, sm: 48 }}
+        >
           {logout.isError && (
             <Box mb="xl">
               <ErrorNotice
@@ -107,14 +115,16 @@ export function App() {
             </Box>
           )}
           <Outlet />
-          <Group component="footer" justify="space-between" mt={64} gap="xs">
-            <Text size="xs" c="dimmed">
-              Mobile QA · Android workspace
-            </Text>
-            <Badge variant="transparent" color="gray">
-              Evidence before execution.
-            </Badge>
-          </Group>
+          {!taskWorkspace && (
+            <Group component="footer" justify="space-between" mt={64} gap="xs">
+              <Text size="xs" c="dimmed">
+                Mobile QA · Android workspace
+              </Text>
+              <Badge variant="transparent" color="gray">
+                Evidence before execution.
+              </Badge>
+            </Group>
+          )}
         </Container>
       </AppShell.Main>
     </AppShell>

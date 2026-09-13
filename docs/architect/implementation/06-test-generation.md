@@ -164,8 +164,10 @@ successful phone. Ordinary tests use synthetic boundaries and do not launch it.
 ### Task and test workspace layout
 
 The standalone task page and case editor share a task-left, phone-right workspace.
-The phone panel stays beside the scrolling editor on desktop and stacks below it
-on narrow screens. In the case editor, **Open phone preview** opens the default
+Both columns share the full available workspace width with compact outer padding.
+The phone panel fills the right half and stays beside the scrolling editor on
+desktop, then stacks below it on narrow screens. The shell uses a 48px header and
+a default 64px icon sidebar, which can still expand to show navigation labels. In the case editor, **Open phone preview** opens the default
 build/profile without navigating away or discarding unsaved test fields. An existing
 active session reconnects automatically. Viewing a saved case alone does not start
 a new device session. The standalone Try page retains automatic opening.

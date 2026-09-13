@@ -2,16 +2,12 @@
 
 Status: locally implemented; simulated HTTP and one real API-to-emulator good-path run verified. Browser, live fault/reliability and hosted acceptance remain pending. Depends on: 02 and 03. Owns: Rust run/scheduler/report modules and migrations, worker protocol/adapter, Runs UI.
 
-## Implementation planning
+## Implementation scope
 
-The [phase 04 implementation plan](../../../.claude/PRPs/plans/04-execution-and-reports.plan.md)
-was prepared against main `9eb5dba` plus the device integration branch `d4c4729`.
-The local implementation is recorded in the [implementation report](../../../.claude/PRPs/reports/04-execution-and-reports-report.md); device qualification and hosted
-storage acceptance remain open. It covers versioned operator-authored test definitions, semantic
-Minitap actions, independent evidence checks, HTTP leases and the Runs interface.
-The existing executable test is the controlled persistence demo; the customer test
-editor remains spec 05. The plan records proposed implementation details; this spec
-and product requirements remain authoritative.
+The local implementation covers versioned test definitions, device actions, independent
+evidence checks, HTTP leases and the Runs interface. Validation and remaining device and
+hosted-storage acceptance gates are tracked in [current status](../status.md).
+The customer test editor belongs to spec 05.
 
 ## Deliverable
 

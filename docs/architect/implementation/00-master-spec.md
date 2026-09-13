@@ -6,7 +6,7 @@ reliability campaign and cloud qualification remain open. Spec 04 is locally imp
 with simulated HTTP and one real API-to-emulator good-path run verified; browser,
 live fault/reliability and hosted acceptance remain open. Spec 05 authoring/review/default-plan source and simulated HTTP acceptance are locally
 implemented; rendered UI and UI-triggered real-device acceptance remain open. See its
-[implementation report](../../../.claude/PRPs/reports/05-test-library-and-plans-report.md).
+[current status](../status.md).
 Spec 06 task-session source is locally implemented; its direct-execution, template and
 AI-authoring revamp is locally implemented and validated. Real-model quality and rendered
 browser acceptance remain open. Spec 07 remains planned.

@@ -48,9 +48,8 @@ This completes the user-authored test workflow. AI generation in spec 06 must pr
 
 ## Implementation packet
 
-The [phase 05 implementation plan](../../../.claude/PRPs/plans/05-test-library-and-plans.plan.md)
-is based on the integrated phase 02/04 tree at `b4970c7`. It specifies separate
-editable drafts and immutable published versions, exact-revision/hash review,
+The implementation separates
+editable drafts from immutable published versions, with exact-revision/hash review,
 archive/default-plan rules, typed browser APIs and the complete UI-to-run flow.
 Rust owns all DTOs and semantic validation; generated SDK/Zod and Pydantic remain
 the only browser/worker contract pipeline. Real route agreement, stale-edit tests
@@ -97,4 +96,4 @@ Rust/Schemars/Pydantic worker protocol.
 HTTP routes, explicitly selects the default, runs simulated Python evidence after
 API restart and checks the manifest remains unchanged after a new draft edit.
 It does not prove rendered UI or real emulator acceptance. Validation evidence and
-remaining gates belong in the [implementation report](../../../.claude/PRPs/reports/05-test-library-and-plans-report.md).
+remaining gates belong in the [current status](../status.md).

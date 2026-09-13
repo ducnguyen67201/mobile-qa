@@ -2,7 +2,7 @@
 
 Status: harness implemented; offline checks passed; live qualification pending. No paid infrastructure provisioned. Depends on: minimal source setup. Blocks: real execution in spec 04. Owns: `apps/mobile-worker/`, device-host configuration under `infra/`, qualification records.
 
-Detailed [phase 02 implementation plan](../../../.claude/PRPs/plans/02-cloud-phone-and-feasibility.plan.md) prepared against merged scaffold `d137e35` on 2026-09-12. Implementation and offline validation are recorded in the [report](../../../.claude/PRPs/reports/02-cloud-phone-and-feasibility-report.md); cloud qualification remains pending. The packet specifies a controlled demo APK, an independent persistence verifier, strict qualification contracts, process cleanup, affected CI and an authorization gate before paid execution. This document remains the architecture authority.
+Implementation and offline validation are recorded in [current status](../status.md); cloud qualification remains pending. This spec covers a controlled demo APK, an independent persistence verifier, strict qualification contracts, process cleanup, affected CI and an authorization gate before paid execution.
 
 ## Decision
 

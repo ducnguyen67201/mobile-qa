@@ -85,6 +85,5 @@ converting an opaque agent transcript into supposedly deterministic tests.
 
 Preserve legacy payload hashes and approval rules. Generated expectations require explicit
 review; app observations cannot establish intended behavior. See the
-[owning spec](implementation/06-test-generation.md) and
-[implementation plan](../../.claude/PRPs/plans/06-direct-execution-and-ai-test-authoring.plan.md).
+[owning spec](implementation/06-test-generation.md).
 The source now follows this decision. Validation and live acceptance are tracked separately in status.md. Existing session payloads and receipt transactions own the additive state; a second queue and migration would duplicate those mechanisms. Invalid model output fails closed rather than buying automatic repair calls.

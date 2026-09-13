@@ -2,8 +2,7 @@
 
 Status: local implementation verified; hosted and rendered acceptance open. Depends on: 01. Device preflight uses 02 once qualified. Owns: Rust app/build/auth modules, migrations, transport DTOs, frontend App screen.
 
-Implementation: [report](../../../.claude/PRPs/reports/03-app-setup-report.md) and
-[executed plan](../../../.claude/PRPs/plans/completed/03-app-setup.plan.md).
+Implementation and validation are tracked in [current status](../status.md).
 Authentication, local upload/validation and persisted UI are verified. Device readiness
 remains unverified; the hosted adapter still needs an authorized bucket round-trip.
 

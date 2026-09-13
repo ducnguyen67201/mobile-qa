@@ -13,10 +13,7 @@ AI discovery/generation action. Case editing and phone trials share structured d
 steps are no longer flattened into one model prompt. Rust owns durable orchestration and
 validation; Python owns device interaction and isolated model calls.
 
-Detailed tasks, contracts, migration and acceptance are in the
-[implementation plan](../../../.claude/PRPs/plans/06-direct-execution-and-ai-test-authoring.plan.md).
-The prior [task-session plan](../../../.claude/PRPs/plans/06-task-sessions.plan.md) records
-the original implementation rather than the new target behavior.
+This spec owns the implementation requirements; [current status](../status.md) records validation and remaining acceptance gates.
 
 ## Tester experience
 

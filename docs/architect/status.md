@@ -111,7 +111,7 @@ restriction; no alternate access was attempted. Device readiness remains `not_ch
 and overall execution readiness remains false.
 
 Implementation details, deviations and final checks:
-[Spec 03 report](../../.claude/PRPs/reports/03-app-setup-report.md).
+[phase 03 specification](implementation/03-app-setup-and-ui-backend.md).
 
 ### Google-only follow-up (2026-09-12)
 
@@ -192,9 +192,8 @@ region/AMI/network, the approved model, current rates, spend and shutdown deadli
 still operator inputs. A launch template is not an approved launch packet. Phase 03
 app setup can proceed independently.
 
-See the [implementation report](../../.claude/PRPs/reports/02-cloud-phone-and-feasibility-report.md)
-and authoritative [device qualification runbook](device-qualification.md). The PRP plan
-remains unarchived until task 12 has real qualification and teardown evidence.
+See the [phase 02 specification](implementation/02-cloud-phone-and-feasibility.md)
+and authoritative [device qualification runbook](device-qualification.md). Real qualification and teardown evidence remain required.
 
 ## Hosting direction follow-up
 
@@ -295,8 +294,8 @@ No manual browser, model/device, cloud or hosted S3 acceptance ran for this phas
 The frontend production audit found no known vulnerabilities; Cargo audit still
 reports the previously documented `RUSTSEC-2023-0071` in rsa 0.9.10.
 
-The [implementation report](../../.claude/PRPs/reports/04-execution-and-reports-report.md)
-records changes, validation, deviations and remaining gates. The plan remains active;
+The [phase 04 specification](implementation/04-execution-and-reports.md)
+defines the execution/reporting scope and remaining gates;
 this is local execution/reporting implementation, not phase-wide acceptance.
 
 Phase 04 follow-up: bounded long-poll claims and an explicit real-worker launch
@@ -340,14 +339,14 @@ helper test and 20 CI scope cases. TypeScript, ESLint, Clippy, Ruff, Pyright,
 generated drift and both builds pass. The HTTP smoke authors and reviews a case,
 suite and plan, selects an explicit default, runs the fake Python worker after
 API restart and preserves passed/failed/blocked reports plus the queued manifest
-after a later draft edit. See the [phase 05 report](../../.claude/PRPs/reports/05-test-library-and-plans-report.md).
+after a later draft edit. See the [phase 05 specification](implementation/05-test-library-and-plans.md).
 The GAN review is source-only; rendered layout and the new UI-to-emulator flow
 remain unverified under the existing browser restriction.
 
 ### Phase 06 task sessions — in progress
 
 Task-first source is being implemented on `codex/06-task-sessions`; see
-[the plan](../../.claude/PRPs/plans/06-task-sessions.plan.md). No completion or real
+[phase 06 specification](implementation/06-test-generation.md). No completion or real
 UI-to-Minitap acceptance is claimed yet. This checkout retains local phase 05
 changes; GitHub PR #5 was the phase 04 execution/report PR.
 
@@ -356,13 +355,13 @@ run `a8101844-8f33-4292-b093-8dd02e719b1c` saved two different texts through the
 sample APK, including a selected-control task, and closed its owned emulator.
 Generated contracts, 43 Rust tests, 93 browser tests and the worker checks passed
 (with one existing local HTTP test requiring a successful targeted rerun).
-See [the implementation report](../../.claude/PRPs/reports/06-task-sessions-report.md).
+See [phase 06 specification](implementation/06-test-generation.md).
 Rendered browser acceptance, persistent local worker credential/registration,
 restart-goal acceptance and the broader generation/discovery scope remain open.
 
 ## Phase 06 revamp — locally validated (2026-09-13)
 
-The [direct execution and AI test authoring plan](../../.claude/PRPs/plans/06-direct-execution-and-ai-test-authoring.plan.md)
+The [phase 06 specification](implementation/06-test-generation.md)
 revises phase 06 following tester feedback. It covers direct device commands and recording,
 reusable predefined templates, and an explicit Generate with AI flow that discovers bounded
 journeys and proposes named test drafts. Both preview and saved regression execution must
@@ -381,4 +380,4 @@ for `Hello direct` and `Xin chào`, with zero AI calls and verified emulator shu
 and fixed competing Android hierarchy dump mechanisms. This device check does not prove the
 whole new UI/API route on a real device. Real-model proposal quality, rendered browser acceptance,
 broader app qualification and hosted gates remain open. See the
-[revamp report](../../.claude/PRPs/reports/06-direct-execution-and-ai-test-authoring-report.md).
+[phase 06 specification](implementation/06-test-generation.md).

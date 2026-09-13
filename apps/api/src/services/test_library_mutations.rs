@@ -11,6 +11,7 @@ use uuid::Uuid;
 #[derive(Serialize)]
 #[serde(tag = "operation", content = "request", rename_all = "snake_case")]
 pub enum Mutation {
+    Authored(mobile_qa_contracts::automation::SaveAuthoredTestsRequest),
     Create(CreateLibraryEntryRequest),
     Fork(Uuid, ForkLibraryDraftRequest),
     Save(Uuid, SaveLibraryDraftRequest),
@@ -22,6 +23,7 @@ pub enum Mutation {
 impl Mutation {
     fn id(&self) -> Uuid {
         match self {
+            Self::Authored(r) => r.mutation_id,
             Self::Create(r) => r.mutation_id,
             Self::Fork(_, r) => r.mutation_id,
             Self::Save(_, r) => r.mutation_id,
@@ -129,6 +131,9 @@ pub async fn apply(
         }
     }
     let response = match mutation {
+        Mutation::Authored(r) => {
+            LibraryMutationReceipt::Authored(super::test_authoring::save(&tx, actor, app, r).await?)
+        }
         Mutation::Create(r) => {
             if !bounded(&r.key, 100) {
                 return Err(ApiFailure::invalid(
@@ -260,7 +265,7 @@ pub async fn apply(
                 if c.package != previous.package {
                     return Err(ApiFailure::invalid("The draft package belongs to its app"));
                 }
-                c.provenance = "user_authored".into();
+                c.provenance = previous.provenance.clone();
             }
             r.definition.check_bounds().map_err(ApiFailure::invalid)?;
             let payload = json(&r.definition)?;

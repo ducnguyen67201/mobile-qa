@@ -131,3 +131,12 @@ Real navigation uses the qualified host profile's explicit Doppler project/confi
 for the SDK child, matching phase 02. The child environment excludes API/lease/DB
 credentials. The fake HTTP smoke supplies isolated synthetic tokens and never calls
 Doppler, starts an emulator or calls a model. No .env files are introduced.
+
+## Direct-only device profiles
+
+Install worker extras with `uv sync --project apps/mobile-worker --frozen --extra device
+--extra ai --extra sdk`. A direct-only host profile may omit `model`; register its API
+execution profile with driver `direct` and empty model. Direct commands need no model secret.
+AI authoring requires an explicitly configured model and a Minitap-capable profile; only its
+isolated child is wrapped in Doppler. Ordinary tests and synthetic smoke remain Doppler-free.
+Use the same owned-device task-worker command documented in spec 06; protocol 2 is automatic.

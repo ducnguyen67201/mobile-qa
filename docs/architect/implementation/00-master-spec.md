@@ -7,7 +7,9 @@ with simulated HTTP and one real API-to-emulator good-path run verified; browser
 live fault/reliability and hosted acceptance remain open. Spec 05 authoring/review/default-plan source and simulated HTTP acceptance are locally
 implemented; rendered UI and UI-triggered real-device acceptance remain open. See its
 [implementation report](../../../.claude/PRPs/reports/05-test-library-and-plans-report.md).
-Specs 06–07 remain planned.
+Spec 06 task-session source is locally implemented; its direct-execution, template and
+AI-authoring revamp is locally implemented and validated. Real-model quality and rendered
+browser acceptance remain open. Spec 07 remains planned.
 [Current status and evidence](../status.md) own completion claims.
 This roadmap owns sequencing; [system architecture](../system.md), [contracts](../contracts.md),
 [environment](../environment.md), and [development workflow](../development.md) own their current details.
@@ -46,7 +48,7 @@ Runnable applications live under `apps/api`, `apps/web` and `apps/mobile-worker`
 | 3     | [App setup and first UI/backend slice](03-app-setup-and-ui-backend.md)     | Sign in, create app, upload APK, see real readiness status                  |
 | 4     | [Run one test and report](04-execution-and-reports.md)                     | Browser → durable job → Python → phone → persisted report                   |
 | 5     | [Test cases, suites and plans](05-test-library-and-plans.md)               | Edit, review, version and rerun approved definitions                        |
-| 6     | [Generate tests](06-test-generation.md)                                    | Sources become reviewable drafts that can actually execute                  |
+| 6     | [Direct execution and AI test authoring](06-test-generation.md)            | Direct steps and templates run; AI proposes named, reviewable tests         |
 | 7     | [Regression, pilot readiness and scaling](07-pilot-readiness-and-scale.md) | New-build comparison, recovery, measured reliability and costs              |
 
 Dependencies: 01 → 02 and 03; both 02 and 03 → 04 → 05 → 06 → 07. Work on the small App screen can continue while infrastructure access is pending, but device qualification gates real execution. Avoid completing a large UI before proving the runner.

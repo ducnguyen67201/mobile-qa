@@ -1,7 +1,7 @@
 //! Actual HTTP and PostgreSQL session lifecycle; worker responses are synthetic.
 mod support;
 use mobile_qa::services::{execution_store::*, test_definitions, worker_auth};
-use mobile_qa_contracts::{execution::*, task_sessions::*};
+use mobile_qa_contracts::{automation::*, execution::*, task_sessions::*, test_library::*};
 use support::*;
 
 #[tokio::test]
@@ -78,8 +78,7 @@ async fn task_session_requires_no_plan_and_fences_worker_and_task_identity() {
         let claim = server
             .post("/api/worker/phone-claims")
             .add_header("authorization", format!("Bearer {token}"))
-            .json(&PhoneClaimRequest {
-                claim_id: Uuid::new_v4(),
+            .json(&PhoneClaimRequest { protocol_version: 0, claim_id: Uuid::new_v4(),
             })
             .await;
         claim.assert_status_ok();
@@ -112,6 +111,8 @@ async fn task_session_requires_no_plan_and_fences_worker_and_task_identity() {
                 .add_header("x-lease-token", lease.lease_token.clone())
         };
         publish().json(&status).await.assert_status_ok();
+        let unsupported=serde_json::json!({"id":Uuid::new_v4(),"expected_revision":0,"frame_id":null,"title":"Back","sequence":{"actions":[{"id":"b","checkpoint_id":"b","kind":"direct","instruction":"","command":{"operation":"back"}}],"checks":[]}});
+        assert_eq!(owner.write(server.post(&format!("{path}/commands"))).json(&unsupported).await.status_code().as_u16(),409);
         let stale = PhoneTaskRequest {
             id: Uuid::new_v4(),
             goal: "Tap Save".into(),
@@ -204,11 +205,56 @@ async fn task_session_requires_no_plan_and_fences_worker_and_task_identity() {
         let claimed = server
             .post("/api/worker/phone-claims")
             .add_header("authorization", format!("Bearer {token}"))
-            .json(&PhoneClaimRequest {
-                claim_id: Uuid::new_v4(),
+            .json(&PhoneClaimRequest { protocol_version: 2, claim_id: Uuid::new_v4(),
             })
             .await;
         claimed.assert_status_ok();
+        let lease2=claimed.json::<PhoneClaimResponse>().lease.unwrap();
+        let update2=format!("/api/worker/phones/{}/update",next.id);
+        let publish2=||server.post(&update2).add_header("authorization",format!("Bearer {token}")).add_header("x-lease-token",lease2.lease_token.clone());
+        status.state=PhoneState::Ready;status.clean=false;status.frame=s.frame.clone();
+        // Obtain a fresh synthetic frame, not a fabricated Android execution result.
+        status.frame=Some(PhoneFrame{id:Uuid::new_v4(),width:1080,height:1920,png_base64:{use base64::Engine;let mut p=b"\x89PNG\r\n\x1a\n00000000".to_vec();p.extend(1080u32.to_be_bytes());p.extend(1920u32.to_be_bytes());base64::engine::general_purpose::STANDARD.encode(p)},controls:vec![]});
+        publish2().json(&status).await.assert_status_ok();
+        let sequence:AutomationSequence=serde_json::from_value(serde_json::json!({"actions":[{"id":"back","checkpoint_id":"back","kind":"direct","instruction":"","command":{"operation":"back"}}],"checks":[]})).unwrap();
+        let command=PhoneCommandRequest{id:Uuid::new_v4(),expected_revision:0,frame_id:status.frame.as_ref().map(|f|f.id),title:"Go back without AI".into(),sequence:sequence.clone()};
+        let commands=format!("/api/phones/{}/commands",next.id);
+        assert!(!other.write(server.post(&commands)).json(&command).await.status_code().is_success());
+        let queued=owner.write(server.post(&commands)).json(&command).await;
+        queued.assert_status_ok();
+        let admitted=queued.json::<PhoneSession>();assert_eq!(admitted.revision,1);
+        owner.write(server.post(&commands)).json(&command).await.assert_status_ok();
+        let changed=PhoneCommandRequest{title:"Different".into(),..command.clone()};
+        assert_eq!(owner.write(server.post(&commands)).json(&changed).await.status_code().as_u16(),409);
+        let concurrent=PhoneCommandRequest{id:Uuid::new_v4(),..command.clone()};
+        assert_eq!(owner.write(server.post(&commands)).json(&concurrent).await.status_code().as_u16(),409);
+        let mut task=admitted.tasks[0].clone();task.state=PhoneTaskState::Acting;
+        task.steps.push(StepReceipt{action_id:"back".into(),state:StepState::Completed,message:"Done".into()});
+        status.task=Some(task.clone());assert_eq!(publish2().json(&status).await.status_code().as_u16(),409);
+        task.steps[0].state=StepState::Started;status.task=Some(task.clone());publish2().json(&status).await.assert_status_ok();
+        let mut altered=task.clone();altered.sequence.as_mut().unwrap().actions[0].command=Some(DirectCommand::Restart {});status.task=Some(altered);
+        assert_eq!(publish2().json(&status).await.status_code().as_u16(),409);
+        task.steps[0].state=StepState::Completed;task.state=PhoneTaskState::Completed;status.task=Some(task.clone());publish2().json(&status).await.assert_status_ok();
+        publish2().json(&status).await.assert_status_ok();
+        task.steps[0].message="Rewritten".into();status.task=Some(task);assert_eq!(publish2().json(&status).await.status_code().as_u16(),409);status.task=None;
+        let stale=PhoneCommandRequest{id:Uuid::new_v4(),..command.clone()};assert_eq!(owner.write(server.post(&commands)).json(&stale).await.status_code().as_u16(),409);
+        let templates=owner.read(server.get(&format!("/api/apps/{app}/test-templates"))).await;
+        templates.assert_status_ok();let catalog=templates.json::<TestTemplates>();assert_eq!(catalog.items.len(),4);
+        let save=SaveAuthoredTestsRequest{mutation_id:Uuid::new_v4(),source_task_id:None,expectations_confirmed:false,tests:vec![SaveAuthoredTest{template_id:Some(catalog.items[0].id.clone()),proposal_id:None,title:"My smoke test".into(),requirement:String::new(),sequence:AutomationSequence{actions:catalog.items[0].definition.actions.clone(),checks:catalog.items[0].definition.checks.clone()}}]};
+        let save_path=format!("/api/apps/{app}/test-library/from-recording");
+        let result=owner.write(server.post(&save_path)).json(&save).await;result.assert_status_ok();let saved=result.json::<SavedAuthoredTests>();
+        assert_eq!(owner.write(server.post(&save_path)).json(&save).await.json::<SavedAuthoredTests>().entry_ids,saved.entry_ids);
+        let draft=owner.read(server.get(&format!("/api/apps/{app}/test-library/{}/draft",saved.entry_ids[0]))).await.json::<LibraryDraftResponse>();
+        assert!(!draft.issues.is_empty());
+        let before=rows(&ctx.db,"SELECT id FROM test_library_entries WHERE app_id=$1",vec![app.into()]).await.unwrap().len();
+        let mut invalid=save.clone();invalid.mutation_id=Uuid::new_v4();invalid.tests.push(SaveAuthoredTest{template_id:None,proposal_id:None,title:String::new(),requirement:String::new(),sequence});
+        assert!(!owner.write(server.post(&save_path)).json(&invalid).await.status_code().is_success());
+        assert_eq!(rows(&ctx.db,"SELECT id FROM test_library_entries WHERE app_id=$1",vec![app.into()]).await.unwrap().len(),before);
+        let generation=GenerateTestsRequest{id:Uuid::new_v4(),session_id:next.id,expected_revision:1,category:CoverageKind::Smoke,journey:String::new(),allow_writes:false,reuse_job_id:None};
+        let gen_path=format!("/api/apps/{app}/test-generations");owner.write(server.post(&gen_path)).json(&generation).await.assert_status_ok();
+        owner.write(server.post(&gen_path)).json(&generation).await.assert_status_ok();
+        assert!(!other.read(server.get(&format!("{gen_path}/{}",generation.id))).await.status_code().is_success());
+        owner.read(server.get(&format!("{gen_path}/{}",generation.id))).await.assert_status_ok();
         exec(
             &ctx.db,
             "UPDATE phone_sessions SET expires_at=now()-interval '1 second' WHERE id=$1",

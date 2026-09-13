@@ -1,165 +1,161 @@
-# 06 — Run tasks visually and save reusable tests
+# 06 — Direct execution and AI test authoring
 
-Status: planned. Depends on: 04–05 and a qualified execution path. Owns: Rust interactive session/task services and generated transport contracts, Python/Minitap session execution, React phone/task UI, and optional test generation/review.
+Status: **revamp implemented and locally validated**; real-model quality and broader qualification remain separate.
+Depends on: 04–05, existing phase 06 sessions and a qualified Android execution path.
+Owns: Rust command/generation services and contracts, Python device execution and bounded
+AI authoring, React test creation and the shared phone workspace.
 
-## Deliverable
+## Current behavior and next deliverable
 
-The primary experience is: open an uploaded app on an emulator, see its screen,
-point to a control or describe a task, and press **Run task**. Minitap plans and
-performs the requested task while the user sees progress and screen updates.
-Creating cases, suites, release plans and review records is not a prerequisite
-for this interactive task flow. This replaces the form-first generation proposal
-following user feedback on 2026-09-13; none of the interactive flow is implemented yet.
+Ordinary actions now use a shared Python direct executor. Minitap runs only explicit
+Ask AI/legacy navigation steps. Tests offers templates, manual editing and an explicit
+AI discovery/generation action. Case editing and phone trials share structured draft state;
+steps are no longer flattened into one model prompt. Rust owns durable orchestration and
+validation; Python owns device interaction and isolated model calls.
 
-Afterward, **Save as test** optionally turns the task and captured evidence into
-a reusable draft through phase 05. Reusable regression checks retain explicit
-expected outcomes and existing review semantics. Batch generation from pasted
-stories remains a secondary workflow: it produces drafts, never automatically
-approved regression definitions.
+Detailed tasks, contracts, migration and acceptance are in the
+[implementation plan](../../../.claude/PRPs/plans/06-direct-execution-and-ai-test-authoring.plan.md).
+The prior [task-session plan](../../../.claude/PRPs/plans/06-task-sessions.plan.md) records
+the original implementation rather than the new target behavior.
 
-## First implementation: task session
+## Tester experience
 
-- Show the current Android screen beside one task input and **Run task**. Select
-  a validated build and configured device automatically when unambiguous; show
-  a simple chooser when needed. Display preparation, unavailable device and
-  connection errors explicitly. Never substitute a mock phone for a missing session.
-- Let a user mark a control on the captured screen as context for the task.
-  Bind the selection to its screenshot/frame and UI hierarchy; resolve it again
-  against the current device state before acting. A selection does not silently
-  send a tap. **Run task** authorizes the described task and its bounded execution.
-- Pass the goal and selected context to Python's existing Minitap seam. Minitap
-  owns planning and device interaction; do not add a competing Rust tap planner.
-  Show available plan/action progress and refresh the phone from actual device
-  captures. Do not claim streaming plan events until the pinned SDK seam supports them.
-- Expose queued, preparing, planning, acting, completed, needs-input, failed and
-  stopped states with screenshots and an observed outcome. **Stop** cancels the
-  active task and confirms worker termination before releasing the device.
-- Keep the original goal fixed for each attempt. Show task completion separately
-  from a verified test pass. If a success criterion is absent, report observations;
-  never invent an expectation or equate the agent's completion claim with a pass.
-- Keep **Save as test** and advanced case fields secondary. Saving does not
-  silently approve a case or change an existing release plan.
+Tests offers **Generate with AI**, **Use a template**, and **Create manually**.
+Test names are readable and editable; internal stable keys are generated automatically.
+The task editor remains on the left, actual Android captures on the right, with the
+existing resizer and compact navigation.
 
-Rust owns authenticated app-scoped sessions, frozen build/environment binding,
-idempotent task submission, task events, cancellation and private evidence access.
-Python claims durable HTTP jobs and owns exclusive device leases, Minitap, capture
-and cleanup. Reuse phase 04 lease infrastructure without weakening the existing
-approved-regression run route: interactive tasks are an explicit job kind with
-separate result semantics. Account/device isolation, step/time limits, restart
-recovery and uncertain side effects remain enforced; lease expiry never blindly
-replays a task that may already have changed the app.
+- **Direct authoring:** select Tap, Enter text, Swipe, Back, Restart or a supported
+  check. Pick a target on the phone and provide only the required value/expectation.
+  The left panel uses compact two-row actions: an icon/type selector and controls
+  above the target/value inputs, with accessible labels and multiline text support.
+  Add action appends another. Checks expand only when added or explicitly opened. Optional checks appear inside their owning action;
+  no check form is created until requested. Actions can be tried without checks.
+  Reviewed release tests still require evidence under the existing approval rules.
+  Removed-action checks remain recoverable for reassignment rather than being silently deleted.
+  Run the typed sequence directly; show per-step progress, evidence and checks.
+- **Control and record:** distinguish Pick target from Control phone. Picking only
+  binds a step; controlling executes an explicit command. An optional recording
+  toggle saves successful direct commands into the current draft in order.
+- **Predefined templates:** begin with app-open smoke, valid form submission, required
+  field validation and restart persistence. Templates contain visible binding slots;
+  they do not pretend to know an arbitrary APK's controls or intended behavior.
+- **Generate with AI:** select Smoke by default, optionally describe a journey, and
+  start discovery/generation explicitly. Reuse a compatible build/profile/session
+  when available; ask for a choice only when needed. Show visited screens and gaps,
+  then editable proposals such as “Smoke — app opens” and “Saved task survives restart.”
+- **Save and rerun:** save selected proposals or recorded steps atomically as drafts.
+  A tester can trial drafts without first assembling a release plan. Existing review
+  and immutable-definition rules still govern approved regression runs.
 
-Rust contracts generate browser SDK/types/Zod and worker Pydantic models through
-the existing pipelines. Cover actual session/task routes, events, errors and
-evidence responses at their runtime boundaries. No handwritten parallel wire types.
+Templates, manual authoring and direct execution remain usable without model credentials.
+AI is never invoked by uploading a build, visiting a page, or failing to find a selector.
+Explicit Ask AI steps are labeled and account for their own usage. Direct-only repeated
+runs must make zero model calls; emulator/infrastructure cost still exists.
 
-## Input
+## Planned execution and transport
 
-Persist a source revision containing the customer's text, app/environment context, declared critical journeys and constraints. Start with pasted text; repository crawling, ticket integrations and complex document ingestion are deferred.
+Use a shared Rust-authored tagged action format across browser commands, recorded steps,
+case definitions, generation proposals, worker requests and frozen manifests. Generate
+browser SDK/types/Zod and worker Pydantic through the existing pipelines. No handwritten
+consumer shapes or free-form executable scripts are introduced.
 
-Provide the generator with supported device capabilities, available fixture/reset adapters, permitted verification methods and existing cases. Do not send account secrets. Treat supplied text/app observations as data, not authority to expand tool permissions.
+Python resolves each selected target against fresh hierarchy and performs direct commands
+through an explicitly pinned uiautomator2 adapter on the already leased serial. Prefer
+resource IDs and require unique matches. Frame-local control IDs and old coordinates are
+not reusable selectors. Literal text goes through a device RPC, not shell interpolation.
+Missing/ambiguous controls stop with a useful error; they do not trigger hidden AI recovery.
 
-## Pipeline
+Both interactive sessions and approved regression runs use this executor. Per-step capture
+feeds the existing independent Rust evidence checks. Agent completion and successful taps
+alone are never a test pass. Keep supported assertion methods and require explicit expected
+behavior; unsupported checks remain needs-input rather than being silently approximated.
 
-1. **Normalize requirements:** extract criterion IDs, expected behavior, prerequisites and ambiguity. Preserve source anchors and contradictory statements for review.
-2. **Propose scenarios:** generate happy paths and relevant negative cases grounded in those criteria. Bound count and scope to the pilot's critical journeys; avoid an unreviewable catalog.
-3. **Validate structure:** parse typed output, apply business validation, reject unknown source IDs and unsupported checks. Repair malformed output only within a bounded retry budget.
-4. **Check readiness:** map fixture/reset needs and execution limits. Separate “valid draft” from “executable on this configuration.” Missing knowledge becomes a question/needs-input state.
-5. **Group and compare:** suggest suites/default plan, compare with existing cases and flag potential duplicates. Never merge or overwrite approved definitions automatically.
-6. **Review:** show source → proposed expectation → verification method. Save edits and approval through spec 05. An approved selection becomes eligible for execution.
+Manual commands, automated sequences and discovery share one exclusive session command
+lane. Preserve app/creator authorization, CSRF, scoped worker leases, idempotent request
+fingerprints, revision fencing, reservations, heartbeat, cancellation, cleanup and quarantine.
+A response lost after a possible device side effect is uncertain; never automatically replay it.
 
-Current-screen capture is required for the initial task session. Broader device
-discovery remains optional; a screen inventory is not a prerequisite for giving
-Minitap a task. Observing the current app helps locate a control; it cannot
-establish whether a buggy behavior is correct.
+Add explicit direct/model capabilities and protocol versions. Direct profiles need no model;
+old workers must not receive new action variants. Preserve legacy navigation JSON and stored
+hashes, historical manifests, approvals and existing active-session semantics. Converting an
+old prose test requires an explicit new draft/version; no silent historical data migration.
 
-### Optional screen discovery and authoring
+## Discovery and proposals
 
-The phase 05 editor currently assumes the author knows the app; APK intake does
-not discover screens. As an extension to task sessions, users may explore selected
-journeys, review captured screens and ask AI to suggest additional drafts. This
-is planned, not implemented; collecting all screens is not a required first step.
+Rust persists a generation job before execution and dispatches it through the phone worker's
+leased command queue. Python captures bounded observations, asks an isolated model child
+for a typed next action, validates that action against the allowed journey and current controls,
+and calls the shared direct executor. Persist actual action traces and source snapshots.
+The model child receives no worker token and has no independent device-control tools.
 
-Capture screenshots, UI hierarchy and observed navigation transitions with build,
-environment and session provenance. Show the selected screen beside the case
-editor so authors can describe controls and attach relevant evidence. Both manual
-and generated drafts use the same phase 05 validation and review services.
+Start with bounded discovery: 12 actions, 8 captured states, 180 seconds and 5 proposed
+cases, each at most 20 steps. Include drafting in a maximum of 16 model calls;
+freeze per-call output and context limits as specified in the plan. Count failed calls and unknown
+usage, stop when limits prevent continuation, and show partial results honestly. These are
+initial product defaults, not a promise of measured dollar cost.
 
-Discovery must have explicit journey and time/action limits, account/reset setup
-and cancellation. Present visited screens and unexplored gaps, never a promise of
-all screens: authentication, roles, data and network state can change the UI.
-Treat captured content as untrusted app data and apply evidence access/redaction
-rules before model use. Requirements or explicit author decisions establish the
-expected result; screenshots alone cannot establish correctness. Missing intent
-remains a review question rather than an automatically accepted expectation.
+Capture only qualified test-environment journeys. Read-only exploration is the default;
+write/form actions require a journey that permits test-data changes. Enforce operation and
+target restrictions outside prompts. Login, unsupported controls, external packages and
+missing reset prerequisites stop discovery with a visible explanation.
 
-## Job and failure behavior
+Redact password content and corresponding screenshot regions before provider transmission;
+filtering picker controls alone is insufficient. Treat all app text as untrusted data. Persist
+private source references through the session’s build checksum, environment revision, device
+image and observations, plus versioned template/proposal identity. Prompt-version cataloging
+remains part of the later qualification/retention work. Cache/reuse only within the same
+app and compatible scope; changed builds/environments invalidate old discovery context.
 
-Generation runs as a durable, bounded Rust background job and returns a job ID immediately. Persist source revision, prompt/template version, model/provider configuration, usage and per-stage output status. Limit request size, scenario count, model time, repair attempts and spend.
+AI proposals contain suggested title/category, structured steps, source references, expected
+checks or explicit unanswered questions, and potential duplicates. Screens show what occurred;
+requirements or the author's explicit decision establish what should occur. Suggested expected
+behavior needs confirmation before review. Do not redefine a seeded defect as correct behavior.
+Generated output never automatically approves a test or updates the default plan.
 
-Canceling or retrying generation does not mutate already saved approved cases. Expose partial drafts with stage errors and allow a targeted retry. Key draft creation to generation/item IDs to avoid duplicate records on delivery retries. Do not hold a database transaction across model calls.
+Generation state and selected-proposal acceptance are durable/idempotent. Canceling stops
+future model calls/actions, retains completed proposals, and leaves approved cases unchanged.
+A worker crash with uncertain side effects quarantines the session rather than resuming it.
+Source images are bounded private session payloads read through authorized routes. Separate
+artifact retention/garbage collection remains part of phase 07; referenced source tasks must
+not be removed while saved drafts depend on them.
 
-Use direct model API calls from Rust for structured drafting. Minitap's internal device reasoning remains in Python. OpenAI Agents SDK is unnecessary for the first pipeline; add orchestration only when measured workflows require it.
+## Delivery order and acceptance
 
-## UI
+1. **Direct execution and recording:** prove picked tap/type/restart/check steps on the
+   qualified sample through both the phone API and approved run pipeline, with no model
+   credentials/calls. Verify Unicode, ambiguity, failures, cancellation and cleanup.
+2. **Templates and reusable tests:** bind template slots, save complete typed drafts
+   atomically, review them through existing semantics and rerun the frozen definitions.
+3. **AI discovery and proposals:** run bounded discovery, generate named grounded scenarios,
+   resolve missing expectations, save selected proposals and execute their direct steps.
 
-Primary: **App → phone preview + task → Run task → watch actions and outcome →
-optionally Save as test**. Example: “Type Buy milk, save it, restart the app, and
-check that Buy milk is still there.” The user does not manually author the
-intermediate navigation steps. Keep the existing detailed case editor available
-for advanced editing and existing drafts; do not discard their content.
+Use real HTTP/PostgreSQL tests and generated boundary checks alongside synthetic worker,
+model and DOM tests. Add legacy serialization/hash fixtures, old-worker capability fencing,
+concurrent-command/retry tests and atomic batch-save rollback coverage. Real-device and
+small explicit real-model evaluation are separate acceptance gates. Broken/ambiguous source
+fixtures must prove the generator preserves intent and uncertainty.
 
-Secondary: Tests → Generate from requirements → paste criteria → review proposed
-cases. Show missing inputs, duplicates and unsupported checks before approval.
-Make “edit existing draft” and “generate proposed revision” explicit. Uploading
-a new APK does not automatically start a task or regenerate the library.
+The qualified sample/device scope remains in force; this revision does not establish arbitrary
+customer APK support, all-screen coverage, automatic login/reset or hosted reliability.
+Respect the existing browser inspection restriction and record rendered acceptance separately.
 
-## Acceptance
+## Connecting the local worker
 
-The first vertical slice uses the offline input/save sample APK: open a real
-session, show its captured screen in the UI, submit the example task, observe
-Minitap interaction and retained text, and inspect the evidence. Verify both
-plain-text goals and selected-control context. This must not use a hardcoded
-sample tap script in place of Minitap. A second goal must exercise a different
-interaction to establish that task input is actually honored.
+The existing `task-worker` owns a disposable Android emulator and claims sessions from Rust:
 
-Route and worker tests cover cross-app access denial, generated schema agreement,
-duplicate submission, stale screen selection, exclusive device ownership,
-missing device, model failure, cancellation and uncertain lease recovery.
-DOM tests cover the task flow and accessible screen selection without advanced
-case fields. Use synthetic SDK/device responses in ordinary checks; explicitly
-label them. Real UI-to-Minitap acceptance remains an independent gate, not a claim
-inferred from DOM or fake-worker checks.
+```sh
+uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker task-worker \
+  --origin http://localhost:5150 --state /absolute/private/task-worker \
+  --profile /absolute/private/profile.toml
+```
 
-Use fixed source fixtures: clear criterion, ambiguous behavior, contradictory source, missing reset, duplicate case and unsupported action. Check schema handling, valid source references, preserved uncertainty, partial errors and bounded retries. Stub provider responses in normal tests; run a small explicit real-model evaluation before pilot use.
-
-Manually approved generated cases execute through the same manifest/worker/report path as authored cases. Seeded defects cannot be redefined as expected behavior by the generator. A schema-valid output alone does not satisfy this gate.
-
-## Local implementation in progress
-
-The first task-session implementation is on `codex/06-task-sessions`, layered on
-local phase 05 source (GitHub PR #5 refers to phase 04). It adds dedicated phone
-sessions/tasks sharing the existing physical reservation namespace. Browser entry
-is App → Open app & try a task; it opens the newest validated build automatically
-when one qualified real worker profile is configured. User input goes directly to
-Minitap; completed tasks may be saved as incomplete case drafts for later review.
-
-The first device path retains the qualified `ai.mobileqa.demo` adapter and Android
-35 profile. Arbitrary app/package qualification and customer login/reset are not
-silently enabled. A worker still needs explicit operator registration for each app;
-no browser self-provisioning of worker tokens or qualification grants is added.
-The task worker captures actual screenshots while the SDK acts, without claiming
-per-step planner streaming. Captures are held privately in the session record;
-this initial view retains the latest frame and task history, not a full video.
-
-Run the explicit worker with injected `MOBILE_QA_WORKER_TOKEN` using
-`uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker task-worker
---origin http://localhost:5150 --state /absolute/private/task-worker
---profile /absolute/private/profile.toml`. The host profile and model must match
-the registered execution profile. The SDK child gets model credentials through
-its configured Doppler injection; API credentials never enter that child.
-A missing device/model configuration produces an unavailable state, not a fake
-successful phone. Ordinary tests use synthetic boundaries and do not launch it.
+API identity is supplied through the existing operator registration and Doppler process injection.
+Direct-only host profiles omit `model` and use a registered direct execution profile. Install the
+explicit `device` extra; add `ai` and `sdk` for generation and explicit Minitap steps. No model
+secret is needed for direct steps. Restart the API and worker after updating; only Vite has HMR.
+Ordinary tests never start a device or model. The supported adapter remains `ai.mobileqa.demo`
+on the existing qualified Android image; this does not establish arbitrary APK support.
 
 ### Task and test workspace layout
 
@@ -175,26 +171,43 @@ a new device session. The standalone Try page retains automatic opening.
 
 Users can compose a task before the phone is ready, select a control on its current
 capture, then run it while keeping their draft visible. Task trials execute the
-written goal; editing draft fields alone neither executes nor verifies that draft.
+current structured steps and checks; editing fields alone does not control the phone.
 Preview frames refresh through the existing session polling, not a video stream.
 This layout change has DOM interaction coverage; rendered browser acceptance remains
 pending under the existing inspection restriction.
 
-Task composition uses numbered, reorderable steps: Ask AI, Tap, Enter text, Swipe,
-Go back or Restart app. These are editor instructions compiled into one ordered
-goal for the existing Minitap task endpoint, with a combined 4,000-character limit
-and at most 20 steps. Action choices are still executed by the AI agent; the UI
-does not claim deterministic device commands or individual step verification.
-A selected live control anchors the start of the task; later targets are described
-in each step. Completed task status covers the whole sequence. Steps stay visible
-after submission and can be edited or run again with a new request identity.
+Task composition preserves generated structured actions through picking, editing, saving,
+trial and regression execution. Pick target binds a resource ID or accessibility description;
+Control phone executes it after fresh unique-target resolution. Recording appends completed
+interactions once. Later screens must be reached before binding controls on them. Failed
+selectors block; they never silently invoke AI. Expected checks remain separate from actions.
 
-Each Tap or Enter text step offers **Pick on phone**. The user arms that step and
-selects a detected control from the current capture; its label fills the target
-field, and the generated goal includes its resource ID beside the label. The
-selection follows the step through reordering. Editing the target or changing
-its action clears the captured-control metadata. Picking does not execute an
-Android action and is available only when the phone is ready. Only controls on
-the currently captured screen can be picked; targets on later screens can still
-be described. Minitap locates the target during execution; a picked target is not
-a guarantee that a future screen or control will be unchanged.
+### Persistence and rollout
+
+This revision reuses existing phone session/task JSON payloads and library mutation receipts;
+no duplicate generation queue or new migration is needed. Commands increment a session revision,
+freeze their request fingerprint and require worker protocol 2. Legacy worker claims remain
+valid for legacy work only. Started step receipts are durable before action execution; terminal
+receipts cannot change. Environment revision changes require a new session. Snapshots are bounded
+private session data (eight frames, sixteen model calls maximum), delivered through the existing
+authorized phone/job route rather than a second artifact store. Canceling discovery stops and
+cleans up its owning session. A lost worker is quarantined, never resumed mid-action.
+
+Discovery uses a generated structured-response model child with at most eight states, twelve
+actions, three minutes and five proposals. Read-only discovery permits wait/back/swipe only;
+form submissions need the explicit test-data switch and a described journey. Missing usage stops
+further calls. Invalid output fails closed without repair calls. Password fields are masked before
+provider requests. Proposals retain source IDs and versioned template/generation provenance;
+accepting them creates drafts and never grants approvals. Existing-name hints cover the loaded
+catalog page, not semantic deduplication across the whole library. Same-session captures can be
+reused explicitly, while changed environment/build/session scope requires discovery again.
+
+### Verification scope
+
+`just smoke-direct-authoring` exercises real HTTP draft/review/run persistence with synthetic
+worker evidence; it is not real-emulator acceptance. Worker unit tests exercise the same direct
+RPC seam, literal Unicode input, ambiguity, uncertainty, explicit AI dispatch and generation
+source rejection. The direct executor passed local sample input/save/restart with plain text and Vietnamese text
+on 2026-09-13, with no model configured or invoked. Real-model proposal quality and the complete
+rendered browser-to-device journey still require separate acceptance.
+The supported device adapter remains the qualified Android demo; arbitrary APKs are not qualified.

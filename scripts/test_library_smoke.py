@@ -17,7 +17,7 @@ def mutate(owner, csrf, method, path, body):
     return result
 
 
-def main():
+def main(direct=False):
     saved = {}
 
     def author(owner, csrf, app, profile):
@@ -66,6 +66,39 @@ def main():
             return candidate
 
         case = create("case")
+        if direct:
+            catalog = request(owner, "GET", f"/api/apps/{app}/test-templates")
+            assert len(catalog["items"]) == 4
+            content = case["definition"]["content"]
+            original = content["actions"][0]
+            original.update(
+                kind="direct",
+                instruction="",
+                command={
+                    "operation": "set_text",
+                    "target": {
+                        "by": "resource_id",
+                        "value": "ai.mobileqa.demo:id/task_input",
+                    },
+                    "text": "${task_title}",
+                },
+            )
+            content["actions"].insert(
+                1,
+                {
+                    "id": "save",
+                    "checkpoint_id": "saved",
+                    "kind": "direct",
+                    "instruction": "",
+                    "command": {
+                        "operation": "tap",
+                        "target": {
+                            "by": "resource_id",
+                            "value": "ai.mobileqa.demo:id/save_task",
+                        },
+                    },
+                },
+            )
         assert case["definition"]["content"]["provenance"] == "user_authored"
         # Explicit browser save, even when starting from the optional demo template.
         case = mutate(

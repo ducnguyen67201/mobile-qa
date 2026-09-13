@@ -1,3 +1,4 @@
+import { actionLabel } from '@/lib/action-label'
 import { Accordion, Alert, Badge, Card, Group, List, Stack, Text, Title } from '@mantine/core'
 import { Link } from 'react-router'
 import { useWorkspace } from '@/hooks/use-workspace'
@@ -165,13 +166,7 @@ export function DefinitionSummary({
                 <Stack key={action.id} gap="xs">
                   <Group gap="sm">
                     <Badge circle>{i + 1}</Badge>
-                    <Text fw={500}>
-                      {action.kind === 'navigate'
-                        ? action.instruction
-                        : action.kind === 'restart_app'
-                          ? 'Restart the app, preserving saved data'
-                          : 'Capture checkpoint evidence'}
-                    </Text>
+                    <Text fw={500}>{actionLabel(action)}</Text>
                   </Group>
                   {definition.content.checks
                     .filter((check) => check.checkpoint_id === action.checkpoint_id)

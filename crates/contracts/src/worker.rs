@@ -126,6 +126,8 @@ impl ContractProbe {
 // It is not a message envelope sent to a worker and is never executed as a job.
 #[derive(JsonSchema)]
 pub struct WorkerContracts {
+    pub authoring_request: crate::automation::AuthoringModelRequest,
+    pub authoring_response: crate::automation::AuthoringModelResponse,
     pub phone_claim: crate::task_sessions::PhoneClaimResponse,
     pub phone_claim_request: crate::task_sessions::PhoneClaimRequest,
     pub phone_update: crate::task_sessions::PhoneUpdate,

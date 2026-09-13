@@ -1,7 +1,7 @@
 /** Real SDK + synthetic server replies; this is not emulator acceptance. */
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -9,8 +9,8 @@ import { routes } from '@/routes'
 import { theme } from '@/theme'
 import { app, appId, orgId, session, settings } from '@/test/fixtures'
 import { entryId, libraryDraft, libraryEntry, libraryOptions } from '@/test/library-fixtures'
-import type { PhoneSession, PhoneTaskRequest } from '@/api/generated/types.gen'
-import { zOpenPhoneRequest, zPhoneTaskRequest } from '@/api/generated/zod.gen'
+import type { PhoneSession, PhoneCommandRequest } from '@/api/generated/types.gen'
+import { zOpenPhoneRequest, zPhoneCommandRequest } from '@/api/generated/zod.gen'
 const id = '8fc2fe54-1c10-4c26-8ae6-b6882d2b3e21'
 const profile = {
   id,
@@ -43,6 +43,8 @@ function show(blocked = false, embedded = false) {
           id: 'task-input',
           resource_id: 'ai.mobileqa.demo:id/task_input',
           label: 'Task input',
+          editable: true,
+          description: '',
           left: 20,
           top: 100,
           right: 380,
@@ -52,6 +54,8 @@ function show(blocked = false, embedded = false) {
           id: 'save',
           resource_id: 'ai.mobileqa.demo:id/save',
           label: 'Save',
+          editable: false,
+          description: '',
           left: 20,
           top: 180,
           right: 380,
@@ -59,10 +63,13 @@ function show(blocked = false, embedded = false) {
         },
       ],
     },
+    protocol_version: 2,
+    revision: 0,
+    environment_revision: 1,
     tasks: [],
   }
   const opened: unknown[] = []
-  const tasks: PhoneTaskRequest[] = []
+  const tasks: PhoneCommandRequest[] = []
   vi.stubGlobal(
     'fetch',
     vi.fn(async (request: Request) => {
@@ -85,20 +92,29 @@ function show(blocked = false, embedded = false) {
         opened.push(zOpenPhoneRequest.parse(await request.json()))
         return Response.json(current)
       }
-      if (path.endsWith('/tasks')) {
-        const body = zPhoneTaskRequest.parse(await request.json())
+      if (path.endsWith('/commands')) {
+        const body = zPhoneCommandRequest.parse(await request.json())
         tasks.push(body)
         current = {
           ...current,
-          state: 'acting',
+          state: 'ready',
+          revision: (current.revision ?? 0) + 1,
           frame: current.frame ? { ...current.frame, png_base64: 'dXBkYXRlZA==' } : null,
           tasks: [
             {
               id: body.id,
-              goal: body.goal,
+              goal: body.title,
+              sequence: body.sequence,
+              generation: null,
+              progress: null,
+              steps: body.sequence.actions.map((a) => ({
+                action_id: a.id,
+                state: 'completed',
+                message: 'Done',
+              })),
               control: null,
-              state: 'queued',
-              message: 'Waiting for Minitap',
+              state: 'completed',
+              message: 'Actions completed',
             },
           ],
         }
@@ -129,143 +145,99 @@ function show(blocked = false, embedded = false) {
   return { opened, tasks }
 }
 afterEach(() => vi.unstubAllGlobals())
-it('opens the default phone without setup fields and submits the users goal', async () => {
+it('picking binds a typed target without executing or invoking AI', async () => {
   const { opened, tasks } = show()
-  const goal = await screen.findByLabelText('Step 1 instruction')
   await waitFor(() => expect(opened).toHaveLength(1))
-  expect(goal).toBeEnabled()
-  expect(screen.queryByLabelText('Stable key')).not.toBeInTheDocument()
-  expect(screen.queryByLabelText('Choose a device')).not.toBeInTheDocument()
-  await userEvent.type(goal, 'Save Buy milk and restart')
-  await userEvent.click(screen.getByRole('button', { name: 'Run task' }))
+  await userEvent.click(await screen.findByRole('combobox', { name: 'Action 1 action' }))
+  await userEvent.click(screen.getByRole('option', { name: 'Enter text' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Pick target for action 1 on phone' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Select Task input' }))
+  await userEvent.type(screen.getByLabelText('Action 1 text'), 'Hello')
+  expect(tasks).toHaveLength(0)
+  expect(screen.getByText('Direct execution · no AI calls')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Run test' }))
   await waitFor(() => expect(tasks).toHaveLength(1))
-  expect(tasks[0]?.goal).toBe('Save Buy milk and restart')
-  expect(screen.getByRole('button', { name: 'Run task' })).toBeDisabled()
-  await userEvent.click(screen.getByRole('button', { name: 'Stop session' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Stop session' })).toBeDisabled())
+  expect(tasks[0]?.sequence.actions[0]?.command).toEqual({
+    operation: 'set_text',
+    target: { by: 'resource_id', value: 'ai.mobileqa.demo:id/task_input' },
+    text: 'Hello',
+  })
+  expect(tasks[0]?.frame_id).toBeNull()
 })
-it('explains missing device setup without pretending there is a phone', async () => {
+it('controls the phone immediately and records each completed receipt once', async () => {
+  const { opened, tasks } = show()
+  await waitFor(() => expect(opened).toHaveLength(1))
+  await userEvent.click(screen.getByRole('button', { name: 'Control phone' }))
+  await userEvent.click(screen.getByLabelText('Record interactions into this test'))
+  await userEvent.click(screen.getByRole('button', { name: 'Interact with Task input' }))
+  await userEvent.type(screen.getByLabelText('Text to enter'), 'Xin chào')
+  await userEvent.click(screen.getByRole('button', { name: 'Enter text' }))
+  await waitFor(() => expect(tasks).toHaveLength(1))
+  expect(tasks[0]?.frame_id).toBe(id)
+  await waitFor(() => expect(screen.getByLabelText('Action 1 text')).toHaveValue('Xin chào'))
+  expect(screen.queryByLabelText('Action 2 action')).not.toBeInTheDocument()
+})
+it('reorders direct steps and only marks an explicit Ask AI step as AI', async () => {
+  const { opened, tasks } = show()
+  await waitFor(() => expect(opened).toHaveLength(1))
+  await userEvent.click(screen.getByRole('combobox', { name: 'Action 1 action' }))
+  await userEvent.click(screen.getByRole('option', { name: 'Go back' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Add action' }))
+  await userEvent.click(screen.getByRole('combobox', { name: 'Action 2 action' }))
+  await userEvent.click(screen.getByRole('option', { name: 'Ask AI' }))
+  await userEvent.type(screen.getByLabelText('Action 2 AI instruction'), 'Explore settings')
+  await userEvent.click(screen.getByRole('button', { name: 'Move action 2 up' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Run test' }))
+  await waitFor(() => expect(tasks).toHaveLength(1))
+  expect(tasks[0]?.sequence.actions.map((a) => a.kind)).toEqual(['navigate', 'direct'])
+})
+it('preserves an embedded drafts unsaved title while opening its preview', async () => {
+  const { opened } = show(false, true)
+  const title = await screen.findByLabelText('Test name')
+  await userEvent.clear(title)
+  await userEvent.type(title, 'My unsaved test')
+  expect(opened).toHaveLength(0)
+  await userEvent.click(screen.getByRole('button', { name: 'Open phone preview' }))
+  await waitFor(() => expect(opened).toHaveLength(1))
+  expect(title).toHaveValue('My unsaved test')
+  expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
+  expect(
+    within(screen.getByRole('region', { name: 'Task setup' })).getByLabelText(
+      'Action 1 AI instruction',
+    ),
+  ).toHaveValue('Create and save ${task_title}.')
+})
+it('shows missing setup and lets Escape cancel target picking', async () => {
   const { opened } = show(true)
   expect(
     await screen.findByText('A device worker needs to be connected for this app.'),
   ).toBeInTheDocument()
   expect(opened).toHaveLength(0)
-  expect(
-    screen.queryByRole('img', { name: 'Current screen of your Android app' }),
-  ).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Run task' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Run test' })).toBeDisabled()
 })
 
-it('runs beside the saved draft without navigating or losing unsaved edits', async () => {
-  const { opened, tasks } = show(false, true)
-  const title = await screen.findByLabelText('Case title')
-  await userEvent.clear(title)
-  await userEvent.type(title, 'My unsaved task')
-  const setup = screen.getByRole('region', { name: 'Task setup' })
-  const preview = screen.getByRole('complementary', { name: 'App preview' })
-  const goal = within(setup).getByLabelText('Step 1 instruction')
-  await userEvent.type(goal, 'Enter Buy milk and save it')
-  expect(opened).toHaveLength(0)
-  expect(within(setup).getByRole('button', { name: 'Run task' })).toBeDisabled()
-  await userEvent.click(await within(preview).findByRole('button', { name: 'Open phone preview' }))
-  const control = await within(preview).findByRole('button', { name: 'Select Task input' })
-  await userEvent.click(control)
-  expect(within(setup).getByText('Starting control: Task input')).toBeInTheDocument()
-  await userEvent.click(within(setup).getByRole('button', { name: 'Run task' }))
-  await waitFor(() => expect(tasks).toHaveLength(1))
-  expect(tasks[0]).toMatchObject({
-    goal: 'Enter Buy milk and save it',
-    selection: { frame_id: id, control_id: 'task-input' },
-  })
-  await waitFor(() =>
-    expect(within(preview).getByRole('img')).toHaveAttribute(
-      'src',
-      'data:image/png;base64,dXBkYXRlZA==',
-    ),
-  )
-  expect(title).toHaveValue('My unsaved task')
-  expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
-  expect(
-    within(preview).queryByRole('button', { name: 'Select Task input' }),
-  ).not.toBeInTheDocument()
-})
-
-it('adds and reorders action steps before submitting one ordered Minitap goal', async () => {
-  const { opened, tasks } = show()
+it('adds optional checks inside an action and keeps their binding when reordered', async () => {
+  const { opened } = show()
   await waitFor(() => expect(opened).toHaveLength(1))
-  await userEvent.selectOptions(await screen.findByLabelText('Step 1 action'), 'type')
-  await userEvent.type(screen.getByLabelText('Step 1 target'), 'task input')
-  await userEvent.type(screen.getByLabelText('Step 1 text'), 'Buy milk')
-  await userEvent.click(screen.getByRole('button', { name: 'Add step' }))
-  expect(screen.getByRole('button', { name: 'Run task' })).toBeDisabled()
-  await userEvent.selectOptions(screen.getByLabelText('Step 2 action'), 'restart')
-  await userEvent.click(screen.getByRole('button', { name: 'Move step 2 up' }))
-  await userEvent.click(screen.getByRole('button', { name: 'Add step' }))
-  await userEvent.type(screen.getByLabelText('Step 3 instruction'), 'Unwanted step')
-  await userEvent.click(screen.getByRole('button', { name: 'Remove step 3' }))
-  await userEvent.click(screen.getByRole('button', { name: 'Run task' }))
-  await waitFor(() => expect(tasks).toHaveLength(1))
-  expect(tasks[0]?.goal).toBe(
-    'Perform these steps in order. Stop if a step cannot be completed.\n1. Restart the app without clearing its saved data.\n2. Enter "Buy milk" into task input.',
+  expect(screen.queryByLabelText('Check 1 description')).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Add action' }))
+  expect(screen.getByRole('button', { name: 'Edit action 1' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
   )
-  expect(screen.getByLabelText('Step 2 text')).toHaveValue('Buy milk')
-})
-
-it('blocks an oversized combined task before making an API request', async () => {
-  const { opened, tasks } = show()
-  await waitFor(() => expect(opened).toHaveLength(1))
-  fireEvent.change(await screen.findByLabelText('Step 1 instruction'), {
-    target: { value: 'a'.repeat(3990) },
-  })
-  await userEvent.click(screen.getByRole('button', { name: 'Add step' }))
-  await userEvent.selectOptions(screen.getByLabelText('Step 2 action'), 'back')
-  expect(screen.getByText('Shorten your steps to fit within 4,000 characters.')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Run task' })).toBeDisabled()
-  expect(tasks).toHaveLength(0)
-})
-
-it('picks separate targets for steps and retains their identity through reordering', async () => {
-  const { opened, tasks } = show()
-  await waitFor(() => expect(opened).toHaveLength(1))
-  await userEvent.selectOptions(await screen.findByLabelText('Step 1 action'), 'type')
-  await userEvent.click(screen.getByRole('button', { name: 'Pick target for step 1 on phone' }))
-  expect(screen.getByText('Choose a target for Step 1')).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: 'Select Task input' }))
-  expect(screen.getByLabelText('Step 1 target')).toHaveValue('Task input')
-  await userEvent.type(screen.getByLabelText('Step 1 text'), 'Buy milk')
-  await userEvent.click(screen.getByRole('button', { name: 'Add step' }))
-  await userEvent.selectOptions(screen.getByLabelText('Step 2 action'), 'tap')
-  await userEvent.click(screen.getByRole('button', { name: 'Pick target for step 2 on phone' }))
-  await userEvent.click(screen.getByRole('button', { name: 'Select Save' }))
-  expect(screen.getByLabelText('Step 2 target')).toHaveValue('Save')
-  expect(tasks).toHaveLength(0)
-  await userEvent.click(screen.getByRole('button', { name: 'Move step 2 up' }))
-  expect(screen.getByLabelText('Step 1 target')).toHaveValue('Save')
-  await userEvent.click(screen.getByRole('button', { name: 'Run task' }))
-  await waitFor(() => expect(tasks).toHaveLength(1))
-  expect(tasks[0]?.goal).toContain(
-    '1. Tap the control labelled "Save" with resource ID "ai.mobileqa.demo:id/save".',
+  expect(screen.getByRole('button', { name: 'Edit action 2' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
   )
-  expect(tasks[0]?.goal).toContain(
-    '2. Enter "Buy milk" into the control labelled "Task input" with resource ID "ai.mobileqa.demo:id/task_input".',
+  await userEvent.click(screen.getByRole('button', { name: 'Add check to action 2' }))
+  await waitFor(() => expect(screen.getByLabelText('Check 1 description')).toBeVisible())
+  expect(screen.queryByLabelText('Check 1 after step')).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Move action 2 up' }))
+  expect(screen.getByRole('button', { name: 'Edit action 1' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
   )
-  expect(tasks[0]?.selection).toBeNull()
-})
-
-it('cancels picking and clears captured identity when the user describes a different target', async () => {
-  const { opened, tasks } = show()
-  await waitFor(() => expect(opened).toHaveLength(1))
-  await userEvent.selectOptions(await screen.findByLabelText('Step 1 action'), 'tap')
-  const pick = screen.getByRole('button', { name: 'Pick target for step 1 on phone' })
-  await userEvent.click(pick)
-  await userEvent.keyboard('{Escape}')
-  expect(pick).toHaveAttribute('aria-pressed', 'false')
-  await userEvent.click(pick)
-  await userEvent.click(screen.getByRole('button', { name: 'Select Save' }))
-  await userEvent.clear(screen.getByLabelText('Step 1 target'))
-  await userEvent.type(screen.getByLabelText('Step 1 target'), 'Cancel button')
-  expect(screen.queryByText('Selected from the app: Save')).not.toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: 'Run task' }))
-  await waitFor(() => expect(tasks).toHaveLength(1))
-  expect(tasks[0]?.goal).toBe('Tap Cancel button.')
+  await waitFor(() => expect(screen.getByLabelText('Check 1 description')).toBeVisible())
+  await userEvent.click(screen.getByRole('button', { name: 'Remove check' }))
+  expect(screen.queryByLabelText('Check 1 description')).not.toBeInTheDocument()
 })

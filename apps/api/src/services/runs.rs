@@ -61,6 +61,16 @@ pub async fn preview(
             return Ok(out);
         }
     };
+    if cases.iter().any(|c| {
+        c.case
+            .actions
+            .iter()
+            .any(|a| a.kind == ActionKind::Navigate)
+    }) && profile.model.is_empty()
+    {
+        out.blockers
+            .push("This plan includes Ask AI steps but the device has no model".into());
+    }
     let env = one(
         db,
         "SELECT revision,account_secret_reference_id,reset_secret_reference_id FROM \

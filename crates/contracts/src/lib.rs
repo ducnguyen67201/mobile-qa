@@ -13,3 +13,6 @@ pub mod test_library_api;
 
 pub mod task_sessions;
 pub mod task_sessions_api;
+
+pub mod automation;
+pub mod automation_api;

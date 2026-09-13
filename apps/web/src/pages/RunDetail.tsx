@@ -1,3 +1,4 @@
+import { actionLabel } from '@/lib/action-label'
 import {
   Alert,
   Anchor,
@@ -87,7 +88,7 @@ export function RunDetail() {
                 ?.case.actions.map((action) => (
                   <List.Item key={action.id}>
                     <Text>
-                      {action.id}: {action.instruction || action.kind}
+                      {action.id}: {actionLabel(action)}
                     </Text>
                     {a.events.some((e) => e.action_id === action.id) ? (
                       a.events

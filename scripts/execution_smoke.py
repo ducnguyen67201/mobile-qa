@@ -304,7 +304,9 @@ def main(author=None, edit_after_queue=None):
                 assert report["state"] == "finished", report
                 assert report["attempts"][0]["outcome"] == expected, report
                 assert report["attempts"][0]["cleanup"] == "verified_clean"
-                assert len(report["attempts"][0]["artifacts"]) == 4
+                assert len(report["attempts"][0]["artifacts"]) == 2 * len(
+                    report["manifest"]["cases"][0]["case"]["actions"]
+                )
                 assert report["manifest"]["profile"]["driver"] == "fake"
                 results.append(report)
         with server(env):

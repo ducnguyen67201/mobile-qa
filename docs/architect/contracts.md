@@ -133,3 +133,12 @@ to the existing `TestDefinition` is explicit and server-side. Browser cases rece
 rewritten. Python consumes the same published manifest through generated Pydantic.
 `ExecutionPlanQuery` supports a selected `plan_version_id`; omission uses the stored
 app default without automatically choosing a later approval.
+
+## Direct actions and AI authoring
+
+`automation.rs` owns strict tagged commands/targets, structured sequences, receipts, templates
+and bounded generation payloads. `TestAction.command` is additive and omitted for legacy JSON
+so historical hashes remain unchanged; boundary semantic validation enforces kind/command
+agreement. OpenAPI includes actual authoring routes; worker schemas include isolated model
+requests/responses. Phone protocol 2 and execution claim version 2 advertise direct support.
+Generated consumers remain the only browser/worker transport shapes.

@@ -359,3 +359,26 @@ Generated contracts, 43 Rust tests, 93 browser tests and the worker checks passe
 See [the implementation report](../../.claude/PRPs/reports/06-task-sessions-report.md).
 Rendered browser acceptance, persistent local worker credential/registration,
 restart-goal acceptance and the broader generation/discovery scope remain open.
+
+## Phase 06 revamp — locally validated (2026-09-13)
+
+The [direct execution and AI test authoring plan](../../.claude/PRPs/plans/06-direct-execution-and-ai-test-authoring.plan.md)
+revises phase 06 following tester feedback. It covers direct device commands and recording,
+reusable predefined templates, and an explicit Generate with AI flow that discovers bounded
+journeys and proposes named test drafts. Both preview and saved regression execution must
+preserve structured actions; direct-only reruns must use no model calls.
+
+Structured direct steps, phone control/recording, four reusable templates, and bounded AI
+proposal generation are implemented in source. Legacy approved definitions retain their wire
+serialization. Runtime state uses existing session payloads and library receipt transactions;
+no new database migration is required. Protocol 2 fences direct work from old workers.
+Validation: TypeScript, ESLint, Ruff, Pyright, Clippy, formatting and contract drift pass;
+99 browser tests, 46 Rust tests and 136 worker tests pass (one pre-existing local HTTP worker
+test intermittently times out in the full run and passes individually). Both builds pass.
+The direct-authoring HTTP smoke preserves passed/failed/blocked reports through API restarts.
+The actual shared direct executor also entered/saved/restarted the local sample successfully
+for `Hello direct` and `Xin chào`, with zero AI calls and verified emulator shutdown. It exposed
+and fixed competing Android hierarchy dump mechanisms. This device check does not prove the
+whole new UI/API route on a real device. Real-model proposal quality, rendered browser acceptance,
+broader app qualification and hosted gates remain open. See the
+[revamp report](../../.claude/PRPs/reports/06-direct-execution-and-ai-test-authoring-report.md).

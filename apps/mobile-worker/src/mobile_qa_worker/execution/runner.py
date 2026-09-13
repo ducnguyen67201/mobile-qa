@@ -281,7 +281,7 @@ def serve(
             try:
                 response = client.send(
                     "/api/worker/claims",
-                    {"version": 1, "claim_id": claim_id, "profile_id": str(profile_id)},
+                    {"version": 2, "claim_id": claim_id, "profile_id": str(profile_id)},
                     ClaimResponse,
                 )
             except TransportError as exc:

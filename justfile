@@ -69,7 +69,7 @@ device-qualify config:
 
 # Explicit real-device development. Ordinary dev/check/smoke never boots a phone.
 device-local-setup:
-    uv sync --project apps/mobile-worker --frozen --extra sdk
+    uv sync --project apps/mobile-worker --frozen --extra sdk --extra device --extra ai
     python3 scripts/local_device.py setup
 
 device-local-build:
@@ -106,3 +106,7 @@ dev-execution-real origin profile_id state profile:
 # Full author/review/default/run HTTP flow; fake Python evidence, no phone or secrets.
 smoke-test-library:
     python3 scripts/test_library_smoke.py
+
+# Typed direct definitions through the real API; simulated evidence, no model calls.
+smoke-direct-authoring:
+    python3 scripts/direct_authoring_smoke.py

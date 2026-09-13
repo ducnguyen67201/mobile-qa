@@ -2,7 +2,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import * as sdk from './generated/sdk.gen'
 import * as z from './generated/zod.gen'
-import type { OpenPhoneRequest, PhoneTaskRequest } from './generated/types.gen'
+import type { OpenPhoneRequest } from './generated/types.gen'
 import { checked, headers, options } from './session-transport'
 export const phoneOptionsQuery = (appId: string) =>
   queryOptions({
@@ -26,16 +26,6 @@ export const openPhone = (appId: string, body: OpenPhoneRequest) =>
       headers: headers(),
       path: { app_id: appId },
       body: z.zOpenPhoneRequest.parse(body),
-    }),
-    z.zPhoneSession,
-  )
-export const runPhoneTask = (id: string, body: PhoneTaskRequest) =>
-  checked(
-    sdk.runPhoneTask({
-      ...options,
-      headers: headers(),
-      path: { session_id: id },
-      body: z.zPhoneTaskRequest.parse(body),
     }),
     z.zPhoneSession,
   )

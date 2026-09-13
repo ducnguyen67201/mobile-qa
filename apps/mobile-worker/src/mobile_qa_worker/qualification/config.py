@@ -43,10 +43,10 @@ class Profile:
     @classmethod
     def load(cls, path: Path) -> "Profile":
         raw: dict[str, object] = tomllib.loads(path.read_text())
-        required = {"sdk_root", "state_root", "model", "toolchain"}
+        required = {"sdk_root", "state_root", "toolchain"}
         if not required <= raw.keys() or raw.keys() - cls.__dataclass_fields__.keys():
             raise QualificationError("invalid_profile_fields")
-        strings = required | {"doppler_project", "doppler_config", "system_image"}
+        strings = required | {"model", "doppler_project", "doppler_config", "system_image"}
         for name in strings:
             if name in raw and (not isinstance(raw[name], str) or not raw[name]):
                 raise QualificationError("invalid_profile_string")
@@ -62,6 +62,7 @@ class Profile:
             if not value.is_absolute() or value != value.resolve():
                 raise QualificationError("profile_paths_must_be_absolute_without_symlinks")
             raw[name] = value
+        raw.setdefault("model", "")
         profile = cls(**cast(dict[str, object], raw))  # type: ignore[arg-type]
         if profile.system_image not in (
             "system-images;android-35;google_apis;x86_64",

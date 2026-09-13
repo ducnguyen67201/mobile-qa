@@ -23,6 +23,7 @@ PRETTIER_EXTENSIONS = {
     ".mdx",
 }
 GENERATED = (
+    "graphify-out/",
     "apps/web/src/api/generated/",
     "apps/mobile-worker/src/mobile_qa_worker/generated/",
     "contracts/browser.openapi.json",

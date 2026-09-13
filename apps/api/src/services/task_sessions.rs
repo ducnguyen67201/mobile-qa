@@ -69,7 +69,7 @@ pub async fn options(ctx: &AppContext, user: Uuid, app: Uuid) -> ApiResult<Phone
     let a = apps::authorized(ctx, user, app).await?;
     reconcile(ctx).await?;
     let builds=rows(&ctx.db,"SELECT id,original_filename FROM builds WHERE app_id=$1 AND validation_state='validated' ORDER BY created_at DESC,id DESC LIMIT 50",vec![app.into()]).await?.iter().map(|r|Ok(PhoneBuildChoice{id:field(r,"id")?,name:field(r,"original_filename")?})).collect::<ApiResult<Vec<_>>>()?;
-    let profiles=rows(&ctx.db,"SELECT p.payload FROM execution_profiles p WHERE p.app_id=$1 AND EXISTS(SELECT 1 FROM execution_workers w WHERE w.profile_id=p.id AND w.revoked=false)",vec![app.into()]).await?.iter().map(|r|decode::<ExecutionProfile>(field(r,"payload")?)).collect::<ApiResult<Vec<_>>>()?.into_iter().filter(|p|p.qualified&&p.driver==Driver::Minitap&&p.package==a.android_package).collect::<Vec<_>>();
+    let profiles=rows(&ctx.db,"SELECT p.payload FROM execution_profiles p WHERE p.app_id=$1 AND EXISTS(SELECT 1 FROM execution_workers w WHERE w.profile_id=p.id AND w.revoked=false)",vec![app.into()]).await?.iter().map(|r|decode::<ExecutionProfile>(field(r,"payload")?)).collect::<ApiResult<Vec<_>>>()?.into_iter().filter(|p|p.qualified&&matches!(p.driver,Driver::Minitap|Driver::Direct)&&p.package==a.android_package).collect::<Vec<_>>();
     let active_session=rows(&ctx.db,"SELECT id FROM phone_sessions WHERE app_id=$1 AND creator_id=$2 AND payload->>'state' NOT IN ('closed','quarantined') ORDER BY created_at DESC LIMIT 1",vec![app.into(),user.into()]).await?.first().map(|r|field(r,"id")).transpose()?;
     let mut blockers = vec![];
     if builds.is_empty() {
@@ -145,7 +145,19 @@ pub async fn open(
     if bytes < 1 || bytes > i64::from(profile.max_apk_bytes.min(104857600)) {
         return Err(ApiFailure::invalid("Build is too large for this device"));
     }
+    let environment_revision: i32 = field(
+        &one(
+            &tx,
+            "SELECT revision FROM environments WHERE app_id=$1",
+            vec![app.into()],
+        )
+        .await?,
+        "revision",
+    )?;
     let s = PhoneSession {
+        environment_revision: environment_revision as u32,
+        revision: 0,
+        protocol_version: 0,
         id: input.id,
         app_id: app,
         build_id: build,
@@ -190,6 +202,11 @@ pub async fn task(
         }
         return detail(&tx, id).await;
     }
+    if s.profile.model.is_empty() {
+        return Err(ApiFailure::invalid(
+            "Legacy tasks require a model; use structured commands for direct execution",
+        ));
+    }
     if s.state != PhoneState::Ready {
         return Err(conflict("Wait for the phone to be ready"));
     }
@@ -219,6 +236,10 @@ pub async fn task(
         None
     };
     let task = PhoneTask {
+        sequence: None,
+        steps: vec![],
+        generation: None,
+        progress: None,
         id: input.id,
         goal: input.goal,
         control,
@@ -264,6 +285,9 @@ pub async fn claim(
     w: &Worker,
     input: PhoneClaimRequest,
 ) -> ApiResult<PhoneClaimResponse> {
+    if ![0, 2].contains(&input.protocol_version) {
+        return Err(conflict("Unsupported phone protocol"));
+    }
     reconcile(ctx).await?;
     let tx = ctx.db.begin().await?;
     one(
@@ -273,7 +297,7 @@ pub async fn claim(
     )
     .await?;
     let p = test_definitions::profile(&tx, w.app_id, w.profile_id).await?;
-    if !p.qualified || p.driver != Driver::Minitap {
+    if !p.qualified || !matches!(p.driver, Driver::Minitap | Driver::Direct) {
         return Err(conflict("A qualified real device profile is required"));
     }
     rows(
@@ -312,6 +336,10 @@ pub async fn claim(
         return Ok(PhoneClaimResponse { lease: None });
     };
     let mut s: PhoneSession = decode(field(r, "payload")?)?;
+    s.protocol_version = input.protocol_version;
+    if p.driver == Driver::Direct && input.protocol_version != 2 {
+        return Err(conflict("Update this worker for direct execution"));
+    }
     s.state = PhoneState::Preparing;
     s.message = "Opening your app".into();
     // A registered profile cannot change the physical identity of an already queued session.
@@ -362,7 +390,7 @@ pub async fn lease(
     }
     Ok(r)
 }
-fn validate_frame(f: &PhoneFrame) -> ApiResult<()> {
+pub(crate) fn validate_frame(f: &PhoneFrame) -> ApiResult<()> {
     if f.png_base64.len() > 2097152 || f.controls.len() > 200 || f.width != 1080 || f.height != 1920
     {
         return Err(ApiFailure::invalid("Unsupported screen capture"));
@@ -433,7 +461,14 @@ pub async fn update(
             vec![id.into()],
         )
         .await?;
-        exec(&tx,"UPDATE phone_tasks SET payload=jsonb_set(jsonb_set(payload,'{state}','\"stopped\"'),'{message}','\"Session stopped\"') WHERE session_id=$1 AND payload->>'state' IN ('queued','acting')",vec![id.into()]).await?;
+        for row in rows(&tx,"SELECT id,payload FROM phone_tasks WHERE session_id=$1 AND payload->>'state' IN ('queued','acting') FOR UPDATE",vec![id.into()]).await? {
+            let mut task:PhoneTask=decode(field(&row,"payload")?)?;
+            task.state=PhoneTaskState::Stopped;
+            task.message="Session stopped".into();
+            if let Some(progress)=&mut task.progress {progress.state=mobile_qa_contracts::automation::GenerationState::Canceled;}
+            for step in &mut task.steps {if step.state==mobile_qa_contracts::automation::StepState::Started {step.state=mobile_qa_contracts::automation::StepState::Inconclusive;step.message="Session stopped before the result was acknowledged".into();}}
+            exec(&tx,"UPDATE phone_tasks SET payload=$2 WHERE id=$1",vec![task.id.into(),json(&task)?.into()]).await?;
+        }
     } else {
         if let Some(mut task) = input.task {
             let old: PhoneTask = decode(field(
@@ -445,6 +480,16 @@ pub async fn update(
                 .await?,
                 "payload",
             )?)?;
+            if serde_json::to_value(&old).ok() == serde_json::to_value(&task).ok() {
+                exec(
+                    &tx,
+                    "UPDATE phone_sessions SET expires_at=now()+interval '60 seconds' WHERE id=$1",
+                    vec![id.into()],
+                )
+                .await?;
+                tx.commit().await?;
+                return detail(&ctx.db, id).await;
+            }
             if !matches!(old.state, PhoneTaskState::Queued | PhoneTaskState::Acting)
                 || task.message.len() > 500
             {
@@ -453,6 +498,9 @@ pub async fn update(
             if task.state == PhoneTaskState::Queued {
                 return Err(conflict("Task cannot return to the queue"));
             }
+            super::authoring_validation::task_update(&old, &task, &s.profile.package)?;
+            task.sequence = old.sequence;
+            task.generation = old.generation;
             task.goal = old.goal;
             task.control = old.control;
             let ended = matches!(

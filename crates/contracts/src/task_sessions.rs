@@ -28,6 +28,10 @@ pub enum PhoneTaskState {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PhoneControl {
+    #[serde(default)]
+    pub editable: bool,
+    #[serde(default)]
+    pub description: String,
     pub id: String,
     pub label: String,
     pub resource_id: String,
@@ -68,6 +72,14 @@ pub struct PhoneTaskRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PhoneTask {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sequence: Option<crate::automation::AutomationSequence>,
+    #[serde(default)]
+    pub steps: Vec<crate::automation::StepReceipt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generation: Option<crate::automation::GenerateTestsRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub progress: Option<crate::automation::GenerationProgress>,
     pub id: Uuid,
     pub goal: String,
     pub control: Option<PhoneControl>,
@@ -77,6 +89,12 @@ pub struct PhoneTask {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PhoneSession {
+    #[serde(default)]
+    pub environment_revision: u32,
+    #[serde(default)]
+    pub revision: u32,
+    #[serde(default)]
+    pub protocol_version: u32,
     pub id: Uuid,
     pub app_id: Uuid,
     pub build_id: Uuid,
@@ -111,6 +129,8 @@ pub struct PhoneLease {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PhoneClaimRequest {
+    #[serde(default)]
+    pub protocol_version: u32,
     pub claim_id: Uuid,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]

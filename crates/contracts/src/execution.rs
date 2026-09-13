@@ -65,6 +65,7 @@ pub enum UiProperty {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ActionKind {
+    Direct,
     Navigate,
     RestartApp,
     Checkpoint,
@@ -79,6 +80,7 @@ pub enum EvidenceState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Driver {
+    Direct,
     Fake,
     Minitap,
 }
@@ -104,6 +106,8 @@ pub struct ExecutionBudget {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TestAction {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<crate::automation::DirectCommand>,
     pub id: String,
     pub kind: ActionKind,
     pub instruction: String,
@@ -124,6 +128,36 @@ pub struct ExpectedCheck {
     pub prerequisite_check_ids: Vec<String>,
     pub required: bool,
     pub observation_seconds: u32,
+}
+impl TestAction {
+    pub fn validate(&self, package: &str) -> Result<(), &'static str> {
+        for id in [&self.id, &self.checkpoint_id] {
+            if id.is_empty()
+                || id.len() > 100
+                || !id
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"_-".contains(&b))
+            {
+                return Err("Invalid step identity");
+            }
+        }
+        match (&self.kind, &self.command) {
+            (ActionKind::Direct, Some(command)) if self.instruction.is_empty() => {
+                command.validate(package)
+            }
+            (ActionKind::Navigate, None)
+                if !self.instruction.trim().is_empty() && self.instruction.len() <= 4000 =>
+            {
+                Ok(())
+            }
+            (ActionKind::RestartApp | ActionKind::Checkpoint, None)
+                if self.instruction.is_empty() =>
+            {
+                Ok(())
+            }
+            _ => Err("Action and command do not agree"),
+        }
+    }
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -450,6 +484,7 @@ impl TestDefinition {
                 let mut actions = BTreeSet::new();
                 let mut checkpoints = BTreeSet::new();
                 for a in &c.actions {
+                    a.validate(&c.package)?;
                     if !bounded(&a.id, 100)
                         || !bounded(&a.checkpoint_id, 100)
                         || [&a.id, &a.checkpoint_id].iter().any(|v| {

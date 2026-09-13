@@ -1,3 +1,4 @@
+import { actionLabel } from '@/lib/action-label'
 import {
   Accordion,
   Alert,
@@ -110,12 +111,7 @@ export function RunPreview({
                       <List type="ordered">
                         {c.case.actions.map((a) => (
                           <List.Item key={a.id}>
-                            {a.kind === 'navigate'
-                              ? a.instruction
-                              : a.kind === 'restart_app'
-                                ? 'Restart the app, preserving saved data'
-                                : 'Capture evidence'}{' '}
-                            · {a.checkpoint_id}
+                            {actionLabel(a)} · {a.checkpoint_id}
                           </List.Item>
                         ))}
                       </List>

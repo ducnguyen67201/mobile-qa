@@ -145,3 +145,10 @@ present in Cargo.lock. The deterministic UI verifier bounds input, node count an
 depth and rejects document type declarations/custom entities. This is a parser for
 retained Android hierarchy evidence, not a general customer-supplied script engine.
 The worker retains pinned Minitap 4.0.0 and the existing compatibility guard.
+
+## Direct execution and authoring extras
+
+Worker extras explicitly pin `uiautomator2==3.5.0` (`device`), `langchain-openai==1.6.2`
+and `Pillow==12.3.0` (`ai`), matching existing transitive versions. Device operations lazily
+load uiautomator2; model SDKs are imported only in explicit AI paths. No Appium/Redis service
+is added. The `sdk` extra remains for explicit Minitap navigation.

@@ -1,95 +1,100 @@
-/** Interactive device work. Captures are server evidence, never a mock emulator. */
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+/** Real device capture and structured commands share the case draft's state. */
+import { useEffect, useRef, useState } from 'react'
 import {
+  Accordion,
   Alert,
-  Anchor,
   Badge,
   Button,
   Card,
+  Checkbox,
   Group,
   Loader,
+  Modal,
   Select,
   Stack,
   Text,
+  Textarea,
+  TextInput,
   Title,
 } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
+import type {
+  AutomationSequence,
+  CaseDefinition,
+  DirectCommand,
+  DirectTarget,
+  PhoneCommandRequest,
+  PhoneControl,
+  PhoneSession,
+  SaveAuthoredTestsRequest,
+} from '@/api/generated/types.gen'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { ErrorNotice } from '@/components/app/feedback'
-import {
-  openPhone,
-  phoneOptionsQuery,
-  phoneQuery,
-  runPhoneTask,
-  stopPhone,
-} from '@/api/task-sessions'
-import type {
-  OpenPhoneRequest,
-  PhoneSelection,
-  PhoneTaskRequest,
-  PhoneSession,
-  PhoneTask,
-} from '@/api/generated/types.gen'
-
-import { createLibraryEntry, saveLibraryDraft } from '@/api/test-library'
-
-import classes from './phone-workspace.module.css'
+import { openPhone, phoneOptionsQuery, phoneQuery, stopPhone } from '@/api/task-sessions'
+import { runPhoneCommand, saveAuthoredTests } from '@/api/test-authoring'
+import { GenerationPanel, ProposalReview } from '@/components/test-library/ai-authoring'
+import { BudgetFields } from '@/components/test-library/definition-fields'
 import { ResizableWorkspace } from './resizable-workspace'
-import { newTaskStep, taskGoal, TaskSteps } from './task-steps'
+import { newTaskStep, sequenceReady, TaskSteps } from './task-steps'
+import classes from './phone-workspace.module.css'
 
 export function PhoneWorkspace({
   appId,
   autoOpen = true,
-  children,
+  value,
+  onChange,
+  disabled = false,
 }: {
   appId: string
   autoOpen?: boolean
-  children?: ReactNode
+  value?: CaseDefinition
+  onChange?: (v: CaseDefinition) => void
+  disabled?: boolean
 }) {
   const { href } = useWorkspace()
+  const [params] = useSearchParams()
   const client = useQueryClient()
   const choices = useQuery(phoneOptionsQuery(appId))
   const [id, setId] = useState('')
-  const [requestId] = useState(() => crypto.randomUUID())
+  const [local, setLocal] = useState<AutomationSequence>({ actions: [newTaskStep()], checks: [] })
+  const [title, setTitle] = useState('New test')
+  const [requirement, setRequirement] = useState('')
   const [device, setDevice] = useState<string | null>(null)
-  const [steps, setSteps] = useState(() => [newTaskStep()])
-  const goal = taskGoal(steps)
-  const tooLong = goal.length > 4000
-  const [pickingId, setPickingId] = useState<string | null>(null)
-  const pickingIndex = steps.findIndex(
-    (step) => step.id === pickingId && (step.kind === 'tap' || step.kind === 'type'),
-  )
-  const pickingStep = steps[pickingIndex]
-  const [selection, setSelection] = useState<PhoneSelection | null>(null)
+  const [picking, setPicking] = useState<string | null>(null)
+  const [mode, setMode] = useState('pick')
+  const [record, setRecord] = useState(false)
+  const [typing, setTyping] = useState<PhoneControl | null>(null)
+  const [text, setText] = useState('')
+  const [ai, setAi] = useState(params.get('generate') === '1')
   const initiated = useRef(false)
-  const mounted = useRef(true)
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
-  const saved = (s: PhoneSession) => {
-    if (mounted.current) {
-      client.setQueryData(['phone', s.id], s)
-      setId(s.id)
-    }
+  const [openId] = useState(() => crypto.randomUUID())
+  const recorded = useRef(new Set<string>())
+  const awaitingRecord = useRef(new Set<string>())
+  const sequence: AutomationSequence = value
+    ? { actions: value.actions, checks: value.checks }
+    : local
+  const current = useRef(sequence)
+  current.current = sequence
+  const setSequence = (next: AutomationSequence) => {
+    if (value && onChange) onChange({ ...value, ...next })
+    else setLocal(next)
   }
+  const sessionSaved = (s: PhoneSession) => {
+    client.setQueryData(['phone', s.id], s)
+    setId(s.id)
+  }
+  const reopen = useMutation({
+    mutationFn: (profile: string) =>
+      openPhone(appId, { id: crypto.randomUUID(), build_id: null, profile_id: profile }),
+    onSuccess: sessionSaved,
+  })
   const create = useMutation({
-    mutationFn: (body: OpenPhoneRequest) => openPhone(appId, body),
-    onSuccess: saved,
+    mutationFn: (profile: string | null) =>
+      openPhone(appId, { id: openId, build_id: null, profile_id: profile }),
+    onSuccess: sessionSaved,
   })
-  const submit = useMutation({
-    mutationFn: (body: PhoneTaskRequest) => runPhoneTask(id, body),
-    onSuccess: (s) => {
-      saved(s)
-      setSelection(null)
-      setPickingId(null)
-    },
-  })
-  const stop = useMutation({ mutationFn: () => stopPhone(id), onSuccess: saved })
-  const { mutate: createSession } = create
+  const { mutate: open } = create
   useEffect(() => {
     if (!choices.data || initiated.current) return
     if (choices.data.active_session) {
@@ -99,136 +104,219 @@ export function PhoneWorkspace({
     }
     if (autoOpen && !choices.data.blockers.length && choices.data.profiles.length === 1) {
       initiated.current = true
-      createSession({ id: requestId, build_id: null, profile_id: null })
+      open(null)
     }
-  }, [choices.data, createSession, requestId, autoOpen])
+  }, [choices.data, autoOpen, open])
   const phone = useQuery(phoneQuery(id))
   const s = phone.data
   const frame = s?.frame
-  const ready = s?.state === 'ready' && !phone.isError && !submit.isPending
-  const done = s && ['closed', 'quarantined'].includes(s.state)
-  const selected =
-    frame?.id === selection?.frame_id
-      ? frame?.controls.find((c) => c.id === selection?.control_id)
-      : undefined
+  const submit = useMutation({
+    mutationFn: (body: PhoneCommandRequest) => runPhoneCommand(id, body),
+    onSuccess: sessionSaved,
+  })
+  const stop = useMutation({ mutationFn: () => stopPhone(id), onSuccess: sessionSaved })
+  const save = useMutation({
+    mutationFn: (body: SaveAuthoredTestsRequest) => saveAuthoredTests(appId, body),
+    onSuccess: () => void client.invalidateQueries({ queryKey: ['test-library'] }),
+  })
+  const ready =
+    s?.state === 'ready' && s.protocol_version === 2 && !phone.isError && !submit.isPending
+  const usesAi = sequence.actions.some((a) => a.kind === 'navigate')
+  useEffect(() => {
+    for (const task of s?.tasks ?? []) {
+      if (
+        !awaitingRecord.current.has(task.id) ||
+        recorded.current.has(task.id) ||
+        task.state !== 'completed' ||
+        !task.sequence
+      )
+        continue
+      recorded.current.add(task.id)
+      const draft = current.current
+      const placeholder =
+        draft.actions.length === 1 &&
+        !draft.checks.length &&
+        draft.actions[0]?.command?.operation === 'tap' &&
+        !draft.actions[0].command.target.value
+      setSequence({
+        ...draft,
+        actions: [...(placeholder ? [] : draft.actions), ...task.sequence.actions].slice(0, 20),
+      })
+    }
+    // Receipts append once to the active draft; mutable editor values must not trigger replay.
+  }, [s?.tasks])
+  const run = (next: AutomationSequence, manual = false) => {
+    if (!s || (manual && record && sequence.actions.length >= 20)) return
+    const commandId = crypto.randomUUID()
+    if (manual && record) awaitingRecord.current.add(commandId)
+    submit.mutate({
+      id: commandId,
+      expected_revision: s.revision ?? 0,
+      frame_id: manual ? (frame?.id ?? null) : null,
+      title: manual ? 'Phone interaction' : value?.title || title,
+      sequence: next,
+    })
+  }
+  const targetFor = (control: PhoneControl): DirectTarget | undefined =>
+    control.resource_id
+      ? { by: 'resource_id', value: control.resource_id }
+      : control.description
+        ? { by: 'description', value: control.description }
+        : undefined
+  const control = (command: DirectCommand) =>
+    run({ actions: [newTaskStep(command)], checks: [] }, true)
+  const pick = (c: PhoneControl) => {
+    const target = targetFor(c)
+    if (!target) return
+    if (mode === 'control') {
+      if (c.editable) {
+        setTyping(c)
+        setText('')
+      } else control({ operation: 'tap', target })
+      return
+    }
+    if (!picking) return
+    const action = sequence.actions.find((a) => a.id === picking)
+    if (action?.command && 'target' in action.command)
+      setSequence({
+        ...sequence,
+        actions: sequence.actions.map((a) =>
+          a.id === picking && a.command && 'target' in a.command
+            ? { ...a, command: { ...a.command, target } }
+            : a,
+        ),
+      })
+    else if (c.resource_id)
+      setSequence({
+        ...sequence,
+        checks: sequence.checks.map((check) =>
+          check.id === picking
+            ? { ...check, resource_id: c.resource_id, ready_resource_id: c.resource_id }
+            : check,
+        ),
+      })
+    setPicking(null)
+  }
   return (
     <Stack
-      gap="lg"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') setPickingId(null)
+      gap="md"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') setPicking(null)
       }}
     >
-      {!children && (
-        <Group justify="space-between">
-          <div>
-            <Title order={1}>Try your app</Title>
-            <Text c="dimmed">Set up a task on the left. Watch your app on the right.</Text>
-          </div>
-          <Anchor component={Link} to={href(`/apps/${appId}`)}>
-            App & builds
-          </Anchor>
-        </Group>
-      )}
       {choices.isError && (
         <ErrorNotice error={choices.error} retry={() => void choices.refetch()} />
       )}
-      {!choices.data && !choices.isError && <Loader aria-label="Finding your app" />}
       {choices.data?.blockers.map((message) => (
         <Alert key={message}>{message}</Alert>
       ))}
-      {!id && choices.data && !choices.data.blockers.length && choices.data.profiles.length > 1 && (
-        <Card withBorder>
-          <Stack>
-            <Select
-              label="Choose a device"
-              data={choices.data.profiles.map((p) => ({ value: p.id, label: p.name }))}
-              value={device}
-              onChange={setDevice}
-            />
-            <Button
-              disabled={!device}
-              loading={create.isPending}
-              onClick={() => create.mutate({ id: requestId, build_id: null, profile_id: device })}
-            >
-              Open app
-            </Button>
-          </Stack>
-        </Card>
-      )}
-      {create.isError && (
-        <ErrorNotice
-          error={create.error}
-          retry={() => create.variables && create.mutate(create.variables)}
-        />
-      )}
-      {phone.isError && <ErrorNotice error={phone.error} retry={() => void phone.refetch()} />}
       <ResizableWorkspace>
         <Stack component="section" aria-label="Task setup" className={classes.editor}>
-          <Title order={2} size="h3">
-            Set up your task
-          </Title>
-          <Text size="sm" c="dimmed">
-            Add steps, choose actions, or ask AI to handle a task. Run when you’re ready.
-          </Text>
+          <Group justify="space-between">
+            <Title order={2} size="h3">
+              Set up your test
+            </Title>
+            <Button variant="light" onClick={() => setAi(!ai)}>
+              {ai ? 'Hide AI generation' : 'Generate with AI'}
+            </Button>
+          </Group>
+          {ai && <GenerationPanel session={s} onSession={sessionSaved} />}
+          <TextInput
+            label="Test name"
+            value={value?.title ?? title}
+            disabled={disabled}
+            maxLength={200}
+            onChange={(e) =>
+              value && onChange
+                ? onChange({ ...value, title: e.currentTarget.value })
+                : setTitle(e.currentTarget.value)
+            }
+          />
           <TaskSteps
-            steps={steps}
-            disabled={submit.isPending}
+            value={sequence}
+            disabled={disabled}
             canPick={!!ready && !!frame?.controls.length}
-            pickingId={pickingStep?.id ?? null}
-            onPick={(stepId) => {
-              setPickingId(pickingId === stepId ? null : stepId)
-              setSelection(null)
-              submit.reset()
+            pickingId={picking}
+            onPick={(key) => {
+              setMode('pick')
+              setPicking(picking === key ? null : key)
             }}
             onChange={(next) => {
-              setSteps(next)
-              setPickingId(null)
+              setSequence(next)
+              setPicking(null)
               submit.reset()
             }}
           />
-          {tooLong && (
-            <Alert color="orange">Shorten your steps to fit within 4,000 characters.</Alert>
-          )}
-          {selected && (
-            <Group>
-              <Text size="sm">Starting control: {selected.label}</Text>
-              <Button
-                variant="subtle"
-                size="xs"
-                onClick={() => {
-                  setSelection(null)
-                  submit.reset()
-                }}
-              >
-                Clear
-              </Button>
-            </Group>
-          )}
-          {selection && !selected && <Alert>The screen changed. Select the control again.</Alert>}
+          <Accordion variant="contained">
+            <Accordion.Item value="details">
+              <Accordion.Control>Requirement and setup</Accordion.Control>
+              <Accordion.Panel>
+                <Stack>
+                  <Textarea
+                    label="Expected behavior / requirement"
+                    value={value?.requirement ?? requirement}
+                    onChange={(e) =>
+                      value && onChange
+                        ? onChange({ ...value, requirement: e.currentTarget.value })
+                        : setRequirement(e.currentTarget.value)
+                    }
+                  />
+                  {value && onChange && (
+                    <>
+                      <Textarea
+                        label="Before the test"
+                        value={value.preconditions.join('\n')}
+                        onChange={(e) =>
+                          onChange({
+                            ...value,
+                            preconditions: e.currentTarget.value.split('\n').filter(Boolean),
+                          })
+                        }
+                      />
+                      <BudgetFields
+                        value={value.budget}
+                        onChange={(budget) => onChange({ ...value, budget })}
+                      />
+                    </>
+                  )}
+                </Stack>
+              </Accordion.Panel>
+            </Accordion.Item>
+          </Accordion>
+          <Text size="xs" c="dimmed">
+            {usesAi
+              ? 'Uses AI for the explicitly selected Ask AI steps.'
+              : 'Direct execution · no AI calls'}
+          </Text>
           <Group>
             <Button
-              size="md"
-              disabled={!ready || !goal || tooLong || !!pickingStep || (!!selection && !selected)}
-              loading={submit.isPending}
-              onClick={() =>
-                submit.mutate(
-                  submit.isError && submit.variables
-                    ? submit.variables
-                    : { id: crypto.randomUUID(), goal, selection },
-                )
+              disabled={
+                !ready ||
+                !sequenceReady(sequence) ||
+                disabled ||
+                (usesAi && !s?.profile.model) ||
+                !!picking
               }
+              loading={submit.isPending}
+              onClick={() => run(sequence)}
             >
-              Run task
+              Run test
             </Button>
-            {s && !done && (
+            {!value && (
               <Button
                 variant="light"
-                color="red"
-                loading={stop.isPending}
-                disabled={s.state === 'stopping'}
-                onClick={() => stop.mutate()}
+                loading={save.isPending}
+                disabled={!sequence.actions.length}
+                onClick={() =>
+                  save.mutate({
+                    mutation_id: crypto.randomUUID(),
+                    source_task_id: null,
+                    expectations_confirmed: true,
+                    tests: [{ template_id: null, proposal_id: null, title, requirement, sequence }],
+                  })
+                }
               >
-                Stop session
+                Save as test
               </Button>
             )}
           </Group>
@@ -238,225 +326,229 @@ export function PhoneWorkspace({
               retry={() => submit.variables && submit.mutate(submit.variables)}
             />
           )}
-          {stop.isError && <ErrorNotice error={stop.error} retry={() => stop.mutate()} />}
-          {done && (
-            <Alert>
-              {s.state === 'quarantined'
-                ? 'The device needs operator recovery before another session.'
-                : 'This session ended.'}
-            </Alert>
+          {save.isError && (
+            <ErrorNotice
+              error={save.error}
+              retry={() => save.variables && save.mutate(save.variables)}
+            />
           )}
-          {s?.state === 'closed' && (
-            <Button
-              variant="light"
-              loading={create.isPending}
-              onClick={() => {
-                setSelection(null)
-                submit.reset()
-                stop.reset()
-                create.mutate({ id: crypto.randomUUID(), build_id: null, profile_id: s.profile.id })
-              }}
-            >
-              Open a new session
+          {save.data?.entry_ids.map((key) => (
+            <Button variant="light" component={Link} to={href(`/tests/${appId}/${key}`)} key={key}>
+              Open saved test draft
             </Button>
-          )}
+          ))}
           {s?.tasks
             .slice()
             .reverse()
-            .map((t) => (
-              <Card key={t.id} withBorder>
-                <Stack gap="xs">
+            .map((task) => (
+              <Card withBorder key={task.id}>
+                <Stack gap="sm">
                   <Group justify="space-between">
-                    <Text fw={600}>{t.goal}</Text>
-                    <Badge color={t.state === 'failed' ? 'red' : 'gray'}>{t.state}</Badge>
+                    <Text fw={600}>{task.goal}</Text>
+                    <Badge>{task.state}</Badge>
                   </Group>
-                  <Text size="sm" c="dimmed">
-                    {t.message}
-                  </Text>
-                  {t.state === 'completed' && <SaveTask appId={appId} task={t} />}
+                  <Text size="sm">{task.message}</Text>
+                  {task.steps?.map((step, i) => (
+                    <Text key={step.action_id} size="sm">
+                      Step {i + 1}: {step.state} — {step.message}
+                    </Text>
+                  ))}
+                  {task.progress && (
+                    <ProposalReview key={`${task.id}:${task.state}`} task={task} appId={appId} />
+                  )}
                 </Stack>
               </Card>
             ))}
-          {children ?? (
-            <Anchor component={Link} to={href('/tests')}>
-              Saved tests & advanced editing
-            </Anchor>
-          )}
         </Stack>
         <aside aria-label="App preview" className={classes.preview}>
-          <Stack gap="sm">
+          <Stack>
             <Group justify="space-between">
               <Title order={2} size="h3">
                 App preview
               </Title>
-              {s && <Badge>{s.state.replaceAll('_', ' ')}</Badge>}
+              {s && <Badge>{s.state}</Badge>}
             </Group>
-            {s && (
-              <Text size="sm" role="status">
-                {s.message}
-              </Text>
-            )}
-            {!id &&
-              !autoOpen &&
-              choices.data &&
-              !choices.data.blockers.length &&
-              choices.data.profiles.length === 1 && (
+            <Text size="sm" role="status">
+              {s?.message ?? 'Connect the phone to pick controls or try your test.'}
+            </Text>
+            {!id && choices.data && !choices.data.blockers.length && (
+              <>
+                {choices.data.profiles.length > 1 && (
+                  <Select
+                    label="Device"
+                    value={device}
+                    data={choices.data.profiles.map((p) => ({ value: p.id, label: p.name }))}
+                    onChange={setDevice}
+                  />
+                )}
                 <Button
                   loading={create.isPending}
-                  onClick={() => create.mutate({ id: requestId, build_id: null, profile_id: null })}
+                  disabled={choices.data.profiles.length > 1 && !device}
+                  onClick={() => create.mutate(device)}
                 >
                   Open phone preview
                 </Button>
-              )}
-            {pickingStep && ready && (
-              <Alert title={`Choose a target for Step ${pickingIndex + 1}`}>
-                Click the input or button in the phone. This only selects the target; it does not
-                tap the app.
-              </Alert>
+              </>
             )}
-            <Card withBorder radius="xl" p="sm" className={classes.phone}>
+            {s && s.protocol_version !== 2 && s.state === 'ready' && (
+              <Alert>Reconnect with the updated worker to use direct steps.</Alert>
+            )}
+            {create.isError && (
+              <ErrorNotice error={create.error} retry={() => create.mutate(device)} />
+            )}
+            {phone.isError && (
+              <ErrorNotice error={phone.error} retry={() => void phone.refetch()} />
+            )}
+            <Group>
+              <Button
+                size="xs"
+                variant={mode === 'pick' ? 'filled' : 'light'}
+                onClick={() => {
+                  setMode('pick')
+                  setTyping(null)
+                }}
+              >
+                Pick target
+              </Button>
+              <Button
+                size="xs"
+                variant={mode === 'control' ? 'filled' : 'light'}
+                disabled={!ready}
+                onClick={() => {
+                  setMode('control')
+                  setPicking(null)
+                }}
+              >
+                Control phone
+              </Button>
+            </Group>
+            {mode === 'control' && (
+              <>
+                <Checkbox
+                  label="Record interactions into this test"
+                  checked={record}
+                  onChange={(e) => setRecord(e.currentTarget.checked)}
+                  disabled={disabled || sequence.actions.length >= 20}
+                />
+                <Group>
+                  <Button
+                    variant="light"
+                    size="xs"
+                    disabled={!ready}
+                    onClick={() => control({ operation: 'back' })}
+                  >
+                    Back
+                  </Button>
+                  {(['up', 'down', 'left', 'right'] as const).map((direction) => (
+                    <Button
+                      size="xs"
+                      variant="light"
+                      key={direction}
+                      disabled={!ready}
+                      onClick={() => control({ operation: 'swipe', direction })}
+                    >
+                      Swipe {direction}
+                    </Button>
+                  ))}
+                </Group>
+              </>
+            )}
+            {picking && (
+              <Alert>Pick the control for this step. Selecting it does not tap the app.</Alert>
+            )}
+            <Card withBorder radius="xl" className={classes.phone} p="sm">
               {frame ? (
                 <div
                   style={{
                     position: 'relative',
-                    lineHeight: 0,
-                    width: `min(100%, calc((100dvh - 240px) * ${frame.width / frame.height}))`,
+                    width: `min(100%, calc((100dvh - 270px) * ${frame.width / frame.height}))`,
                     marginInline: 'auto',
+                    lineHeight: 0,
                   }}
                 >
                   <img
                     src={`data:image/png;base64,${frame.png_base64}`}
                     alt="Current screen of your Android app"
-                    style={{ width: '100%', borderRadius: 16, display: 'block' }}
+                    style={{ width: '100%', display: 'block', borderRadius: 16 }}
                   />
                   {ready &&
-                    frame.controls.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        aria-label={`Select ${c.label}`}
-                        aria-pressed={selected?.id === c.id}
-                        onClick={() => {
-                          if (pickingStep) {
-                            setSteps((current) =>
-                              current.map((step) =>
-                                step.id === pickingStep.id
-                                  ? { ...step, target: c.label, pickedControl: c }
-                                  : step,
-                              ),
-                            )
-                            setPickingId(null)
-                            setSelection(null)
-                          } else {
-                            setSelection({ frame_id: frame.id, control_id: c.id })
-                          }
-                          submit.reset()
-                        }}
-                        style={{
-                          position: 'absolute',
-                          left: `${(100 * c.left) / frame.width}%`,
-                          top: `${(100 * c.top) / frame.height}%`,
-                          width: `${(100 * (c.right - c.left)) / frame.width}%`,
-                          height: `${(100 * (c.bottom - c.top)) / frame.height}%`,
-                          cursor: 'crosshair',
-                          background: selected?.id === c.id ? '#88bd6260' : 'transparent',
-                          border:
-                            selected?.id === c.id
-                              ? '2px solid #245b46'
-                              : pickingStep
-                                ? '1px dashed #245b46'
-                                : '1px solid transparent',
-                        }}
-                      />
-                    ))}
+                    (mode === 'control' || picking) &&
+                    frame.controls
+                      .filter((c) => !!targetFor(c))
+                      .map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          aria-label={`${mode === 'control' ? 'Interact with' : 'Select'} ${c.label}`}
+                          onClick={() => pick(c)}
+                          style={{
+                            position: 'absolute',
+                            left: `${(100 * c.left) / frame.width}%`,
+                            top: `${(100 * c.top) / frame.height}%`,
+                            width: `${(100 * (c.right - c.left)) / frame.width}%`,
+                            height: `${(100 * (c.bottom - c.top)) / frame.height}%`,
+                            background: 'transparent',
+                            border: '1px dashed #245b46',
+                            cursor: mode === 'control' ? 'pointer' : 'crosshair',
+                          }}
+                        />
+                      ))}
                 </div>
               ) : (
                 <Stack align="center" justify="center" className={classes.placeholder}>
-                  {!done &&
-                    !choices.data?.blockers.length &&
-                    (id || create.isPending || autoOpen) && <Loader aria-label="Opening phone" />}
+                  {id && <Loader />}
                   <Text ta="center">
-                    {s?.message ??
-                      (choices.data?.blockers.length
-                        ? 'Your app screen will appear here once setup is ready.'
-                        : !id && !autoOpen && !create.isPending
-                          ? 'Open the phone preview to try your task here.'
-                          : 'Opening your app…')}
+                    {s?.message ?? 'Your app screen appears here after connecting.'}
                   </Text>
                 </Stack>
               )}
-              {frame && (
-                <Text size="xs" c="dimmed" mt="sm">
-                  {ready
-                    ? 'Use Pick on phone in a step, then select its target here.'
-                    : 'Screen captures update while Minitap works.'}
-                </Text>
-              )}
             </Card>
             <Text size="xs" c="dimmed">
-              Latest device capture. Refreshes during execution; writing a task does not control the
-              app.
+              Latest device capture. Pick target binds a step; Control phone performs the action.
             </Text>
+            {s && !['closed', 'quarantined'].includes(s.state) && (
+              <Button
+                color="red"
+                variant="light"
+                disabled={s.state === 'stopping'}
+                loading={stop.isPending}
+                onClick={() => stop.mutate()}
+              >
+                Stop session
+              </Button>
+            )}
+            {stop.isError && <ErrorNotice error={stop.error} retry={() => stop.mutate()} />}
+            {s?.state === 'closed' && (
+              <Button loading={reopen.isPending} onClick={() => reopen.mutate(s.profile.id)}>
+                Open a new session
+              </Button>
+            )}
+            {reopen.isError && (
+              <ErrorNotice error={reopen.error} retry={() => s && reopen.mutate(s.profile.id)} />
+            )}
           </Stack>
         </aside>
       </ResizableWorkspace>
-    </Stack>
-  )
-}
-
-function SaveTask({ appId, task }: { appId: string; task: PhoneTask }) {
-  const { href } = useWorkspace()
-  const [mutationId] = useState(() => crypto.randomUUID())
-  const save = useMutation({
-    mutationFn: async () => {
-      const draft = await createLibraryEntry(appId, {
-        entry_id: task.id,
-        mutation_id: task.id,
-        kind: 'case',
-        key: `task-${task.id}`,
-        template_profile_id: null,
-      })
-      if (draft.definition.kind !== 'case') throw new Error('Expected a case draft')
-      return saveLibraryDraft(appId, task.id, {
-        mutation_id: mutationId,
-        expected_revision: draft.entry.revision,
-        definition: {
-          kind: 'case',
-          content: {
-            ...draft.definition.content,
-            title: task.goal.slice(0, 200),
-            requirement: task.goal,
-            actions: [
-              {
-                id: 'task',
-                kind: 'navigate',
-                instruction: task.goal,
-                checkpoint_id: 'task-result',
-              },
-            ],
-            checks: [],
-          },
-        },
-      })
-    },
-  })
-  return (
-    <Stack gap="xs">
-      {save.data ? (
-        <Anchor component={Link} to={href(`/tests/${appId}/${task.id}`)}>
-          Open saved test draft
-        </Anchor>
-      ) : (
-        <Button variant="light" loading={save.isPending} onClick={() => save.mutate()}>
-          Save as test
-        </Button>
-      )}
-      {save.isError && <ErrorNotice error={save.error} retry={() => save.mutate()} />}
-      {save.data && (
-        <Text size="xs" c="dimmed">
-          Draft saved. Add an expected result before reviewing it as a reusable test.
-        </Text>
-      )}
+      <Modal opened={!!typing} onClose={() => setTyping(null)} title="Enter text on the phone">
+        <Stack>
+          <Textarea
+            label="Text to enter"
+            value={text}
+            maxLength={4000}
+            onChange={(e) => setText(e.currentTarget.value)}
+          />
+          <Button
+            disabled={!ready}
+            onClick={() => {
+              const target = typing && targetFor(typing)
+              if (target) control({ operation: 'set_text', target, text })
+              setTyping(null)
+            }}
+          >
+            Enter text
+          </Button>
+        </Stack>
+      </Modal>
     </Stack>
   )
 }

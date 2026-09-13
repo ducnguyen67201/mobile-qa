@@ -4,7 +4,7 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
-export type ActionKind = 'navigate' | 'restart_app' | 'checkpoint';
+export type ActionKind = 'direct' | 'navigate' | 'restart_app' | 'checkpoint';
 
 export type ApiError = {
     code: string;
@@ -87,6 +87,18 @@ export type AttemptResponse = {
     reason?: string | null;
     state: JobState;
     usage: Array<ModelUsage>;
+};
+
+export type AuthoringUsage = {
+    calls: number;
+    input_tokens: number;
+    output_tokens: number;
+    unknown_calls: number;
+};
+
+export type AutomationSequence = {
+    actions: Array<TestAction>;
+    checks: Array<ExpectedCheck>;
 };
 
 export type BuildListResponse = {
@@ -181,6 +193,8 @@ export type CompleteRequest = {
     usage: Array<ModelUsage>;
 };
 
+export type CoverageKind = 'smoke' | 'happy_path' | 'validation' | 'persistence';
+
 export type CreateAppRequest = {
     android_package: string;
     backend_origins: Array<string>;
@@ -242,7 +256,39 @@ export type DefinitionResponse = {
     id: string;
 };
 
-export type Driver = 'fake' | 'minitap';
+export type DirectCommand = {
+    operation: 'tap';
+    target: DirectTarget;
+} | {
+    operation: 'set_text';
+    target: DirectTarget;
+    text: string;
+} | {
+    direction: SwipeDirection;
+    operation: 'swipe';
+} | {
+    operation: 'back';
+} | {
+    operation: 'restart';
+} | {
+    operation: 'wait_for';
+    target: DirectTarget;
+};
+
+export type DirectTarget = {
+    by: 'resource_id';
+    value: string;
+} | {
+    by: 'description';
+    value: string;
+};
+
+export type DiscoverySnapshot = {
+    frame: PhoneFrame;
+    id: string;
+};
+
+export type Driver = 'direct' | 'fake' | 'minitap';
 
 export type EnvironmentCheck = {
     checked_at?: string | null;
@@ -338,6 +384,37 @@ export type ForkLibraryDraftRequest = {
     mutation_id: string;
     source_version_id: string;
 };
+
+export type GenerateTestsRequest = {
+    allow_writes: boolean;
+    category: CoverageKind;
+    expected_revision: number;
+    id: string;
+    journey: string;
+    reuse_job_id?: string | null;
+    session_id: string;
+};
+
+export type GenerationProgress = {
+    gaps: Array<string>;
+    proposals: Array<GenerationProposal>;
+    snapshots: Array<DiscoverySnapshot>;
+    state: GenerationState;
+    trace: Array<DirectCommand>;
+    usage: AuthoringUsage;
+};
+
+export type GenerationProposal = {
+    category: CoverageKind;
+    id: string;
+    questions: Array<string>;
+    requirement: string;
+    sequence: AutomationSequence;
+    source_ids: Array<string>;
+    title: string;
+};
+
+export type GenerationState = 'queued' | 'discovering' | 'drafting' | 'ready' | 'needs_input' | 'failed' | 'canceled';
 
 export type GoogleLoginChallenge = {
     challenge_id: string;
@@ -533,8 +610,18 @@ export type PhoneBuildChoice = {
     name: string;
 };
 
+export type PhoneCommandRequest = {
+    expected_revision: number;
+    frame_id?: string | null;
+    id: string;
+    sequence: AutomationSequence;
+    title: string;
+};
+
 export type PhoneControl = {
     bottom: number;
+    description?: string;
+    editable?: boolean;
     id: string;
     label: string;
     left: number;
@@ -566,10 +653,13 @@ export type PhoneSelection = {
 export type PhoneSession = {
     app_id: string;
     build_id: string;
+    environment_revision?: number;
     frame?: null | PhoneFrame;
     id: string;
     message: string;
     profile: ExecutionProfile;
+    protocol_version?: number;
+    revision?: number;
     state: PhoneState;
     tasks: Array<PhoneTask>;
 };
@@ -578,10 +668,14 @@ export type PhoneState = 'queued' | 'preparing' | 'ready' | 'acting' | 'stopping
 
 export type PhoneTask = {
     control?: null | PhoneControl;
+    generation?: null | GenerateTestsRequest;
     goal: string;
     id: string;
     message: string;
+    progress?: null | GenerationProgress;
+    sequence?: null | AutomationSequence;
     state: PhoneTaskState;
+    steps?: Array<StepReceipt>;
 };
 
 export type PhoneTaskRequest = {
@@ -692,10 +786,29 @@ export type RunResponse = {
     summary: string;
 };
 
+export type SaveAuthoredTest = {
+    proposal_id?: string | null;
+    requirement: string;
+    sequence: AutomationSequence;
+    template_id?: string | null;
+    title: string;
+};
+
+export type SaveAuthoredTestsRequest = {
+    expectations_confirmed: boolean;
+    mutation_id: string;
+    source_task_id?: string | null;
+    tests: Array<SaveAuthoredTest>;
+};
+
 export type SaveLibraryDraftRequest = {
     definition: LibraryDraftDefinition;
     expected_revision: number;
     mutation_id: string;
+};
+
+export type SavedAuthoredTests = {
+    entry_ids: Array<string>;
 };
 
 export type SecretKind = 'account' | 'reset';
@@ -729,6 +842,14 @@ export type SettingsResponse = {
     upload_ttl_seconds: number;
 };
 
+export type StepReceipt = {
+    action_id: string;
+    message: string;
+    state: StepState;
+};
+
+export type StepState = 'started' | 'completed' | 'failed' | 'blocked' | 'inconclusive';
+
 export type SubmitLibraryDraftRequest = {
     expected_revision: number;
     mutation_id: string;
@@ -741,8 +862,11 @@ export type SuiteDefinition = {
     version: number;
 };
 
+export type SwipeDirection = 'up' | 'down' | 'left' | 'right';
+
 export type TestAction = {
     checkpoint_id: string;
+    command?: null | DirectCommand;
     id: string;
     instruction: string;
     kind: ActionKind;
@@ -757,6 +881,19 @@ export type TestDefinition = {
 } | {
     content: PlanDefinition;
     kind: 'plan';
+};
+
+export type TestTemplate = {
+    category: CoverageKind;
+    definition: CaseDefinition;
+    description: string;
+    id: string;
+    title: string;
+    version: number;
+};
+
+export type TestTemplates = {
+    items: Array<TestTemplate>;
 };
 
 export type UiProperty = 'text' | 'content_description' | 'checked' | 'enabled';
@@ -2097,6 +2234,197 @@ export type CreateRunResponses = {
 
 export type CreateRunResponse = CreateRunResponses[keyof CreateRunResponses];
 
+export type GenerateTestsData = {
+    body: GenerateTestsRequest;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-generations';
+};
+
+export type GenerateTestsErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+};
+
+export type GenerateTestsError = GenerateTestsErrors[keyof GenerateTestsErrors];
+
+export type GenerateTestsResponses = {
+    /**
+     * Success
+     */
+    200: PhoneSession;
+};
+
+export type GenerateTestsResponse = GenerateTestsResponses[keyof GenerateTestsResponses];
+
+export type GetTestGenerationData = {
+    body?: never;
+    path: {
+        app_id: string;
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-generations/{job_id}';
+};
+
+export type GetTestGenerationErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+};
+
+export type GetTestGenerationError = GetTestGenerationErrors[keyof GetTestGenerationErrors];
+
+export type GetTestGenerationResponses = {
+    /**
+     * Success
+     */
+    200: PhoneTask;
+};
+
+export type GetTestGenerationResponse = GetTestGenerationResponses[keyof GetTestGenerationResponses];
+
+export type CancelTestGenerationData = {
+    body?: never;
+    path: {
+        app_id: string;
+        job_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-generations/{job_id}/cancel';
+};
+
+export type CancelTestGenerationErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+};
+
+export type CancelTestGenerationError = CancelTestGenerationErrors[keyof CancelTestGenerationErrors];
+
+export type CancelTestGenerationResponses = {
+    /**
+     * Success
+     */
+    200: PhoneSession;
+};
+
+export type CancelTestGenerationResponse = CancelTestGenerationResponses[keyof CancelTestGenerationResponses];
+
 export type ListTestLibraryData = {
     body?: never;
     path: {
@@ -2242,6 +2570,69 @@ export type CreateTestLibraryEntryResponses = {
 };
 
 export type CreateTestLibraryEntryResponse = CreateTestLibraryEntryResponses[keyof CreateTestLibraryEntryResponses];
+
+export type SaveAuthoredTestsData = {
+    body: SaveAuthoredTestsRequest;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-library/from-recording';
+};
+
+export type SaveAuthoredTestsErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+};
+
+export type SaveAuthoredTestsError = SaveAuthoredTestsErrors[keyof SaveAuthoredTestsErrors];
+
+export type SaveAuthoredTestsResponses = {
+    /**
+     * Success
+     */
+    200: SavedAuthoredTests;
+};
+
+export type SaveAuthoredTestsResponse = SaveAuthoredTestsResponses[keyof SaveAuthoredTestsResponses];
 
 export type GetTestLibraryOptionsData = {
     body?: never;
@@ -2949,6 +3340,69 @@ export type ReviewTestLibraryVersionResponses = {
 
 export type ReviewTestLibraryVersionResponse = ReviewTestLibraryVersionResponses[keyof ReviewTestLibraryVersionResponses];
 
+export type GetTestTemplatesData = {
+    body?: never;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-templates';
+};
+
+export type GetTestTemplatesErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+};
+
+export type GetTestTemplatesError = GetTestTemplatesErrors[keyof GetTestTemplatesErrors];
+
+export type GetTestTemplatesResponses = {
+    /**
+     * Success
+     */
+    200: TestTemplates;
+};
+
+export type GetTestTemplatesResponse = GetTestTemplatesResponses[keyof GetTestTemplatesResponses];
+
 export type StartGoogleSignInData = {
     body?: never;
     headers: {
@@ -3409,6 +3863,69 @@ export type GetPhoneResponses = {
 };
 
 export type GetPhoneResponse = GetPhoneResponses[keyof GetPhoneResponses];
+
+export type RunPhoneCommandData = {
+    body: PhoneCommandRequest;
+    path: {
+        session_id: string;
+    };
+    query?: never;
+    url: '/api/phones/{session_id}/commands';
+};
+
+export type RunPhoneCommandErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+};
+
+export type RunPhoneCommandError = RunPhoneCommandErrors[keyof RunPhoneCommandErrors];
+
+export type RunPhoneCommandResponses = {
+    /**
+     * Success
+     */
+    200: PhoneSession;
+};
+
+export type RunPhoneCommandResponse = RunPhoneCommandResponses[keyof RunPhoneCommandResponses];
 
 export type StopPhoneData = {
     body?: never;

@@ -103,6 +103,7 @@ class Device:
         self.current = profile.state_root / "current"
         self.inventory: dict[str, str] = {}
         self.video_pid: str | None = None
+        self.direct_automation = False
 
     def adb(self, *args: str, timeout: float | None = None) -> bytes:
         return command(
@@ -276,8 +277,9 @@ class Device:
             for line in foreground.splitlines()
         ):
             raise QualificationError("wrong_foreground_package")
-        self.adb("shell", "uiautomator", "dump", "/data/local/tmp/mobile-qa.xml")
-        xml = self.adb("exec-out", "cat", "/data/local/tmp/mobile-qa.xml")
+        from mobile_qa_worker.automation.direct import hierarchy
+
+        xml = hierarchy(self)
         png = self.adb("exec-out", "screencap", "-p")
         validate_png(png)
         return observe(xml, task), xml, png

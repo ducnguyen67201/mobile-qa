@@ -114,7 +114,7 @@ pub async fn claim(
     worker: &Worker,
     input: ClaimRequest,
 ) -> ApiResult<ClaimResponse> {
-    if input.version != 1 || input.profile_id != worker.profile_id {
+    if ![1, 2].contains(&input.version) || input.profile_id != worker.profile_id {
         return Err(conflict("Unsupported protocol or worker profile"));
     }
     reconcile(ctx).await?;
@@ -168,9 +168,9 @@ pub async fn claim(
             &tx,
             "SELECT a.id FROM execution_attempts a JOIN execution_runs r ON r.id=a.run_id WHERE \
             r.app_id=$1 AND a.state='queued' AND r.cancel_requested=false AND \
-            r.manifest->'profile'->>'id'=$2 ORDER BY r.created_at,a.case_index,a.number FOR \
+            r.manifest->'profile'->>'id'=$2 AND ($3 OR NOT jsonb_path_exists(r.manifest, '$.cases[*].case.actions[*] ? (@.kind == \"direct\")')) ORDER BY r.created_at,a.case_index,a.number FOR \
             UPDATE OF a SKIP LOCKED LIMIT 1",
-            vec![worker.app_id.into(), worker.profile_id.to_string().into()],
+            vec![worker.app_id.into(), worker.profile_id.to_string().into(), (input.version==2).into()],
         )
         .await?;
         let Some(r) = jobs.first() else {

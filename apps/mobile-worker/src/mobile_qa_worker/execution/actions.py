@@ -103,7 +103,7 @@ def execute(
     profile = Profile.load(profile_path)
     definition = job.manifest.cases[job.case_index].case
     if (
-        job.manifest.profile.driver.value != "minitap"
+        job.manifest.profile.driver.value not in ("minitap", "direct")
         or definition.adapter != "demo_persistence_v1"
     ):
         raise ValueError("unsupported_device_adapter")
@@ -163,6 +163,13 @@ def execute(
                             step_budget,
                             usage,
                         )
+                    elif action.kind.value == "direct" and action.command:
+                        from mobile_qa_worker.automation.direct import execute as direct_execute
+
+                        command = action.command.model_copy(deep=True)
+                        if command.root.operation == "set_text":
+                            command.root.text = command.root.text.replace("${task_title}", task)
+                        direct_execute(device, definition.package, command)
                     elif action.kind.value == "restart_app":
                         device.adb("shell", "am", "force-stop", definition.package)
                         device.launch()

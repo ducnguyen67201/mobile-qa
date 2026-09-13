@@ -103,7 +103,7 @@ it('creates without a manual key and reuses the same generated identity after a 
   expect(first.key).toMatch(/^case-[a-f0-9-]{36}$/)
   // The primary action must be as safe to retry as the explicit Retry action.
   await userEvent.click(create)
-  expect(await screen.findByLabelText('Case title')).toBeInTheDocument()
+  expect(await screen.findByLabelText('Test name')).toBeInTheDocument()
   expect(bodies).toHaveLength(2)
   expect(bodies[1]).toEqual(bodies[0])
 })
@@ -116,7 +116,7 @@ it('authors before an APK is uploaded and opens the saved draft from the catalog
   await userEvent.click(
     await screen.findByRole('link', { name: /A saved task survives a restart/ }),
   )
-  expect(await screen.findByLabelText('Case title')).toHaveValue(
+  expect(await screen.findByLabelText('Test name')).toHaveValue(
     libraryDraft.definition.content.title,
   )
   expect(fetchMock.mock.calls.some(([r]) => new URL(r.url).pathname.endsWith('/builds'))).toBe(
@@ -152,7 +152,7 @@ it('saves explicit typed content, preserving incomplete drafts and disabling rev
     }),
   )
   show(`/tests/${appId}/${entryId}`)
-  await userEvent.clear(await screen.findByLabelText('Case title'))
+  await userEvent.clear(await screen.findByLabelText('Test name'))
   expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Request review' })).toBeDisabled()
   expect(savedBodies).toHaveLength(0)
@@ -199,7 +199,7 @@ it('preserves a stale editor, compares saved fields and requires an explicit rev
     }),
   )
   show(`/tests/${appId}/${entryId}`)
-  const title = await screen.findByLabelText('Case title')
+  const title = await screen.findByLabelText('Test name')
   await userEvent.clear(title)
   await userEvent.type(title, 'My carefully edited title')
   await userEvent.click(screen.getByRole('button', { name: 'Save draft' }))
@@ -227,11 +227,13 @@ it('keeps expected results when an action is removed and warns before leaving an
   show(`/tests/${appId}/${entryId}`)
   await userEvent.click(await screen.findByRole('button', { name: 'Remove action 2' }))
   expect(screen.getByText('Reconnect an expected result')).toBeInTheDocument()
-  expect(screen.getByLabelText('Expected result 1')).toHaveValue('The saved task remains visible.')
+  expect(screen.getByLabelText('Check 1 description')).toHaveValue(
+    'The saved task remains visible.',
+  )
   await userEvent.click(screen.getByRole('link', { name: 'Back to test library' }))
   expect(await screen.findByRole('dialog', { name: 'Leave unsaved changes?' })).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Keep editing' }))
-  expect(screen.getByLabelText('Expected result 1')).toBeInTheDocument()
+  expect(screen.getByLabelText('Check 1 description')).toBeInTheDocument()
   await userEvent.click(screen.getByRole('link', { name: 'Back to test library' }))
   await userEvent.click(await screen.findByRole('button', { name: 'Discard changes and leave' }))
   expect(await screen.findByRole('heading', { name: 'Tests', level: 1 })).toBeInTheDocument()
@@ -307,7 +309,7 @@ it('binds two independent review decisions to the displayed exact hash and revis
     purpose: 'executability',
     content_hash: libraryVersion.version.content_hash,
   })
-  expect(screen.queryByLabelText('Case title')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Test name')).not.toBeInTheDocument()
 })
 it('explains missing review authority instead of presenting approval buttons', async () => {
   const version: LibraryVersionResponse = {
@@ -577,7 +579,7 @@ it.each(['failed refresh', 'submitted elsewhere'])(
       }),
     )
     const { client } = show(`/tests/${appId}/${entryId}`)
-    const title = await screen.findByLabelText('Case title')
+    const title = await screen.findByLabelText('Test name')
     await userEvent.clear(title)
     await userEvent.type(title, 'Local work must survive')
     changed = true
@@ -585,7 +587,7 @@ it.each(['failed refresh', 'submitted elsewhere'])(
     expect(
       await screen.findByText('Saved status could not be refreshed. Your editor is preserved.'),
     ).toBeInTheDocument()
-    expect(screen.getByLabelText('Case title')).toHaveValue('Local work must survive')
+    expect(screen.getByLabelText('Test name')).toHaveValue('Local work must survive')
     if (scenario === 'submitted elsewhere')
       expect(screen.getByText('This draft was submitted elsewhere')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('link', { name: 'Back to test library' }))

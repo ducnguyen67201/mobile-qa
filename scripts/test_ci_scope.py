@@ -13,6 +13,7 @@ cases = [
     (["crates/contracts/src/task_sessions.rs"], ["api", "web", "worker", "contracts"]),
     (["crates/contracts/src/task_sessions_api.rs"], ["api", "web", "contracts"]),
     (["scripts/task_session_smoke.py"], ["api", "worker"]),
+    (["scripts/direct_authoring_smoke.py"], ["api", "worker"]),
     (["crates/contracts/src/test_library.rs"], ["api", "web", "contracts"]),
     (["crates/contracts/src/test_library_api.rs"], ["api", "web", "contracts"]),
     (["scripts/test_library_smoke.py"], ["api", "worker"]),

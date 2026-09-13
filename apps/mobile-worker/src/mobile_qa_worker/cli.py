@@ -40,6 +40,10 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description="Mobile QA local fixture adapter")
     commands = parser.add_subparsers(dest="command", required=True)
+    authoring = commands.add_parser("_authoring-model", help=argparse.SUPPRESS)
+    authoring.add_argument("--request", type=Path, required=True)
+    authoring.add_argument("--result", type=Path, required=True)
+    authoring.add_argument("--profile", type=Path, required=True)
     fake = commands.add_parser("fake", help="Run a local fixture without SDK/device/model access")
     fake.add_argument("fixture", type=Path)
     commands.add_parser("sdk-import", help="Import installed SDK only; never create an Agent")
@@ -83,7 +87,7 @@ def main() -> int:
     run = commands.add_parser("_execution-run", help=argparse.SUPPRESS)
     run.add_argument("--job", type=Path, required=True)
     run.add_argument("--directory", type=Path, required=True)
-    run.add_argument("--driver", choices=["fake", "minitap"], required=True)
+    run.add_argument("--driver", choices=["fake", "minitap", "direct"], required=True)
     run.add_argument("--profile", type=Path)
     run.add_argument("--scenario", choices=["pass", "fail", "blocked"], default="pass")
     nav = commands.add_parser("_execution-sdk", help=argparse.SUPPRESS)
@@ -97,6 +101,12 @@ def main() -> int:
     phone.add_argument("--profile", type=Path, required=True)
     phone.add_argument("--once", action="store_true")
     args = parser.parse_args()
+    if args.command == "_authoring-model":
+        from mobile_qa_worker.authoring.model_adapter import run as authoring_model
+
+        authoring_model(args.request, args.result, args.profile)
+        return 0
+
     try:
         if args.command == "task-worker":
             from mobile_qa_worker.task_sessions import serve as serve_tasks

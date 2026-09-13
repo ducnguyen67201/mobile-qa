@@ -44,7 +44,6 @@ import { useWorkspace } from '@/hooks/use-workspace'
 import { useMounted } from '@/hooks/use-mounted'
 import { ErrorNotice, formatDate, LoadingPanel, PageHeading } from '@/components/app/feedback'
 import { RunPreview } from '@/components/app/run-preview'
-import { PhoneWorkspace } from '@/components/task-session/phone-workspace'
 import { DraftEditor } from '@/components/test-library/draft-editor'
 import {
   Coverage,
@@ -112,17 +111,8 @@ function EntryWorkspace({
               until an operator restores it.
             </Alert>
           )}
-          {entry.data.kind === 'case' && !versionId ? (
-            <PhoneWorkspace appId={appId} autoOpen={false}>
-              <EntryContent entry={entry.data} versionId={versionId} />
-              <VersionHistory appId={appId} entryId={entryId} />
-            </PhoneWorkspace>
-          ) : (
-            <>
-              <EntryContent entry={entry.data} versionId={versionId} />
-              <VersionHistory appId={appId} entryId={entryId} />
-            </>
-          )}
+          <EntryContent entry={entry.data} versionId={versionId} />
+          <VersionHistory appId={appId} entryId={entryId} />
         </>
       )}
     </Stack>

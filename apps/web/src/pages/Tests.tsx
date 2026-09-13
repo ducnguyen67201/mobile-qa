@@ -28,11 +28,11 @@ import type {
   CreateLibraryEntryRequest,
   DefinitionKind,
   LibraryReviewState,
-  LibraryProfileChoice,
 } from '@/api/generated/types.gen'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { useMounted } from '@/hooks/use-mounted'
 import { ErrorNotice, LoadingPanel, PageHeading } from '@/components/app/feedback'
+import { TemplatePicker } from '@/components/test-library/template-picker'
 import { ReviewBadge } from '@/components/test-library/library-presentation'
 const kinds: Record<DefinitionKind, { label: string; single: string; description: string }> = {
   case: {
@@ -70,6 +70,7 @@ function WorkspaceTests() {
   const [archived, setArchived] = useState(false)
   const [cursor, setCursor] = useState<string | undefined>()
   const [creating, setCreating] = useState(false)
+  const [templates, setTemplates] = useState(false)
   const updateParams = (field: string, value: string) => {
     const next = new URLSearchParams(params)
     next.set(field, value)
@@ -118,21 +119,38 @@ function WorkspaceTests() {
             }}
           />
           <Card withBorder>
-            <Group justify="space-between">
-              <Stack gap={4}>
-                <Title order={2} size="h3">
-                  Just describe what to try
-                </Title>
-                <Text size="sm" c="dimmed">
-                  Open the phone and let Minitap handle the steps. Save a test afterward if you
-                  want.
-                </Text>
-              </Stack>
-              <Button component={Link} to={href(`/apps/${appId}/try`)}>
-                Try this app
-              </Button>
-            </Group>
+            <Stack gap="sm">
+              <Title order={2} size="h3">
+                How would you like to create a test?
+              </Title>
+              <Text size="sm" c="dimmed">
+                Record direct steps, start from a template, or let AI suggest scenarios.
+              </Text>
+              <Group>
+                <Button component={Link} to={href(`/apps/${appId}/try?generate=1`)}>
+                  Generate with AI
+                </Button>
+                <Button variant="light" onClick={() => setTemplates(true)}>
+                  Use a template
+                </Button>
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    updateParams('kind', 'case')
+                    setCreating(true)
+                  }}
+                >
+                  Create manually
+                </Button>
+              </Group>
+            </Stack>
           </Card>
+          <TemplatePicker
+            key={appId}
+            appId={appId}
+            opened={templates}
+            close={() => setTemplates(false)}
+          />
           <Tabs
             value={kind}
             onChange={(value) => {
@@ -299,7 +317,6 @@ function WorkspaceTests() {
             key={`${appId}:${kind}:${creating}`}
             appId={appId}
             kind={kind}
-            profiles={options.data?.profiles ?? []}
             opened={creating}
             close={() => setCreating(false)}
           />
@@ -311,13 +328,11 @@ function WorkspaceTests() {
 function CreateEntry({
   appId,
   kind,
-  profiles,
   opened,
   close,
 }: {
   appId: string
   kind: DefinitionKind
-  profiles: LibraryProfileChoice[]
   opened: boolean
   close: () => void
 }) {
@@ -326,7 +341,6 @@ function CreateEntry({
   const client = useQueryClient()
   const mounted = useMounted()
   const [entryId] = useState(() => crypto.randomUUID())
-  const [template, setTemplate] = useState<string | null>(null)
   const create = useMutation({
     mutationFn: (body: CreateLibraryEntryRequest) => createLibraryEntry(appId, body),
     onSuccess: (draft) => {
@@ -343,24 +357,6 @@ function CreateEntry({
           Start a draft, then give it a title and describe its content. You can save your progress
           before it is ready for review.
         </Text>
-        {kind === 'case' &&
-          profiles.some((p) => p.qualified && p.adapter === 'demo_persistence_v1') && (
-            <Select
-              label="Starting point"
-              description="The controlled demo template provides actions and expected checks. It still needs both reviews."
-              placeholder="Blank draft"
-              clearable
-              value={template}
-              data={profiles
-                .filter((p) => p.qualified && p.adapter === 'demo_persistence_v1')
-                .map((p) => ({ value: p.id, label: `Demo persistence case · ${p.name}` }))}
-              disabled={create.isPending}
-              onChange={(id) => {
-                setTemplate(id)
-                create.reset()
-              }}
-            />
-          )}
         {create.isError && (
           <ErrorNotice
             error={create.error}
@@ -377,7 +373,7 @@ function CreateEntry({
                 entry_id: entryId,
                 kind,
                 key: `${kind}-${entryId}`,
-                template_profile_id: template,
+                template_profile_id: null,
               },
             )
           }

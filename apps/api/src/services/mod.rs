@@ -28,3 +28,7 @@ pub mod test_library;
 pub mod test_library_mutations;
 
 pub mod task_sessions;
+
+pub mod test_authoring;
+
+pub mod authoring_validation;

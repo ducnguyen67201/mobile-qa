@@ -258,6 +258,7 @@ pub struct ExecutionPlanQuery {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "response", rename_all = "snake_case")]
 pub enum LibraryMutationReceipt {
+    Authored(crate::automation::SavedAuthoredTests),
     Draft(LibraryDraftResponse),
     Version(LibraryVersionResponse),
     Entry(LibraryEntryResponse),
@@ -342,6 +343,9 @@ impl LibraryDraftDefinition {
                         a.id.len() > 100
                             || a.checkpoint_id.len() > 100
                             || a.instruction.len() > 4000
+                            || a.command.as_ref().is_some_and(|c| {
+                                serde_json::to_vec(c).map_or(true, |v| v.len() > 8192)
+                            })
                     })
                     || c.checks.iter().any(|c| {
                         c.id.len() > 100
@@ -411,6 +415,13 @@ impl LibraryDraftDefinition {
         if let Self::Case(c) = self {
             let mut earlier = std::collections::BTreeSet::new();
             for action in &c.actions {
+                if action.kind == ActionKind::Direct && action.validate(&c.package).is_err() {
+                    issues.push(LibraryIssue::new(
+                        LibraryIssueCode::Required,
+                        "actions.command",
+                        "Pick a control for each direct step",
+                    ));
+                }
                 if action.kind == ActionKind::Navigate && action.instruction.trim().is_empty() {
                     issues.push(LibraryIssue {
                         code: LibraryIssueCode::Required,

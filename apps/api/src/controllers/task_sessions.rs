@@ -125,7 +125,7 @@ pub fn routes() -> Routes {
         .add("/api/worker/phone-claims", post(claim))
         .add(
             "/api/worker/phones/{session_id}/update",
-            post(update).layer(DefaultBodyLimit::max(3145728)),
+            post(update).layer(DefaultBodyLimit::max(16777216)),
         )
         .add("/api/worker/phones/{session_id}/build", get(build))
 }

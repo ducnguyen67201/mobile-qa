@@ -9,3 +9,4 @@ contracts/worker.schema.json
 **/pnpm-lock.yaml
 **/uv.lock
 **/*.tsbuildinfo
+graphify-out/**

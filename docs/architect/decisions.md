@@ -68,3 +68,23 @@ editable, and saved regression approval rules remain in force. Interactive task
 completion does not establish an independently verified regression pass.
 The [phase 06 specification](implementation/06-test-generation.md) owns the
 session/job boundaries, generated contracts and acceptance criteria.
+
+## Direct execution with explicit AI authoring — implemented in source (2026-09-13)
+
+User feedback revises A07 and the task-first decision for the next phase 06 implementation.
+Ordinary typed actions will use one Python direct-device executor shared by interactive
+control, recording, discovery and approved regression runs. Minitap remains for explicit
+Ask AI/legacy navigation. There is no automatic model fallback when a direct selector fails.
+
+AI will discover bounded journeys and propose named, source-grounded test drafts; predefined
+templates and direct reruns require no model. Rust owns durable jobs, authorization, typed
+contracts, atomic saves and verdict semantics. Python owns bounded structured model calls in
+an isolated child and validates proposed discovery actions before direct execution. This
+supersedes the earlier proposed Rust-only model-calling generation pipeline and avoids
+converting an opaque agent transcript into supposedly deterministic tests.
+
+Preserve legacy payload hashes and approval rules. Generated expectations require explicit
+review; app observations cannot establish intended behavior. See the
+[owning spec](implementation/06-test-generation.md) and
+[implementation plan](../../.claude/PRPs/plans/06-direct-execution-and-ai-test-authoring.plan.md).
+The source now follows this decision. Validation and live acceptance are tracked separately in status.md. Existing session payloads and receipt transactions own the additive state; a second queue and migration would duplicate those mechanisms. Invalid model output fails closed rather than buying automatic repair calls.

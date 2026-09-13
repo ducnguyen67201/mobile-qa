@@ -55,6 +55,9 @@ def controls(xml: bytes) -> list[PhoneControl]:
                     "id": str(len(result)),
                     "label": label[:500],
                     "resource_id": node.get("resource-id", "")[:500],
+                    "editable": node.get("editable") == "true"
+                    or "EditText" in node.get("class", ""),
+                    "description": node.get("content-desc", "")[:500],
                     "left": left,
                     "top": top,
                     "right": right,
@@ -68,8 +71,9 @@ def controls(xml: bytes) -> list[PhoneControl]:
 def capture(device: Device, selectable: bool = True) -> PhoneFrame:
     items: list[PhoneControl] = []
     if selectable:
-        device.adb("shell", "uiautomator", "dump", "/data/local/tmp/mobile-qa.xml")
-        items = controls(device.adb("exec-out", "cat", "/data/local/tmp/mobile-qa.xml"))
+        from mobile_qa_worker.automation.direct import hierarchy
+
+        items = controls(hierarchy(device))
     png = device.adb("exec-out", "screencap", "-p")
     validate_png(png)
     if len(png) > 1572864:
@@ -128,7 +132,7 @@ class SessionConnection:
                 PhoneUpdate(state=state, frame=frame, task=task, message=message, clean=clean),
                 PhoneSession,
                 self.lease.lease_token,
-                limit=3145728,
+                limit=16777216,
             )
             if self.session.state in (
                 PhoneState.stopping,
@@ -156,8 +160,9 @@ def act(
     profile: Profile,
     profile_path: Path,
     directory: Path,
+    publish: bool = True,
 ) -> None:
-    directory.mkdir(mode=0o700)
+    directory.mkdir(mode=0o700, parents=True)
     goal = goal_for(task, capture(device))
     request = NavigationRequest.model_validate(
         {
@@ -194,7 +199,8 @@ def act(
     env = {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG", "VIRTUAL_ENV")}
     task.state = PhoneTaskState.acting
     task.message = "Minitap is planning and performing your task"
-    connection.update(task=task, message=task.message)
+    if publish:
+        connection.update(task=task, message=task.message)
     with (directory / "sdk.log").open("wb") as log:
         child = subprocess.Popen(
             args,
@@ -219,9 +225,10 @@ def act(
             stop_group(child)
     task.state = PhoneTaskState.completed
     task.message = "Minitap finished. Inspect the screen; this is not a verified test pass."
-    connection.update(
-        state=PhoneState.ready, task=task, frame=capture(device), message=task.message
-    )
+    if publish:
+        connection.update(
+            state=PhoneState.ready, task=task, frame=capture(device), message=task.message
+        )
 
 
 def run_session(client: Client, lease: PhoneLease, state: Path, profile_path: Path) -> None:
@@ -274,7 +281,13 @@ def run_session(client: Client, lease: PhoneLease, state: Path, profile_path: Pa
                 if pending is None:
                     continue
                 try:
-                    act(
+                    from mobile_qa_worker.authoring.generation import run as generate
+                    from mobile_qa_worker.automation.session import run as run_steps
+
+                    runner = (
+                        generate if pending.generation else run_steps if pending.sequence else act
+                    )
+                    runner(
                         connection,
                         device,
                         pending.model_copy(deep=True),
@@ -285,7 +298,9 @@ def run_session(client: Client, lease: PhoneLease, state: Path, profile_path: Pa
                 except (QualificationError, OSError, ValueError) as exc:
                     if connection.stopped.is_set():
                         break
-                    task = pending.model_copy(deep=True)
+                    task = next(
+                        (t for t in connection.session.tasks if t.id == pending.id), pending
+                    ).model_copy(deep=True)
                     task.state = PhoneTaskState.failed
                     task.message = (
                         "The selected control changed. Select it again."
@@ -323,7 +338,9 @@ def serve(origin: str, state: Path, profile_path: Path, once: bool = False) -> N
             claim_id = uuid4()
             write(pending, {"claim_id": str(claim_id)})
             response = client.send(
-                "/api/worker/phone-claims", {"claim_id": str(claim_id)}, PhoneClaimResponse
+                "/api/worker/phone-claims",
+                {"claim_id": str(claim_id), "protocol_version": 2},
+                PhoneClaimResponse,
             )
             if response.lease:
                 run_session(client, response.lease, state, profile_path.resolve())

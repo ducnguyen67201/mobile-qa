@@ -10,3 +10,5 @@ pub mod worker;
 pub mod test_library;
 
 pub mod task_sessions;
+
+pub mod test_authoring;

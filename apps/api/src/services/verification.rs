@@ -95,14 +95,12 @@ pub fn observe(
         .iter()
         .filter(|n| n.get("resource-id") == Some(&check.resource_id))
         .collect();
-    let expected = check.expected.replace("${task_title}", task);
     if !check.text_filter.is_empty() {
         let text = check.text_filter.replace("${task_title}", task);
         targets.retain(|n| n.get("text") == Some(&text));
     }
-    if targets.len() > 1 && check.property == UiProperty::Text {
-        targets.retain(|n| n.get("text") == Some(&expected));
-    }
+    // Ambiguous evidence must not become unique solely because one value matches the expectation.
+
     if check.method == CheckMethod::UiElementPresenceV1 {
         return Ok((!targets.is_empty()).to_string());
     }

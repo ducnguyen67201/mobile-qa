@@ -5,6 +5,8 @@ requires-python = ">=3.12,<3.14"
 dependencies = ["pydantic>=2.11,<3"]
 [project.optional-dependencies]
 sdk = ["minitap-mobile-use==4.0.0", "langchain-core==1.6.3"]
+device = ["uiautomator2==3.5.0"]
+ai = ["langchain-openai==1.6.2", "Pillow==12.3.0"]
 [dependency-groups]
 dev = [
     "datamodel-code-generator==0.76.0",

@@ -76,6 +76,7 @@ jobs:
               - 'scripts/app_setup_smoke.py'
               - 'scripts/execution_smoke.py'
               - 'scripts/test_library_smoke.py'
+              - 'scripts/direct_authoring_smoke.py'
               - 'scripts/task_session_smoke.py'
             web:
               - '.github/workflows/**'
@@ -99,6 +100,7 @@ jobs:
               - 'crates/contracts/src/task_sessions.rs'
               - 'scripts/execution_smoke.py'
               - 'scripts/test_library_smoke.py'
+              - 'scripts/direct_authoring_smoke.py'
               - 'scripts/task_session_smoke.py'
               - 'crates/contracts/src/worker/**'
               - 'infra/device-host/**'
@@ -157,6 +159,7 @@ jobs:
       - run: uv sync --project apps/mobile-worker --frozen
       - run: python3 scripts/execution_smoke.py
       - run: python3 scripts/test_library_smoke.py
+      - run: python3 scripts/direct_authoring_smoke.py
   web:
     needs: scope
     if: needs.scope.outputs.web == 'true'
@@ -188,7 +191,7 @@ jobs:
           version: 0.12.1
           enable-cache: true
           cache-dependency-glob: apps/mobile-worker/uv.lock
-      - run: uv sync --project apps/mobile-worker --frozen --extra sdk
+      - run: uv sync --project apps/mobile-worker --frozen --extra sdk --extra device --extra ai
       - run: uv run --no-sync --project apps/mobile-worker --frozen ruff check apps/mobile-worker
       - run: cd apps/mobile-worker && uv run --no-sync --frozen pyright
       - run: uv run --no-sync --project apps/mobile-worker --frozen pytest apps/mobile-worker/tests

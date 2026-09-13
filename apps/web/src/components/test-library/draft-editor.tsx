@@ -19,7 +19,7 @@ import type {
 import { useWorkspace } from '@/hooks/use-workspace'
 import { useMounted } from '@/hooks/use-mounted'
 import { ErrorNotice, LoadingPanel } from '@/components/app/feedback'
-import { CaseFields } from './definition-fields'
+import { PhoneWorkspace } from '@/components/task-session/phone-workspace'
 import { PlanFields, SuiteFields } from './membership-fields'
 import { Coverage, LibraryIssues } from './library-presentation'
 
@@ -241,7 +241,10 @@ export function DraftEditor({
         style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}
       >
         {definition.kind === 'case' ? (
-          <CaseFields
+          <PhoneWorkspace
+            appId={appId}
+            autoOpen={false}
+            disabled={!canEdit || busy}
             value={definition.content}
             onChange={(content) => setDefinition({ kind: 'case', content })}
           />

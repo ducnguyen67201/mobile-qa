@@ -164,10 +164,11 @@ successful phone. Ordinary tests use synthetic boundaries and do not launch it.
 ### Task and test workspace layout
 
 The standalone task page and case editor share a task-left, phone-right workspace.
-Both columns share the full available workspace width with compact outer padding.
+Both columns share the full available workspace width with compact outer padding and a draggable divider (30–70% preview width).
+The divider also supports arrow keys, Home/End, and double-click to reset.
 The phone panel fills the right half and stays beside the scrolling editor on
-desktop, then stacks below it on narrow screens. The shell uses a 48px header and
-a default 64px icon sidebar, which can still expand to show navigation labels. In the case editor, **Open phone preview** opens the default
+desktop, then stacks below it on narrow screens. The shell uses a 40px header and
+a default 52px icon sidebar, which can still expand to show navigation labels. In the case editor, **Open phone preview** opens the default
 build/profile without navigating away or discarding unsaved test fields. An existing
 active session reconnects automatically. Viewing a saved case alone does not start
 a new device session. The standalone Try page retains automatic opening.
@@ -178,3 +179,12 @@ written goal; editing draft fields alone neither executes nor verifies that draf
 Preview frames refresh through the existing session polling, not a video stream.
 This layout change has DOM interaction coverage; rendered browser acceptance remains
 pending under the existing inspection restriction.
+
+Task composition uses numbered, reorderable steps: Ask AI, Tap, Enter text, Swipe,
+Go back or Restart app. These are editor instructions compiled into one ordered
+goal for the existing Minitap task endpoint, with a combined 4,000-character limit
+and at most 20 steps. Action choices are still executed by the AI agent; the UI
+does not claim deterministic device commands or individual step verification.
+A selected live control anchors the start of the task; later targets are described
+in each step. Completed task status covers the whole sequence. Steps stay visible
+after submission and can be edited or run again with a new request identity.

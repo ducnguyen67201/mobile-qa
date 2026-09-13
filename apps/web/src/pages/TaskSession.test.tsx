@@ -1,7 +1,7 @@
 /** Real SDK + synthetic server replies; this is not emulator acceptance. */
 import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -122,7 +122,7 @@ function show(blocked = false, embedded = false) {
 afterEach(() => vi.unstubAllGlobals())
 it('opens the default phone without setup fields and submits the users goal', async () => {
   const { opened, tasks } = show()
-  const goal = await screen.findByLabelText('What should Minitap do?')
+  const goal = await screen.findByLabelText('Step 1 instruction')
   await waitFor(() => expect(opened).toHaveLength(1))
   expect(goal).toBeEnabled()
   expect(screen.queryByLabelText('Stable key')).not.toBeInTheDocument()
@@ -154,14 +154,14 @@ it('runs beside the saved draft without navigating or losing unsaved edits', asy
   await userEvent.type(title, 'My unsaved task')
   const setup = screen.getByRole('region', { name: 'Task setup' })
   const preview = screen.getByRole('complementary', { name: 'App preview' })
-  const goal = within(setup).getByLabelText('What should Minitap do?')
+  const goal = within(setup).getByLabelText('Step 1 instruction')
   await userEvent.type(goal, 'Enter Buy milk and save it')
   expect(opened).toHaveLength(0)
   expect(within(setup).getByRole('button', { name: 'Run task' })).toBeDisabled()
   await userEvent.click(await within(preview).findByRole('button', { name: 'Open phone preview' }))
   const control = await within(preview).findByRole('button', { name: 'Select Task input' })
   await userEvent.click(control)
-  expect(within(setup).getByText('Selected: Task input')).toBeInTheDocument()
+  expect(within(setup).getByText('Starting control: Task input')).toBeInTheDocument()
   await userEvent.click(within(setup).getByRole('button', { name: 'Run task' }))
   await waitFor(() => expect(tasks).toHaveLength(1))
   expect(tasks[0]).toMatchObject({
@@ -179,4 +179,38 @@ it('runs beside the saved draft without navigating or losing unsaved edits', asy
   expect(
     within(preview).queryByRole('button', { name: 'Select Task input' }),
   ).not.toBeInTheDocument()
+})
+
+it('adds and reorders action steps before submitting one ordered Minitap goal', async () => {
+  const { opened, tasks } = show()
+  await waitFor(() => expect(opened).toHaveLength(1))
+  await userEvent.selectOptions(await screen.findByLabelText('Step 1 action'), 'type')
+  await userEvent.type(screen.getByLabelText('Step 1 target'), 'task input')
+  await userEvent.type(screen.getByLabelText('Step 1 text'), 'Buy milk')
+  await userEvent.click(screen.getByRole('button', { name: 'Add step' }))
+  expect(screen.getByRole('button', { name: 'Run task' })).toBeDisabled()
+  await userEvent.selectOptions(screen.getByLabelText('Step 2 action'), 'restart')
+  await userEvent.click(screen.getByRole('button', { name: 'Move step 2 up' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Add step' }))
+  await userEvent.type(screen.getByLabelText('Step 3 instruction'), 'Unwanted step')
+  await userEvent.click(screen.getByRole('button', { name: 'Remove step 3' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Run task' }))
+  await waitFor(() => expect(tasks).toHaveLength(1))
+  expect(tasks[0]?.goal).toBe(
+    'Perform these steps in order. Stop if a step cannot be completed.\n1. Restart the app without clearing its saved data.\n2. Enter "Buy milk" into task input.',
+  )
+  expect(screen.getByLabelText('Step 2 text')).toHaveValue('Buy milk')
+})
+
+it('blocks an oversized combined task before making an API request', async () => {
+  const { opened, tasks } = show()
+  await waitFor(() => expect(opened).toHaveLength(1))
+  fireEvent.change(await screen.findByLabelText('Step 1 instruction'), {
+    target: { value: 'a'.repeat(3990) },
+  })
+  await userEvent.click(screen.getByRole('button', { name: 'Add step' }))
+  await userEvent.selectOptions(screen.getByLabelText('Step 2 action'), 'back')
+  expect(screen.getByText('Shorten your steps to fit within 4,000 characters.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Run task' })).toBeDisabled()
+  expect(tasks).toHaveLength(0)
 })

@@ -149,3 +149,24 @@ TypeScript, ESLint and production build passed. The browser suite initially pass
 were updated for the compact default, including switching via its menu, and all
 eight workspace tests passed on rerun. TypeScript and affected lint passed again.
 No runtime logic or transport contracts changed. Visual acceptance is still pending.
+
+### Resizable preview and numbered task steps
+
+Added a draggable divider with pointer capture, bounded pane sizes, keyboard
+arrows, Home/End and double-click reset. The sidebar is now 52px and the header
+40px. Task composition offers numbered Ask AI, Tap, Enter text, Swipe, Go back and
+Restart app steps, with add/remove/reorder controls. The editor compiles them into
+one ordered Minitap goal using the existing generated request contract. Empty
+steps and combined goals above 4,000 characters cannot run. Steps remain visible
+after submission; a deliberate subsequent run receives a fresh request identity,
+while a failed request can retry with its original identity.
+
+These action choices guide the AI agent; they are not a new deterministic command
+API or a per-step pass/fail report. The selected capture control anchors the start
+of the task. Later targets are described in the step fields.
+
+Validation: all 98 browser tests, TypeScript, ESLint, Prettier, production build and
+diff checks passed. New tests cover pointer/keyboard resizing, retained editor
+values, ordered step submission, removal, and combined-length rejection. Browser
+visual acceptance remains pending. The existing production bundle-size warning
+remains; no worker or backend behavior was changed by this update.

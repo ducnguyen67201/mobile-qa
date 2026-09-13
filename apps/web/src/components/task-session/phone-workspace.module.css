@@ -1,7 +1,10 @@
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, var(--editor-width, 50fr)) 16px minmax(
+      0,
+      var(--preview-width, 50fr)
+    );
+  gap: 8px;
   align-items: start;
 }
 
@@ -9,11 +12,15 @@
   min-width: 0;
 }
 
-.preview {
+.previewColumn {
   position: sticky;
-  top: 64px;
+  top: 56px;
   min-width: 0;
-  min-height: calc(100dvh - 80px);
+}
+
+.preview {
+  min-width: 0;
+  min-height: calc(100dvh - 72px);
   padding: 20px;
   border-radius: 16px;
   background: var(--mantine-color-forest-0);
@@ -34,9 +41,43 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .preview {
+  .previewColumn {
     position: static;
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .preview {
     min-height: 0;
     padding: 12px;
   }
+}
+
+.divider {
+  align-self: stretch;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  border-radius: 8px;
+  background: linear-gradient(var(--mantine-color-gray-3), var(--mantine-color-gray-3)) center / 1px
+    100% no-repeat;
+}
+
+.divider span {
+  display: block;
+  position: sticky;
+  top: 45vh;
+  width: 4px;
+  height: 40px;
+  margin-inline: auto;
+  border-radius: 4px;
+  background: var(--mantine-color-forest-4);
+}
+
+.divider:hover,
+.divider:focus-visible {
+  background-color: var(--mantine-color-forest-1);
+  outline: 2px solid var(--mantine-color-forest-5);
 }

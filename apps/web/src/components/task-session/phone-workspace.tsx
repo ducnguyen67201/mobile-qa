@@ -11,7 +11,6 @@ import {
   Select,
   Stack,
   Text,
-  Textarea,
   Title,
 } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -36,6 +35,8 @@ import type {
 import { createLibraryEntry, saveLibraryDraft } from '@/api/test-library'
 
 import classes from './phone-workspace.module.css'
+import { ResizableWorkspace } from './resizable-workspace'
+import { newTaskStep, taskGoal, TaskSteps } from './task-steps'
 
 export function PhoneWorkspace({
   appId,
@@ -52,7 +53,9 @@ export function PhoneWorkspace({
   const [id, setId] = useState('')
   const [requestId] = useState(() => crypto.randomUUID())
   const [device, setDevice] = useState<string | null>(null)
-  const [goal, setGoal] = useState('')
+  const [steps, setSteps] = useState(() => [newTaskStep()])
+  const goal = taskGoal(steps)
+  const tooLong = goal.length > 4000
   const [selection, setSelection] = useState<PhoneSelection | null>(null)
   const initiated = useRef(false)
   const mounted = useRef(true)
@@ -77,7 +80,6 @@ export function PhoneWorkspace({
     onSuccess: (s) => {
       saved(s)
       setSelection(null)
-      setGoal('')
     },
   })
   const stop = useMutation({ mutationFn: () => stopPhone(id), onSuccess: saved })
@@ -149,31 +151,36 @@ export function PhoneWorkspace({
         />
       )}
       {phone.isError && <ErrorNotice error={phone.error} retry={() => void phone.refetch()} />}
-      <div className={classes.workspace}>
+      <ResizableWorkspace>
         <Stack component="section" aria-label="Task setup" className={classes.editor}>
           <Title order={2} size="h3">
             Set up your task
           </Title>
           <Text size="sm" c="dimmed">
-            Describe what to do, or select a control in the phone preview. Run when you’re ready.
+            Add steps, choose actions, or ask AI to handle a task. Run when you’re ready.
           </Text>
-          <Textarea
-            label="What should Minitap do?"
-            placeholder="Type Buy milk, save it, restart the app, and check that Buy milk is still there."
-            autosize
-            minRows={4}
-            maxLength={4000}
-            value={goal}
-            onChange={(e) => {
-              setGoal(e.currentTarget.value)
+          <TaskSteps
+            steps={steps}
+            disabled={submit.isPending}
+            onChange={(next) => {
+              setSteps(next)
               submit.reset()
             }}
-            disabled={submit.isPending}
           />
+          {tooLong && (
+            <Alert color="orange">Shorten your steps to fit within 4,000 characters.</Alert>
+          )}
           {selected && (
             <Group>
-              <Text size="sm">Selected: {selected.label}</Text>
-              <Button variant="subtle" size="xs" onClick={() => setSelection(null)}>
+              <Text size="sm">Starting control: {selected.label}</Text>
+              <Button
+                variant="subtle"
+                size="xs"
+                onClick={() => {
+                  setSelection(null)
+                  submit.reset()
+                }}
+              >
                 Clear
               </Button>
             </Group>
@@ -182,10 +189,14 @@ export function PhoneWorkspace({
           <Group>
             <Button
               size="md"
-              disabled={!ready || !goal.trim() || (!!selection && !selected)}
+              disabled={!ready || !goal || tooLong || (!!selection && !selected)}
               loading={submit.isPending}
               onClick={() =>
-                submit.mutate(submit.variables ?? { id: crypto.randomUUID(), goal, selection })
+                submit.mutate(
+                  submit.isError && submit.variables
+                    ? submit.variables
+                    : { id: crypto.randomUUID(), goal, selection },
+                )
               }
             >
               Run task
@@ -300,7 +311,10 @@ export function PhoneWorkspace({
                         type="button"
                         aria-label={`Select ${c.label}`}
                         aria-pressed={selected?.id === c.id}
-                        onClick={() => setSelection({ frame_id: frame.id, control_id: c.id })}
+                        onClick={() => {
+                          setSelection({ frame_id: frame.id, control_id: c.id })
+                          submit.reset()
+                        }}
                         style={{
                           position: 'absolute',
                           left: `${(100 * c.left) / frame.width}%`,
@@ -333,7 +347,7 @@ export function PhoneWorkspace({
               {frame && (
                 <Text size="xs" c="dimmed" mt="sm">
                   {ready
-                    ? 'Select a control to point Minitap to it.'
+                    ? 'Select a starting control for Minitap. Describe later targets in your steps.'
                     : 'Screen captures update while Minitap works.'}
                 </Text>
               )}
@@ -344,7 +358,7 @@ export function PhoneWorkspace({
             </Text>
           </Stack>
         </aside>
-      </div>
+      </ResizableWorkspace>
     </Stack>
   )
 }

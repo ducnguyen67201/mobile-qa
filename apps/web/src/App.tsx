@@ -43,8 +43,8 @@ export function App() {
   return (
     <AppShell
       layout="alt"
-      header={{ height: 48 }}
-      navbar={{ width: minimized ? 64 : 224, breakpoint: 'sm', collapsed: { mobile: true } }}
+      header={{ height: 40 }}
+      navbar={{ width: minimized ? 52 : 224, breakpoint: 'sm', collapsed: { mobile: true } }}
       padding={0}
     >
       <a className="skip-link" href="#main">
@@ -52,7 +52,7 @@ export function App() {
       </a>
       <AppShell.Navbar
         component="aside"
-        p={minimized ? 10 : 'md'}
+        p={minimized ? 4 : 'md'}
         className="workspace-nav"
         style={{ overflowY: 'auto' }}
       >

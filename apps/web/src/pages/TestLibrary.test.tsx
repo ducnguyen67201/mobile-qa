@@ -57,6 +57,13 @@ function fixtureFetch(override?: (request: Request) => Promise<Response | undefi
         next_cursor: null,
       })
     if (path === `/api/apps/${appId}`) return Response.json(app)
+    if (path.endsWith('/phone-options'))
+      return Response.json({
+        builds: [],
+        profiles: [],
+        active_session: null,
+        blockers: ['Upload a build and connect a worker to preview this app.'],
+      })
     if (path.endsWith('/default-test-plan'))
       return Response.json({ app_id: appId, revision: 0, plan_version_id: null })
     if (path.endsWith('/test-library/options')) return Response.json(libraryOptions)

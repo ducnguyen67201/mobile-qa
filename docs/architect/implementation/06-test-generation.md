@@ -160,3 +160,19 @@ the registered execution profile. The SDK child gets model credentials through
 its configured Doppler injection; API credentials never enter that child.
 A missing device/model configuration produces an unavailable state, not a fake
 successful phone. Ordinary tests use synthetic boundaries and do not launch it.
+
+### Task and test workspace layout
+
+The standalone task page and case editor share a task-left, phone-right workspace.
+The phone panel stays beside the scrolling editor on desktop and stacks below it
+on narrow screens. In the case editor, **Open phone preview** opens the default
+build/profile without navigating away or discarding unsaved test fields. An existing
+active session reconnects automatically. Viewing a saved case alone does not start
+a new device session. The standalone Try page retains automatic opening.
+
+Users can compose a task before the phone is ready, select a control on its current
+capture, then run it while keeping their draft visible. Task trials execute the
+written goal; editing draft fields alone neither executes nor verifies that draft.
+Preview frames refresh through the existing session polling, not a video stream.
+This layout change has DOM interaction coverage; rendered browser acceptance remains
+pending under the existing inspection restriction.

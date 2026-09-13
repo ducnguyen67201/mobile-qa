@@ -119,3 +119,19 @@ versions were changed. These checks do not claim a fresh Rust dependency audit.
 CI scope selection was extended for both task-session contract modules and the
 explicit acceptance script; all 23 scope cases passed. Real device/model scripts
 remain explicit and are not executed by ordinary CI.
+
+## Task-left / phone-right editor update
+
+The case editor now embeds the shared task workspace instead of linking away to
+another page. Task composition and draft fields stay on the left; the current
+phone capture stays in a sticky right panel on desktop and stacks on narrow
+screens. Open phone preview starts a session explicitly from the editor, while an
+existing active session reconnects. The standalone Try page retains automatic
+opening. Task composition is available while the phone is opening.
+
+Validation: TypeScript, ESLint, all 94 browser tests, production Vite build,
+Prettier and diff checks passed. The added integration test opens the embedded
+phone, selects a control, sends a generated-contract task request, observes the
+returned frame update and confirms unsaved draft edits remain intact. The existing
+bundle-size warning remains. Rendered browser acceptance remains pending; these
+DOM checks do not claim visual or real-device acceptance for the new layout.

@@ -44,6 +44,7 @@ import { useWorkspace } from '@/hooks/use-workspace'
 import { useMounted } from '@/hooks/use-mounted'
 import { ErrorNotice, formatDate, LoadingPanel, PageHeading } from '@/components/app/feedback'
 import { RunPreview } from '@/components/app/run-preview'
+import { PhoneWorkspace } from '@/components/task-session/phone-workspace'
 import { DraftEditor } from '@/components/test-library/draft-editor'
 import {
   Coverage,
@@ -101,11 +102,6 @@ function EntryWorkspace({
             title={entry.data.title || 'Untitled draft'}
             description={entry.data.key}
           />
-          {entry.data.kind === 'case' && (
-            <Button component={Link} to={href(`/apps/${appId}/try`)} w="fit-content">
-              Try a task on the phone instead
-            </Button>
-          )}
           <EntryLifecycle entry={entry.data} />
           {entry.data.archived_at && (
             <Alert color="orange" title="Archived entry">
@@ -113,8 +109,17 @@ function EntryWorkspace({
               until an operator restores it.
             </Alert>
           )}
-          <EntryContent entry={entry.data} versionId={versionId} />
-          <VersionHistory appId={appId} entryId={entryId} />
+          {entry.data.kind === 'case' && !versionId ? (
+            <PhoneWorkspace appId={appId} autoOpen={false}>
+              <EntryContent entry={entry.data} versionId={versionId} />
+              <VersionHistory appId={appId} entryId={entryId} />
+            </PhoneWorkspace>
+          ) : (
+            <>
+              <EntryContent entry={entry.data} versionId={versionId} />
+              <VersionHistory appId={appId} entryId={entryId} />
+            </>
+          )}
         </>
       )}
     </Stack>

@@ -180,3 +180,20 @@ index and navigation guidance were merged into this branch; documentation/config
 conflicts were reconciled while retaining the GAN cleanup rule and Android ignore
 patterns. No app source conflicts occurred. PR #2 remains open; this operation does
 not merge or close either PR.
+
+### Per-step target picker
+
+Tap and Enter text steps now have a Pick on phone button. Arming a step highlights
+detected controls in the current preview; selecting one fills that step's target
+label and retains its generated PhoneControl metadata. The ordered goal includes
+its resource ID, so each step carries its own target through reordering. Picking
+itself never sends a device task. Manual target edits/action changes clear captured
+metadata; Escape cancels picking. The existing optional task-start selection is
+cleared when selecting a step target to avoid conflicting instructions.
+
+Validation: all seven affected task-session DOM tests, TypeScript, ESLint,
+Prettier, production build and diff checks passed. New tests cover two independent
+step targets, reorder, no execution on selection, Escape and manual-target
+replacement. Rendered browser verification remains pending; the existing bundle
+size warning is unchanged in kind. Targets are AI instructions with control
+identity, not a new deterministic action protocol.

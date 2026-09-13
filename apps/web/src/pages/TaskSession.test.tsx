@@ -48,6 +48,15 @@ function show(blocked = false, embedded = false) {
           right: 380,
           bottom: 160,
         },
+        {
+          id: 'save',
+          resource_id: 'ai.mobileqa.demo:id/save',
+          label: 'Save',
+          left: 20,
+          top: 180,
+          right: 380,
+          bottom: 240,
+        },
       ],
     },
     tasks: [],
@@ -213,4 +222,50 @@ it('blocks an oversized combined task before making an API request', async () =>
   expect(screen.getByText('Shorten your steps to fit within 4,000 characters.')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Run task' })).toBeDisabled()
   expect(tasks).toHaveLength(0)
+})
+
+it('picks separate targets for steps and retains their identity through reordering', async () => {
+  const { opened, tasks } = show()
+  await waitFor(() => expect(opened).toHaveLength(1))
+  await userEvent.selectOptions(await screen.findByLabelText('Step 1 action'), 'type')
+  await userEvent.click(screen.getByRole('button', { name: 'Pick target for step 1 on phone' }))
+  expect(screen.getByText('Choose a target for Step 1')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Select Task input' }))
+  expect(screen.getByLabelText('Step 1 target')).toHaveValue('Task input')
+  await userEvent.type(screen.getByLabelText('Step 1 text'), 'Buy milk')
+  await userEvent.click(screen.getByRole('button', { name: 'Add step' }))
+  await userEvent.selectOptions(screen.getByLabelText('Step 2 action'), 'tap')
+  await userEvent.click(screen.getByRole('button', { name: 'Pick target for step 2 on phone' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Select Save' }))
+  expect(screen.getByLabelText('Step 2 target')).toHaveValue('Save')
+  expect(tasks).toHaveLength(0)
+  await userEvent.click(screen.getByRole('button', { name: 'Move step 2 up' }))
+  expect(screen.getByLabelText('Step 1 target')).toHaveValue('Save')
+  await userEvent.click(screen.getByRole('button', { name: 'Run task' }))
+  await waitFor(() => expect(tasks).toHaveLength(1))
+  expect(tasks[0]?.goal).toContain(
+    '1. Tap the control labelled "Save" with resource ID "ai.mobileqa.demo:id/save".',
+  )
+  expect(tasks[0]?.goal).toContain(
+    '2. Enter "Buy milk" into the control labelled "Task input" with resource ID "ai.mobileqa.demo:id/task_input".',
+  )
+  expect(tasks[0]?.selection).toBeNull()
+})
+
+it('cancels picking and clears captured identity when the user describes a different target', async () => {
+  const { opened, tasks } = show()
+  await waitFor(() => expect(opened).toHaveLength(1))
+  await userEvent.selectOptions(await screen.findByLabelText('Step 1 action'), 'tap')
+  const pick = screen.getByRole('button', { name: 'Pick target for step 1 on phone' })
+  await userEvent.click(pick)
+  await userEvent.keyboard('{Escape}')
+  expect(pick).toHaveAttribute('aria-pressed', 'false')
+  await userEvent.click(pick)
+  await userEvent.click(screen.getByRole('button', { name: 'Select Save' }))
+  await userEvent.clear(screen.getByLabelText('Step 1 target'))
+  await userEvent.type(screen.getByLabelText('Step 1 target'), 'Cancel button')
+  expect(screen.queryByText('Selected from the app: Save')).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Run task' }))
+  await waitFor(() => expect(tasks).toHaveLength(1))
+  expect(tasks[0]?.goal).toBe('Tap Cancel button.')
 })

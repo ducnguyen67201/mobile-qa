@@ -188,3 +188,13 @@ does not claim deterministic device commands or individual step verification.
 A selected live control anchors the start of the task; later targets are described
 in each step. Completed task status covers the whole sequence. Steps stay visible
 after submission and can be edited or run again with a new request identity.
+
+Each Tap or Enter text step offers **Pick on phone**. The user arms that step and
+selects a detected control from the current capture; its label fills the target
+field, and the generated goal includes its resource ID beside the label. The
+selection follows the step through reordering. Editing the target or changing
+its action clears the captured-control metadata. Picking does not execute an
+Android action and is available only when the phone is ready. Only controls on
+the currently captured screen can be picked; targets on later screens can still
+be described. Minitap locates the target during execution; a picked target is not
+a guarantee that a future screen or control will be unchanged.

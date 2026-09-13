@@ -9,6 +9,7 @@ import {
   Textarea,
   TextInput,
 } from '@mantine/core'
+import type { PhoneControl } from '@/api/generated/types.gen'
 import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react'
 
 /** Editor-only state. The existing generated task contract receives the ordered goal. */
@@ -17,6 +18,7 @@ export type TaskStep = {
   kind: 'ai' | 'tap' | 'type' | 'swipe' | 'back' | 'restart'
   text: string
   target: string
+  pickedControl?: PhoneControl
 }
 export const newTaskStep = (): TaskStep => ({
   id: crypto.randomUUID(),
@@ -25,14 +27,17 @@ export const newTaskStep = (): TaskStep => ({
   target: '',
 })
 export function stepInstruction(step: TaskStep): string {
+  const target = step.pickedControl
+    ? `the control labelled ${JSON.stringify(step.target)} with resource ID ${JSON.stringify(step.pickedControl.resource_id)}`
+    : step.target.trim()
   switch (step.kind) {
     case 'ai':
       return step.text.trim()
     case 'tap':
-      return step.target.trim() ? `Tap ${step.target.trim()}.` : ''
+      return step.target.trim() ? `Tap ${target}.` : ''
     case 'type':
       return step.target.trim() && step.text.trim()
-        ? `Enter ${JSON.stringify(step.text)} into ${step.target.trim()}.`
+        ? `Enter ${JSON.stringify(step.text)} into ${target}.`
         : ''
     case 'swipe':
       return step.text.trim() ? `Swipe ${step.text.trim()}.` : ''
@@ -53,10 +58,16 @@ export function TaskSteps({
   steps,
   onChange,
   disabled,
+  canPick,
+  pickingId,
+  onPick,
 }: {
   steps: TaskStep[]
   onChange: (steps: TaskStep[]) => void
   disabled: boolean
+  canPick: boolean
+  pickingId: string | null
+  onPick: (id: string) => void
 }) {
   const update = (id: string, value: Partial<TaskStep>) =>
     onChange(steps.map((step) => (step.id === id ? { ...step, ...value } : step)))
@@ -123,18 +134,47 @@ export function TaskSteps({
                   kind === 'back' ||
                   kind === 'restart'
                 )
-                  update(step.id, { kind })
+                  update(step.id, { kind, pickedControl: undefined })
               }}
             />
             {(step.kind === 'tap' || step.kind === 'type') && (
-              <TextInput
-                label={`Step ${index + 1} target`}
-                placeholder="e.g. Save button or task input"
-                value={step.target}
-                disabled={disabled}
-                maxLength={500}
-                onChange={(event) => update(step.id, { target: event.currentTarget.value })}
-              />
+              <Stack gap="xs">
+                <Group justify="space-between" align="flex-end" gap="sm">
+                  <TextInput
+                    label={`Step ${index + 1} target`}
+                    placeholder="Pick from the phone or describe a control"
+                    value={step.target}
+                    disabled={disabled}
+                    maxLength={500}
+                    style={{ flex: '1 1 180px' }}
+                    onChange={(event) =>
+                      update(step.id, {
+                        target: event.currentTarget.value,
+                        pickedControl: undefined,
+                      })
+                    }
+                  />
+                  <Button
+                    variant={pickingId === step.id ? 'filled' : 'light'}
+                    aria-label={`Pick target for step ${index + 1} on phone`}
+                    aria-pressed={pickingId === step.id}
+                    disabled={disabled || !canPick}
+                    onClick={() => onPick(step.id)}
+                  >
+                    {pickingId === step.id ? 'Cancel picking' : 'Pick on phone'}
+                  </Button>
+                </Group>
+                {step.pickedControl && (
+                  <Text size="xs" c="dimmed">
+                    Selected from the app: {step.target}
+                  </Text>
+                )}
+                {!canPick && (
+                  <Text size="xs" c="dimmed">
+                    Picking is available when the phone is ready and has detected controls.
+                  </Text>
+                )}
+              </Stack>
             )}
             {(step.kind === 'ai' || step.kind === 'type' || step.kind === 'swipe') && (
               <Textarea

@@ -56,6 +56,11 @@ export function PhoneWorkspace({
   const [steps, setSteps] = useState(() => [newTaskStep()])
   const goal = taskGoal(steps)
   const tooLong = goal.length > 4000
+  const [pickingId, setPickingId] = useState<string | null>(null)
+  const pickingIndex = steps.findIndex(
+    (step) => step.id === pickingId && (step.kind === 'tap' || step.kind === 'type'),
+  )
+  const pickingStep = steps[pickingIndex]
   const [selection, setSelection] = useState<PhoneSelection | null>(null)
   const initiated = useRef(false)
   const mounted = useRef(true)
@@ -80,6 +85,7 @@ export function PhoneWorkspace({
     onSuccess: (s) => {
       saved(s)
       setSelection(null)
+      setPickingId(null)
     },
   })
   const stop = useMutation({ mutationFn: () => stopPhone(id), onSuccess: saved })
@@ -106,7 +112,12 @@ export function PhoneWorkspace({
       ? frame?.controls.find((c) => c.id === selection?.control_id)
       : undefined
   return (
-    <Stack gap="lg">
+    <Stack
+      gap="lg"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') setPickingId(null)
+      }}
+    >
       {!children && (
         <Group justify="space-between">
           <div>
@@ -162,8 +173,16 @@ export function PhoneWorkspace({
           <TaskSteps
             steps={steps}
             disabled={submit.isPending}
+            canPick={!!ready && !!frame?.controls.length}
+            pickingId={pickingStep?.id ?? null}
+            onPick={(stepId) => {
+              setPickingId(pickingId === stepId ? null : stepId)
+              setSelection(null)
+              submit.reset()
+            }}
             onChange={(next) => {
               setSteps(next)
+              setPickingId(null)
               submit.reset()
             }}
           />
@@ -189,7 +208,7 @@ export function PhoneWorkspace({
           <Group>
             <Button
               size="md"
-              disabled={!ready || !goal || tooLong || (!!selection && !selected)}
+              disabled={!ready || !goal || tooLong || !!pickingStep || (!!selection && !selected)}
               loading={submit.isPending}
               onClick={() =>
                 submit.mutate(
@@ -289,6 +308,12 @@ export function PhoneWorkspace({
                   Open phone preview
                 </Button>
               )}
+            {pickingStep && ready && (
+              <Alert title={`Choose a target for Step ${pickingIndex + 1}`}>
+                Click the input or button in the phone. This only selects the target; it does not
+                tap the app.
+              </Alert>
+            )}
             <Card withBorder radius="xl" p="sm" className={classes.phone}>
               {frame ? (
                 <div
@@ -312,7 +337,19 @@ export function PhoneWorkspace({
                         aria-label={`Select ${c.label}`}
                         aria-pressed={selected?.id === c.id}
                         onClick={() => {
-                          setSelection({ frame_id: frame.id, control_id: c.id })
+                          if (pickingStep) {
+                            setSteps((current) =>
+                              current.map((step) =>
+                                step.id === pickingStep.id
+                                  ? { ...step, target: c.label, pickedControl: c }
+                                  : step,
+                              ),
+                            )
+                            setPickingId(null)
+                            setSelection(null)
+                          } else {
+                            setSelection({ frame_id: frame.id, control_id: c.id })
+                          }
                           submit.reset()
                         }}
                         style={{
@@ -324,7 +361,11 @@ export function PhoneWorkspace({
                           cursor: 'crosshair',
                           background: selected?.id === c.id ? '#88bd6260' : 'transparent',
                           border:
-                            selected?.id === c.id ? '2px solid #245b46' : '1px solid transparent',
+                            selected?.id === c.id
+                              ? '2px solid #245b46'
+                              : pickingStep
+                                ? '1px dashed #245b46'
+                                : '1px solid transparent',
                         }}
                       />
                     ))}
@@ -347,7 +388,7 @@ export function PhoneWorkspace({
               {frame && (
                 <Text size="xs" c="dimmed" mt="sm">
                   {ready
-                    ? 'Select a starting control for Minitap. Describe later targets in your steps.'
+                    ? 'Use Pick on phone in a step, then select its target here.'
                     : 'Screen captures update while Minitap works.'}
                 </Text>
               )}

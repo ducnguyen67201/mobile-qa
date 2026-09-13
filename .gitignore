@@ -16,3 +16,6 @@
 /apps/mobile-worker/dist/
 
 **/*.tsbuildinfo
+
+# Temporary GAN design working files; clean up after applying the design.
+/gan-harness/

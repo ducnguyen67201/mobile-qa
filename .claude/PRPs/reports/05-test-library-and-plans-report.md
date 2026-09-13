@@ -82,7 +82,7 @@ web bundle retains Vite's size warning (942.05 kB JS / 279.63 kB gzip).
 Independent source evaluations: 7.43 → 7.85 → 8.00 / 10 (threshold 7.5).
 Required fixes covered stale-edit recovery, draft-only archive/restore, complete
 frozen semantics and unsaved work surviving background refresh/concurrent submission.
-See [final GAN feedback](../../../gan-harness/feedback/phase05-iteration-03.md).
+Temporary GAN feedback files were removed after the design changes were applied.
 Scores are provisional source assessments, not verified rendered appearance.
 
 ## Deviations and acceptance limits
@@ -111,7 +111,7 @@ Scores are provisional source assessments, not verified rendered appearance.
 - Routes: `apps/api/src/controllers/test_library.rs`, shared execution-plan query.
 - UI: `pages/Tests.tsx`, `TestLibraryDetail.tsx`, `components/test-library/`, `api/test-library.ts`, selected-plan RunPreview.
 - Tests: Rust contract and real route/upgrade suites, browser transport and twelve DOM workflows, worker compatibility test, `scripts/test_library_smoke.py`.
-- Documentation: architecture status/contracts/development/spec 05 and GAN source review history.
+- Documentation: architecture status/contracts/development/spec 05 and the design review summary above.
 
 Next acceptance work is the allowed rendered browser → backend → real emulator flow.
 The implementation is ready for source review and PR preparation.

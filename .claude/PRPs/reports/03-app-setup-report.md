@@ -123,7 +123,7 @@ hostile Android archive variant.
 
 - Executed plan: `../plans/completed/03-app-setup.plan.md`
 - Canonical status: `../../../docs/architect/status.md`
-- GAN reports: `../../../gan-harness/feedback/iteration-01.md`, `iteration-02.md`
+- Temporary GAN reports were removed after applying the design; the review outcomes remain summarized in this report.
 - Operator/tool setup: `../../../docs/architect/development.md`
 
 ## Files changed
@@ -231,12 +231,6 @@ hostile Android archive variant.
 | `apps/web/src/pages/SignIn.tsx`                                 | Created  |
 | `apps/web/src/test/fixtures.ts`                                 | Created  |
 | `apps/web/src/theme.ts`                                         | Created  |
-| `gan-harness/eval-rubric.md`                                    | Created  |
-| `gan-harness/feedback/iteration-01.md`                          | Created  |
-| `gan-harness/feedback/iteration-02.md`                          | Created  |
-| `gan-harness/feedback/mantine-review.md`                        | Created  |
-| `gan-harness/generator-state.md`                                | Created  |
-| `gan-harness/spec.md`                                           | Created  |
 | `scripts/apk_fixtures.py`                                       | Created  |
 | `scripts/app_setup_smoke.py`                                    | Created  |
 | `scripts/setup_android.py`                                      | Created  |

@@ -32,3 +32,8 @@ See docs/architect/environment.md. Do not change the user's Doppler auth/config 
 Comments must make scaffold/fake/generated boundaries and non-obvious rules clear.
 Follow docs/architect/commenting.md; explain purpose and constraints without narrating
 every line. Keep comments aligned with implementation and preserve generator markers.
+
+GAN design files are temporary working artifacts. After applying a GAN design run,
+remove its Markdown specs, rubrics, state and feedback files from `gan-harness/`
+before committing or updating a PR. Keep lasting decisions and acceptance limits
+in the owning architecture document or implementation report instead.

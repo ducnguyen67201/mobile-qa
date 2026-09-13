@@ -170,3 +170,13 @@ diff checks passed. New tests cover pointer/keyboard resizing, retained editor
 values, ordered step submission, removal, and combined-length rejection. Browser
 visual acceptance remains pending. The existing production bundle-size warning
 remains; no worker or backend behavior was changed by this update.
+
+## PR base correction
+
+PR #6 now targets `main`. PR #5 was merged into the still-open phase 02 branch,
+so this PR includes the pending Android runner and phase 04 execution backend as
+well as the phase 05 library and phase 06 task workspace. Main's Graphify workflow,
+index and navigation guidance were merged into this branch; documentation/config
+conflicts were reconciled while retaining the GAN cleanup rule and Android ignore
+patterns. No app source conflicts occurred. PR #2 remains open; this operation does
+not merge or close either PR.

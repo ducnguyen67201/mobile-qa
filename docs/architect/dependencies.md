@@ -1,5 +1,12 @@
 # Upstream baseline and adaptations
 
+Graphify navigation tooling: https://github.com/Graphify-Labs/graphify
+Official PyPI distribution `graphifyy==0.9.58` (CLI `graphify`), isolated under
+tools/graphify with frozen transitive dependencies. Published wheel source was inspected
+for code-only extraction, portable source paths, source-commit provenance and no-model
+clustering/report generation. No upstream assistant installer or hook is run.
+See [development](development.md) for CI publication and agent usage boundaries.
+
 Loco v1.1.0: https://github.com/loco-rs/loco/releases/tag/v1.1.0
 Commit ba726cc4d938d43309bf27bacfe27461f9c782fb. The initial scaffold materialized
 loco-new/base_template conventions directly because loco new unconditionally runs

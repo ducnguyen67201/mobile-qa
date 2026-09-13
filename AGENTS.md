@@ -37,3 +37,13 @@ GAN design files are temporary working artifacts. After applying a GAN design ru
 remove its Markdown specs, rubrics, state and feedback files from `gan-harness/`
 before committing or updating a PR. Keep lasting decisions and acceptance limits
 in the owning architecture document or implementation report instead.
+
+For codebase relationship questions, consult the generated Graphify index when present:
+`GRAPHIFY_QUERY_LOG_DISABLE=1 uv run --project tools/graphify --frozen graphify query "<question>"`.
+Use `graphify explain "<symbol>"` or `graphify path "<A>" "<B>"` through the same uv prefix
+for focused follow-up. Check `built_at_commit` in graphify-out/graph.json and inspect
+source changes since that commit; feature branches and local edits can make it stale.
+Verify graph findings in source. Fall back to normal search if the graph is missing,
+stale or insufficient. Do not load the entire graph into context or rebuild it during
+editing. docs/architect remains authoritative; this code-only index does not model
+requirements or prove complete runtime relationships. CI owns the generated files.

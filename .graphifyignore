@@ -1,0 +1,20 @@
+# Index application, contract and tooling code; keep docs authoritative outside the graph.
+*
+!apps/
+!apps/**
+!crates/
+!crates/**
+!scripts/
+!scripts/**
+
+# Generated consumers duplicate the Rust transport source and obscure ownership.
+apps/web/src/api/generated/
+apps/mobile-worker/src/mobile_qa_worker/generated/
+**/node_modules/
+**/dist/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.env
+**/.env.*

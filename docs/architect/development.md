@@ -43,6 +43,41 @@ compared against the whole PR base, including additions/deletions, rather than o
 last commit: a still-failing earlier change must not disappear from required coverage.
 Root docs-only changes skip app builds. The path map lives in .github/workflows/ci.yaml.
 
+### Codebase navigation graph
+
+[Graph refresh](../../.github/workflows/graphify.yaml) runs after pushes/merges to main
+and can be dispatched manually on main. It builds a fresh Graphify code-only index,
+then commits only graphify-out/graph.json and GRAPH_REPORT.md directly to main with
+the built-in GITHUB_TOKEN. No model key, Doppler injection, paid service, assistant
+installer or local hook is involved. The isolated tool's dependencies are frozen in
+tools/graphify/uv.lock; [the ignore policy](../../.graphifyignore) scopes extraction to
+apps, crates and scripts, excluding generated consumers. Docs retain their authority.
+These two navigation files are an explicit exception to the general artifact exclusion;
+caches, machine paths, HTML and private runtime artifacts remain untracked.
+
+Runs serialize and checkout current main. If main advances during generation, the
+stale result is discarded; a push racing the final check is rejected without force
+or rebase. The next queued source push regenerates the graph. Output-only changes are
+ignored, and GITHUB_TOKEN pushes do not trigger another Actions run. No-change runs
+make no commit. Failed generation leaves the previous published graph intact.
+
+The workflow requests contents:write for its job. Repository/organization policy must
+allow that permission and direct bot pushes to main. It does not bypass branch rules,
+enable PR auto-merge or use a PAT. If protected-main rules later require PRs, replace
+publication with an approved GitHub App PR/check/auto-merge flow. Check the Actions run
+for publication failures; fixing policy or transient races may require a manual rerun.
+
+Agents use the scoped query commands in [AGENTS.md](../../AGENTS.md), compare the graph's
+built_at_commit with subsequent source changes, and verify matches in the actual code.
+Graph connections can be inferred or incomplete, especially dynamic dispatch and
+cross-language HTTP boundaries. A graph does not itself guarantee better answers.
+After finishing an edit batch, local generation is explicit:
+`python3 scripts/refresh_graphify.py` (requires uv; installs only its isolated tool env).
+Local generation describes the working files but stamps HEAD, so only clean main CI
+output should be treated as a committed source snapshot.
+
+### CI path coverage
+
 | Changed surface                          | CI checks                                                |
 | ---------------------------------------- | -------------------------------------------------------- |
 | apps/api source/config/migration/tests   | API and migration format/Clippy/tests; API build         |

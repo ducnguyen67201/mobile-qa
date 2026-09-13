@@ -67,7 +67,13 @@ type PageHeadingProps = {
   action?: ReactNode
   identifier?: boolean
 }
-export function PageHeading({ eyebrow, title, description, action, identifier = false }: PageHeadingProps) {
+export function PageHeading({
+  eyebrow,
+  title,
+  description,
+  action,
+  identifier = false,
+}: PageHeadingProps) {
   return (
     <Group justify="space-between" align="flex-end" gap="lg" mb={36}>
       <Stack gap="sm" maw={680} miw={0}>
@@ -77,7 +83,11 @@ export function PageHeading({ eyebrow, title, description, action, identifier = 
         <Title order={1} fz={{ base: 30, sm: 38 }}>
           {title}
         </Title>
-        <Text size={identifier ? 'xs' : 'sm'} c="dimmed" className={identifier ? 'identifier' : undefined}>
+        <Text
+          size={identifier ? 'xs' : 'sm'}
+          c="dimmed"
+          className={identifier ? 'identifier' : undefined}
+        >
           {description}
         </Text>
       </Stack>

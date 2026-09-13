@@ -12,16 +12,16 @@ pnpm-workspace.yaml prevents discovery of unrelated ancestor workspaces. Normal 
 commands use --no-sync. Moved virtual environments can be refreshed explicitly with
 `uv sync --project apps/mobile-worker --frozen --extra sdk --reinstall`.
 
-| Command | Work |
-|---|---|
-| dev | Isolated PostgreSQL, Doppler-injected API startup, Vite; owned-child cleanup |
-| types | Pure Rust exporter, local Hey API SDK/Zod, worker Pydantic; content-only writes |
-| check-contracts | Temporary regeneration/drift + content-sync test |
-| check-web | Strict tsc including generator config, ESLint, Vitest |
-| check-api | Cargo fmt check, Clippy, workspace tests with isolated test DB |
-| check-worker | Ruff, strict Pyright, pytest |
-| build | Vite production bundle, Cargo workspace debug build |
-| smoke | Built API without dist, Vite proxy, DB bookkeeping, fixtures, import-only SDK |
+| Command         | Work                                                                            |
+| --------------- | ------------------------------------------------------------------------------- |
+| dev             | Isolated PostgreSQL, Doppler-injected API startup, Vite; owned-child cleanup    |
+| types           | Pure Rust exporter, local Hey API SDK/Zod, worker Pydantic; content-only writes |
+| check-contracts | Temporary regeneration/drift + content-sync test                                |
+| check-web       | Strict tsc including generator config, ESLint, Vitest                           |
+| check-api       | Cargo fmt check, Clippy, workspace tests with isolated test DB                  |
+| check-worker    | Ruff, strict Pyright, pytest                                                    |
+| build           | Vite production bundle, Cargo workspace debug build                             |
+| smoke           | Built API without dist, Vite proxy, DB bookkeeping, fixtures, import-only SDK   |
 
 API processes run with apps/api as cwd; workspace target/cache stay at repository
 root. Test binaries resolve apps/api/config from their Cargo package directory.
@@ -76,19 +76,21 @@ After finishing an edit batch, local generation is explicit:
 Local generation describes the working files but stamps HEAD, so only clean main CI
 output should be treated as a committed source snapshot.
 
-| Changed surface | CI checks |
-|---|---|
-| apps/api source/config/migration/tests | API and migration format/Clippy/tests; API build |
-| apps/web ordinary source/tests | Web typecheck/lint/tests/build |
-| apps/mobile-worker ordinary source/tests | Worker Ruff/Pyright/tests |
-| Rust browser DTOs or browser OpenAPI | API (Rust source), web consumer and contract checks |
-| Rust worker DTOs or worker schema | API (Rust source), worker consumer and contract checks |
-| Common Rust contract module/manifest | All contract consumers and contract checks |
-| Web generator/config/dependency inputs | Web and contract checks; no Python/API app suite |
-| Python generator/dependency inputs | Worker and contract checks; no web/API app suite |
-| Root Rust lock/toolchain/workspace | API and contract checks; no web/Python app suite |
-| Contract fixtures | Rust contract tests, API package checks and worker tests |
-| CI workflow | All jobs, to verify the pipeline itself |
+### CI path coverage
+
+| Changed surface                          | CI checks                                                |
+| ---------------------------------------- | -------------------------------------------------------- |
+| apps/api source/config/migration/tests   | API and migration format/Clippy/tests; API build         |
+| apps/web ordinary source/tests           | Web typecheck/lint/tests/build                           |
+| apps/mobile-worker ordinary source/tests | Worker Ruff/Pyright/tests                                |
+| Rust browser DTOs or browser OpenAPI     | API (Rust source), web consumer and contract checks      |
+| Rust worker DTOs or worker schema        | API (Rust source), worker consumer and contract checks   |
+| Common Rust contract module/manifest     | All contract consumers and contract checks               |
+| Web generator/config/dependency inputs   | Web and contract checks; no Python/API app suite         |
+| Python generator/dependency inputs       | Worker and contract checks; no web/API app suite         |
+| Root Rust lock/toolchain/workspace       | API and contract checks; no web/Python app suite         |
+| Contract fixtures                        | Rust contract tests, API package checks and worker tests |
+| CI workflow                              | All jobs, to verify the pipeline itself                  |
 
 Generated-output edits always trigger drift checks. The contracts job has its own
 Rust checks and tests, plus Node/Python generation, without starting PostgreSQL. An
@@ -113,6 +115,16 @@ verification previously denied access: do not use alternate browser/Playwright/H
 workarounds to evade it. Rendered keyboard/Retry/HMR acceptance remains explicitly
 unverified until approved browser access is available. Endpoint smoke is a separate
 existing automated check, not a claim of rendered browser acceptance.
+
+## Explicit qualification commands
+
+`just device-doctor profile`, `just device-smoke request`, and `just device-qualify config`
+are opt-in operator commands, never dependencies of setup/check/build/smoke. The Android
+fixture has its own pinned Gradle wrapper under apps/qa-demo-android. Worker checks install
+the optional SDK for strict type resolution but never run a model/device. Demo-only CI
+builds/lints APKs, no emulator. Device-host infrastructure selects worker checks; PostgreSQL
+infrastructure selects API checks. CI filter tests run only for changed workflow/filter tests.
+See [device qualification](device-qualification.md) for host prerequisites and result semantics.
 
 ## App setup development and operator commands
 
@@ -145,7 +157,7 @@ the specified Google email; no password is created. The task prints only new use
 - `reference app:<id> kind:account|reset label:<label>`: records an injected
   `MOBILE_QA_SECRET_LOCATOR` beginning `doppler://`, prints only reference ID.
 - `observe app:<id> revision:<n> kind:backend|account|reset
-  state:operator_reported_ok|operator_reported_blocked [note:<safe-note>]`: records
+state:operator_reported_ok|operator_reported_blocked [note:<safe-note>]`: records
   an operator observation at the current environment revision. Never include
   credentials in notes. Editing the environment invalidates old observations.
 
@@ -217,3 +229,128 @@ workspace IDs display an error instead of silently selecting a different workspa
 App lists and creation use the selected organization. Nested app resources derive
 and verify ownership through their app IDs; the browser rejects an app link whose
 organization differs from the selected workspace before loading builds/uploads.
+
+### Combined app setup and phone runner
+
+This branch retains main's Mantine dashboard, sign-in, workspace and APK intake flows.
+Use `just dev` for that application and `just device-local-agent MODEL` for the
+standalone demo runner. Phase 04 Tests/Runs now dispatch approved API jobs to a registered execution worker. An accepted uploaded
+build is not an automatically executable test and device readiness remains separate.
+
+`just setup-android` supplies intake Build Tools 36.0.0; `just device-local-setup`
+supplies execution Build Tools 35.0.0, platform-tools and the emulator. They coexist
+in versioned directories under `.private/android-sdk` and share android-35 revision 2.
+Keep both explicit commands; neither belongs in ordinary dev/check startup.
+
+## Execution development
+
+After the complete implementation edit batch, run `just types`, the affected `just
+check-*` recipes and `just build`; `just smoke-execution` then exercises real local
+HTTP, a simulated Python worker, pass/fail/blocked evidence and API restart persistence.
+Prepare signed synthetic fixtures with `just apk-fixtures` first. The additional
+`execution.apk` fixture has the demo package identity but is an intake-only fixture;
+it is never claimed as a runnable Android application.
+
+Operator commands use the existing Loco task entry from apps/api:
+`cargo loco task execution action:import actor:<uuid> app:<uuid> file:<absolute-json>`.
+The JSON contains the case/suite/plan tagged definition only. Use `grant-reviewer`
+with `user` and `purpose:business|executability`; then `approve` with `definition`,
+`hash` and `purpose`. `register-profile` reads a nonsecret profile JSON; `register-worker`
+takes `worker`/`profile` UUIDs and an injected token. `action:reconcile` marks expired
+leases for recovery; `action:recover` requires actor/app/attempt and a physical-reset
+evidence reference. Recovery is an operator assertion after stopping the old process
+and verifying reset, never a substitute for that procedure.
+
+`execution-worker --origin <api-origin> --profile-id <uuid> --state <private-path>`
+long-polls the protocol for up to 30 seconds. `--once` exits after one claim, including an idle timeout. A real profile additionally needs
+`--profile <absolute-host-profile>` matching the manifest image/model. `--scenario`
+is an explicit synthetic/demo fixture control, not customer run input. Do not use
+`dev-execution-fake` with a registered real profile: the profile controls the driver.
+A dirty execution journal requires operator recovery; restarting never replays actions.
+
+## Source formatting
+
+`just format` explicitly formats Rust with rustfmt, all supported handwritten
+JS/TS/CSS/HTML/JSON/YAML/Markdown with pinned Prettier, and Python throughout the
+repository with Ruff. `just format-check` checks the same scope in CI. The formatter
+selects Git-visible files, including new files, and skips generated contracts, locks
+and private/build/dependency directories. Other extensions retain their native format. No format-on-save hook or watcher is
+installed. For frontend-only work, use `pnpm --dir apps/web format`;
+`pnpm --dir apps/web format:check` is included in `just check-web` and frontend CI.
+Prettier uses 100-column lines, single quotes and no semicolons. Generated browser
+contracts, dependency locks and build outputs are excluded so their generators stay
+authoritative. Rust SQL literals use escaped line breaks where needed to keep query
+calls readable while preserving the exact SQL bytes.
+
+## Test backend dispatch to an emulator
+
+First run `just smoke-execution` for the existing secret-free HTTP/Python fake
+acceptance. It verifies persisted runs and evidence without starting a phone.
+The real path requires an explicitly started worker on the emulator host; the API
+does not provision that host or start a worker daemon for you.
+
+1. Prepare the Android toolchain and build the actual demo with
+   `just device-local-build`. Upload the good demo APK from
+   `apps/qa-demo-android/app/build/outputs/apk/good/debug/` through normal app setup,
+   using package `ai.mobileqa.demo`. Do not upload `.private/test-apks/execution.apk`
+   for this test: it is only an intake fixture, not a runnable application.
+2. Select an existing qualified host TOML profile, with `headless = false` if you
+   want to see the emulator. Its model, system image, SDK paths and Doppler SDK
+   configuration must be valid. `just device-doctor /absolute/path/profile.toml`
+   checks the host. Register the matching backend execution profile with
+   `driver: minitap`, `adapter: demo_persistence_v1`, `package: ai.mobileqa.demo`,
+   the exact same model/image and at most 104857600 APK bytes. Qualification must
+   reference real evidence; do not label an unqualified host qualified just to run.
+3. Use the execution maintenance commands above to import/review
+   `contracts/fixtures/execution/persistence-case.json`, import/review a plan
+   selecting that case and real profile, and register a worker for that app/profile.
+   Inject the same `MOBILE_QA_WORKER_TOKEN` into registration and worker processes
+   through Doppler. Backend origins belong to the demo fixture; customer account
+   and reset references remain unsupported by this adapter.
+4. With the API running, start the worker in another terminal on that host:
+
+   ```bash
+   # Run in a Doppler-injected shell/process with MOBILE_QA_WORKER_TOKEN available.
+   just dev-execution-real http://127.0.0.1:5150 PROFILE_UUID \
+     /absolute/private/execution-state /absolute/path/profile.toml
+   ```
+
+5. Submit the approved plan/build using the dashboard Run button, or the normal
+   authenticated `POST /api/apps/{app_id}/runs` endpoint with an Idempotency-Key
+   and body `{"build_id":"BUILD_UUID","plan_version_id":"PLAN_UUID",
+"environment_revision":1}`. Browser session, CSRF and app membership checks
+   still apply. Start the worker **before** submitting to observe the wakeup.
+6. The waiting claim returns, the emulator boots, the APK installs, and Minitap
+   creates the unique task. The worker restarts the app, captures checkpoints,
+   verifies reset and uploads evidence. Read `GET /api/runs/{run_id}` or the report
+   page: expect `driver: minitap`, a passed persistence check and
+   `cleanup: verified_clean`. A simulated report does not validate this path.
+
+The claim endpoint waits up to 30 seconds; the Python HTTP timeout is 35 seconds.
+An idle response sets `poll_after_seconds: 0`, so the worker immediately opens its
+next waiting request. Ordinary HTTP calls retain five-second timeouts. Same-process
+run commits and clean resource release wake claims immediately; a five-second
+database recheck covers other API processes and maintenance commands. This initial
+wakeup is process-local, not PostgreSQL LISTEN/NOTIFY. No transaction is held while
+waiting. Worker revocation is rechecked on each wake/recheck. Reverse proxies must
+permit requests lasting longer than 30 seconds. Heartbeats and cleanup fencing are
+unchanged. Real-device/model execution is not part of ordinary checks.
+
+## Authoring workflow acceptance
+
+After the complete phase 05 source/test/config batch, run `just types`, `just format`,
+`just format-check`, the contracts/API/web/worker checks, CI scope checks, `just build`
+and `just smoke-test-library`. The last command reuses the synthetic sign-in/APK
+and worker fixtures on the owned test API port. It performs customer mutations
+through HTTP, checks exact retries and restarts, and never consumes Doppler secrets
+or starts an emulator. Preserve existing local development processes.
+
+For an allowed browser acceptance: Tests → app → new case or controlled demo template
+→ Save → Request review → both explicitly granted reviews → suite/release plan →
+review → Set as default → choose a build → Run → report. An operator must already
+register a compatible qualified profile and grant the reviewer purposes. Customer
+apps without a qualified adapter can be authored and receive business review;
+automatic execution remains blocked with a visible readiness explanation.
+
+The existing browser admin-policy restriction is binding. Source design review,
+DOM tests and HTTP acceptance must be reported separately from rendered/device proof.

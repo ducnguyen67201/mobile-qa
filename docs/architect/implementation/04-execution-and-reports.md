@@ -1,6 +1,13 @@
 # 04 — Run one test and produce an evidence report
 
-Status: planned. Depends on: 02 and 03. Owns: Rust run/scheduler/report modules and migrations, worker protocol/adapter, Runs UI.
+Status: locally implemented; simulated HTTP and one real API-to-emulator good-path run verified. Browser, live fault/reliability and hosted acceptance remain pending. Depends on: 02 and 03. Owns: Rust run/scheduler/report modules and migrations, worker protocol/adapter, Runs UI.
+
+## Implementation scope
+
+The local implementation covers versioned test definitions, device actions, independent
+evidence checks, HTTP leases and the Runs interface. Validation and remaining device and
+hosted-storage acceptance gates are tracked in [current status](../status.md).
+The customer test editor belongs to spec 05.
 
 ## Deliverable
 
@@ -52,3 +59,26 @@ Poll run status through TanStack Query initially, stopping when terminal and bac
 Use the fake worker for deterministic tests: duplicate submit/completion, worker disappearance, late completion, cancellation, artifact failure, backend outage, mixed retries and cross-project access. Use a real PostgreSQL integration test for competing claims and lease uniqueness.
 
 Repeat the three qualified device scenarios through the browser. Restart the Rust app during a run and recover persisted progress; interrupt the worker and prove it cannot cause double execution on the same account/device. Done means an actual useful report, not just a “job succeeded” badge.
+
+## Local implementation scope
+
+The phase 04 implementation uses one typed version store (`execution_definitions`)
+for cases, suites and plans, with distinct Rust variants and separate review grants
+and immutable approvals. Attempts serve as durable queue records; the manifest pins
+resolved case selections. This reduces parallel table/entity scaffolding while keeping
+case/suite/plan meaning and version identity separate. All SQL goes through SeaORM
+with bound parameters; the migration owns constraints.
+
+The first registered adapter is `demo_persistence_v1`. Real mode reuses the phase 02
+controlled device lifecycle and executes imported semantic actions through the shared
+pinned Minitap seam. Fake mode uses the same HTTP protocol and labels all reports as
+simulated. Arbitrary customer package/reset/login adapters and the phase 05 editor
+remain future work. SDK traces remain private; normalized checkpoint PNG/XML and
+semantic action events are the customer-visible evidence in this slice.
+
+Completion remains subject to the recorded validation report and open real-device /
+hosted acceptance gates. No paid resources are launched by normal checks or smoke.
+
+Worker claims now use bounded 30-second HTTP long polling with immediate local
+commit notifications and a five-second database fallback across API processes.
+See the backend-to-emulator runbook in development.md.

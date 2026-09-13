@@ -1,0 +1,8 @@
+<resources>
+    <item name="ready_marker" type="id" />
+    <item name="prerequisite_unavailable" type="id" />
+    <item name="task_input" type="id" />
+    <item name="save_task" type="id" />
+    <item name="task_list" type="id" />
+    <item name="task_row" type="id" />
+</resources>

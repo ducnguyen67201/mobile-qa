@@ -18,9 +18,9 @@ server:
       must_exist: true
       precompressed: false
       folder:
-        uri: "/"
-        path: "../web/dist"
-      fallback: "../web/dist/index.html"
+        uri: '/'
+        path: '../web/dist'
+      fallback: '../web/dist/index.html'
 database:
   uri: postgres://mobile_qa:mobile_qa_local@127.0.0.1:55432/mobile_qa_development
   enable_logging: false

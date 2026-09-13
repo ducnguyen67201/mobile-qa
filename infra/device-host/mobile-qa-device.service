@@ -1,0 +1,22 @@
+# Install only on the designated device host after replacing paths/config.
+[Unit]
+Description=Mobile QA controlled qualification campaign
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=mobile-qa
+SupplementaryGroups=kvm
+WorkingDirectory=/opt/mobile-qa/repo
+ExecStart=/opt/mobile-qa/repo/apps/mobile-worker/.venv/bin/mobile-qa-worker device-qualify --config /var/lib/mobile-qa/campaign.toml
+KillMode=control-group
+Restart=no
+RuntimeMaxSec=4h
+TimeoutStopSec=300
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+LimitFSIZE=268435456
+# Doppler uses the service user's configured scoped auth, never an EnvironmentFile.
+# No Install section: this operator experiment must not start automatically at boot.

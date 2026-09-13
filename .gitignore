@@ -9,6 +9,17 @@
 .env.*
 /.private/
 .DS_Store
+
+/apps/qa-demo-android/.gradle/
+/apps/qa-demo-android/**/build/
+/apps/qa-demo-android/local.properties
+/apps/mobile-worker/dist/
+
+**/*.tsbuildinfo
+
+# Temporary GAN design working files; clean up after applying the design.
+/gan-harness/
+
 /tools/graphify/.venv/
 # Only the portable navigation index and report are versioned.
 /graphify-out/*

@@ -2,8 +2,9 @@
 
 Status: implemented foundation. Component ownership lives in [system architecture](system.md).
 The source of wire definitions is [crates/contracts](../../crates/contracts); generated
-outputs are derived artifacts, never an independent specification. Product/job protocols
-beyond health and local fixtures remain planned in [spec 04](implementation/04-execution-and-reports.md).
+outputs are derived artifacts, never an independent specification. Browser app-setup
+contracts and local worker qualification contracts are implemented. Production worker
+job protocols remain planned in [spec 04](implementation/04-execution-and-reports.md).
 
 ## Browser boundary
 
@@ -103,3 +104,41 @@ The browser's `workspace` URL parameter maps to the list API's `organization_id`
 List queries validate membership, and cursors from another organization are rejected.
 Nested resources continue to use their persisted app/organization ownership for
 server authorization; URL selection never grants access.
+
+## Phase 04 execution boundary
+
+`crates/contracts/src/execution.rs` owns semantic definitions, manifests, results and
+worker envelope leaves. `execution_api.rs` merges browser operations into the same
+OpenAPI export; `worker/execution.rs` exposes protocol/local child messages through
+WorkerContracts. Qualification and foundation fake messages remain distinct.
+
+Definitions are imported as a tagged case/suite/plan JSON object. Approval is separate
+and binds an exact content hash and reviewer purpose. `contracts/fixtures/execution/`
+contains a synthetic persistence case, not customer test data. Worker requests use
+bearer identity plus an attempt-scoped token/generation; Python never receives DB
+credentials. See the phase 04 plan for the route inventory and fencing semantics.
+
+## Phase 05 authoring boundary
+
+`test_library.rs` owns the draft union, catalog/version/review responses, bounded
+revision/mutation requests, typed issues and feature error details. Its OpenAPI
+operations live in `test_library_api.rs` and merge into the local browser export.
+The API returns feature details inside the existing `ApiError.details` field;
+the browser accepts those details only after generated `zLibraryErrorDetails`
+validation. Existing generic and malformed-error behavior stays safe.
+
+`LibraryDraftDefinition::Plan` permits `profile_id: null` until submission. Conversion
+to the existing `TestDefinition` is explicit and server-side. Browser cases receive
+`user_authored` provenance; legacy `operator_authored` content and hashes are not
+rewritten. Python consumes the same published manifest through generated Pydantic.
+`ExecutionPlanQuery` supports a selected `plan_version_id`; omission uses the stored
+app default without automatically choosing a later approval.
+
+## Direct actions and AI authoring
+
+`automation.rs` owns strict tagged commands/targets, structured sequences, receipts, templates
+and bounded generation payloads. `TestAction.command` is additive and omitted for legacy JSON
+so historical hashes remain unchanged; boundary semantic validation enforces kind/command
+agreement. OpenAPI includes actual authoring routes; worker schemas include isolated model
+requests/responses. Phone protocol 2 and execution claim version 2 advertise direct support.
+Generated consumers remain the only browser/worker transport shapes.

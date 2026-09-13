@@ -28,7 +28,14 @@ check-contracts:
     python3 scripts/contracts.py --check
     python3 -m unittest scripts.test_contracts
 
+format:
+    python3 scripts/format.py
+
+format-check:
+    python3 scripts/format.py --check
+
 check-web:
+    pnpm --dir apps/web format:check
     pnpm --dir apps/web typecheck
     pnpm --dir apps/web lint
     pnpm --dir apps/web test
@@ -50,6 +57,32 @@ build:
 smoke:
     python3 scripts/runtime.py smoke
 
+# Explicit device work only; never dependencies of setup/check/build/smoke.
+device-doctor profile:
+    uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker device-doctor --profile {{quote(profile)}}
+
+device-smoke request:
+    uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker device-run --request {{quote(request)}}
+
+device-qualify config:
+    uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker device-qualify --config {{quote(config)}}
+
+# Explicit real-device development. Ordinary dev/check/smoke never boots a phone.
+device-local-setup:
+    uv sync --project apps/mobile-worker --frozen --extra sdk --extra device --extra ai
+    python3 scripts/local_device.py setup
+
+device-local-build:
+    python3 scripts/local_device.py build
+
+# Real emulator + deterministic demo taps, no model credentials or API calls.
+device-local scenario="good":
+    python3 scripts/local_device.py run --scenario {{quote(scenario)}}
+
+# Explicit Minitap run; model credentials come from the profile's Doppler config.
+device-local-agent model scenario="good":
+    python3 scripts/local_device.py run --scenario {{quote(scenario)}} --model {{quote(model)}}
+
 setup-android:
     python3 scripts/setup_android.py
 
@@ -59,6 +92,21 @@ apk-fixtures:
 smoke-app-setup:
     python3 scripts/app_setup_smoke.py
 
-device-smoke:
-    @echo "Spec 02 device qualification is not implemented. No device or cloud action was taken."
-    @exit 2
+# Explicit HTTP worker commands. Simulated profiles never import the device SDK.
+dev-execution-fake origin profile_id state:
+    uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker execution-worker --origin {{quote(origin)}} --profile-id {{quote(profile_id)}} --state {{quote(state)}}
+
+smoke-execution:
+    python3 scripts/execution_smoke.py
+
+# Real emulator/Minitap execution is explicit; inject MOBILE_QA_WORKER_TOKEN first.
+dev-execution-real origin profile_id state profile:
+    uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker execution-worker --origin {{quote(origin)}} --profile-id {{quote(profile_id)}} --state {{quote(state)}} --profile {{quote(profile)}}
+
+# Full author/review/default/run HTTP flow; fake Python evidence, no phone or secrets.
+smoke-test-library:
+    python3 scripts/test_library_smoke.py
+
+# Typed direct definitions through the real API; simulated evidence, no model calls.
+smoke-direct-authoring:
+    python3 scripts/direct_authoring_smoke.py

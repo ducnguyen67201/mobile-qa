@@ -46,11 +46,39 @@ https://github.com/minitap-ai/mobile-use
 Inspected revision12a1dbd3774e96fbc6029ba4d2a7801aeb527764 is not asserted identical
 to the published wheel. Import seam is minitap.mobile_use.sdk.Agent; construction
 initializes telemetry, so setup never constructs it. Telemetry is disabled before
-explicit import. The SDK extra keeps fake development independent. The existing
+explicit import. The adapter uses function-local direct imports and upstream typed
+Agent, builder, model configuration and TaskRequest classes; no dynamic Any-typed
+module facade. The pinned wheel lacks a typing marker and has incomplete return
+annotations, so `apps/mobile-worker/typings` describes only the consumed SDK surface;
+a compatibility test checks it against the installed package. Task return values
+remain opaque `object` because our verifier owns the verdict. Callback metadata is
+narrowed before use, and SDK output still never decides the QA verdict. The SDK extra keeps fake development independent. The existing
 python-dotenv1.2.2 override and pytest9.0.3 update are preserved for audit compatibility.
 
 PostgreSQL17-alpine is digest-pinned in infra/compose.yaml. Rust1.95.0, Node24.14.1,
 pnpm11.16.0 and uv0.12.1 are retained. Lockfiles own exact resolutions; [status](status.md) owns validation evidence; no global editor/tool configuration is modified.
+
+## Phase 02 qualification dependencies
+
+Minitap remains pinned to4.0.0. langchain-core1.6.3 is declared directly in the sdk extra
+for the completion-usage callback (same existing transitive resolution). No second agent
+framework is added. The tiny Java/Views demo adds an isolated AGP8.13.0/Gradle8.13/JDK17
+build, compile/target35 and Build Tools35.0.0. Gradle wrapper files come from the upstream
+v8.13.0 tag; retain their license headers. Android archive metadata and vendor checksums
+are pinned in infra/device-host/toolchain.lock.json. Required vendor licenses still apply;
+no installer silently accepts SDK terms or modifies a user's existing SDK.
+
+The first live Minitap demo exposed private ToolNode API drift: Minitap 4.0.0
+omits both the config argument to state extraction and the tools list in ToolRuntime.
+`qualification/sdk_compat.py` supplies a typed ExecutorToolNode subclass only inside
+the isolated SDK process and selects it in Minitap's graph factory. It is guarded
+against the exact Minitap 4.0.0 / langgraph-prebuilt 1.1.0 pair; no installed package
+files are modified. The subclass preserves sequential execution and error handling.
+[Upstream fix #214](https://github.com/minitap-ai/mobile-use/pull/214) tracks state
+extraction; our adapter also supplies the tools and execution context fields.
+A real offline graph tool call verifies the compatibility path before device use.
+Remove the adapter after a fixed SDK release passes that test and qualification.
+Downgrading was rejected because the resulting LangChain version had a known advisory.
 
 ## Spec 03 additions
 
@@ -109,3 +137,18 @@ only ephemeral synthetic signing material. No actual Google account/token is use
 by automated tests. References: [Google verification](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token),
 [Google setup](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid),
 [React wrapper](https://github.com/MomenSherif/react-oauth).
+
+## Execution evidence parser
+
+Phase 04 adds a direct `quick-xml = 0.41.0` API dependency using the version already
+present in Cargo.lock. The deterministic UI verifier bounds input, node count and
+depth and rejects document type declarations/custom entities. This is a parser for
+retained Android hierarchy evidence, not a general customer-supplied script engine.
+The worker retains pinned Minitap 4.0.0 and the existing compatibility guard.
+
+## Direct execution and authoring extras
+
+Worker extras explicitly pin `uiautomator2==3.5.0` (`device`), `langchain-openai==1.6.2`
+and `Pillow==12.3.0` (`ai`), matching existing transitive versions. Device operations lazily
+load uiautomator2; model SDKs are imported only in explicit AI paths. No Appium/Redis service
+is added. The `sdk` extra remains for explicit Minitap navigation.

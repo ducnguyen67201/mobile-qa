@@ -1,0 +1,27 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'ai.mobileqa.demo'
+    compileSdk 35
+    buildToolsVersion '35.0.0'
+    defaultConfig {
+        applicationId 'ai.mobileqa.demo'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
+        buildConfigField 'boolean', 'REQUIRE_SESSION', 'true'
+    }
+    buildFeatures { buildConfig true }
+    flavorDimensions += 'persistence'
+    productFlavors {
+        good { dimension 'persistence'; buildConfigField 'boolean', 'PERSIST', 'true' }
+        broken { dimension 'persistence'; buildConfigField 'boolean', 'PERSIST', 'false' }
+        sample {
+            dimension 'persistence'
+            versionNameSuffix '-sample'
+            buildConfigField 'boolean', 'PERSIST', 'true'
+            buildConfigField 'boolean', 'REQUIRE_SESSION', 'false'
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}

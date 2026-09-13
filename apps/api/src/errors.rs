@@ -11,6 +11,7 @@ pub struct ApiFailure {
     pub status: StatusCode,
     pub code: &'static str,
     pub message: String,
+    pub details: Option<serde_json::Value>,
 }
 pub type ApiResult<T> = Result<T, ApiFailure>;
 impl ApiFailure {
@@ -19,7 +20,15 @@ impl ApiFailure {
             status: StatusCode::from_u16(status).expect("static status"),
             code,
             message: message.into(),
+            details: None,
         }
+    }
+    pub fn with_library_details(
+        mut self,
+        details: mobile_qa_contracts::test_library::LibraryErrorDetails,
+    ) -> Self {
+        self.details = serde_json::to_value(details).ok();
+        self
     }
     pub fn missing() -> Self {
         Self::new(404, "not_found", "Record not found")
@@ -45,7 +54,7 @@ impl IntoResponse for ApiFailure {
             Json(ApiError {
                 code: self.code.into(),
                 message: self.message,
-                details: None,
+                details: self.details,
                 request_id: Uuid::new_v4(),
             }),
         )

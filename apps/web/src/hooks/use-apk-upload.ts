@@ -91,8 +91,13 @@ export function useApkUpload(appId: string, maxBytes: number) {
           setInputError(`Choose a nonempty APK up to ${formatBytes(maxBytes)}.`)
           return
         }
-        if (current && (file.name !== current.original_filename || file.size !== current.expected_size)) {
-          setInputError('Reselect the original file with the same name and size, or start a new upload.')
+        if (
+          current &&
+          (file.name !== current.original_filename || file.size !== current.expected_size)
+        ) {
+          setInputError(
+            'Reselect the original file with the same name and size, or start a new upload.',
+          )
           return
         }
         if (!current) {
@@ -138,5 +143,17 @@ export function useApkUpload(appId: string, maxBytes: number) {
     setInputError('')
   }
   const stop = () => abort.current?.abort()
-  return { uploadId, upload, phase, error, inputError, selectFile, run, inspect, clear, stop, updateUrl }
+  return {
+    uploadId,
+    upload,
+    phase,
+    error,
+    inputError,
+    selectFile,
+    run,
+    inspect,
+    clear,
+    stop,
+    updateUrl,
+  }
 }

@@ -6,18 +6,20 @@ Start here before planning or changing the application.
 
 ## Read by task
 
-| Question | Authoritative document |
-|---|---|
-| What exists and what remains unverified? | [Current status](status.md) |
-| Who is this for; what are the user stories, objects and result rules? | [Product requirements](product.md) |
-| What owns each responsibility; what stack do we use? | [System architecture](system.md) |
-| How do Rust, TypeScript and Python agree on data? | [Transport contracts](contracts.md) |
-| What comes first; what can run concurrently? | [Master implementation spec](implementation/00-master-spec.md) and its seven specs |
-| How do we develop, validate and scope CI? | [Development workflow](development.md) |
-| How do secrets and environment selection work? | [Doppler environment](environment.md) |
-| Why did we choose this approach? | [Decision record](decisions.md) |
-| How should humans and AI document code? | [Commenting conventions](commenting.md) |
-| Which upstream packages and adaptations are in use? | [Dependency provenance](dependencies.md) |
+| Question                                                              | Authoritative document                                                             |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| What exists and what remains unverified?                              | [Current status](status.md)                                                        |
+| Who is this for; what are the user stories, objects and result rules? | [Product requirements](product.md)                                                 |
+| What owns each responsibility; what stack do we use?                  | [System architecture](system.md)                                                   |
+| How do Rust, TypeScript and Python agree on data?                     | [Transport contracts](contracts.md)                                                |
+| What comes first; what can run concurrently?                          | [Master implementation spec](implementation/00-master-spec.md) and its seven specs |
+| How do we develop, validate and scope CI?                             | [Development workflow](development.md)                                             |
+| How do we qualify the Android runner?                                 | [Device qualification](device-qualification.md)                                    |
+| Where do we deploy first and how do we migrate later?                 | [Hosting](hosting.md)                                                              |
+| How do secrets and environment selection work?                        | [Doppler environment](environment.md)                                              |
+| Why did we choose this approach?                                      | [Decision record](decisions.md)                                                    |
+| How should humans and AI document code?                               | [Commenting conventions](commenting.md)                                            |
+| Which upstream packages and adaptations are in use?                   | [Dependency provenance](dependencies.md)                                           |
 
 ## Authority and maintenance
 
@@ -44,7 +46,8 @@ Start here before planning or changing the application.
 
 An operated Android regression-testing service: app setup → reviewed tests → run →
 evidence report, with small Settings. Rust/Loco/SeaORM owns the application; React/Vite
-owns the UI; Python/Minitap owns future device interaction. The source foundation exists.
-Local app setup (03) is implemented and verified; hosted storage and rendered acceptance
-remain open. Device feasibility (02) and real execution/reporting (04) remain planned. Manual browser acceptance from
-01 remains open. See the status page before treating any milestone as complete.
+owns the UI; Python/Minitap owns device interaction. Main's Mantine dashboard, Google
+sign-in, workspace onboarding and app/APK setup are preserved in this branch. The local
+Android runner and one live Minitap demo are verified independently. Execution/report source (04) and authoring/review (05) are locally implemented
+with simulated HTTP acceptance. Rendered UI-to-device acceptance, full device
+qualification and hosted acceptance remain open. See the status page before treating any milestone as complete.

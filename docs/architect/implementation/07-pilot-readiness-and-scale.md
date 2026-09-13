@@ -43,14 +43,14 @@ Calculate cost per delivered report from allocated host idle time + active execu
 
 ## Scale only at observed bottlenecks
 
-| Signal | Smallest next change |
-|---|---|
-| Queue wait misses the agreed turnaround while device is busy | Add another qualified worker/device and matching test-account capacity |
-| Slow cold boot dominates | Maintain a small warm pool with verified reset and an idle-cost cap |
-| Web latency rises independently of device load | Add an API replica; shared leases/sessions/storage must already work across replicas |
-| Generation consumes web process resources | Move existing Rust generation jobs into a separate process |
-| Job queries show measured contention | Tune indexes/claim batching; consider dedicated queue infrastructure only with evidence |
-| First customer requires another platform/ABI | Qualify that device provider and adapter before selling coverage |
+| Signal                                                       | Smallest next change                                                                    |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| Queue wait misses the agreed turnaround while device is busy | Add another qualified worker/device and matching test-account capacity                  |
+| Slow cold boot dominates                                     | Maintain a small warm pool with verified reset and an idle-cost cap                     |
+| Web latency rises independently of device load               | Add an API replica; shared leases/sessions/storage must already work across replicas    |
+| Generation consumes web process resources                    | Move existing Rust generation jobs into a separate process                              |
+| Job queries show measured contention                         | Tune indexes/claim batching; consider dedicated queue infrastructure only with evidence |
+| First customer requires another platform/ABI                 | Qualify that device provider and adapter before selling coverage                        |
 
 No per-customer database or service is needed by default. Preserve tenant scope and isolated device/account resources; do not add concurrency before reset and backend test-data isolation are reliable.
 

@@ -2950,6 +2950,7 @@ dependencies = [
  "loco-rs",
  "migration",
  "mobile-qa-contracts",
+ "quick-xml",
  "rand 0.8.8",
  "reqwest",
  "rsa",

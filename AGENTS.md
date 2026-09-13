@@ -1,4 +1,5 @@
 # Mobile QA foundation
+
 Read [docs/architect/README.md](docs/architect/README.md) before planning or implementation.
 It is the canonical documentation authority. Update the owning document in the same PR
 as a material change; use status.md to distinguish implemented behavior from planned work.
@@ -15,7 +16,10 @@ pipeline; Schemars → Pydantic is the worker pipeline. `just types` writes gene
 outputs only when contents change. Never handwrite equivalent consumer shapes.
 Keep actual API method/path/input/output/error agreement covered by real route tests.
 Use generated Zod at success/error boundaries; do not trust SDK static types alone.
-Preserve Loco scaffold markers. Spec 03 adds authentication/app/build setup; no device/model execution or domain framework.
+Preserve Loco scaffold markers. Spec 03 owns authentication/app/build setup; spec 02
+owns explicit operator device qualification. Spec 04 owns HTTP worker leases and
+reports; spec 05 owns editable drafts and reviewed test library versions.
+No device/model calls in ordinary checks; no additional domain framework.
 No global configuration changes. Keep secrets/artifacts out of Git. Do not touch
 parent sources/. Coordinate shared files before parallel edits. Respect the existing
 browser admin-policy denial; no alternate-access workaround for manual UI inspection.
@@ -28,6 +32,11 @@ See docs/architect/environment.md. Do not change the user's Doppler auth/config 
 Comments must make scaffold/fake/generated boundaries and non-obvious rules clear.
 Follow docs/architect/commenting.md; explain purpose and constraints without narrating
 every line. Keep comments aligned with implementation and preserve generator markers.
+
+GAN design files are temporary working artifacts. After applying a GAN design run,
+remove its Markdown specs, rubrics, state and feedback files from `gan-harness/`
+before committing or updating a PR. Keep lasting decisions and acceptance limits
+in the owning architecture document or implementation report instead.
 
 For codebase relationship questions, consult the generated Graphify index when present:
 `GRAPHIFY_QUERY_LOG_DISABLE=1 uv run --project tools/graphify --frozen graphify query "<question>"`.

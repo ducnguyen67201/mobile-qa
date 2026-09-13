@@ -1,0 +1,12 @@
+**/node_modules/**
+**/dist/**
+**/coverage/**
+.private/**
+target/**
+apps/web/src/api/generated/**
+contracts/browser.openapi.json
+contracts/worker.schema.json
+**/pnpm-lock.yaml
+**/uv.lock
+**/*.tsbuildinfo
+graphify-out/**

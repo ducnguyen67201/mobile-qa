@@ -1,15 +1,16 @@
 # Mobile QA
 
-Local Loco API, React dashboard and deterministic Python fixture executor. Only
-App's health check is implemented; auth, app uploads and devices belong to later specs.
+Rust/Loco API, authenticated Mantine dashboard, app/APK setup and an explicit Android
+test runner. Main's Google sign-in, workspaces, app setup and uploads are preserved;
+Tests/Runs and UI-to-worker job dispatch remain planned.
 
 ```text
 apps/api/             Loco source, configuration, migrations and tests
 apps/web/             React/Vite app and generated browser SDK/Zod validators
-apps/mobile-worker/   Python/uv fake executor and generated Pydantic models
+apps/mobile-worker/   Python/uv fixture and device runners, generated Pydantic models
 crates/contracts/     Pure Rust transport definitions and lightweight schema exporter
 contracts/            Generated browser OpenAPI, worker JSON Schema and fixtures
-infra/                Isolated local PostgreSQL
+infra/                Local PostgreSQL and pinned device-host setup
 scripts/              Explicit setup, generation, development and verification
 Cargo.toml            Virtual workspace (API, migration, contracts)
 ```
@@ -67,11 +68,43 @@ Vite HMR never invokes typechecking/lint/tests/generation or a Rust rebuild watc
 Full setup includes the optional Minitap SDK. For fake-only Python work:
 `uv sync --project apps/mobile-worker --frozen`. Dependency reconciliation belongs to
 setup; ordinary uv commands use --no-sync. Fixture CLI outcomes passed/failed/blocked
-return JSON with exit0; invalid input exits2. `just device-smoke` explains spec02 is
-unimplemented and exits2 without any device/cloud work.
+return JSON with exit0; invalid input exits2. `just device-smoke REQUEST` explicitly runs
+one controlled Android/Minitap attempt; it is never part of ordinary smoke checks.
+
+## Test a real phone locally
+
+Use native macOS (Apple Silicon or Intel) or Linux x86_64 with KVM, JDK 17 and the
+Python/uv prerequisites above. No cloud account, database or API server is needed.
+
+```sh
+just device-local-setup
+# Review/accept Android SDK licenses using the command printed by setup.
+just device-local-build
+just device-local
+just device-local broken
+just device-local unavailable
+```
+
+The default local mode uses **real Android + ADB demo taps**, without a model key. It
+checks saving/reopening the demo, screenshots and a fresh-device reset. A detected
+broken build is expected: command exit 0 means the expected outcome and reset matched.
+It does not establish AI-agent reliability or support arbitrary customer APKs.
+
+To exercise **Minitap on the same real phone**, configure `OPENAI_API_KEY` in the local
+profile's Doppler config and explicitly select your OpenAI model:
+
+```sh
+just device-local-agent YOUR_MODEL_ID
+```
+
+This makes billed model calls. `.private/device-local/profile.toml` contains nonsecret
+host settings; the default Mac phone is visible (`headless = true` hides it). Reports
+are under `.private/artifacts/local-device/`; `latest.json` points to the latest report.
+Close any emulator on ports 5554/5555 first. The runner refuses to borrow or kill it.
+See [local device setup and recovery](docs/architect/device-qualification.md#local-mac-or-linux-development).
 
 Start at **[docs/architect](docs/architect/README.md)**, the source of truth for product,
-architecture, implementation specs and operations. This local scaffold is unauthenticated;
+architecture, implementation specs and operations. The dashboard uses Google sign-in and workspace authorization;
 production configuration support is not a deployed or qualified customer service.
-Rendered browser/keyboard/HMR acceptance remains pending due the browser tool's admin
-policy verification denial. Automated UI tests do not substitute for that observation.
+Main's dashboard acceptance and this branch's device evidence are recorded separately
+in [current status](docs/architect/status.md); hosted execution remains unqualified.

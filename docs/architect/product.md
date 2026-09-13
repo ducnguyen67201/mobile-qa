@@ -28,52 +28,52 @@ The founder reports four pains: testing phones is difficult; regression testing 
 
 No named customer, measured current testing cost, signed pilot, or willingness-to-pay evidence has been supplied. Public competitor offerings establish that this category exists; they do not establish demand for this particular service.
 
-| Pain | Likely current workaround, to verify | Product response | Pilot measurement |
-|---|---|---|---|
-| Setup takes effort | Developer installs builds and maintains devices | Guided build intake and managed execution | Operator/customer setup minutes |
-| Regression work repeats | Someone taps through a checklist each release | Save approved cases and rerun them | Human minutes per release before/after |
-| Nobody knows what was covered | Ad hoc checks and messages | Plan manifest with explicit included and excluded checks | Missing critical journeys identified |
-| Failures are hard to reproduce | Screenshot or vague bug message | Evidence linked to build, case, device, and attempt | Time from report to reproduced bug |
-| Tests get stale | Fix scripts or skip checks | Propose versioned changes for review | Review effort and stale-case count |
-| Release uncertainty | Ship and watch for complaints | Scoped result summary and unresolved blockers | Release delays and escaped defects |
+| Pain                           | Likely current workaround, to verify            | Product response                                         | Pilot measurement                      |
+| ------------------------------ | ----------------------------------------------- | -------------------------------------------------------- | -------------------------------------- |
+| Setup takes effort             | Developer installs builds and maintains devices | Guided build intake and managed execution                | Operator/customer setup minutes        |
+| Regression work repeats        | Someone taps through a checklist each release   | Save approved cases and rerun them                       | Human minutes per release before/after |
+| Nobody knows what was covered  | Ad hoc checks and messages                      | Plan manifest with explicit included and excluded checks | Missing critical journeys identified   |
+| Failures are hard to reproduce | Screenshot or vague bug message                 | Evidence linked to build, case, device, and attempt      | Time from report to reproduced bug     |
+| Tests get stale                | Fix scripts or skip checks                      | Propose versioned changes for review                     | Review effort and stale-case count     |
+| Release uncertainty            | Ship and watch for complaints                   | Scoped result summary and unresolved blockers            | Release delays and escaped defects     |
 
 Premises for this draft: repeatable regression is the first product; test generation reduces authoring work but cannot establish business truth; human review is part of initial service delivery; no result guarantees that an app is bug-free or will receive App Store approval.
 
 ## 3. User stories and acceptance criteria
 
-| ID | User story | Acceptance criteria for MVP |
-|---|---|---|
-| US-01 | As a developer, I want to register my app and upload a build so testing can start without installing a framework. | Identify app/package and build checksum; reject unsupported/corrupt files; report install/preflight errors separately from test failures. |
-| US-02 | As a product owner, I want to explain what must work so tests reflect intended behavior. | Accept pasted stories and acceptance criteria; preserve source versions; highlight missing prerequisites and unclear expectations. |
-| US-03 | As a QA operator, I want AI to draft tests so I can review instead of starting from a blank page. | Each draft has a source, expected outcome, prerequisites, test data needs, and verification method; unsupported claims are marked as assumptions. |
-| US-04 | As a reviewer, I want to edit and approve cases so the AI cannot define correctness by itself. | Drafts cannot enter normal regression runs; approvals record actor/time/version; edits to approved content create a new draft version. |
-| US-05 | As a developer, I want suites for onboarding, login, and other features so tests are reusable. | Add/remove/reorder case references; allow one case in several suites; prevent duplicate execution of the same case variant in one plan. |
-| US-06 | As a release owner, I want a test plan so I know exactly what this release check includes. | Save coverage, environment policy, suites/cases, device configuration, required checks, budgets, and retry policy; bind a build when starting a run and preview resolved cases and gaps. |
-| US-07 | As a developer, I want visible run progress so I know whether to wait or intervene. | Show queued/running/finished states, current case, elapsed time, cancellation, and setup blockers; disconnecting the browser does not lose the job. |
-| US-08 | As a developer, I want an evidence-based failure report so I can reproduce and fix the issue. | Show expected/actual, failed check, exact attempt, screenshots/video where available, logs, build/device identifiers, and replayable instructions. |
-| US-09 | As a release owner, I want to rerun the suite on a new build so I can detect regressions. | Pin approved versions; preserve old results; distinguish comparable changes from new/changed tests and environment differences. |
-| US-10 | As a reviewer, I want to triage findings without erasing evidence. | Confirm bug, expected behavior, duplicate, or needs investigation; keep machine outcome and original artifacts immutable. |
-| US-11 | As a customer, I want my app and credentials accessible only to authorized people. | Project-scoped access controls cover metadata, builds, run controls, and artifacts; secrets are references, never embedded in cases or exported reports. |
-| US-12 | As an operator, I want bounded jobs so one broken app cannot consume unlimited time or money. | Enforce time/step/token budgets outside model prompts; preserve partial evidence; use an explicit inconclusive result when limits are reached. |
+| ID    | User story                                                                                                        | Acceptance criteria for MVP                                                                                                                                                              |
+| ----- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-01 | As a developer, I want to register my app and upload a build so testing can start without installing a framework. | Identify app/package and build checksum; reject unsupported/corrupt files; report install/preflight errors separately from test failures.                                                |
+| US-02 | As a product owner, I want to explain what must work so tests reflect intended behavior.                          | Accept pasted stories and acceptance criteria; preserve source versions; highlight missing prerequisites and unclear expectations.                                                       |
+| US-03 | As a QA operator, I want AI to draft tests so I can review instead of starting from a blank page.                 | Each draft has a source, expected outcome, prerequisites, test data needs, and verification method; unsupported claims are marked as assumptions.                                        |
+| US-04 | As a reviewer, I want to edit and approve cases so the AI cannot define correctness by itself.                    | Drafts cannot enter normal regression runs; approvals record actor/time/version; edits to approved content create a new draft version.                                                   |
+| US-05 | As a developer, I want suites for onboarding, login, and other features so tests are reusable.                    | Add/remove/reorder case references; allow one case in several suites; prevent duplicate execution of the same case variant in one plan.                                                  |
+| US-06 | As a release owner, I want a test plan so I know exactly what this release check includes.                        | Save coverage, environment policy, suites/cases, device configuration, required checks, budgets, and retry policy; bind a build when starting a run and preview resolved cases and gaps. |
+| US-07 | As a developer, I want visible run progress so I know whether to wait or intervene.                               | Show queued/running/finished states, current case, elapsed time, cancellation, and setup blockers; disconnecting the browser does not lose the job.                                      |
+| US-08 | As a developer, I want an evidence-based failure report so I can reproduce and fix the issue.                     | Show expected/actual, failed check, exact attempt, screenshots/video where available, logs, build/device identifiers, and replayable instructions.                                       |
+| US-09 | As a release owner, I want to rerun the suite on a new build so I can detect regressions.                         | Pin approved versions; preserve old results; distinguish comparable changes from new/changed tests and environment differences.                                                          |
+| US-10 | As a reviewer, I want to triage findings without erasing evidence.                                                | Confirm bug, expected behavior, duplicate, or needs investigation; keep machine outcome and original artifacts immutable.                                                                |
+| US-11 | As a customer, I want my app and credentials accessible only to authorized people.                                | Project-scoped access controls cover metadata, builds, run controls, and artifacts; secrets are references, never embedded in cases or exported reports.                                 |
+| US-12 | As an operator, I want bounded jobs so one broken app cannot consume unlimited time or money.                     | Enforce time/step/token budgets outside model prompts; preserve partial evidence; use an explicit inconclusive result when limits are reached.                                           |
 
 ## 4. Domain model: plan, suite, case, and run
 
 These are separate objects. A plan is not a folder containing copied suites, and a test definition is not its most recent execution result.
 
-| Object | Meaning | Example |
-|---|---|---|
-| Project | Customer app boundary for builds, sources, tests, and access | PocketTasks Android |
-| Requirement / user story | Intended user outcome with acceptance criteria | A returning user can sign in |
-| Test case | One independently verifiable scenario | Incorrect password does not sign the user in |
-| Test suite | Reusable collection of case references | Authentication regression |
+| Object                             | Meaning                                                                              | Example                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| Project                            | Customer app boundary for builds, sources, tests, and access                         | PocketTasks Android                             |
+| Requirement / user story           | Intended user outcome with acceptance criteria                                       | A returning user can sign in                    |
+| Test case                          | One independently verifiable scenario                                                | Incorrect password does not sign the user in    |
+| Test suite                         | Reusable collection of case references                                               | Authentication regression                       |
 | Test plan / release check template | A reusable, versioned choice of coverage and execution policy, without a fixed build | Standard release authentication and task checks |
-| Build | Immutable uploaded application binary and identity | APK SHA-256 + version 1.4.0 |
-| Environment | Backend endpoint, fixture/reset method, and capability profile | Staging with seeded test accounts |
-| Run | Execution of a frozen plan manifest against a build | RUN-1042 |
-| Case execution | One case-version/data-variant/device combination in a run | AUTH-002 v1 on emulator configuration A |
-| Attempt | One try at that case execution | Attempt 1, then permitted diagnostic retry |
-| Check result | Evidence for one expected outcome | Error visible; authenticated session absent |
-| Finding | Reviewable potential defect linked to evidence | Invalid-password login appears accepted |
+| Build                              | Immutable uploaded application binary and identity                                   | APK SHA-256 + version 1.4.0                     |
+| Environment                        | Backend endpoint, fixture/reset method, and capability profile                       | Staging with seeded test accounts               |
+| Run                                | Execution of a frozen plan manifest against a build                                  | RUN-1042                                        |
+| Case execution                     | One case-version/data-variant/device combination in a run                            | AUTH-002 v1 on emulator configuration A         |
+| Attempt                            | One try at that case execution                                                       | Attempt 1, then permitted diagnostic retry      |
+| Check result                       | Evidence for one expected outcome                                                    | Error visible; authenticated session absent     |
+| Finding                            | Reviewable potential defect linked to evidence                                       | Invalid-password login appears accepted         |
 
 Relationships:
 
@@ -131,13 +131,13 @@ Synthetic example only. No customer evidence is implied.
 
 **Acceptance criteria:** AC-1: valid credentials open that user's task list. AC-2: invalid credentials show the agreed error and do not create an authenticated session. AC-3: signing out removes access to protected tasks. Password reset, lockout thresholds, session duration, and offline behavior are unspecified; generation should ask about them or propose unapproved candidates.
 
-| Case | Scenario | Expected evidence | Suite |
-|---|---|---|---|
-| AUTH-001 | Valid sign-in | Known test user's task list appears | Authentication; Smoke |
-| AUTH-002 | Incorrect password | Agreed error; no authenticated session | Authentication |
-| AUTH-003 | Sign out then attempt protected access | Login required; protected content inaccessible | Authentication; Smoke |
-| TASK-001 | Create a task and relaunch | Named task persists after relaunch | Task management; Smoke |
-| TASK-002 | Complete an existing task | Completion persists in the expected list/state | Task management |
+| Case     | Scenario                               | Expected evidence                              | Suite                  |
+| -------- | -------------------------------------- | ---------------------------------------------- | ---------------------- |
+| AUTH-001 | Valid sign-in                          | Known test user's task list appears            | Authentication; Smoke  |
+| AUTH-002 | Incorrect password                     | Agreed error; no authenticated session         | Authentication         |
+| AUTH-003 | Sign out then attempt protected access | Login required; protected content inaccessible | Authentication; Smoke  |
+| TASK-001 | Create a task and relaunch             | Named task persists after relaunch             | Task management; Smoke |
+| TASK-002 | Complete an existing task              | Completion persists in the expected list/state | Task management        |
 
 TASK-001 and TASK-002 require their own approved task-management requirements; the login story does not authorize inventing them.
 
@@ -211,14 +211,14 @@ Persist approved cases/suites/plan versions and an explicit coverage map. On new
 6. Retry only where policy permits, after reset, retaining all attempts. A failure followed by a pass is mixed evidence requiring review, never silently green.
 7. Aggregate results in application code, generate a report from stored facts, and have our operator review it before pilot delivery.
 
-| Outcome | Definition |
-|---|---|
-| Passed | All required checks have sufficient positive evidence on a valid attempt |
-| Failed | At least one required check has evidence of behavior contrary to the approved expectation |
-| Blocked | A known prerequisite or supported capability is missing/unavailable |
+| Outcome      | Definition                                                                                               |
+| ------------ | -------------------------------------------------------------------------------------------------------- |
+| Passed       | All required checks have sufficient positive evidence on a valid attempt                                 |
+| Failed       | At least one required check has evidence of behavior contrary to the approved expectation                |
+| Blocked      | A known prerequisite or supported capability is missing/unavailable                                      |
 | Inconclusive | Execution/evidence is insufficient to establish correctness, including agent uncertainty and time limits |
-| Skipped | Deliberate non-execution with recorded reason; never counted as pass |
-| Canceled | User/operator canceled; preserve completed results and partial artifacts |
+| Skipped      | Deliberate non-execution with recorded reason; never counted as pass                                     |
+| Canceled     | User/operator canceled; preserve completed results and partial artifacts                                 |
 
 Check precedence within an attempt: an established functional contradiction remains Failed even if a later check is inconclusive. A worker/transport error without contradictory app evidence is Inconclusive or Blocked, not a fabricated app bug.
 
@@ -242,13 +242,13 @@ For a criterion requiring several checks, it is verified only if all required li
 
 User-directed simplification: three main areas, App, Tests, and Runs, plus a small Settings page. App setup is an onboarding flow within App. Generation, editing, and suite grouping live within Tests. Plans are saved execution presets exposed in the pre-run confirmation, not a separate navigation area. Overview content lives on the app page. Avoid making the customer configure agent roles or model prompts to get value.
 
-| Screen | Primary content | Main action | Necessary states |
-|---|---|---|---|
-| App / initial setup | App identity, build upload, test account, journeys, readiness, latest result | Set up app / upload next build | Empty, uploading, invalid build, missing account, ready |
-| Tests | Generate from journeys, review source/expectations, edit cases, group into suites | Generate / review / select tests to run | Generating, partial draft, clarification needed, approved, deprecated |
-| Run confirmation, within Tests or Runs | Build, selected tests, saved plan defaults, device, budget, exclusions | Confirm scope and run | Unsupported configuration, unresolved required case, ready |
-| Runs / report detail | History, progress, case outcomes, attempts, expected versus actual, evidence | Inspect failure / rerun on fixed build | Queued, running, partial, mixed retries, complete, canceled |
-| Settings | Reusable environment/account/reset configuration, qualified device default, run limits, team access, retention | Update configuration | Valid, missing/expired credential, unsupported device, pending validation |
+| Screen                                 | Primary content                                                                                                | Main action                             | Necessary states                                                          |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------- |
+| App / initial setup                    | App identity, build upload, test account, journeys, readiness, latest result                                   | Set up app / upload next build          | Empty, uploading, invalid build, missing account, ready                   |
+| Tests                                  | Generate from journeys, review source/expectations, edit cases, group into suites                              | Generate / review / select tests to run | Generating, partial draft, clarification needed, approved, deprecated     |
+| Run confirmation, within Tests or Runs | Build, selected tests, saved plan defaults, device, budget, exclusions                                         | Confirm scope and run                   | Unsupported configuration, unresolved required case, ready                |
+| Runs / report detail                   | History, progress, case outcomes, attempts, expected versus actual, evidence                                   | Inspect failure / rerun on fixed build  | Queued, running, partial, mixed retries, complete, canceled               |
+| Settings                               | Reusable environment/account/reset configuration, qualified device default, run limits, team access, retention | Update configuration                    | Valid, missing/expired credential, unsupported device, pending validation |
 
 The onboarding wizard creates the underlying objects. First use: “Set up app → generate tests → review expectations → run → report.” Subsequent releases: “Upload next build → rerun approved tests → compare results.” Regeneration is optional when requirements change, not mandatory for every build. A customer supplies journeys; the operator reviews technical readiness and the proposed plan within the established business-approval rules.
 
@@ -276,14 +276,14 @@ Implementation planning baseline: Loco (Rust, built on Axum) for the application
 
 Frontend planning baseline: the Loco React/TypeScript/Vite starter, preserving React Router and TanStack Query, with Mantine packaged components (superseding the original shadcn choice). Rust-owned DTOs and endpoint descriptions generate OpenAPI, then a typed browser SDK and runtime validators; worker DTOs generate JSON Schema and Python validation models. Runnable applications are separated under `apps/api`, `apps/web` and `apps/mobile-worker`. The [master implementation spec](implementation/00-master-spec.md) and its seven smaller specs own the build order, source setup, cloud emulator qualification and final stack decisions. They supersede earlier raw-Axum/SQLx and ts-rs browser-only proposals. See [current status](status.md) for implemented behavior and validation; device qualification remains open.
 
-| Module | Owns | Does not decide |
-|---|---|---|
-| Web/API | Projects, permissions, uploads, review workflow, run submission | Whether a UI observation proves business correctness |
-| Generation service | Structured proposals and source references | Approval or release permission |
-| Scheduler/worker | Leases, install/reset, budgets, cancellation, execution persistence | Rewriting expected outcomes |
-| mobile-use adapter | Bounded navigation, device observations, raw execution evidence | Final release result |
-| Verification layer | Checks using the declared evidence method | Customer requirements inferred from current behavior |
-| Report service | Aggregation and summaries from persisted results | Erasing failures after a retry |
+| Module             | Owns                                                                | Does not decide                                      |
+| ------------------ | ------------------------------------------------------------------- | ---------------------------------------------------- |
+| Web/API            | Projects, permissions, uploads, review workflow, run submission     | Whether a UI observation proves business correctness |
+| Generation service | Structured proposals and source references                          | Approval or release permission                       |
+| Scheduler/worker   | Leases, install/reset, budgets, cancellation, execution persistence | Rewriting expected outcomes                          |
+| mobile-use adapter | Bounded navigation, device observations, raw execution evidence     | Final release result                                 |
+| Verification layer | Checks using the declared evidence method                           | Customer requirements inferred from current behavior |
+| Report service     | Aggregation and summaries from persisted results                    | Erasing failures after a retry                       |
 
 Adapter boundary: execute a case against a reserved device using case-version ID, allowed operations, secret references, and budgets. Return action events, observations, artifacts, errors, and usage. Verify the chosen upstream SDK's actual event/trace formats in the feasibility phase; these interface names are our proposed contract, not asserted upstream APIs.
 
@@ -307,11 +307,11 @@ Record runtime, device minutes, model token usage where available, retries, stor
 
 ## 13. Alternatives considered
 
-| Approach | Effort / risk | Pros | Cons | Reuse |
-|---|---|---|---|---|
-| A. Ordinary pipeline + mobile-use, working recommendation | Smallest / medium | Shortest route to evidence; few orchestration layers | Need our own product state and validation; upstream compatibility risk | Existing device execution and model support |
-| B. Agents SDK coordinator + mobile-use | Medium / medium | Better fit for later cross-system workflows; reusable orchestration/tracing | Two orchestration layers; more integration/state boundaries | Existing executor plus SDK |
-| C. Custom mobile agent on device tools | Largest / high | Full control; potential long-term specialized verifier | Must develop navigation/recovery and evaluate reliability ourselves | Device drivers and SDK tools |
+| Approach                                                  | Effort / risk     | Pros                                                                        | Cons                                                                   | Reuse                                       |
+| --------------------------------------------------------- | ----------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------- |
+| A. Ordinary pipeline + mobile-use, working recommendation | Smallest / medium | Shortest route to evidence; few orchestration layers                        | Need our own product state and validation; upstream compatibility risk | Existing device execution and model support |
+| B. Agents SDK coordinator + mobile-use                    | Medium / medium   | Better fit for later cross-system workflows; reusable orchestration/tracing | Two orchestration layers; more integration/state boundaries            | Existing executor plus SDK                  |
+| C. Custom mobile agent on device tools                    | Largest / high    | Full control; potential long-term specialized verifier                      | Must develop navigation/recovery and evaluate reliability ourselves    | Device drivers and SDK tools                |
 
 Approach A is the engineering baseline. Customer-specific expectations and pilot scope still require the approval rules in Section 19. No timetable is promised before the device feasibility check.
 
@@ -325,15 +325,15 @@ These deferrals restrict initial coverage. They must be visible in pilot proposa
 
 ## 15. Build order and acceptance gates
 
-| Milestone | Deliverable | Exit evidence |
-|---|---|---|
-| M0: Pre-build agreement | This specification, sample suite, default plan, named pilot owner, scope and acceptance criteria | Stakeholders understand the promise and unsupported features |
-| M1: Feasibility | Pin mobile-use revision; execute/reset/record one real journey on intended worker and pilot-compatible build | At least one clean pass, deliberate app failure, and unavailable-prerequisite result correctly distinguished; actual event formats and costs recorded |
-| M2: One vertical workflow | Upload build → run one manually authored approved case → evidence report | Durable job, cancellation, failure handling, and authorization work end to end |
-| M3: Test library and plans | Cases/suites/plan versions, approvals, manifests, fixture/data references | Historical runs unchanged by edits; duplicates resolved; unresolved cases block normal runs |
-| M4: Generation | Requirements → draft cases/suites/plan → review | Source links, assumptions, validation, partial-error handling, and duplicate suggestions work |
-| M5: Regression and triage | New build comparison, retries, findings, coverage gaps | Correct comparison categories and no false green from mixed/incomplete results |
-| M6: Operated pilot | One customer app, scoped report, repeat release, cost log | Customer can act on findings; review effort and cost measured; renewal decision requested |
+| Milestone                  | Deliverable                                                                                                  | Exit evidence                                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M0: Pre-build agreement    | This specification, sample suite, default plan, named pilot owner, scope and acceptance criteria             | Stakeholders understand the promise and unsupported features                                                                                          |
+| M1: Feasibility            | Pin mobile-use revision; execute/reset/record one real journey on intended worker and pilot-compatible build | At least one clean pass, deliberate app failure, and unavailable-prerequisite result correctly distinguished; actual event formats and costs recorded |
+| M2: One vertical workflow  | Upload build → run one manually authored approved case → evidence report                                     | Durable job, cancellation, failure handling, and authorization work end to end                                                                        |
+| M3: Test library and plans | Cases/suites/plan versions, approvals, manifests, fixture/data references                                    | Historical runs unchanged by edits; duplicates resolved; unresolved cases block normal runs                                                           |
+| M4: Generation             | Requirements → draft cases/suites/plan → review                                                              | Source links, assumptions, validation, partial-error handling, and duplicate suggestions work                                                         |
+| M5: Regression and triage  | New build comparison, retries, findings, coverage gaps                                                       | Correct comparison categories and no false green from mixed/incomplete results                                                                        |
+| M6: Operated pilot         | One customer app, scoped report, repeat release, cost log                                                    | Customer can act on findings; review effort and cost measured; renewal decision requested                                                             |
 
 Build generation after the manually authored execution path works. Generating cases that cannot run is a convincing demo but not a functioning QA service.
 
@@ -363,16 +363,16 @@ Dependencies: one authorized test app/build; test backend and seed/reset approac
 
 ## 18. Open questions and proposed defaults
 
-| Question | Working default | Resolution point |
-|---|---|---|
-| Who is the first customer and app? | Small mobile team; not yet named | Before pilot scope is sold |
-| Android or iOS required first? | Android | Before M1 device selection |
-| What is the test-data/reset contract? | Customer staging account plus explicit reset/seed procedure | Before approving executable cases |
-| Must results prove backend state? | Only where a read-only verification interface is supplied; otherwise disclose UI-only scope | Per-case approval |
-| Which model and mobile-use revision? | Evaluate a compatible pinned combination | M1 |
-| What price and service commitment? | Fixed-scope paid pilot with usage limits; US$500 hypothesis in Section 20, not a validated price | After measured pilot workload |
-| What does the customer permit us to record? | Synthetic data and restricted artifacts | Before customer testing |
-| When is iOS added? | After Android pilot, unless an actual buyer requires it | Sales and feasibility evidence |
+| Question                                    | Working default                                                                                  | Resolution point                  |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------- |
+| Who is the first customer and app?          | Small mobile team; not yet named                                                                 | Before pilot scope is sold        |
+| Android or iOS required first?              | Android                                                                                          | Before M1 device selection        |
+| What is the test-data/reset contract?       | Customer staging account plus explicit reset/seed procedure                                      | Before approving executable cases |
+| Must results prove backend state?           | Only where a read-only verification interface is supplied; otherwise disclose UI-only scope      | Per-case approval                 |
+| Which model and mobile-use revision?        | Evaluate a compatible pinned combination                                                         | M1                                |
+| What price and service commitment?          | Fixed-scope paid pilot with usage limits; US$500 hypothesis in Section 20, not a validated price | After measured pilot workload     |
+| What does the customer permit us to record? | Synthetic data and restricted artifacts                                                          | Before customer testing           |
+| When is iOS added?                          | After Android pilot, unless an actual buyer requires it                                          | Sales and feasibility evidence    |
 
 Physical-iPhone support is unverified: the inspected upstream README says unsupported while current code includes WebDriverAgent integration. Do not promise production readiness from either source alone.
 
@@ -380,15 +380,15 @@ Physical-iPhone support is unverified: the inspected upstream README says unsupp
 
 The customer appoints a business owner and may explicitly delegate approval to a named person. Our operator cannot infer that delegation from access to a build. Administrative control over our infrastructure does not confer authority to change the customer's requirements.
 
-| Decision | Customer business/release owner | Our QA operator | Application |
-|---|---|---|---|
-| Intended behavior and criterion changes | Accountable approver | Drafts and flags gaps | Records actor, source, version |
-| Case business expectations | Approves or explicitly delegates | Proposes evidence/check mapping | Prevents unapproved release execution |
-| Case execution readiness | Consulted on required fixtures | Approves setup, capabilities, evidence feasibility | Enforces both expectation and readiness approvals |
-| Plan scope and exclusions | Approves | Proposes selection/budget | Freezes approved versions |
-| Baseline acceptance | Accepts scoped baseline | Reviews evidence and prerequisites | Preserves machine outcomes |
-| Report evidence quality | Receives and questions findings | Reviews and signs delivery | Aggregates stored facts |
-| Release despite a failure / waiver | Sole release decision owner | Advises and records rationale | Never converts failure into pass |
+| Decision                                | Customer business/release owner  | Our QA operator                                    | Application                                       |
+| --------------------------------------- | -------------------------------- | -------------------------------------------------- | ------------------------------------------------- |
+| Intended behavior and criterion changes | Accountable approver             | Drafts and flags gaps                              | Records actor, source, version                    |
+| Case business expectations              | Approves or explicitly delegates | Proposes evidence/check mapping                    | Prevents unapproved release execution             |
+| Case execution readiness                | Consulted on required fixtures   | Approves setup, capabilities, evidence feasibility | Enforces both expectation and readiness approvals |
+| Plan scope and exclusions               | Approves                         | Proposes selection/budget                          | Freezes approved versions                         |
+| Baseline acceptance                     | Accepts scoped baseline          | Reviews evidence and prerequisites                 | Preserves machine outcomes                        |
+| Report evidence quality                 | Receives and questions findings  | Reviews and signs delivery                         | Aggregates stored facts                           |
+| Release despite a failure / waiver      | Sole release decision owner      | Advises and records rationale                      | Never converts failure into pass                  |
 
 A case becomes Approved only after both expectation approval and technical-readiness approval; one designated person may legitimately perform both, with both acts recorded. Customer-delegated approval and its scope are audited.
 
@@ -420,26 +420,26 @@ Hard intake gate before executable-case approval:
 
 ## 22. Pilot v0 versus expansion
 
-| Pilot v0: build for the first paid customer | Pilot v1: after repeat demand | Later |
-|---|---|---|
-| Operator-provisioned project and access; APK intake | Self-service onboarding | Broad connectors and repo analysis |
-| Pasted requirements; generated case drafts; source references | Richer requirement import and review | Autonomous large-scale discovery |
-| Minimal versioned case/suite/plan forms and approvals | Bulk editing and suite management | Multiple runner backends |
-| One reusable plan; fixed qualified device; manifest per run | More templates and qualified profiles | iOS/physical device fleet |
-| Manually authored cases before generation rollout | Optional bounded discovery UI | Fully autonomous suite maintenance |
-| Basic previous-run comparison table and findings | Trends, advanced comparison dashboard | Automatic defect fixing |
-| Private reports, budgets, safe resets, operator triage | Customer self-service triage | Billing and CI integration automation |
+| Pilot v0: build for the first paid customer                   | Pilot v1: after repeat demand         | Later                                 |
+| ------------------------------------------------------------- | ------------------------------------- | ------------------------------------- |
+| Operator-provisioned project and access; APK intake           | Self-service onboarding               | Broad connectors and repo analysis    |
+| Pasted requirements; generated case drafts; source references | Richer requirement import and review  | Autonomous large-scale discovery      |
+| Minimal versioned case/suite/plan forms and approvals         | Bulk editing and suite management     | Multiple runner backends              |
+| One reusable plan; fixed qualified device; manifest per run   | More templates and qualified profiles | iOS/physical device fleet             |
+| Manually authored cases before generation rollout             | Optional bounded discovery UI         | Fully autonomous suite maintenance    |
+| Basic previous-run comparison table and findings              | Trends, advanced comparison dashboard | Automatic defect fixing               |
+| Private reports, budgets, safe resets, operator triage        | Customer self-service triage          | Billing and CI integration automation |
 
 Version identity, access isolation, evidence preservation, and bounded execution remain v0 requirements. Sophisticated interfaces for those controls do not. Optional discovery from Section 7 is performed only if needed by the operator during v0; a simple requirements-to-case generation path is sufficient.
 
 ## 23. Custody and retention policy to implement
 
-| Data | Access | Proposed retention / end-of-pilot treatment |
-|---|---|---|
-| APKs, raw screenshots, video, device logs | Assigned project operators and authorized project users; raw downloads restricted | Delete 14 days after collection unless a shorter agreed period applies |
-| Reviewed reports, cases, approvals, result metadata | Authorized project roles | Keep during engagement; offer export and delete 30 days after pilot closes unless renewed |
-| Credentials | Runtime injection and explicitly authorized operator access only | Never in case definitions; delete stored secrets at pilot close; customer revokes/rotates them |
-| Backups containing project metadata | Restricted infrastructure administrators | Maximum 30-day expiry after deletion; restored systems must replay deletion tombstones |
+| Data                                                | Access                                                                            | Proposed retention / end-of-pilot treatment                                                    |
+| --------------------------------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| APKs, raw screenshots, video, device logs           | Assigned project operators and authorized project users; raw downloads restricted | Delete 14 days after collection unless a shorter agreed period applies                         |
+| Reviewed reports, cases, approvals, result metadata | Authorized project roles                                                          | Keep during engagement; offer export and delete 30 days after pilot closes unless renewed      |
+| Credentials                                         | Runtime injection and explicitly authorized operator access only                  | Never in case definitions; delete stored secrets at pilot close; customer revokes/rotates them |
+| Backups containing project metadata                 | Restricted infrastructure administrators                                          | Maximum 30-day expiry after deletion; restored systems must replay deletion tombstones         |
 
 Production implementation must enforce these periods with deletion jobs and test them. Expired evidence links are shown as expired; stored outcome metadata does not imply the artifact is still available. Customer-requested project deletion immediately revokes access and queued jobs, cancels active jobs, revokes/invalidate artifact URLs, and schedules primary-object deletion within 24 hours, with documented backup expiry. Existing downloads cannot be recalled.
 

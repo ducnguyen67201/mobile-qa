@@ -4,7 +4,9 @@ version = "0.1.0"
 requires-python = ">=3.12,<3.14"
 dependencies = ["pydantic>=2.11,<3"]
 [project.optional-dependencies]
-sdk = ["minitap-mobile-use==4.0.0"]
+sdk = ["minitap-mobile-use==4.0.0", "langchain-core==1.6.3"]
+device = ["uiautomator2==3.5.0"]
+ai = ["langchain-openai==1.6.2", "Pillow==12.3.0"]
 [dependency-groups]
 dev = [
     "datamodel-code-generator==0.76.0",
@@ -26,6 +28,7 @@ extend-exclude = ["src/mobile_qa_worker/generated"]
 select = ["E", "F", "I", "UP", "B"]
 [tool.pyright]
 typeCheckingMode = "strict"
+stubPath = "typings"
 include = ["src/mobile_qa_worker"]
 exclude = ["src/mobile_qa_worker/generated"]
 venvPath = "."

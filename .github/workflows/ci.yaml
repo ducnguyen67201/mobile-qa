@@ -13,6 +13,25 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  formatting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.12.1
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt
+      - run: pnpm --dir apps/web install --frozen-lockfile --ignore-scripts
+      - run: uv sync --project apps/mobile-worker --frozen
+      - run: python3 scripts/format.py --check
   scope:
     permissions:
       contents: read
@@ -23,12 +42,23 @@ jobs:
       web: ${{ steps.paths.outputs.web }}
       worker: ${{ steps.paths.outputs.worker }}
       contracts: ${{ steps.paths.outputs.contracts }}
+      demo: ${{ steps.paths.outputs.demo }}
+      scope_tests: ${{ steps.paths.outputs.scope_tests }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: paths
         with:
           filters: |
+            demo:
+              - '.github/workflows/**'
+              - 'apps/qa-demo-android/**'
+              - 'infra/device-host/toolchain.lock.json'
+              - 'infra/device-host/install_tools.py'
+              - 'scripts/local_device.py'
+            scope_tests:
+              - '.github/workflows/**'
+              - 'scripts/test_ci_scope.py'
             api:
               - '.github/workflows/**'
               - 'Cargo.toml'
@@ -38,16 +68,27 @@ jobs:
               - 'apps/api/**'
               - 'crates/contracts/**'
               - 'contracts/fixtures/**'
-              - 'infra/**'
+              - 'infra/compose.yaml'
+              - 'infra/postgres/**'
               - 'scripts/runtime.py'
               - 'scripts/setup_android.py'
               - 'scripts/apk_fixtures.py'
               - 'scripts/app_setup_smoke.py'
+              - 'scripts/execution_smoke.py'
+              - 'scripts/test_library_smoke.py'
+              - 'scripts/direct_authoring_smoke.py'
+              - 'scripts/task_session_smoke.py'
             web:
               - '.github/workflows/**'
               - 'apps/web/**'
               - '.node-version'
               - 'crates/contracts/src/browser.rs'
+              - 'crates/contracts/src/execution.rs'
+              - 'crates/contracts/src/execution_api.rs'
+              - 'crates/contracts/src/test_library.rs'
+              - 'crates/contracts/src/test_library_api.rs'
+              - 'crates/contracts/src/task_sessions.rs'
+              - 'crates/contracts/src/task_sessions_api.rs'
               - 'contracts/browser.openapi.json'
               - 'crates/contracts/Cargo.toml'
               - 'crates/contracts/src/lib.rs'
@@ -55,9 +96,18 @@ jobs:
               - '.github/workflows/**'
               - 'apps/mobile-worker/**'
               - 'crates/contracts/src/worker.rs'
+              - 'crates/contracts/src/execution.rs'
+              - 'crates/contracts/src/task_sessions.rs'
+              - 'scripts/execution_smoke.py'
+              - 'scripts/test_library_smoke.py'
+              - 'scripts/direct_authoring_smoke.py'
+              - 'scripts/task_session_smoke.py'
+              - 'crates/contracts/src/worker/**'
+              - 'infra/device-host/**'
               - 'contracts/worker.schema.json'
               - 'contracts/fixtures/**'
               - 'scripts/sdk_smoke.py'
+              - 'scripts/local_device.py'
               - 'crates/contracts/Cargo.toml'
               - 'crates/contracts/src/lib.rs'
             # Generator inputs and generated-only edits still need drift validation.
@@ -103,6 +153,13 @@ jobs:
       - run: python3 scripts/runtime.py check-api --api-only
       - run: cargo build --package mobile-qa --locked
       - run: python3 scripts/app_setup_smoke.py
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.12.1
+      - run: uv sync --project apps/mobile-worker --frozen
+      - run: python3 scripts/execution_smoke.py
+      - run: python3 scripts/test_library_smoke.py
+      - run: python3 scripts/direct_authoring_smoke.py
   web:
     needs: scope
     if: needs.scope.outputs.web == 'true'
@@ -118,6 +175,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: apps/web/pnpm-lock.yaml
       - run: pnpm --dir apps/web install --frozen-lockfile --ignore-scripts
+      - run: pnpm --dir apps/web format:check
       - run: pnpm --dir apps/web typecheck
       - run: pnpm --dir apps/web lint
       - run: pnpm --dir apps/web test
@@ -133,7 +191,7 @@ jobs:
           version: 0.12.1
           enable-cache: true
           cache-dependency-glob: apps/mobile-worker/uv.lock
-      - run: uv sync --project apps/mobile-worker --frozen
+      - run: uv sync --project apps/mobile-worker --frozen --extra sdk --extra device --extra ai
       - run: uv run --no-sync --project apps/mobile-worker --frozen ruff check apps/mobile-worker
       - run: cd apps/mobile-worker && uv run --no-sync --frozen pyright
       - run: uv run --no-sync --project apps/mobile-worker --frozen pytest apps/mobile-worker/tests
@@ -168,3 +226,47 @@ jobs:
       - run: cargo test --package mobile-qa-contracts --locked
       - run: python3 scripts/contracts.py --check
       - run: python3 -m unittest scripts.test_contracts
+
+  demo:
+    needs: scope
+    if: needs.scope.outputs.demo == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .private/android-sdk
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: demo-${{ runner.os }}-${{ hashFiles('infra/device-host/toolchain.lock.json', 'apps/qa-demo-android/**/*.gradle', 'apps/qa-demo-android/gradle/wrapper/*') }}
+      - run: python3 infra/device-host/install_tools.py --sdk-root "$GITHUB_WORKSPACE/.private/android-sdk" --demo-only
+      - name: Build and lint controlled APKs only
+        run: |
+          # Hosted runners predefine a different SDK through this deprecated alias.
+          unset ANDROID_SDK_ROOT
+          export ANDROID_HOME="$GITHUB_WORKSPACE/.private/android-sdk"
+          cd apps/qa-demo-android
+          ./gradlew --no-daemon :app:assembleGoodDebug :app:assembleBrokenDebug :app:assembleSampleDebug :app:lintGoodDebug :app:lintBrokenDebug :app:lintSampleDebug
+  scope_tests:
+    needs: scope
+    if: needs.scope.outputs.scope_tests == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.12.1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: pnpm --dir apps/web install --frozen-lockfile --ignore-scripts
+      - run: uv sync --project apps/mobile-worker --frozen
+      - run: uv run --no-sync --project apps/mobile-worker --frozen python scripts/test_ci_scope.py

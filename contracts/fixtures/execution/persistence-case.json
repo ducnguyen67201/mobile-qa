@@ -1,0 +1,53 @@
+{
+  "kind": "case",
+  "content": {
+    "key": "TASK-PERSIST",
+    "version": 1,
+    "title": "Saved task survives restart",
+    "requirement": "A created task must remain in the task list after an app process restart.",
+    "provenance": "operator_authored",
+    "package": "ai.mobileqa.demo",
+    "adapter": "demo_persistence_v1",
+    "preconditions": ["Clean demo device", "Controlled demo backend available"],
+    "actions": [
+      {
+        "id": "create",
+        "kind": "navigate",
+        "instruction": "Create exactly one task named ${task_title}, press Save, return to the list and stop. Do not close the app or change settings.",
+        "checkpoint_id": "created"
+      },
+      { "id": "restart", "kind": "restart_app", "instruction": "", "checkpoint_id": "reopened" }
+    ],
+    "checks": [
+      {
+        "id": "created",
+        "checkpoint_id": "created",
+        "description": "The unique task was created before testing persistence",
+        "method": "ui_element_presence_v1",
+        "resource_id": "ai.mobileqa.demo:id/task_row",
+        "text_filter": "${task_title}",
+        "property": "text",
+        "expected": "true",
+        "ready_resource_id": "ai.mobileqa.demo:id/ready_marker",
+        "prerequisite_check_ids": [],
+        "required": false,
+        "observation_seconds": 10
+      },
+      {
+        "id": "persisted",
+        "checkpoint_id": "reopened",
+        "description": "The same unique task remains after restart",
+        "method": "ui_element_presence_v1",
+        "resource_id": "ai.mobileqa.demo:id/task_row",
+        "text_filter": "${task_title}",
+        "property": "text",
+        "expected": "true",
+        "ready_resource_id": "ai.mobileqa.demo:id/ready_marker",
+        "prerequisite_check_ids": ["created"],
+        "required": true,
+        "observation_seconds": 10
+      }
+    ],
+    "budget": { "duration_seconds": 600, "max_steps": 30, "artifact_bytes": 16777216 }
+  }
+}

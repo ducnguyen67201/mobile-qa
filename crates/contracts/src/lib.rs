@@ -4,3 +4,15 @@
 
 pub mod browser;
 pub mod worker;
+
+pub mod execution;
+pub mod execution_api;
+
+pub mod test_library;
+pub mod test_library_api;
+
+pub mod task_sessions;
+pub mod task_sessions_api;
+
+pub mod automation;
+pub mod automation_api;

@@ -3,8 +3,29 @@
   "title": "WorkerContracts",
   "type": "object",
   "properties": {
+    "authoring_request": {
+      "$ref": "#/$defs/AuthoringModelRequest"
+    },
+    "authoring_response": {
+      "$ref": "#/$defs/AuthoringModelResponse"
+    },
+    "execution": {
+      "$ref": "#/$defs/ExecutionContracts"
+    },
+    "phone_claim": {
+      "$ref": "#/$defs/PhoneClaimResponse"
+    },
+    "phone_claim_request": {
+      "$ref": "#/$defs/PhoneClaimRequest"
+    },
+    "phone_update": {
+      "$ref": "#/$defs/PhoneUpdate"
+    },
     "probe": {
       "$ref": "#/$defs/ContractProbe"
+    },
+    "qualification": {
+      "$ref": "#/$defs/QualificationContracts"
     },
     "request": {
       "$ref": "#/$defs/FakeExecutionRequest"
@@ -14,11 +35,555 @@
     }
   },
   "required": [
+    "authoring_request",
+    "authoring_response",
+    "phone_claim",
+    "phone_claim_request",
+    "phone_update",
+    "execution",
     "request",
     "result",
-    "probe"
+    "probe",
+    "qualification"
   ],
   "$defs": {
+    "ActionKind": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "navigate",
+        "restart_app",
+        "checkpoint"
+      ]
+    },
+    "ArtifactReceipt": {
+      "type": "object",
+      "properties": {
+        "artifact": {
+          "$ref": "#/$defs/RunArtifact"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "artifact"
+      ]
+    },
+    "ArtifactRequest": {
+      "type": "object",
+      "properties": {
+        "byte_size": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "checkpoint_id": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "checkpoint_id",
+        "name",
+        "mime",
+        "byte_size",
+        "sha256"
+      ]
+    },
+    "AttemptReceipt": {
+      "type": "object",
+      "properties": {
+        "attempt": {
+          "$ref": "#/$defs/AttemptResponse"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "attempt"
+      ]
+    },
+    "AttemptResponse": {
+      "type": "object",
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RunArtifact"
+          }
+        },
+        "case_version_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CheckResult"
+          }
+        },
+        "cleanup": {
+          "$ref": "#/$defs/CleanupState"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExecutionEvent"
+          }
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "number": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Outcome"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/JobState"
+        },
+        "usage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelUsage"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "case_version_id",
+        "generation",
+        "number",
+        "state",
+        "cleanup",
+        "checks",
+        "artifacts",
+        "usage",
+        "events"
+      ]
+    },
+    "AuthoringModelRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "allow_writes": {
+              "type": "boolean"
+            },
+            "frame": {
+              "$ref": "#/$defs/PhoneFrame"
+            },
+            "journey": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "discover"
+            },
+            "package": {
+              "type": "string"
+            },
+            "trace": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/DirectCommand"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "package",
+            "journey",
+            "allow_writes",
+            "frame",
+            "trace"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "category": {
+              "$ref": "#/$defs/CoverageKind"
+            },
+            "journey": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "propose"
+            },
+            "package": {
+              "type": "string"
+            },
+            "snapshots": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/DiscoverySnapshot"
+              }
+            },
+            "trace": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/DirectCommand"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "package",
+            "journey",
+            "category",
+            "snapshots",
+            "trace"
+          ]
+        }
+      ]
+    },
+    "AuthoringModelResponse": {
+      "type": "object",
+      "properties": {
+        "batch": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProposalBatch"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiscoveryDecision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "usage": {
+          "$ref": "#/$defs/AuthoringUsage"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "usage"
+      ]
+    },
+    "AuthoringUsage": {
+      "type": "object",
+      "properties": {
+        "calls": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "unknown_calls": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "calls",
+        "input_tokens",
+        "output_tokens",
+        "unknown_calls"
+      ]
+    },
+    "AutomationSequence": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TestAction"
+          }
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExpectedCheck"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "actions",
+        "checks"
+      ]
+    },
+    "CaseDefinition": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TestAction"
+          }
+        },
+        "adapter": {
+          "type": "string"
+        },
+        "budget": {
+          "$ref": "#/$defs/ExecutionBudget"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExpectedCheck"
+          }
+        },
+        "key": {
+          "type": "string"
+        },
+        "package": {
+          "type": "string"
+        },
+        "preconditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "provenance": {
+          "type": "string"
+        },
+        "requirement": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "version",
+        "title",
+        "requirement",
+        "provenance",
+        "package",
+        "adapter",
+        "preconditions",
+        "actions",
+        "checks",
+        "budget"
+      ]
+    },
+    "CheckMethod": {
+      "type": "string",
+      "enum": [
+        "ui_property_equals_v1",
+        "ui_element_presence_v1",
+        "manual"
+      ]
+    },
+    "CheckResult": {
+      "type": "object",
+      "properties": {
+        "artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "check_id": {
+          "type": "string"
+        },
+        "expected": {
+          "type": "string"
+        },
+        "observed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcome": {
+          "$ref": "#/$defs/Outcome"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "check_id",
+        "expected",
+        "outcome",
+        "reason",
+        "artifact_ids"
+      ]
+    },
+    "ClaimRequest": {
+      "type": "object",
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "profile_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "version": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "claim_id",
+        "profile_id"
+      ]
+    },
+    "ClaimResponse": {
+      "type": "object",
+      "properties": {
+        "lease": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExecutionLease"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "poll_after_seconds": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "poll_after_seconds"
+      ]
+    },
+    "CleanupRequest": {
+      "type": "object",
+      "properties": {
+        "boot_id": {
+          "type": "string"
+        },
+        "evidence_reference": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "reset": {
+          "$ref": "#/$defs/CleanupState"
+        },
+        "stopped": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "stopped",
+        "reset",
+        "evidence_reference",
+        "boot_id"
+      ]
+    },
+    "CleanupState": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "verified_clean",
+        "quarantined"
+      ]
+    },
+    "CompleteRequest": {
+      "type": "object",
+      "properties": {
+        "execution_outcome": {
+          "$ref": "#/$defs/Outcome"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "usage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelUsage"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "execution_outcome",
+        "reason",
+        "usage"
+      ]
+    },
     "ContractProbe": {
       "type": "object",
       "properties": {
@@ -59,6 +624,561 @@
         "counter"
       ]
     },
+    "CoverageKind": {
+      "type": "string",
+      "enum": [
+        "smoke",
+        "happy_path",
+        "validation",
+        "persistence"
+      ]
+    },
+    "DirectCommand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "const": "tap"
+            },
+            "target": {
+              "$ref": "#/$defs/DirectTarget"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "operation",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "const": "set_text"
+            },
+            "target": {
+              "$ref": "#/$defs/DirectTarget"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "operation",
+            "target",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "$ref": "#/$defs/SwipeDirection"
+            },
+            "operation": {
+              "type": "string",
+              "const": "swipe"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "operation",
+            "direction"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "const": "back"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "operation"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "const": "restart"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "operation"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "const": "wait_for"
+            },
+            "target": {
+              "$ref": "#/$defs/DirectTarget"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "operation",
+            "target"
+          ]
+        }
+      ]
+    },
+    "DirectTarget": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "by": {
+              "type": "string",
+              "const": "resource_id"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "by",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "by": {
+              "type": "string",
+              "const": "description"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "by",
+            "value"
+          ]
+        }
+      ]
+    },
+    "DiscoveryDecision": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "command": {
+              "$ref": "#/$defs/DirectCommand"
+            },
+            "decision": {
+              "type": "string",
+              "const": "act"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "decision",
+            "command"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "decision": {
+              "type": "string",
+              "const": "finish"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "decision",
+            "reason"
+          ]
+        }
+      ]
+    },
+    "DiscoverySnapshot": {
+      "type": "object",
+      "properties": {
+        "frame": {
+          "$ref": "#/$defs/PhoneFrame"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "frame"
+      ]
+    },
+    "Driver": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "fake",
+        "minitap"
+      ]
+    },
+    "EventReceipt": {
+      "type": "object",
+      "properties": {
+        "last_sequence": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "last_sequence"
+      ]
+    },
+    "EventRequest": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExecutionEvent"
+          }
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "events"
+      ]
+    },
+    "EvidenceState": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "sealed",
+        "unavailable"
+      ]
+    },
+    "ExecutionBudget": {
+      "type": "object",
+      "properties": {
+        "artifact_bytes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "duration_seconds": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "max_steps": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "duration_seconds",
+        "max_steps",
+        "artifact_bytes"
+      ]
+    },
+    "ExecutionContracts": {
+      "type": "object",
+      "properties": {
+        "artifact_receipt": {
+          "$ref": "#/$defs/ArtifactReceipt"
+        },
+        "artifact_request": {
+          "$ref": "#/$defs/ArtifactRequest"
+        },
+        "attempt_receipt": {
+          "$ref": "#/$defs/AttemptReceipt"
+        },
+        "claim_request": {
+          "$ref": "#/$defs/ClaimRequest"
+        },
+        "claim_response": {
+          "$ref": "#/$defs/ClaimResponse"
+        },
+        "cleanup": {
+          "$ref": "#/$defs/CleanupRequest"
+        },
+        "completion": {
+          "$ref": "#/$defs/CompleteRequest"
+        },
+        "event_receipt": {
+          "$ref": "#/$defs/EventReceipt"
+        },
+        "events": {
+          "$ref": "#/$defs/EventRequest"
+        },
+        "job": {
+          "$ref": "#/$defs/ExecutionJob"
+        },
+        "lease_request": {
+          "$ref": "#/$defs/LeaseRequest"
+        },
+        "lease_status": {
+          "$ref": "#/$defs/LeaseStatusResponse"
+        },
+        "local_result": {
+          "$ref": "#/$defs/LocalExecutionResult"
+        },
+        "navigation": {
+          "$ref": "#/$defs/NavigationRequest"
+        }
+      },
+      "required": [
+        "job",
+        "navigation",
+        "local_result",
+        "claim_request",
+        "claim_response",
+        "lease_request",
+        "lease_status",
+        "events",
+        "event_receipt",
+        "artifact_request",
+        "artifact_receipt",
+        "completion",
+        "cleanup",
+        "attempt_receipt"
+      ]
+    },
+    "ExecutionEvent": {
+      "type": "object",
+      "properties": {
+        "action_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "message": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "sequence": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sequence",
+        "action_id",
+        "phase",
+        "message"
+      ]
+    },
+    "ExecutionJob": {
+      "type": "object",
+      "properties": {
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "case_index": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "manifest": {
+          "$ref": "#/$defs/RunManifest"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "manifest",
+        "case_index"
+      ]
+    },
+    "ExecutionLease": {
+      "type": "object",
+      "properties": {
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "case_index": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "lease_token": {
+          "type": "string"
+        },
+        "manifest": {
+          "$ref": "#/$defs/RunManifest"
+        },
+        "run_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "run_id",
+        "generation",
+        "lease_token",
+        "expires_at",
+        "manifest",
+        "case_index"
+      ]
+    },
+    "ExecutionProfile": {
+      "type": "object",
+      "properties": {
+        "adapter": {
+          "type": "string"
+        },
+        "device_identity": {
+          "type": "string"
+        },
+        "driver": {
+          "$ref": "#/$defs/Driver"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "image": {
+          "type": "string"
+        },
+        "max_apk_bytes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "model": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "package": {
+          "type": "string"
+        },
+        "qualification_reference": {
+          "type": "string"
+        },
+        "qualified": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "driver",
+        "package",
+        "adapter",
+        "device_identity",
+        "image",
+        "model",
+        "qualified",
+        "qualification_reference",
+        "max_apk_bytes"
+      ]
+    },
+    "ExpectedCheck": {
+      "type": "object",
+      "properties": {
+        "checkpoint_id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "expected": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "method": {
+          "$ref": "#/$defs/CheckMethod"
+        },
+        "observation_seconds": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "prerequisite_check_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "property": {
+          "$ref": "#/$defs/UiProperty"
+        },
+        "ready_resource_id": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "text_filter": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "checkpoint_id",
+        "description",
+        "method",
+        "resource_id",
+        "text_filter",
+        "property",
+        "expected",
+        "ready_resource_id",
+        "prerequisite_check_ids",
+        "required",
+        "observation_seconds"
+      ]
+    },
     "FakeExecutionRequest": {
       "type": "object",
       "properties": {
@@ -90,7 +1210,7 @@
           "type": "string"
         },
         "outcome": {
-          "$ref": "#/$defs/Outcome"
+          "$ref": "#/$defs/Outcome2"
         },
         "run_id": {
           "type": "string",
@@ -111,12 +1231,1135 @@
         "message"
       ]
     },
+    "GenerateTestsRequest": {
+      "type": "object",
+      "properties": {
+        "allow_writes": {
+          "type": "boolean"
+        },
+        "category": {
+          "$ref": "#/$defs/CoverageKind"
+        },
+        "expected_revision": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "journey": {
+          "type": "string"
+        },
+        "reuse_job_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "session_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "session_id",
+        "expected_revision",
+        "category",
+        "journey",
+        "allow_writes"
+      ]
+    },
+    "GenerationProgress": {
+      "type": "object",
+      "properties": {
+        "gaps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "proposals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GenerationProposal"
+          }
+        },
+        "snapshots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DiscoverySnapshot"
+          }
+        },
+        "state": {
+          "$ref": "#/$defs/GenerationState"
+        },
+        "trace": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DirectCommand"
+          }
+        },
+        "usage": {
+          "$ref": "#/$defs/AuthoringUsage"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "proposals",
+        "snapshots",
+        "trace",
+        "gaps",
+        "usage"
+      ]
+    },
+    "GenerationProposal": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/CoverageKind"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requirement": {
+          "type": "string"
+        },
+        "sequence": {
+          "$ref": "#/$defs/AutomationSequence"
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "category",
+        "sequence",
+        "requirement",
+        "questions",
+        "source_ids"
+      ]
+    },
+    "GenerationState": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "discovering",
+        "drafting",
+        "ready",
+        "needs_input",
+        "failed",
+        "canceled"
+      ]
+    },
+    "JobState": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "leased",
+        "running",
+        "finalizing",
+        "finished",
+        "cancel_requested",
+        "recovery_required"
+      ]
+    },
+    "LeaseRequest": {
+      "type": "object",
+      "properties": {
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation"
+      ]
+    },
+    "LeaseStatusResponse": {
+      "type": "object",
+      "properties": {
+        "cancel_requested": {
+          "type": "boolean"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "state": {
+          "$ref": "#/$defs/JobState"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "expires_at",
+        "cancel_requested"
+      ]
+    },
+    "LocalExecutionResult": {
+      "type": "object",
+      "properties": {
+        "boot_id": {
+          "type": "string"
+        },
+        "evidence_reference": {
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/Outcome"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "reset": {
+          "$ref": "#/$defs/CleanupState"
+        },
+        "stopped": {
+          "type": "boolean"
+        },
+        "usage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelUsage"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "reason",
+        "usage",
+        "reset",
+        "stopped",
+        "boot_id",
+        "evidence_reference"
+      ]
+    },
+    "ModelUsage": {
+      "type": "object",
+      "properties": {
+        "calls": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "model": {
+          "type": "string"
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "unknown_calls": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "calls",
+        "unknown_calls"
+      ]
+    },
+    "NavigationRequest": {
+      "type": "object",
+      "properties": {
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "instruction": {
+          "type": "string"
+        },
+        "max_steps": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "package": {
+          "type": "string"
+        },
+        "profile_path": {
+          "type": "string"
+        },
+        "serial": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "profile_path",
+        "serial",
+        "package",
+        "instruction",
+        "max_steps"
+      ]
+    },
     "Outcome": {
       "type": "string",
       "enum": [
         "passed",
         "failed",
+        "blocked",
+        "inconclusive",
+        "skipped",
+        "canceled"
+      ]
+    },
+    "Outcome2": {
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
         "blocked"
+      ]
+    },
+    "PhoneClaimRequest": {
+      "type": "object",
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "protocol_version": {
+          "type": "integer",
+          "format": "uint32",
+          "default": 0,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "claim_id"
+      ]
+    },
+    "PhoneClaimResponse": {
+      "type": "object",
+      "properties": {
+        "lease": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhoneLease"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "PhoneControl": {
+      "type": "object",
+      "properties": {
+        "bottom": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "description": {
+          "type": "string",
+          "default": ""
+        },
+        "editable": {
+          "type": "boolean",
+          "default": false
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "left": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "right": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "top": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "resource_id",
+        "left",
+        "top",
+        "right",
+        "bottom"
+      ]
+    },
+    "PhoneFrame": {
+      "type": "object",
+      "properties": {
+        "controls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PhoneControl"
+          }
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "png_base64": {
+          "type": "string"
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "png_base64",
+        "width",
+        "height",
+        "controls"
+      ]
+    },
+    "PhoneLease": {
+      "type": "object",
+      "properties": {
+        "build_bytes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "build_sha256": {
+          "type": "string"
+        },
+        "lease_token": {
+          "type": "string"
+        },
+        "session": {
+          "$ref": "#/$defs/PhoneSession"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "session",
+        "lease_token",
+        "build_sha256",
+        "build_bytes"
+      ]
+    },
+    "PhoneSession": {
+      "type": "object",
+      "properties": {
+        "app_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "build_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "environment_revision": {
+          "type": "integer",
+          "format": "uint32",
+          "default": 0,
+          "minimum": 0
+        },
+        "frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhoneFrame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "message": {
+          "type": "string"
+        },
+        "profile": {
+          "$ref": "#/$defs/ExecutionProfile"
+        },
+        "protocol_version": {
+          "type": "integer",
+          "format": "uint32",
+          "default": 0,
+          "minimum": 0
+        },
+        "revision": {
+          "type": "integer",
+          "format": "uint32",
+          "default": 0,
+          "minimum": 0
+        },
+        "state": {
+          "$ref": "#/$defs/PhoneState"
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PhoneTask"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "app_id",
+        "build_id",
+        "profile",
+        "state",
+        "message",
+        "tasks"
+      ]
+    },
+    "PhoneState": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "preparing",
+        "ready",
+        "acting",
+        "stopping",
+        "closed",
+        "quarantined"
+      ]
+    },
+    "PhoneTask": {
+      "type": "object",
+      "properties": {
+        "control": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhoneControl"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "generation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GenerateTestsRequest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "goal": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "message": {
+          "type": "string"
+        },
+        "progress": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GenerationProgress"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sequence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AutomationSequence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/PhoneTaskState"
+        },
+        "steps": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/StepReceipt"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "goal",
+        "state",
+        "message"
+      ]
+    },
+    "PhoneTaskState": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "acting",
+        "completed",
+        "failed",
+        "stopped"
+      ]
+    },
+    "PhoneUpdate": {
+      "type": "object",
+      "properties": {
+        "clean": {
+          "type": "boolean"
+        },
+        "frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhoneFrame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/PhoneState"
+        },
+        "task": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhoneTask"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "message",
+        "clean"
+      ]
+    },
+    "ProposalBatch": {
+      "type": "object",
+      "properties": {
+        "proposals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GenerationProposal"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "proposals"
+      ]
+    },
+    "QualificationArtifact": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "bytes": {
+              "type": "integer",
+              "format": "uint32",
+              "maximum": 262144000,
+              "minimum": 1
+            },
+            "mime": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "status": {
+              "type": "string",
+              "const": "available"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "name",
+            "path",
+            "mime",
+            "bytes",
+            "sha256"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "const": "unavailable"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "name",
+            "reason"
+          ]
+        }
+      ]
+    },
+    "QualificationContracts": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "$ref": "#/$defs/QualificationRequest"
+        },
+        "result": {
+          "$ref": "#/$defs/QualificationResult"
+        }
+      },
+      "required": [
+        "request",
+        "result"
+      ]
+    },
+    "QualificationOutcome": {
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "blocked",
+        "inconclusive"
+      ]
+    },
+    "QualificationRequest": {
+      "type": "object",
+      "properties": {
+        "activity": {
+          "type": "string",
+          "pattern": "^ai\\.mobileqa\\.demo/\\.MainActivity$"
+        },
+        "apk_path": {
+          "type": "string"
+        },
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "case_id": {
+          "type": "string",
+          "pattern": "^persist-task-v1$"
+        },
+        "expected_apk_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "output_root": {
+          "type": "string"
+        },
+        "package": {
+          "type": "string",
+          "pattern": "^ai\\.mobileqa\\.demo$"
+        },
+        "profile_path": {
+          "type": "string"
+        },
+        "serial": {
+          "type": "string",
+          "pattern": "^emulator-5554$"
+        },
+        "version": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 1,
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "attempt_id",
+        "case_id",
+        "apk_path",
+        "expected_apk_sha256",
+        "package",
+        "activity",
+        "serial",
+        "profile_path",
+        "output_root"
+      ]
+    },
+    "QualificationReset": {
+      "type": "string",
+      "enum": [
+        "verified_clean",
+        "quarantined",
+        "not_started"
+      ]
+    },
+    "QualificationResult": {
+      "type": "object",
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QualificationArtifact"
+          }
+        },
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "case_id": {
+          "type": "string"
+        },
+        "device_inventory": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "ended_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expected_behavior": {
+          "type": "string"
+        },
+        "model_profile_sha256": {
+          "type": "string"
+        },
+        "observed_behavior": {
+          "type": "string"
+        },
+        "observed_build_sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcome": {
+          "$ref": "#/$defs/QualificationOutcome"
+        },
+        "phase_ms": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "reason_code": {
+          "type": "string"
+        },
+        "requested_build_sha256": {
+          "type": "string"
+        },
+        "reset": {
+          "$ref": "#/$defs/QualificationReset"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "usage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QualificationUsage"
+          }
+        },
+        "version": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 1,
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "attempt_id",
+        "case_id",
+        "outcome",
+        "reason_code",
+        "expected_behavior",
+        "observed_behavior",
+        "started_at",
+        "ended_at",
+        "requested_build_sha256",
+        "device_inventory",
+        "model_profile_sha256",
+        "reset",
+        "phase_ms",
+        "artifacts",
+        "usage"
+      ]
+    },
+    "QualificationUsage": {
+      "type": "object",
+      "properties": {
+        "calls": {
+          "type": "integer",
+          "format": "uint32",
+          "maximum": 10000,
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "model": {
+          "type": "string"
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "unknown_calls": {
+          "type": "integer",
+          "format": "uint32",
+          "maximum": 10000,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "calls",
+        "unknown_calls"
+      ]
+    },
+    "ResolvedCase": {
+      "type": "object",
+      "properties": {
+        "case": {
+          "$ref": "#/$defs/CaseDefinition"
+        },
+        "content_hash": {
+          "type": "string"
+        },
+        "data_variant": {
+          "type": "string"
+        },
+        "definition_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "required": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "definition_id",
+        "content_hash",
+        "data_variant",
+        "required",
+        "case"
+      ]
+    },
+    "RunArtifact": {
+      "type": "object",
+      "properties": {
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "byte_size": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "checkpoint_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/EvidenceState"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "attempt_id",
+        "checkpoint_id",
+        "name",
+        "mime",
+        "byte_size",
+        "sha256",
+        "state"
+      ]
+    },
+    "RunManifest": {
+      "type": "object",
+      "properties": {
+        "app_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "budget": {
+          "$ref": "#/$defs/ExecutionBudget"
+        },
+        "build_bytes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "build_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "build_sha256": {
+          "type": "string"
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResolvedCase"
+          }
+        },
+        "diagnostic_retries": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "environment_revision": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "plan_hash": {
+          "type": "string"
+        },
+        "plan_version_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "profile": {
+          "$ref": "#/$defs/ExecutionProfile"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "app_id",
+        "build_id",
+        "build_sha256",
+        "build_bytes",
+        "plan_version_id",
+        "plan_hash",
+        "environment_revision",
+        "profile",
+        "cases",
+        "budget",
+        "diagnostic_retries",
+        "exclusions"
       ]
     },
     "Scenario": {
@@ -160,6 +2403,88 @@
             "kind"
           ]
         }
+      ]
+    },
+    "StepReceipt": {
+      "type": "object",
+      "properties": {
+        "action_id": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/StepState"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "state",
+        "message"
+      ]
+    },
+    "StepState": {
+      "type": "string",
+      "enum": [
+        "started",
+        "completed",
+        "failed",
+        "blocked",
+        "inconclusive"
+      ]
+    },
+    "SwipeDirection": {
+      "type": "string",
+      "enum": [
+        "up",
+        "down",
+        "left",
+        "right"
+      ]
+    },
+    "TestAction": {
+      "type": "object",
+      "properties": {
+        "checkpoint_id": {
+          "type": "string"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DirectCommand"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "instruction": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ActionKind"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "instruction",
+        "checkpoint_id"
+      ]
+    },
+    "UiProperty": {
+      "type": "string",
+      "enum": [
+        "text",
+        "content_description",
+        "checked",
+        "enabled"
       ]
     }
   }

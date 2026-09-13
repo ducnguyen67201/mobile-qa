@@ -8,6 +8,9 @@
 //! Rust owns these shapes. `just types` exports JSON Schema and generates Python
 //! Pydantic models. Serde handles JSON shape; callers must also invoke the explicit
 //! validate methods below for semantic rules that Serde does not enforce.
+pub mod execution;
+pub mod qualification;
+
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -123,7 +126,14 @@ impl ContractProbe {
 // It is not a message envelope sent to a worker and is never executed as a job.
 #[derive(JsonSchema)]
 pub struct WorkerContracts {
+    pub authoring_request: crate::automation::AuthoringModelRequest,
+    pub authoring_response: crate::automation::AuthoringModelResponse,
+    pub phone_claim: crate::task_sessions::PhoneClaimResponse,
+    pub phone_claim_request: crate::task_sessions::PhoneClaimRequest,
+    pub phone_update: crate::task_sessions::PhoneUpdate,
+    pub execution: execution::ExecutionContracts,
     pub request: FakeExecutionRequest,
     pub result: FakeExecutionResult,
     pub probe: ContractProbe,
+    pub qualification: qualification::QualificationContracts,
 }

@@ -22,11 +22,18 @@ describe('generated browser transport', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(healthy)))
     expect(await healthQuery.queryFn()).toEqual(healthy)
   })
-  it.each([null, [], {}, { ...healthy, status: 'unknown' }, { ...healthy, version: 1 }])('rejects malformed success %j', async data => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(data)))
-    await expect(healthQuery.queryFn()).rejects.toThrow()
-  })
-  it.each([new Response(null, { status: 204 }), new Response('', { headers: { 'Content-Length': '0' } }), new Response('not json')])('rejects empty/nonJSON success %#', async response => {
+  it.each([null, [], {}, { ...healthy, status: 'unknown' }, { ...healthy, version: 1 }])(
+    'rejects malformed success %j',
+    async (data) => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(data)))
+      await expect(healthQuery.queryFn()).rejects.toThrow()
+    },
+  )
+  it.each([
+    new Response(null, { status: 204 }),
+    new Response('', { headers: { 'Content-Length': '0' } }),
+    new Response('not json'),
+  ])('rejects empty/nonJSON success %#', async (response) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response))
     await expect(healthQuery.queryFn()).rejects.toThrow()
   })
@@ -35,15 +42,38 @@ describe('generated browser transport', () => {
     await expect(healthQuery.queryFn()).rejects.toThrow('Unexpected health response status (201)')
   })
   it('validates and preserves a structured non2xx error', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ code: 'unavailable', message: 'Try later', details: null, request_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' }, { status: 503 })))
-    await expect(healthQuery.queryFn()).rejects.toMatchObject({ status: 503, message: 'Try later', body: { code: 'unavailable' } })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            code: 'unavailable',
+            message: 'Try later',
+            details: null,
+            request_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          },
+          { status: 503 },
+        ),
+      ),
+    )
+    await expect(healthQuery.queryFn()).rejects.toMatchObject({
+      status: 503,
+      message: 'Try later',
+      body: { code: 'unavailable' },
+    })
   })
-  it.each([{}, { code: 1, message: {} }, { code: 'failure', message: 3 }, null])('does not trust malformed errors %j', async data => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(data, { status: 500 })))
-    await expect(healthQuery.queryFn()).rejects.toEqual(new ApiClientError(500, null))
-  })
+  it.each([{}, { code: 1, message: {} }, { code: 'failure', message: 3 }, null])(
+    'does not trust malformed errors %j',
+    async (data) => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(data, { status: 500 })))
+      await expect(healthQuery.queryFn()).rejects.toEqual(new ApiClientError(500, null))
+    },
+  )
   it('rejects nonJSON HTTP errors without exposing their body', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>upstream</html>', { status: 502 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('<html>upstream</html>', { status: 502 })),
+    )
     await expect(healthQuery.queryFn()).rejects.toEqual(new ApiClientError(502, null))
   })
   it('preserves a network failure', async () => {

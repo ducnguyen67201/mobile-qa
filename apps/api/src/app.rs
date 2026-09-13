@@ -59,7 +59,9 @@ impl Hooks for App {
             .add_route(controllers::health::routes())
             .add_route(controllers::setup::routes())
             .add_route(controllers::runs::routes())
+            .add_route(controllers::test_library::routes())
             .add_route(controllers::worker::routes())
+            .add_route(controllers::task_sessions::routes())
         // routes-inject (do not remove)
     }
     // No Rust background jobs are registered yet. This hook will not launch the

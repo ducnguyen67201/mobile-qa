@@ -57,3 +57,14 @@ The selected workspace lives in the `workspace` URL parameter, not global mutabl
 session state. This supports independent tabs and browser history. Workspace list
 queries include organization ID; nested resources retain authoritative server checks
 against their persisted app and organization. Switching remounts transient UI state.
+
+## Task-first mobile interaction (2026-09-13)
+
+Following user feedback on the manual case editor, phase 06 starts with a phone
+preview, a plain-language goal or selected control, and **Run task**. Minitap
+plans and performs the task; saving a reusable test is optional afterward.
+The accepted direction is still planned work. Existing phase 05 drafts remain
+editable, and saved regression approval rules remain in force. Interactive task
+completion does not establish an independently verified regression pass.
+The [phase 06 specification](implementation/06-test-generation.md) owns the
+session/job boundaries, generated contracts and acceptance criteria.

@@ -21,3 +21,30 @@ export const completeStatuses: (keyof CompleteBuildUploadResponses)[] = [200, 20
 // @ts-expect-error A completed build cannot be fabricated from a success boolean.
 const staleBuild: BuildResponse = { success: true }
 void staleBuild
+
+// Authoring, review and publication remain a discriminated Rust-owned pipeline.
+import type {
+  LibraryDraftDefinition,
+  ReviewLibraryVersionRequest,
+  SaveLibraryDraftRequest,
+  SetDefaultPlanRequest,
+} from '../api/generated/types.gen'
+import { libraryDraft } from './library-fixtures'
+export const editableDefinition: LibraryDraftDefinition = libraryDraft.definition
+// @ts-expect-error Saves require a revision and mutation identity, not only editable content.
+const unversionedSave: SaveLibraryDraftRequest = { definition: editableDefinition }
+// @ts-expect-error Review decisions must bind the exact frozen content hash and purpose.
+const unboundReview: ReviewLibraryVersionRequest = {
+  mutation_id: 'id',
+  expected_revision: 1,
+  decision: 'approve',
+}
+const implicitDefault: SetDefaultPlanRequest = {
+  mutation_id: 'id',
+  expected_revision: 1,
+  // @ts-expect-error Default selection requires an explicit immutable plan version.
+  latest: true,
+}
+void unversionedSave
+void unboundReview
+void implicitDefault

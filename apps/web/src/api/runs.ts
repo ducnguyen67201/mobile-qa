@@ -4,13 +4,22 @@ import * as sdk from './generated/sdk.gen'
 import * as z from './generated/zod.gen'
 import type { CreateRunRequest } from './generated/types.gen'
 import { checked, headers, options } from './session-transport'
-export const planQuery = (workspace: string, appId: string, buildId: string) =>
+export const planQuery = (
+  workspace: string,
+  appId: string,
+  buildId: string,
+  planVersionId?: string,
+) =>
   queryOptions({
-    queryKey: ['execution-plan', workspace, appId, buildId],
+    queryKey: ['execution-plan', workspace, appId, buildId, planVersionId],
     enabled: !!appId && !!buildId,
     queryFn: () =>
       checked(
-        sdk.getExecutionPlan({ ...options, path: { app_id: appId }, query: { build_id: buildId } }),
+        sdk.getExecutionPlan({
+          ...options,
+          path: { app_id: appId },
+          query: { build_id: buildId, plan_version_id: planVersionId },
+        }),
         z.zPlanPreviewResponse,
       ),
   })

@@ -239,3 +239,11 @@ def test_long_poll_has_longer_timeout_than_heartbeat():
     assert result.poll_after_seconds == 0
     client.raw("POST", "/api/worker/attempts/example/heartbeat", b"{}")
     assert opener.timeouts == [35, 5]
+
+
+def test_user_authored_published_case_uses_the_existing_worker_protocol():
+    published = job().model_dump(mode="json")
+    published["manifest"]["cases"][0]["case"]["provenance"] = "user_authored"
+    parsed = ExecutionJob.model_validate(published)
+    assert parsed.manifest.cases[0].case.provenance == "user_authored"
+    assert ExecutionJob.model_validate_json(parsed.model_dump_json()) == parsed

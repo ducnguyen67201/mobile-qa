@@ -1,19 +1,19 @@
-# Design evaluation rubric
+# Phase 05 design evaluation
 
-Each dimension 0–10; weighted score = .35 design + .30 originality + .25 craft + .10 functionality. Pass threshold 7.5, max 10 cycles, plateau after 3 cycles with no improvement for 2. Code-only scores are provisional, not rendered acceptance.
+Score 0–10 each. Weighted total = .35 design + .30 originality + .25 craft + .10 functionality. Threshold 7.5, maximum 10 cycles. Source-only scores are provisional; rendered acceptance remains pending.
 
 ## Design Quality (weight: 0.35)
 
-Hierarchy, spacing rhythm, coherent shadcn theme, readable metadata, calm contrast, responsive layout. Visual claims require actual evidence; source-only assessment explicitly provisional.
+Coherent Mantine/forest workbench, clear hierarchy between expectations and technical details, readable status and long identities, responsive spacing. Navigation makes the case → suite → release plan progression clear.
 
 ## Originality (weight: 0.30)
 
-Distinctive but appropriate QA workbench composition, purposeful status and onboarding presentation, no generic fake-stat dashboard.
+Purposeful test authoring composition: numbered narrative steps, review receipt, quiet coverage summaries. Distinctiveness supports comprehension; no novelty or fake dashboard numbers.
 
 ## Craft (weight: 0.25)
 
-Accessible labels/focus/live regions, keyboard menus, mobile sheet, consistent primitives, reduced motion, graceful long metadata and all empty/loading/error states.
+Accessible labels, focus, keyboard ordering, mobile stacking, explicit loading/empty/error/permission states, safe long text, unsaved/conflict protection, human feedback.
 
 ## Functionality (weight: 0.10)
 
-Complete agreed workflow connected to generated SDK/Zod; no mock data masquerading as real. Functional defects are hard blockers regardless of weighted score.
+Generated requests/success/errors, complete edits and dual review, immutable pins/default, build selection and Run/report. Functional defects block acceptance regardless of weighted score.

@@ -51,6 +51,12 @@ export type ApprovalPurpose = 'business' | 'executability';
 
 export type ApprovalStatus = 'pending' | 'approved';
 
+export type ArchiveLibraryEntryRequest = {
+    archived: boolean;
+    expected_revision: number;
+    mutation_id: string;
+};
+
 export type ArtifactReceipt = {
     artifact: RunArtifact;
 };
@@ -189,6 +195,14 @@ export type CreateBuildUploadRequest = {
     original_filename: string;
 };
 
+export type CreateLibraryEntryRequest = {
+    entry_id: string;
+    key: string;
+    kind: DefinitionKind;
+    mutation_id: string;
+    template_profile_id?: string | null;
+};
+
 export type CreateRunRequest = {
     build_id: string;
     environment_revision: number;
@@ -198,6 +212,12 @@ export type CreateRunRequest = {
 export type CreateWorkspaceRequest = {
     id: string;
     name: string;
+};
+
+export type DefaultPlanResponse = {
+    app_id: string;
+    plan_version_id?: string | null;
+    revision: number;
 };
 
 export type DefinitionApproval = {
@@ -279,6 +299,11 @@ export type ExecutionLease = {
     run_id: string;
 };
 
+export type ExecutionPlanQuery = {
+    build_id: string;
+    plan_version_id?: string | null;
+};
+
 export type ExecutionProfile = {
     adapter: string;
     device_identity: string;
@@ -308,6 +333,12 @@ export type ExpectedCheck = {
     text_filter: string;
 };
 
+export type ForkLibraryDraftRequest = {
+    expected_revision: number;
+    mutation_id: string;
+    source_version_id: string;
+};
+
 export type GoogleLoginChallenge = {
     challenge_id: string;
     client_id: string;
@@ -334,6 +365,136 @@ export type LeaseStatusResponse = {
     state: JobState;
 };
 
+export type LibraryCapabilities = {
+    can_archive: boolean;
+    can_edit: boolean;
+    can_review_business: boolean;
+    can_review_executability: boolean;
+    can_set_default: boolean;
+};
+
+export type LibraryCoveragePreview = {
+    cases: Array<ResolvedCase>;
+    exclusions: Array<string>;
+    issues: Array<LibraryIssue>;
+    required_count: number;
+};
+
+export type LibraryDraftDefinition = {
+    content: CaseDefinition;
+    kind: 'case';
+} | {
+    content: SuiteDefinition;
+    kind: 'suite';
+} | {
+    content: PlanDraftContent;
+    kind: 'plan';
+};
+
+export type LibraryDraftResponse = {
+    coverage: LibraryCoveragePreview;
+    definition: LibraryDraftDefinition;
+    entry: LibraryEntryResponse;
+    issues: Array<LibraryIssue>;
+    source_version_id?: string | null;
+};
+
+export type LibraryEntryResponse = {
+    app_id: string;
+    archived_at?: string | null;
+    capabilities: LibraryCapabilities;
+    draft_version?: number | null;
+    id: string;
+    key: string;
+    kind: DefinitionKind;
+    latest_review_state?: null | LibraryReviewState;
+    latest_version_id?: string | null;
+    revision: number;
+    title: string;
+    updated_at: string;
+};
+
+export type LibraryErrorDetails = {
+    issues: Array<LibraryIssue>;
+    kind: 'validation';
+} | {
+    current_revision: number;
+    entry_id?: string | null;
+    kind: 'stale_revision';
+} | {
+    kind: 'idempotency_conflict';
+    mutation_id: string;
+};
+
+export type LibraryIssue = {
+    code: LibraryIssueCode;
+    field: string;
+    item_id?: string | null;
+    message: string;
+};
+
+export type LibraryIssueCode = 'required' | 'invalid_content' | 'invalid_reference' | 'conflicting_selection' | 'unsupported_capability' | 'archived';
+
+export type LibraryListQuery = {
+    archived?: boolean | null;
+    cursor?: string | null;
+    kind?: null | DefinitionKind;
+    status?: null | LibraryReviewState;
+};
+
+export type LibraryListResponse = {
+    items: Array<LibraryEntryResponse>;
+    next_cursor?: string | null;
+};
+
+export type LibraryOptionsResponse = {
+    approved_versions: Array<LibraryVersionResponse>;
+    capabilities: LibraryCapabilities;
+    profiles: Array<LibraryProfileChoice>;
+};
+
+export type LibraryProfileChoice = {
+    adapter: string;
+    driver: Driver;
+    id: string;
+    name: string;
+    package: string;
+    qualified: boolean;
+};
+
+export type LibraryReviewDecision = 'approve' | 'needs_input' | 'reject';
+
+export type LibraryReviewEvent = {
+    actor_id: string;
+    actor_name: string;
+    content_hash: string;
+    created_at: string;
+    decision: LibraryReviewDecision;
+    id: string;
+    purpose: ApprovalPurpose;
+    reason?: string | null;
+};
+
+export type LibraryReviewState = 'in_review' | 'needs_input' | 'rejected' | 'approved';
+
+export type LibraryVersionListResponse = {
+    items: Array<LibraryVersionResponse>;
+    next_cursor?: string | null;
+};
+
+export type LibraryVersionQuery = {
+    cursor?: string | null;
+};
+
+export type LibraryVersionResponse = {
+    coverage: LibraryCoveragePreview;
+    entry: LibraryEntryResponse;
+    issues: Array<LibraryIssue>;
+    review_events: Array<LibraryReviewEvent>;
+    review_state: LibraryReviewState;
+    version: DefinitionResponse;
+};
+
 export type LoginRequest = {
     challenge_id: string;
     credential: string;
@@ -353,6 +514,12 @@ export type ModelUsage = {
     unknown_calls: number;
 };
 
+export type OpenPhoneRequest = {
+    build_id?: string | null;
+    id: string;
+    profile_id?: string | null;
+};
+
 export type OrganizationMembership = {
     name: string;
     organization_id: string;
@@ -361,6 +528,70 @@ export type OrganizationMembership = {
 
 export type Outcome = 'passed' | 'failed' | 'blocked' | 'inconclusive' | 'skipped' | 'canceled';
 
+export type PhoneBuildChoice = {
+    id: string;
+    name: string;
+};
+
+export type PhoneControl = {
+    bottom: number;
+    id: string;
+    label: string;
+    left: number;
+    resource_id: string;
+    right: number;
+    top: number;
+};
+
+export type PhoneFrame = {
+    controls: Array<PhoneControl>;
+    height: number;
+    id: string;
+    png_base64: string;
+    width: number;
+};
+
+export type PhoneOptions = {
+    active_session?: string | null;
+    blockers: Array<string>;
+    builds: Array<PhoneBuildChoice>;
+    profiles: Array<ExecutionProfile>;
+};
+
+export type PhoneSelection = {
+    control_id: string;
+    frame_id: string;
+};
+
+export type PhoneSession = {
+    app_id: string;
+    build_id: string;
+    frame?: null | PhoneFrame;
+    id: string;
+    message: string;
+    profile: ExecutionProfile;
+    state: PhoneState;
+    tasks: Array<PhoneTask>;
+};
+
+export type PhoneState = 'queued' | 'preparing' | 'ready' | 'acting' | 'stopping' | 'closed' | 'quarantined';
+
+export type PhoneTask = {
+    control?: null | PhoneControl;
+    goal: string;
+    id: string;
+    message: string;
+    state: PhoneTaskState;
+};
+
+export type PhoneTaskRequest = {
+    goal: string;
+    id: string;
+    selection?: null | PhoneSelection;
+};
+
+export type PhoneTaskState = 'queued' | 'acting' | 'completed' | 'failed' | 'stopped';
+
 export type PlanDefinition = {
     budget: ExecutionBudget;
     cases: Array<CaseSelection>;
@@ -368,6 +599,18 @@ export type PlanDefinition = {
     exclusions: Array<string>;
     key: string;
     profile_id: string;
+    suite_version_ids: Array<string>;
+    title: string;
+    version: number;
+};
+
+export type PlanDraftContent = {
+    budget: ExecutionBudget;
+    cases: Array<CaseSelection>;
+    diagnostic_retries: number;
+    exclusions: Array<string>;
+    key: string;
+    profile_id?: string | null;
     suite_version_ids: Array<string>;
     title: string;
     version: number;
@@ -397,6 +640,15 @@ export type ResolvedCase = {
     data_variant: string;
     definition_id: string;
     required: boolean;
+};
+
+export type ReviewLibraryVersionRequest = {
+    content_hash: string;
+    decision: LibraryReviewDecision;
+    expected_revision: number;
+    mutation_id: string;
+    purpose: ApprovalPurpose;
+    reason?: string | null;
 };
 
 export type RunArtifact = {
@@ -440,6 +692,12 @@ export type RunResponse = {
     summary: string;
 };
 
+export type SaveLibraryDraftRequest = {
+    definition: LibraryDraftDefinition;
+    expected_revision: number;
+    mutation_id: string;
+};
+
 export type SecretKind = 'account' | 'reset';
 
 export type SecretReferenceSummary = {
@@ -455,6 +713,12 @@ export type SessionResponse = {
     user: UserIdentity;
 };
 
+export type SetDefaultPlanRequest = {
+    expected_revision: number;
+    mutation_id: string;
+    plan_version_id: string;
+};
+
 export type SettingsResponse = {
     accepted_build_retention: string;
     max_active_uploads: number;
@@ -463,6 +727,11 @@ export type SettingsResponse = {
     session_ttl_seconds: number;
     storage: string;
     upload_ttl_seconds: number;
+};
+
+export type SubmitLibraryDraftRequest = {
+    expected_revision: number;
+    mutation_id: string;
 };
 
 export type SuiteDefinition = {
@@ -1262,6 +1531,143 @@ export type GetBuildResponses = {
 
 export type GetBuildResponse = GetBuildResponses[keyof GetBuildResponses];
 
+export type GetDefaultTestPlanData = {
+    body?: never;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/default-test-plan';
+};
+
+export type GetDefaultTestPlanErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetDefaultTestPlanError = GetDefaultTestPlanErrors[keyof GetDefaultTestPlanErrors];
+
+export type GetDefaultTestPlanResponses = {
+    /**
+     * Success
+     */
+    200: DefaultPlanResponse;
+};
+
+export type GetDefaultTestPlanResponse = GetDefaultTestPlanResponses[keyof GetDefaultTestPlanResponses];
+
+export type SetDefaultTestPlanData = {
+    body: SetDefaultPlanRequest;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/default-test-plan';
+};
+
+export type SetDefaultTestPlanErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type SetDefaultTestPlanError = SetDefaultTestPlanErrors[keyof SetDefaultTestPlanErrors];
+
+export type SetDefaultTestPlanResponses = {
+    /**
+     * Success
+     */
+    200: DefaultPlanResponse;
+};
+
+export type SetDefaultTestPlanResponse = SetDefaultTestPlanResponses[keyof SetDefaultTestPlanResponses];
+
 export type UpdateEnvironmentData = {
     body: UpdateEnvironmentRequest;
     headers: {
@@ -1351,6 +1757,7 @@ export type GetExecutionPlanData = {
     };
     query: {
         build_id: string;
+        plan_version_id?: string;
     };
     url: '/api/apps/{app_id}/execution-plan';
 };
@@ -1412,6 +1819,140 @@ export type GetExecutionPlanResponses = {
 };
 
 export type GetExecutionPlanResponse = GetExecutionPlanResponses[keyof GetExecutionPlanResponses];
+
+export type GetPhoneOptionsData = {
+    body?: never;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/phone-options';
+};
+
+export type GetPhoneOptionsErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetPhoneOptionsError = GetPhoneOptionsErrors[keyof GetPhoneOptionsErrors];
+
+export type GetPhoneOptionsResponses = {
+    /**
+     * Success
+     */
+    200: PhoneOptions;
+};
+
+export type GetPhoneOptionsResponse = GetPhoneOptionsResponses[keyof GetPhoneOptionsResponses];
+
+export type OpenPhoneData = {
+    body: OpenPhoneRequest;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/phones';
+};
+
+export type OpenPhoneErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type OpenPhoneError = OpenPhoneErrors[keyof OpenPhoneErrors];
+
+export type OpenPhoneResponses = {
+    /**
+     * Success
+     */
+    200: PhoneSession;
+};
+
+export type OpenPhoneResponse = OpenPhoneResponses[keyof OpenPhoneResponses];
 
 export type ListRunsData = {
     body?: never;
@@ -1555,6 +2096,858 @@ export type CreateRunResponses = {
 };
 
 export type CreateRunResponse = CreateRunResponses[keyof CreateRunResponses];
+
+export type ListTestLibraryData = {
+    body?: never;
+    path: {
+        app_id: string;
+    };
+    query?: {
+        kind?: DefinitionKind;
+        status?: LibraryReviewState;
+        archived?: boolean;
+        cursor?: string;
+    };
+    url: '/api/apps/{app_id}/test-library';
+};
+
+export type ListTestLibraryErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type ListTestLibraryError = ListTestLibraryErrors[keyof ListTestLibraryErrors];
+
+export type ListTestLibraryResponses = {
+    /**
+     * Success
+     */
+    200: LibraryListResponse;
+};
+
+export type ListTestLibraryResponse = ListTestLibraryResponses[keyof ListTestLibraryResponses];
+
+export type CreateTestLibraryEntryData = {
+    body: CreateLibraryEntryRequest;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-library';
+};
+
+export type CreateTestLibraryEntryErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type CreateTestLibraryEntryError = CreateTestLibraryEntryErrors[keyof CreateTestLibraryEntryErrors];
+
+export type CreateTestLibraryEntryResponses = {
+    /**
+     * Mutation replay
+     */
+    200: LibraryDraftResponse;
+    /**
+     * Success
+     */
+    201: LibraryDraftResponse;
+};
+
+export type CreateTestLibraryEntryResponse = CreateTestLibraryEntryResponses[keyof CreateTestLibraryEntryResponses];
+
+export type GetTestLibraryOptionsData = {
+    body?: never;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-library/options';
+};
+
+export type GetTestLibraryOptionsErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetTestLibraryOptionsError = GetTestLibraryOptionsErrors[keyof GetTestLibraryOptionsErrors];
+
+export type GetTestLibraryOptionsResponses = {
+    /**
+     * Success
+     */
+    200: LibraryOptionsResponse;
+};
+
+export type GetTestLibraryOptionsResponse = GetTestLibraryOptionsResponses[keyof GetTestLibraryOptionsResponses];
+
+export type GetTestLibraryEntryData = {
+    body?: never;
+    path: {
+        app_id: string;
+        entry_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-library/{entry_id}';
+};
+
+export type GetTestLibraryEntryErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetTestLibraryEntryError = GetTestLibraryEntryErrors[keyof GetTestLibraryEntryErrors];
+
+export type GetTestLibraryEntryResponses = {
+    /**
+     * Success
+     */
+    200: LibraryEntryResponse;
+};
+
+export type GetTestLibraryEntryResponse = GetTestLibraryEntryResponses[keyof GetTestLibraryEntryResponses];
+
+export type ArchiveTestLibraryEntryData = {
+    body: ArchiveLibraryEntryRequest;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path: {
+        app_id: string;
+        entry_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-library/{entry_id}/archive';
+};
+
+export type ArchiveTestLibraryEntryErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type ArchiveTestLibraryEntryError = ArchiveTestLibraryEntryErrors[keyof ArchiveTestLibraryEntryErrors];
+
+export type ArchiveTestLibraryEntryResponses = {
+    /**
+     * Success
+     */
+    200: LibraryEntryResponse;
+};
+
+export type ArchiveTestLibraryEntryResponse = ArchiveTestLibraryEntryResponses[keyof ArchiveTestLibraryEntryResponses];
+
+export type GetTestLibraryDraftData = {
+    body?: never;
+    path: {
+        app_id: string;
+        entry_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-library/{entry_id}/draft';
+};
+
+export type GetTestLibraryDraftErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetTestLibraryDraftError = GetTestLibraryDraftErrors[keyof GetTestLibraryDraftErrors];
+
+export type GetTestLibraryDraftResponses = {
+    /**
+     * Success
+     */
+    200: LibraryDraftResponse;
+};
+
+export type GetTestLibraryDraftResponse = GetTestLibraryDraftResponses[keyof GetTestLibraryDraftResponses];
+
+export type ForkTestLibraryDraftData = {
+    body: ForkLibraryDraftRequest;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path: {
+        app_id: string;
+        entry_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-library/{entry_id}/draft';
+};
+
+export type ForkTestLibraryDraftErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type ForkTestLibraryDraftError = ForkTestLibraryDraftErrors[keyof ForkTestLibraryDraftErrors];
+
+export type ForkTestLibraryDraftResponses = {
+    /**
+     * Mutation replay
+     */
+    200: LibraryDraftResponse;
+    /**
+     * Success
+     */
+    201: LibraryDraftResponse;
+};
+
+export type ForkTestLibraryDraftResponse = ForkTestLibraryDraftResponses[keyof ForkTestLibraryDraftResponses];
+
+export type SaveTestLibraryDraftData = {
+    body: SaveLibraryDraftRequest;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path: {
+        app_id: string;
+        entry_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-library/{entry_id}/draft';
+};
+
+export type SaveTestLibraryDraftErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type SaveTestLibraryDraftError = SaveTestLibraryDraftErrors[keyof SaveTestLibraryDraftErrors];
+
+export type SaveTestLibraryDraftResponses = {
+    /**
+     * Success
+     */
+    200: LibraryDraftResponse;
+};
+
+export type SaveTestLibraryDraftResponse = SaveTestLibraryDraftResponses[keyof SaveTestLibraryDraftResponses];
+
+export type SubmitTestLibraryDraftData = {
+    body: SubmitLibraryDraftRequest;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path: {
+        app_id: string;
+        entry_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-library/{entry_id}/submit';
+};
+
+export type SubmitTestLibraryDraftErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type SubmitTestLibraryDraftError = SubmitTestLibraryDraftErrors[keyof SubmitTestLibraryDraftErrors];
+
+export type SubmitTestLibraryDraftResponses = {
+    /**
+     * Mutation replay
+     */
+    200: LibraryVersionResponse;
+    /**
+     * Success
+     */
+    201: LibraryVersionResponse;
+};
+
+export type SubmitTestLibraryDraftResponse = SubmitTestLibraryDraftResponses[keyof SubmitTestLibraryDraftResponses];
+
+export type ListTestLibraryVersionsData = {
+    body?: never;
+    path: {
+        app_id: string;
+        entry_id: string;
+    };
+    query?: {
+        cursor?: string;
+    };
+    url: '/api/apps/{app_id}/test-library/{entry_id}/versions';
+};
+
+export type ListTestLibraryVersionsErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type ListTestLibraryVersionsError = ListTestLibraryVersionsErrors[keyof ListTestLibraryVersionsErrors];
+
+export type ListTestLibraryVersionsResponses = {
+    /**
+     * Success
+     */
+    200: LibraryVersionListResponse;
+};
+
+export type ListTestLibraryVersionsResponse = ListTestLibraryVersionsResponses[keyof ListTestLibraryVersionsResponses];
+
+export type GetTestLibraryVersionData = {
+    body?: never;
+    path: {
+        app_id: string;
+        entry_id: string;
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-library/{entry_id}/versions/{version_id}';
+};
+
+export type GetTestLibraryVersionErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetTestLibraryVersionError = GetTestLibraryVersionErrors[keyof GetTestLibraryVersionErrors];
+
+export type GetTestLibraryVersionResponses = {
+    /**
+     * Success
+     */
+    200: LibraryVersionResponse;
+};
+
+export type GetTestLibraryVersionResponse = GetTestLibraryVersionResponses[keyof GetTestLibraryVersionResponses];
+
+export type ReviewTestLibraryVersionData = {
+    body: ReviewLibraryVersionRequest;
+    headers: {
+        'X-CSRF-Token': string;
+    };
+    path: {
+        app_id: string;
+        entry_id: string;
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/test-library/{entry_id}/versions/{version_id}/review';
+};
+
+export type ReviewTestLibraryVersionErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type ReviewTestLibraryVersionError = ReviewTestLibraryVersionErrors[keyof ReviewTestLibraryVersionErrors];
+
+export type ReviewTestLibraryVersionResponses = {
+    /**
+     * Success
+     */
+    200: LibraryVersionResponse;
+};
+
+export type ReviewTestLibraryVersionResponse = ReviewTestLibraryVersionResponses[keyof ReviewTestLibraryVersionResponses];
 
 export type StartGoogleSignInData = {
     body?: never;
@@ -1949,6 +3342,207 @@ export type GetHealthResponses = {
 };
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
+
+export type GetPhoneData = {
+    body?: never;
+    path: {
+        session_id: string;
+    };
+    query?: never;
+    url: '/api/phones/{session_id}';
+};
+
+export type GetPhoneErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetPhoneError = GetPhoneErrors[keyof GetPhoneErrors];
+
+export type GetPhoneResponses = {
+    /**
+     * Success
+     */
+    200: PhoneSession;
+};
+
+export type GetPhoneResponse = GetPhoneResponses[keyof GetPhoneResponses];
+
+export type StopPhoneData = {
+    body?: never;
+    path: {
+        session_id: string;
+    };
+    query?: never;
+    url: '/api/phones/{session_id}/stop';
+};
+
+export type StopPhoneErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type StopPhoneError = StopPhoneErrors[keyof StopPhoneErrors];
+
+export type StopPhoneResponses = {
+    /**
+     * Success
+     */
+    200: PhoneSession;
+};
+
+export type StopPhoneResponse = StopPhoneResponses[keyof StopPhoneResponses];
+
+export type RunPhoneTaskData = {
+    body: PhoneTaskRequest;
+    path: {
+        session_id: string;
+    };
+    query?: never;
+    url: '/api/phones/{session_id}/tasks';
+};
+
+export type RunPhoneTaskErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type RunPhoneTaskError = RunPhoneTaskErrors[keyof RunPhoneTaskErrors];
+
+export type RunPhoneTaskResponses = {
+    /**
+     * Success
+     */
+    200: PhoneSession;
+};
+
+export type RunPhoneTaskResponse = RunPhoneTaskResponses[keyof RunPhoneTaskResponses];
 
 export type GetRunData = {
     body?: never;

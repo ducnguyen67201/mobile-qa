@@ -300,3 +300,22 @@ wakeup is process-local, not PostgreSQL LISTEN/NOTIFY. No transaction is held wh
 waiting. Worker revocation is rechecked on each wake/recheck. Reverse proxies must
 permit requests lasting longer than 30 seconds. Heartbeats and cleanup fencing are
 unchanged. Real-device/model execution is not part of ordinary checks.
+
+## Authoring workflow acceptance
+
+After the complete phase 05 source/test/config batch, run `just types`, `just format`,
+`just format-check`, the contracts/API/web/worker checks, CI scope checks, `just build`
+and `just smoke-test-library`. The last command reuses the synthetic sign-in/APK
+and worker fixtures on the owned test API port. It performs customer mutations
+through HTTP, checks exact retries and restarts, and never consumes Doppler secrets
+or starts an emulator. Preserve existing local development processes.
+
+For an allowed browser acceptance: Tests → app → new case or controlled demo template
+→ Save → Request review → both explicitly granted reviews → suite/release plan →
+review → Set as default → choose a build → Run → report. An operator must already
+register a compatible qualified profile and grant the reviewer purposes. Customer
+apps without a qualified adapter can be authored and receive business review;
+automatic execution remains blocked with a visible readiness explanation.
+
+The existing browser admin-policy restriction is binding. Source design review,
+DOM tests and HTTP acceptance must be reported separately from rendered/device proof.

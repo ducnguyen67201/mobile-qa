@@ -47,3 +47,22 @@ it('shares session CSRF and retains submission identity on transport failure', a
   expect(requests[0]?.headers.get('x-csrf-token')).toBe('csrf-test')
   expect(requests.every((r) => r.headers.get('idempotency-key') === 'same-key')).toBe(true)
 })
+it('pins an explicit plan version in the preview request and cache identity', async () => {
+  const plan = '44444444-4444-4444-8444-444444444444'
+  const requests: Request[] = []
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      requests.push(request)
+      return Response.json({ plan: null, manifest: null, blockers: ['Fixture'] })
+    }),
+  )
+  const { QueryClient } = await import('@tanstack/react-query')
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  await client.fetchQuery(planQuery('workspace', app, build, plan))
+  expect(new URL(requests[0]!.url).searchParams.get('plan_version_id')).toBe(plan)
+  expect(planQuery('workspace', app, build).queryKey).not.toEqual(
+    planQuery('workspace', app, build, plan).queryKey,
+  )
+  client.clear()
+})

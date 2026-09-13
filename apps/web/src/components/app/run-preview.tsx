@@ -11,7 +11,8 @@ import {
   Title,
 } from '@mantine/core'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
+import { useMounted } from '@/hooks/use-mounted'
 import { createRun, planQuery } from '@/api/runs'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { useSession } from './session'
@@ -21,15 +22,18 @@ export function RunPreview({
   appId,
   buildId,
   readOnly = false,
+  planVersionId,
 }: {
   appId: string
   buildId: string
   readOnly?: boolean
+  planVersionId?: string
 }) {
   const { workspaceId = '', href } = useWorkspace()
+  const mounted = useMounted()
   const session = useSession()
   const navigate = useNavigate()
-  const query = useQuery(planQuery(workspaceId, appId, buildId))
+  const query = useQuery(planQuery(workspaceId, appId, buildId, planVersionId))
   const start = useMutation({
     mutationFn: async () => {
       const manifest = query.data?.manifest
@@ -53,15 +57,25 @@ export function RunPreview({
       sessionStorage.removeItem(storageKey)
       return run
     },
-    onSuccess: (run) => void navigate(href(`/runs/${run.id}`)),
+    onSuccess: (run) => {
+      if (mounted.current) void navigate(href(`/runs/${run.id}`))
+    },
   })
   return (
     <Card withBorder>
       <Stack>
         <Group justify="space-between">
           <Title order={2}>Release check</Title>
-          <Badge variant="light">Operator managed</Badge>
+          <Badge variant="light">Reviewed coverage</Badge>
         </Group>
+        <Button
+          component={Link}
+          to={href(`/tests?app=${appId}&kind=plan`)}
+          variant="subtle"
+          w="fit-content"
+        >
+          Open test library & release plans
+        </Button>
         {query.isPending && <LoadingPanel label="Loading approved tests…" />}
         {query.isError && <ErrorNotice error={query.error} retry={() => void query.refetch()} />}
         {query.data?.blockers.length ? (

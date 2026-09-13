@@ -12,6 +12,8 @@ import { Workspaces, CreateWorkspace } from './pages/Workspaces'
 import { Runs } from './pages/Runs'
 import { RunDetail } from './pages/RunDetail'
 import { Tests } from './pages/Tests'
+import { TestLibraryDetail } from './pages/TestLibraryDetail'
+import { TaskSession } from './pages/TaskSession'
 // scaffold:imports
 export const routes: RouteObject[] = [
   { path: '/sign-in', element: <SignIn /> },
@@ -31,7 +33,10 @@ export const routes: RouteObject[] = [
         children: [
           { path: 'apps', element: <Apps /> },
           { path: 'apps/:app_id', element: <AppDetail /> },
+          { path: 'apps/:app_id/try', element: <TaskSession /> },
           { path: 'tests', element: <Tests /> },
+          { path: 'tests/:app_id/:entry_id', element: <TestLibraryDetail /> },
+          { path: 'tests/:app_id/:entry_id/versions/:version_id', element: <TestLibraryDetail /> },
           { path: 'runs', element: <Runs /> },
           { path: 'runs/:run_id', element: <RunDetail /> },
           { path: 'settings', element: <Settings /> },

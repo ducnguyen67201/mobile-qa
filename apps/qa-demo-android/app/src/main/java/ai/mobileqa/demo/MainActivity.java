@@ -13,7 +13,7 @@ import java.net.URL;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Controlled fixture: identical UI, with only durable storage changed by build flavor. */
+/** Good/broken exercise runner prerequisites; sample exposes the same input UI offline. */
 public final class MainActivity extends Activity {
     private final ExecutorService network = Executors.newSingleThreadExecutor();
     private LinearLayout layout;
@@ -24,6 +24,12 @@ public final class MainActivity extends Activity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(32, 80, 32, 32);
         setContentView(layout);
+        // The installable sample needs no runner. Qualification flavors still
+        // require the controlled backend so an outage cannot look like a pass.
+        if (!BuildConfig.REQUIRE_SESSION) {
+            showTasks();
+            return;
+        }
         label("Checking test session…", 0);
         network.execute(() -> {
             boolean ready = false;

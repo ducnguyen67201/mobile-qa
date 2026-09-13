@@ -1,10 +1,10 @@
 # Implementation status and evidence
 
-Last reconciled: 2026-09-12. This branch integrates main commit `9eb5dba` (PR #3,
-spec 03 dashboard/app setup) with the spec 02 Android/Minitap runner. The dashboard
-and API retain main's source; Tests/Runs and the worker HTTP job protocol remain
-planned. Local device evidence and historical spec 03 evidence are recorded below.
-This is a milestone record, not a live CI badge.
+Last reconciled: 2026-09-12. This branch builds phase 05 on integrated phase 02/04
+commit `b4970c7`. The authoring/library implementation and deterministic validation
+have passed locally. Phase 04 dispatch/report evidence below remains valid;
+phase 05 rendered browser/emulator acceptance is still pending. Historical sections
+record their milestone state, not the current source inventory.
 
 ## Foundation evidence before spec 03
 
@@ -316,3 +316,33 @@ Private report/evidence: `.private/live-execution/aad6f00b-7dff-4174-852f-00e5f5
 backend-to-device run, not manual browser acceptance, broken/unavailable scenarios
 through this new path, cancellation under live navigation, full reliability or
 hosted storage acceptance. Those gates remain open.
+
+## Phase 05 authoring implementation
+
+Draft catalog, immutable submission/review, atomic mutation retries, archive and
+explicit default-plan source are implemented with generated browser contracts.
+The Tests UI connects case/suite/plan editing to existing execution preview and
+reports. Validation passes: 90 web tests, 42 Rust tests, 117 worker tests, one exporter
+helper test and 20 CI scope cases. TypeScript, ESLint, Clippy, Ruff, Pyright,
+generated drift and both builds pass. The HTTP smoke authors and reviews a case,
+suite and plan, selects an explicit default, runs the fake Python worker after
+API restart and preserves passed/failed/blocked reports plus the queued manifest
+after a later draft edit. See the [phase 05 report](../../.claude/PRPs/reports/05-test-library-and-plans-report.md).
+The GAN review is source-only; rendered layout and the new UI-to-emulator flow
+remain unverified under the existing browser restriction.
+
+### Phase 06 task sessions — in progress
+
+Task-first source is being implemented on `codex/06-task-sessions`; see
+[the plan](../../.claude/PRPs/plans/06-task-sessions.plan.md). No completion or real
+UI-to-Minitap acceptance is claimed yet. This checkout retains local phase 05
+changes; GitHub PR #5 was the phase 04 execution/report PR.
+
+Phase 06 primary task-session source and real API-to-Minitap acceptance now pass:
+run `a8101844-8f33-4292-b093-8dd02e719b1c` saved two different texts through the actual
+sample APK, including a selected-control task, and closed its owned emulator.
+Generated contracts, 43 Rust tests, 93 browser tests and the worker checks passed
+(with one existing local HTTP test requiring a successful targeted rerun).
+See [the implementation report](../../.claude/PRPs/reports/06-task-sessions-report.md).
+Rendered browser acceptance, persistent local worker credential/registration,
+restart-goal acceptance and the broader generation/discovery scope remain open.

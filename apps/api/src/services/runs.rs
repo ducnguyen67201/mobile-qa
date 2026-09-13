@@ -17,27 +17,35 @@ pub async fn preview(
         manifest: None,
         blockers: vec![],
     };
+    let b = one(
+        db,
+        "SELECT * FROM builds WHERE id=$1 AND app_id=$2",
+        vec![build.into(), app.into()],
+    )
+    .await?;
     let plan = if let Some(id) = plan {
         id
     } else {
-        let candidates = rows(
-            db,
-            "SELECT id FROM execution_definitions d WHERE app_id=$1 AND kind='plan' AND (SELECT \
-            count(*) FROM execution_approvals a WHERE a.definition_id=d.id)=2 ORDER BY \
-            created_at DESC,id DESC LIMIT 1",
-            vec![app.into()],
-        )
-        .await?;
-        if let Some(r) = candidates.first() {
-            field(r, "id")?
+        if let Some(id) = super::test_library::default_plan(db, app)
+            .await?
+            .plan_version_id
+        {
+            id
         } else {
             out.blockers
-                .push("An operator must import and approve a release check".into());
+                .push("Choose an approved default release plan in Tests".into());
             return Ok(out);
         }
     };
     let d = definitions::get(db, app, plan).await?;
     out.plan = Some(d.clone());
+    if let Err(error) = super::test_library::admitted(db, app, plan).await {
+        if error.status.is_server_error() {
+            return Err(error);
+        }
+        out.blockers.push(error.message);
+        return Ok(out);
+    }
     if !definitions::approved(&d) {
         out.blockers.push("Release check is not approved".into());
         return Ok(out);
@@ -53,12 +61,6 @@ pub async fn preview(
             return Ok(out);
         }
     };
-    let b = one(
-        db,
-        "SELECT * FROM builds WHERE id=$1 AND app_id=$2",
-        vec![build.into(), app.into()],
-    )
-    .await?;
     let env = one(
         db,
         "SELECT revision,account_secret_reference_id,reset_secret_reference_id FROM \

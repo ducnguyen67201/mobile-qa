@@ -1,4 +1,4 @@
-"""Approved navigation only; imports the SDK after process environment isolation."""
+"""Explicit bounded navigation; imports the SDK after process environment isolation."""
 
 from dataclasses import replace
 from pathlib import Path

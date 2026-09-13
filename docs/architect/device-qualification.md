@@ -141,6 +141,19 @@ reaches it through an explicit ADB reverse tunnel at 127.0.0.1:8765. The runner 
 the tunnel after installation, avoiding cold-boot Wi-Fi initialization races. No real
 account credentials are required.
 
+The `sample` flavor is an offline input demo: enter a task name, tap Save and see
+the saved text survive an app restart. It keeps package `ai.mobileqa.demo` and the
+same view IDs, but skips the controlled session prerequisite. Build it with
+`:app:assembleSampleDebug`; the output is
+`apps/qa-demo-android/app/build/outputs/apk/sample/debug/app-sample-debug.apk`.
+This is for trying APK upload and simple input checks; it is not the good/broken
+qualification fixture and does not demonstrate backend-outage handling.
+
+For the dashboard's Create app form use name **QA Tasks sample**, package
+`ai.mobileqa.demo` and environment **Local demo**. The current form requires a
+backend origin, so use the reserved local fixture origin `http://127.0.0.1:8765`;
+this offline APK makes no request to it. Leave login origins empty.
+
 ```sh
 # Explicit SDK/dependency preparation, then build once after complete edits.
 python3 infra/device-host/install_tools.py --sdk-root /opt/mobile-qa/android-sdk --demo-only

@@ -2,7 +2,7 @@
 use crate::{browser::ApiError, execution::*};
 use utoipa::OpenApi;
 #[utoipa::path(get,path="/api/apps/{app_id}/execution-plan",operation_id="getExecutionPlan",security(("session_cookie"=[])),
-params(("app_id" = Uuid, Path),("build_id" = Uuid, Query)),
+params(("app_id" = Uuid, Path),crate::test_library::ExecutionPlanQuery),
 responses((status=200,description="Success",body=PlanPreviewResponse),(status=400,description="API error",body=ApiError),(status=401,description="API error",body=ApiError),(status=403,description="API error",body=ApiError),(status=404,description="API error",body=ApiError),(status=409,description="API error",body=ApiError),(status=413,description="API error",body=ApiError),(status=422,description="API error",body=ApiError),(status=429,description="API error",body=ApiError),(status=500,description="API error",body=ApiError),(status=503,description="API error",body=ApiError),(status="default",description="API error",body=ApiError)))]
 #[allow(dead_code)]
 fn endpoint_0() {}

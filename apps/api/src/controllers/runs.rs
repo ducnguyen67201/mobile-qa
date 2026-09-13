@@ -12,12 +12,9 @@ use axum::{
 };
 use loco_rs::{app::AppContext, controller::Routes};
 use mobile_qa_contracts::execution::*;
+use mobile_qa_contracts::test_library::ExecutionPlanQuery;
 use serde::Deserialize;
 use uuid::Uuid;
-#[derive(Deserialize)]
-struct PreviewQuery {
-    build_id: Uuid,
-}
 #[derive(Deserialize)]
 struct ListQuery {
     cursor: Option<Uuid>,
@@ -26,10 +23,12 @@ async fn preview(
     State(ctx): State<AppContext>,
     session: Session,
     Path(app): Path<Uuid>,
-    Query(q): Query<PreviewQuery>,
+    Query(q): Query<ExecutionPlanQuery>,
 ) -> ApiResult<Json<PlanPreviewResponse>> {
     apps::authorized(&ctx, session.user.id, app).await?;
-    Ok(Json(runs::preview(&ctx.db, app, q.build_id, None).await?))
+    Ok(Json(
+        runs::preview(&ctx.db, app, q.build_id, q.plan_version_id).await?,
+    ))
 }
 async fn create(
     State(ctx): State<AppContext>,

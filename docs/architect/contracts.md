@@ -117,3 +117,19 @@ and binds an exact content hash and reviewer purpose. `contracts/fixtures/execut
 contains a synthetic persistence case, not customer test data. Worker requests use
 bearer identity plus an attempt-scoped token/generation; Python never receives DB
 credentials. See the phase 04 plan for the route inventory and fencing semantics.
+
+## Phase 05 authoring boundary
+
+`test_library.rs` owns the draft union, catalog/version/review responses, bounded
+revision/mutation requests, typed issues and feature error details. Its OpenAPI
+operations live in `test_library_api.rs` and merge into the local browser export.
+The API returns feature details inside the existing `ApiError.details` field;
+the browser accepts those details only after generated `zLibraryErrorDetails`
+validation. Existing generic and malformed-error behavior stays safe.
+
+`LibraryDraftDefinition::Plan` permits `profile_id: null` until submission. Conversion
+to the existing `TestDefinition` is explicit and server-side. Browser cases receive
+`user_authored` provenance; legacy `operator_authored` content and hashes are not
+rewritten. Python consumes the same published manifest through generated Pydantic.
+`ExecutionPlanQuery` supports a selected `plan_version_id`; omission uses the stored
+app default without automatically choosing a later approval.

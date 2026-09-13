@@ -75,6 +75,8 @@ jobs:
               - 'scripts/apk_fixtures.py'
               - 'scripts/app_setup_smoke.py'
               - 'scripts/execution_smoke.py'
+              - 'scripts/test_library_smoke.py'
+              - 'scripts/task_session_smoke.py'
             web:
               - '.github/workflows/**'
               - 'apps/web/**'
@@ -82,6 +84,10 @@ jobs:
               - 'crates/contracts/src/browser.rs'
               - 'crates/contracts/src/execution.rs'
               - 'crates/contracts/src/execution_api.rs'
+              - 'crates/contracts/src/test_library.rs'
+              - 'crates/contracts/src/test_library_api.rs'
+              - 'crates/contracts/src/task_sessions.rs'
+              - 'crates/contracts/src/task_sessions_api.rs'
               - 'contracts/browser.openapi.json'
               - 'crates/contracts/Cargo.toml'
               - 'crates/contracts/src/lib.rs'
@@ -90,7 +96,10 @@ jobs:
               - 'apps/mobile-worker/**'
               - 'crates/contracts/src/worker.rs'
               - 'crates/contracts/src/execution.rs'
+              - 'crates/contracts/src/task_sessions.rs'
               - 'scripts/execution_smoke.py'
+              - 'scripts/test_library_smoke.py'
+              - 'scripts/task_session_smoke.py'
               - 'crates/contracts/src/worker/**'
               - 'infra/device-host/**'
               - 'contracts/worker.schema.json'
@@ -147,6 +156,7 @@ jobs:
           version: 0.12.1
       - run: uv sync --project apps/mobile-worker --frozen
       - run: python3 scripts/execution_smoke.py
+      - run: python3 scripts/test_library_smoke.py
   web:
     needs: scope
     if: needs.scope.outputs.web == 'true'
@@ -238,7 +248,7 @@ jobs:
           unset ANDROID_SDK_ROOT
           export ANDROID_HOME="$GITHUB_WORKSPACE/.private/android-sdk"
           cd apps/qa-demo-android
-          ./gradlew --no-daemon :app:assembleGoodDebug :app:assembleBrokenDebug :app:lintGoodDebug :app:lintBrokenDebug
+          ./gradlew --no-daemon :app:assembleGoodDebug :app:assembleBrokenDebug :app:assembleSampleDebug :app:lintGoodDebug :app:lintBrokenDebug :app:lintSampleDebug
   scope_tests:
     needs: scope
     if: needs.scope.outputs.scope_tests == 'true'

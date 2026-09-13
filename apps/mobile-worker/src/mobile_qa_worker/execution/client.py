@@ -64,7 +64,11 @@ class Client:
         try:
             # Claims may wait 30 seconds server-side; other calls keep their short
             # timeout so the heartbeat watchdog remains responsive.
-            timeout = 35 if method == "POST" and path == "/api/worker/claims" else 5
+            timeout = (
+                35
+                if method == "POST" and path in ("/api/worker/claims", "/api/worker/phone-claims")
+                else 5
+            )
             with self.opener.open(request, timeout=timeout) as response:
                 data = response.read(limit + 1)
                 if len(data) > limit:
@@ -82,10 +86,13 @@ class Client:
         payload: BaseModel | dict[str, object],
         model: type[T],
         lease_token: str = "",
+        limit: int = 1048576,
     ) -> T:
         raw = (
             payload.model_dump_json().encode()
             if isinstance(payload, BaseModel)
             else json.dumps(payload).encode()
         )
-        return model.model_validate_json(self.raw("POST", path, raw, lease_token), strict=True)
+        return model.model_validate_json(
+            self.raw("POST", path, raw, lease_token, limit=limit), strict=True
+        )

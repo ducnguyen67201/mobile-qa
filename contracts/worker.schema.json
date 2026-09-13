@@ -6,6 +6,15 @@
     "execution": {
       "$ref": "#/$defs/ExecutionContracts"
     },
+    "phone_claim": {
+      "$ref": "#/$defs/PhoneClaimResponse"
+    },
+    "phone_claim_request": {
+      "$ref": "#/$defs/PhoneClaimRequest"
+    },
+    "phone_update": {
+      "$ref": "#/$defs/PhoneUpdate"
+    },
     "probe": {
       "$ref": "#/$defs/ContractProbe"
     },
@@ -20,6 +29,9 @@
     }
   },
   "required": [
+    "phone_claim",
+    "phone_claim_request",
+    "phone_update",
     "execution",
     "request",
     "result",
@@ -1017,6 +1029,290 @@
         "passed",
         "failed",
         "blocked"
+      ]
+    },
+    "PhoneClaimRequest": {
+      "type": "object",
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "claim_id"
+      ]
+    },
+    "PhoneClaimResponse": {
+      "type": "object",
+      "properties": {
+        "lease": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhoneLease"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "PhoneControl": {
+      "type": "object",
+      "properties": {
+        "bottom": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "left": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "right": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "top": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "resource_id",
+        "left",
+        "top",
+        "right",
+        "bottom"
+      ]
+    },
+    "PhoneFrame": {
+      "type": "object",
+      "properties": {
+        "controls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PhoneControl"
+          }
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "png_base64": {
+          "type": "string"
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "png_base64",
+        "width",
+        "height",
+        "controls"
+      ]
+    },
+    "PhoneLease": {
+      "type": "object",
+      "properties": {
+        "build_bytes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "build_sha256": {
+          "type": "string"
+        },
+        "lease_token": {
+          "type": "string"
+        },
+        "session": {
+          "$ref": "#/$defs/PhoneSession"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "session",
+        "lease_token",
+        "build_sha256",
+        "build_bytes"
+      ]
+    },
+    "PhoneSession": {
+      "type": "object",
+      "properties": {
+        "app_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "build_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhoneFrame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "message": {
+          "type": "string"
+        },
+        "profile": {
+          "$ref": "#/$defs/ExecutionProfile"
+        },
+        "state": {
+          "$ref": "#/$defs/PhoneState"
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PhoneTask"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "app_id",
+        "build_id",
+        "profile",
+        "state",
+        "message",
+        "tasks"
+      ]
+    },
+    "PhoneState": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "preparing",
+        "ready",
+        "acting",
+        "stopping",
+        "closed",
+        "quarantined"
+      ]
+    },
+    "PhoneTask": {
+      "type": "object",
+      "properties": {
+        "control": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhoneControl"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "goal": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "message": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/PhoneTaskState"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "goal",
+        "state",
+        "message"
+      ]
+    },
+    "PhoneTaskState": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "acting",
+        "completed",
+        "failed",
+        "stopped"
+      ]
+    },
+    "PhoneUpdate": {
+      "type": "object",
+      "properties": {
+        "clean": {
+          "type": "boolean"
+        },
+        "frame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhoneFrame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/PhoneState"
+        },
+        "task": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhoneTask"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "message",
+        "clean"
       ]
     },
     "QualificationArtifact": {

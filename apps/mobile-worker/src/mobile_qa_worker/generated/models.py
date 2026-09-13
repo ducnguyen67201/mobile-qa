@@ -168,6 +168,55 @@ class Outcome2(StrEnum):
     blocked = 'blocked'
 
 
+class PhoneClaimRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    claim_id: UUID
+
+
+class PhoneControl(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    bottom: Annotated[int, Field(ge=0)]
+    id: str
+    label: str
+    left: Annotated[int, Field(ge=0)]
+    resource_id: str
+    right: Annotated[int, Field(ge=0)]
+    top: Annotated[int, Field(ge=0)]
+
+
+class PhoneFrame(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    controls: list[PhoneControl]
+    height: Annotated[int, Field(ge=0)]
+    id: UUID
+    png_base64: str
+    width: Annotated[int, Field(ge=0)]
+
+
+class PhoneState(StrEnum):
+    queued = 'queued'
+    preparing = 'preparing'
+    ready = 'ready'
+    acting = 'acting'
+    stopping = 'stopping'
+    closed = 'closed'
+    quarantined = 'quarantined'
+
+
+class PhoneTaskState(StrEnum):
+    queued = 'queued'
+    acting = 'acting'
+    completed = 'completed'
+    failed = 'failed'
+    stopped = 'stopped'
+
+
 class QualificationArtifact1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -405,6 +454,28 @@ class LocalExecutionResult(BaseModel):
     usage: list[ModelUsage]
 
 
+class PhoneTask(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    control: PhoneControl | None = None
+    goal: str
+    id: UUID
+    message: str
+    state: PhoneTaskState
+
+
+class PhoneUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    clean: bool
+    frame: PhoneFrame | None = None
+    message: str
+    state: PhoneState
+    task: PhoneTask | None = None
+
+
 class QualificationResult(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -461,6 +532,20 @@ class CaseDefinition(BaseModel):
     requirement: str
     title: str
     version: Annotated[int, Field(ge=0)]
+
+
+class PhoneSession(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    app_id: UUID
+    build_id: UUID
+    frame: PhoneFrame | None = None
+    id: UUID
+    message: str
+    profile: ExecutionProfile
+    state: PhoneState
+    tasks: list[PhoneTask]
 
 
 class QualificationContracts(BaseModel):
@@ -529,6 +614,16 @@ class ExecutionLease(BaseModel):
     run_id: UUID
 
 
+class PhoneLease(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    build_bytes: Annotated[int, Field(ge=0)]
+    build_sha256: str
+    lease_token: str
+    session: PhoneSession
+
+
 class ClaimResponse(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -557,11 +652,21 @@ class ExecutionContracts(BaseModel):
     navigation: NavigationRequest
 
 
+class PhoneClaimResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    lease: PhoneLease | None = None
+
+
 class WorkerContracts(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     execution: ExecutionContracts
+    phone_claim: PhoneClaimResponse
+    phone_claim_request: PhoneClaimRequest
+    phone_update: PhoneUpdate
     probe: ContractProbe
     qualification: QualificationContracts
     request: FakeExecutionRequest

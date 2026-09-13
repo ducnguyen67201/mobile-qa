@@ -6,6 +6,8 @@ mod m20260912_000001_app_setup;
 mod m20260912_000002_google_sign_in;
 mod m20260912_000003_workspaces;
 mod m20260912_000004_execution;
+pub mod m20260912_000005_test_library;
+mod m20260913_000006_task_sessions;
 pub struct Migrator;
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
@@ -15,6 +17,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260912_000002_google_sign_in::Migration),
             Box::new(m20260912_000003_workspaces::Migration),
             Box::new(m20260912_000004_execution::Migration),
+            Box::new(m20260912_000005_test_library::Migration),
+            Box::new(m20260913_000006_task_sessions::Migration),
             // inject-above (do not remove this comment)
         ]
     }

@@ -121,6 +121,9 @@ function AppDetailContent({ appId }: { appId: string }) {
           />
         </Box>
       )}
+      <Button component={Link} to={href(`/apps/${appId}/try`)} mb="lg" size="md">
+        Open app & try a task
+      </Button>
       {selected.data && <RunPreview key={selectedId} appId={appId} buildId={selectedId} />}
       <div className="detail-layout">
         <Stack gap="xl" miw={0}>

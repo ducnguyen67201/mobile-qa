@@ -1,6 +1,6 @@
 # 05 — Test cases, suites and plans
 
-Status: planned. Depends on: 04. Owns: Rust test-definition/versioning services, migrations and DTOs; frontend Tests screens.
+Status: locally implemented; deterministic validation and simulated HTTP acceptance passed. Rendered browser and UI-triggered real-device acceptance pending. Depends on: 04. Owns: Rust test-definition/versioning services, migrations and DTOs; frontend Tests screens.
 
 ## Deliverable
 
@@ -45,3 +45,56 @@ Business constraints are Rust service validation, not merely browser form schema
 - Tests cover version pinning, approval concurrency, manifest resolution and authorization. One browser flow proves edit → approve → plan preview → run.
 
 This completes the user-authored test workflow. AI generation in spec 06 must produce drafts through these same services instead of bypassing review.
+
+## Implementation packet
+
+The [phase 05 implementation plan](../../../.claude/PRPs/plans/05-test-library-and-plans.plan.md)
+is based on the integrated phase 02/04 tree at `b4970c7`. It specifies separate
+editable drafts and immutable published versions, exact-revision/hash review,
+archive/default-plan rules, typed browser APIs and the complete UI-to-run flow.
+Rust owns all DTOs and semantic validation; generated SDK/Zod and Pydantic remain
+the only browser/worker contract pipeline. Real route agreement, stale-edit tests
+and authoring-to-worker HTTP acceptance are explicit gates.
+
+PR #5 merged into the phase 02 branch, not main; use the integrated tree or verify
+that a later main includes it. The existing real API-to-emulator good-path test
+does not replace browser acceptance of the new editor/review workflow. The implementation now uses that integrated baseline; new rendered acceptance remains pending.
+
+## Implemented source
+
+Migration 000005 adds the catalog, editable draft, frozen version lifecycle, review
+activity, explicit default and atomic mutation receipt tables. Existing execution
+versions/hashes and run manifests stay immutable. Upgrade validates historical
+references and copies the old latest approved plan choice once; later approvals
+never change that pointer.
+
+The authenticated `/api/apps/{app_id}/test-library` routes support listing, create,
+save, fork, submit, exact-hash review, archive and version history. App members can
+author; purpose-specific grants govern both reviews. Operators alone archive or
+select the default through `/api/apps/{app_id}/default-test-plan`. CLI imports and
+approvals share the catalog/lifecycle rules. An optional controlled-demo template
+uses the existing persistence case; ordinary creation starts an incomplete draft.
+Browser-authored cases use server-assigned `user_authored` provenance.
+The browser automatically assigns a UUID-based stable key for new cases, suites
+and plans. Authors enter a readable title in the draft instead of inventing a key;
+the saved key remains unchanged across versions. Creation retries preserve the
+original mutation and entry identity.
+
+Entry revisions and mutation UUIDs prevent lost updates and make identical retries
+safe. Draft plans explicitly permit a missing profile. Save returns typed issues;
+submit requires valid content and approved, active references. Requiredness/version
+conflicts block publication. Archive blocks new runs transitively while previously
+queued and completed runs use their frozen manifests.
+
+The Mantine Tests UI exposes Cases, Suites and Release plan tabs, explicit saves,
+reviewable stale-edit recovery, action/check ordering, advanced evidence settings,
+version history and the existing run/report screen. No draft content is persisted
+in browser storage. The Rust-owned DTOs generate browser SDK/types/Zod; safe feature
+error details are also validated at runtime. Published definitions use the existing
+Rust/Schemars/Pydantic worker protocol.
+
+`just smoke-test-library` authors and reviews case/suite/plan versions through real
+HTTP routes, explicitly selects the default, runs simulated Python evidence after
+API restart and checks the manifest remains unchanged after a new draft edit.
+It does not prove rendered UI or real emulator acceptance. Validation evidence and
+remaining gates belong in the [implementation report](../../../.claude/PRPs/reports/05-test-library-and-plans-report.md).

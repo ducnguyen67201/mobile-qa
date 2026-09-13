@@ -435,7 +435,7 @@ impl TestDefinition {
                 c.budget.validate()?;
                 if !bounded(&c.title, 200)
                     || !bounded(&c.requirement, 4000)
-                    || c.provenance != "operator_authored"
+                    || !["operator_authored", "user_authored"].contains(&c.provenance.as_str())
                     || !bounded(&c.package, 255)
                     || !bounded(&c.adapter, 100)
                     || c.actions.is_empty()

@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelRunData, CancelRunErrors, CancelRunResponses, CompleteBuildUploadData, CompleteBuildUploadErrors, CompleteBuildUploadResponses, CreateAppData, CreateAppErrors, CreateAppResponses, CreateBuildUploadData, CreateBuildUploadErrors, CreateBuildUploadResponses, CreateRunData, CreateRunErrors, CreateRunResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, GetAppData, GetAppErrors, GetAppResponses, GetBuildData, GetBuildErrors, GetBuildResponses, GetBuildUploadData, GetBuildUploadErrors, GetBuildUploadResponses, GetExecutionPlanData, GetExecutionPlanErrors, GetExecutionPlanResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetRunArtifactData, GetRunArtifactErrors, GetRunArtifactResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, ListAppsData, ListAppsErrors, ListAppsResponses, ListBuildsData, ListBuildsErrors, ListBuildsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, StartGoogleSignInData, StartGoogleSignInErrors, StartGoogleSignInResponses, UpdateEnvironmentData, UpdateEnvironmentErrors, UpdateEnvironmentResponses, UploadBuildContentData, UploadBuildContentErrors, UploadBuildContentResponses } from './types.gen';
-import { zCancelRunPath, zCompleteBuildUploadHeaders, zCompleteBuildUploadPath, zCreateAppBody, zCreateAppHeaders, zCreateBuildUploadBody, zCreateBuildUploadHeaders, zCreateBuildUploadPath, zCreateRunBody, zCreateRunHeaders, zCreateRunPath, zCreateWorkspaceBody, zCreateWorkspaceHeaders, zGetAppPath, zGetBuildPath, zGetBuildUploadPath, zGetExecutionPlanPath, zGetExecutionPlanQuery, zGetRunArtifactPath, zGetRunPath, zListAppsQuery, zListBuildsPath, zListBuildsQuery, zListRunsPath, zListRunsQuery, zLoginBody, zLoginHeaders, zLogoutHeaders, zStartGoogleSignInHeaders, zUpdateEnvironmentBody, zUpdateEnvironmentHeaders, zUpdateEnvironmentPath, zUploadBuildContentBody, zUploadBuildContentHeaders, zUploadBuildContentPath } from './zod.gen';
+import type { ArchiveTestLibraryEntryData, ArchiveTestLibraryEntryErrors, ArchiveTestLibraryEntryResponses, CancelRunData, CancelRunErrors, CancelRunResponses, CompleteBuildUploadData, CompleteBuildUploadErrors, CompleteBuildUploadResponses, CreateAppData, CreateAppErrors, CreateAppResponses, CreateBuildUploadData, CreateBuildUploadErrors, CreateBuildUploadResponses, CreateRunData, CreateRunErrors, CreateRunResponses, CreateTestLibraryEntryData, CreateTestLibraryEntryErrors, CreateTestLibraryEntryResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, ForkTestLibraryDraftData, ForkTestLibraryDraftErrors, ForkTestLibraryDraftResponses, GetAppData, GetAppErrors, GetAppResponses, GetBuildData, GetBuildErrors, GetBuildResponses, GetBuildUploadData, GetBuildUploadErrors, GetBuildUploadResponses, GetDefaultTestPlanData, GetDefaultTestPlanErrors, GetDefaultTestPlanResponses, GetExecutionPlanData, GetExecutionPlanErrors, GetExecutionPlanResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPhoneData, GetPhoneErrors, GetPhoneOptionsData, GetPhoneOptionsErrors, GetPhoneOptionsResponses, GetPhoneResponses, GetRunArtifactData, GetRunArtifactErrors, GetRunArtifactResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, GetTestLibraryDraftData, GetTestLibraryDraftErrors, GetTestLibraryDraftResponses, GetTestLibraryEntryData, GetTestLibraryEntryErrors, GetTestLibraryEntryResponses, GetTestLibraryOptionsData, GetTestLibraryOptionsErrors, GetTestLibraryOptionsResponses, GetTestLibraryVersionData, GetTestLibraryVersionErrors, GetTestLibraryVersionResponses, ListAppsData, ListAppsErrors, ListAppsResponses, ListBuildsData, ListBuildsErrors, ListBuildsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListTestLibraryData, ListTestLibraryErrors, ListTestLibraryResponses, ListTestLibraryVersionsData, ListTestLibraryVersionsErrors, ListTestLibraryVersionsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, OpenPhoneData, OpenPhoneErrors, OpenPhoneResponses, ReviewTestLibraryVersionData, ReviewTestLibraryVersionErrors, ReviewTestLibraryVersionResponses, RunPhoneTaskData, RunPhoneTaskErrors, RunPhoneTaskResponses, SaveTestLibraryDraftData, SaveTestLibraryDraftErrors, SaveTestLibraryDraftResponses, SetDefaultTestPlanData, SetDefaultTestPlanErrors, SetDefaultTestPlanResponses, StartGoogleSignInData, StartGoogleSignInErrors, StartGoogleSignInResponses, StopPhoneData, StopPhoneErrors, StopPhoneResponses, SubmitTestLibraryDraftData, SubmitTestLibraryDraftErrors, SubmitTestLibraryDraftResponses, UpdateEnvironmentData, UpdateEnvironmentErrors, UpdateEnvironmentResponses, UploadBuildContentData, UploadBuildContentErrors, UploadBuildContentResponses } from './types.gen';
+import { zArchiveTestLibraryEntryBody, zArchiveTestLibraryEntryHeaders, zArchiveTestLibraryEntryPath, zCancelRunPath, zCompleteBuildUploadHeaders, zCompleteBuildUploadPath, zCreateAppBody, zCreateAppHeaders, zCreateBuildUploadBody, zCreateBuildUploadHeaders, zCreateBuildUploadPath, zCreateRunBody, zCreateRunHeaders, zCreateRunPath, zCreateTestLibraryEntryBody, zCreateTestLibraryEntryHeaders, zCreateTestLibraryEntryPath, zCreateWorkspaceBody, zCreateWorkspaceHeaders, zForkTestLibraryDraftBody, zForkTestLibraryDraftHeaders, zForkTestLibraryDraftPath, zGetAppPath, zGetBuildPath, zGetBuildUploadPath, zGetDefaultTestPlanPath, zGetExecutionPlanPath, zGetExecutionPlanQuery, zGetPhoneOptionsPath, zGetPhonePath, zGetRunArtifactPath, zGetRunPath, zGetTestLibraryDraftPath, zGetTestLibraryEntryPath, zGetTestLibraryOptionsPath, zGetTestLibraryVersionPath, zListAppsQuery, zListBuildsPath, zListBuildsQuery, zListRunsPath, zListRunsQuery, zListTestLibraryPath, zListTestLibraryQuery, zListTestLibraryVersionsPath, zListTestLibraryVersionsQuery, zLoginBody, zLoginHeaders, zLogoutHeaders, zOpenPhoneBody, zOpenPhonePath, zReviewTestLibraryVersionBody, zReviewTestLibraryVersionHeaders, zReviewTestLibraryVersionPath, zRunPhoneTaskBody, zRunPhoneTaskPath, zSaveTestLibraryDraftBody, zSaveTestLibraryDraftHeaders, zSaveTestLibraryDraftPath, zSetDefaultTestPlanBody, zSetDefaultTestPlanHeaders, zSetDefaultTestPlanPath, zStartGoogleSignInHeaders, zStopPhonePath, zSubmitTestLibraryDraftBody, zSubmitTestLibraryDraftHeaders, zSubmitTestLibraryDraftPath, zUpdateEnvironmentBody, zUpdateEnvironmentHeaders, zUpdateEnvironmentPath, zUploadBuildContentBody, zUploadBuildContentHeaders, zUploadBuildContentPath } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -173,6 +173,41 @@ export const getBuild = <ThrowOnError extends boolean = false>(options: Options<
     ...options
 });
 
+export const getDefaultTestPlan = <ThrowOnError extends boolean = false>(options: Options<GetDefaultTestPlanData, ThrowOnError>): RequestResult<GetDefaultTestPlanResponses, GetDefaultTestPlanErrors, ThrowOnError> => (options.client ?? client).get<GetDefaultTestPlanResponses, GetDefaultTestPlanErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetDefaultTestPlanPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/default-test-plan',
+    ...options
+});
+
+export const setDefaultTestPlan = <ThrowOnError extends boolean = false>(options: Options<SetDefaultTestPlanData, ThrowOnError>): RequestResult<SetDefaultTestPlanResponses, SetDefaultTestPlanErrors, ThrowOnError> => (options.client ?? client).put<SetDefaultTestPlanResponses, SetDefaultTestPlanErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zSetDefaultTestPlanBody,
+        headers: zSetDefaultTestPlanHeaders,
+        path: zSetDefaultTestPlanPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/default-test-plan',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
 export const updateEnvironment = <ThrowOnError extends boolean = false>(options: Options<UpdateEnvironmentData, ThrowOnError>): RequestResult<UpdateEnvironmentResponses, UpdateEnvironmentErrors, ThrowOnError> => (options.client ?? client).patch<UpdateEnvironmentResponses, UpdateEnvironmentErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: zUpdateEnvironmentBody,
@@ -208,6 +243,40 @@ export const getExecutionPlan = <ThrowOnError extends boolean = false>(options: 
     ...options
 });
 
+export const getPhoneOptions = <ThrowOnError extends boolean = false>(options: Options<GetPhoneOptionsData, ThrowOnError>): RequestResult<GetPhoneOptionsResponses, GetPhoneOptionsErrors, ThrowOnError> => (options.client ?? client).get<GetPhoneOptionsResponses, GetPhoneOptionsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetPhoneOptionsPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/phone-options',
+    ...options
+});
+
+export const openPhone = <ThrowOnError extends boolean = false>(options: Options<OpenPhoneData, ThrowOnError>): RequestResult<OpenPhoneResponses, OpenPhoneErrors, ThrowOnError> => (options.client ?? client).post<OpenPhoneResponses, OpenPhoneErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zOpenPhoneBody,
+        path: zOpenPhonePath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/phones',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
 export const listRuns = <ThrowOnError extends boolean = false>(options: Options<ListRunsData, ThrowOnError>): RequestResult<ListRunsResponses, ListRunsErrors, ThrowOnError> => (options.client ?? client).get<ListRunsResponses, ListRunsErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: z.never().optional(),
@@ -236,6 +305,216 @@ export const createRun = <ThrowOnError extends boolean = false>(options: Options
             type: 'apiKey'
         }],
     url: '/api/apps/{app_id}/runs',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const listTestLibrary = <ThrowOnError extends boolean = false>(options: Options<ListTestLibraryData, ThrowOnError>): RequestResult<ListTestLibraryResponses, ListTestLibraryErrors, ThrowOnError> => (options.client ?? client).get<ListTestLibraryResponses, ListTestLibraryErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zListTestLibraryPath,
+        query: zListTestLibraryQuery.optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/test-library',
+    ...options
+});
+
+export const createTestLibraryEntry = <ThrowOnError extends boolean = false>(options: Options<CreateTestLibraryEntryData, ThrowOnError>): RequestResult<CreateTestLibraryEntryResponses, CreateTestLibraryEntryErrors, ThrowOnError> => (options.client ?? client).post<CreateTestLibraryEntryResponses, CreateTestLibraryEntryErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zCreateTestLibraryEntryBody,
+        headers: zCreateTestLibraryEntryHeaders,
+        path: zCreateTestLibraryEntryPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/test-library',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getTestLibraryOptions = <ThrowOnError extends boolean = false>(options: Options<GetTestLibraryOptionsData, ThrowOnError>): RequestResult<GetTestLibraryOptionsResponses, GetTestLibraryOptionsErrors, ThrowOnError> => (options.client ?? client).get<GetTestLibraryOptionsResponses, GetTestLibraryOptionsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetTestLibraryOptionsPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/test-library/options',
+    ...options
+});
+
+export const getTestLibraryEntry = <ThrowOnError extends boolean = false>(options: Options<GetTestLibraryEntryData, ThrowOnError>): RequestResult<GetTestLibraryEntryResponses, GetTestLibraryEntryErrors, ThrowOnError> => (options.client ?? client).get<GetTestLibraryEntryResponses, GetTestLibraryEntryErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetTestLibraryEntryPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/test-library/{entry_id}',
+    ...options
+});
+
+export const archiveTestLibraryEntry = <ThrowOnError extends boolean = false>(options: Options<ArchiveTestLibraryEntryData, ThrowOnError>): RequestResult<ArchiveTestLibraryEntryResponses, ArchiveTestLibraryEntryErrors, ThrowOnError> => (options.client ?? client).post<ArchiveTestLibraryEntryResponses, ArchiveTestLibraryEntryErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zArchiveTestLibraryEntryBody,
+        headers: zArchiveTestLibraryEntryHeaders,
+        path: zArchiveTestLibraryEntryPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/test-library/{entry_id}/archive',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const getTestLibraryDraft = <ThrowOnError extends boolean = false>(options: Options<GetTestLibraryDraftData, ThrowOnError>): RequestResult<GetTestLibraryDraftResponses, GetTestLibraryDraftErrors, ThrowOnError> => (options.client ?? client).get<GetTestLibraryDraftResponses, GetTestLibraryDraftErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetTestLibraryDraftPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/test-library/{entry_id}/draft',
+    ...options
+});
+
+export const forkTestLibraryDraft = <ThrowOnError extends boolean = false>(options: Options<ForkTestLibraryDraftData, ThrowOnError>): RequestResult<ForkTestLibraryDraftResponses, ForkTestLibraryDraftErrors, ThrowOnError> => (options.client ?? client).post<ForkTestLibraryDraftResponses, ForkTestLibraryDraftErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zForkTestLibraryDraftBody,
+        headers: zForkTestLibraryDraftHeaders,
+        path: zForkTestLibraryDraftPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/test-library/{entry_id}/draft',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const saveTestLibraryDraft = <ThrowOnError extends boolean = false>(options: Options<SaveTestLibraryDraftData, ThrowOnError>): RequestResult<SaveTestLibraryDraftResponses, SaveTestLibraryDraftErrors, ThrowOnError> => (options.client ?? client).put<SaveTestLibraryDraftResponses, SaveTestLibraryDraftErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zSaveTestLibraryDraftBody,
+        headers: zSaveTestLibraryDraftHeaders,
+        path: zSaveTestLibraryDraftPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/test-library/{entry_id}/draft',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const submitTestLibraryDraft = <ThrowOnError extends boolean = false>(options: Options<SubmitTestLibraryDraftData, ThrowOnError>): RequestResult<SubmitTestLibraryDraftResponses, SubmitTestLibraryDraftErrors, ThrowOnError> => (options.client ?? client).post<SubmitTestLibraryDraftResponses, SubmitTestLibraryDraftErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zSubmitTestLibraryDraftBody,
+        headers: zSubmitTestLibraryDraftHeaders,
+        path: zSubmitTestLibraryDraftPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/test-library/{entry_id}/submit',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const listTestLibraryVersions = <ThrowOnError extends boolean = false>(options: Options<ListTestLibraryVersionsData, ThrowOnError>): RequestResult<ListTestLibraryVersionsResponses, ListTestLibraryVersionsErrors, ThrowOnError> => (options.client ?? client).get<ListTestLibraryVersionsResponses, ListTestLibraryVersionsErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zListTestLibraryVersionsPath,
+        query: zListTestLibraryVersionsQuery.optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/test-library/{entry_id}/versions',
+    ...options
+});
+
+export const getTestLibraryVersion = <ThrowOnError extends boolean = false>(options: Options<GetTestLibraryVersionData, ThrowOnError>): RequestResult<GetTestLibraryVersionResponses, GetTestLibraryVersionErrors, ThrowOnError> => (options.client ?? client).get<GetTestLibraryVersionResponses, GetTestLibraryVersionErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetTestLibraryVersionPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/test-library/{entry_id}/versions/{version_id}',
+    ...options
+});
+
+export const reviewTestLibraryVersion = <ThrowOnError extends boolean = false>(options: Options<ReviewTestLibraryVersionData, ThrowOnError>): RequestResult<ReviewTestLibraryVersionResponses, ReviewTestLibraryVersionErrors, ThrowOnError> => (options.client ?? client).post<ReviewTestLibraryVersionResponses, ReviewTestLibraryVersionErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zReviewTestLibraryVersionBody,
+        headers: zReviewTestLibraryVersionHeaders,
+        path: zReviewTestLibraryVersionPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/apps/{app_id}/test-library/{entry_id}/versions/{version_id}/review',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -308,6 +587,55 @@ export const getHealth = <ThrowOnError extends boolean = false>(options?: Option
     }).parseAsync(data),
     url: '/api/health',
     ...options
+});
+
+export const getPhone = <ThrowOnError extends boolean = false>(options: Options<GetPhoneData, ThrowOnError>): RequestResult<GetPhoneResponses, GetPhoneErrors, ThrowOnError> => (options.client ?? client).get<GetPhoneResponses, GetPhoneErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetPhonePath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/phones/{session_id}',
+    ...options
+});
+
+export const stopPhone = <ThrowOnError extends boolean = false>(options: Options<StopPhoneData, ThrowOnError>): RequestResult<StopPhoneResponses, StopPhoneErrors, ThrowOnError> => (options.client ?? client).post<StopPhoneResponses, StopPhoneErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zStopPhonePath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/phones/{session_id}/stop',
+    ...options
+});
+
+export const runPhoneTask = <ThrowOnError extends boolean = false>(options: Options<RunPhoneTaskData, ThrowOnError>): RequestResult<RunPhoneTaskResponses, RunPhoneTaskErrors, ThrowOnError> => (options.client ?? client).post<RunPhoneTaskResponses, RunPhoneTaskErrors, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zRunPhoneTaskBody,
+        path: zRunPhoneTaskPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    security: [{
+            in: 'cookie',
+            name: 'mobile_qa_session',
+            type: 'apiKey'
+        }],
+    url: '/api/phones/{session_id}/tasks',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 export const getRun = <ThrowOnError extends boolean = false>(options: Options<GetRunData, ThrowOnError>): RequestResult<GetRunResponses, GetRunErrors, ThrowOnError> => (options.client ?? client).get<GetRunResponses, GetRunErrors, ThrowOnError>({

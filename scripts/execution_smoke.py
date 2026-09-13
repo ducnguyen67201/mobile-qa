@@ -85,7 +85,7 @@ def submit(opener, app, body, csrf):
         return json.load(response)
 
 
-def main():
+def main(author=None, edit_after_queue=None):
     os.umask(0o077)
     env = {
         **os.environ,
@@ -171,47 +171,50 @@ def main():
             task(env, actor, app, "register-profile", file=profile_file)
             for purpose in ["business", "executability"]:
                 task(env, actor, app, "grant-reviewer", user=actor, purpose=purpose)
-            case = approve_file(
-                env,
-                actor,
-                app,
-                directory,
-                json.loads(
-                    (
-                        ROOT / "contracts/fixtures/execution/persistence-case.json"
-                    ).read_text()
-                ),
-            )
-            plan = approve_file(
-                env,
-                actor,
-                app,
-                directory,
-                {
-                    "kind": "plan",
-                    "content": {
-                        "key": "release",
-                        "version": 1,
-                        "title": "Synthetic release check",
-                        "suite_version_ids": [],
-                        "cases": [
-                            {
-                                "case_version_id": case,
-                                "data_variant": "default",
-                                "required": True,
-                            }
-                        ],
-                        "profile_id": profile,
-                        "budget": {
-                            "duration_seconds": 1200,
-                            "max_steps": 30,
-                            "artifact_bytes": 16777216,
+            if author is not None:
+                plan = author(owner, csrf, app, profile)
+            else:
+                case = approve_file(
+                    env,
+                    actor,
+                    app,
+                    directory,
+                    json.loads(
+                        (
+                            ROOT / "contracts/fixtures/execution/persistence-case.json"
+                        ).read_text()
+                    ),
+                )
+                plan = approve_file(
+                    env,
+                    actor,
+                    app,
+                    directory,
+                    {
+                        "kind": "plan",
+                        "content": {
+                            "key": "release",
+                            "version": 1,
+                            "title": "Synthetic release check",
+                            "suite_version_ids": [],
+                            "cases": [
+                                {
+                                    "case_version_id": case,
+                                    "data_variant": "default",
+                                    "required": True,
+                                }
+                            ],
+                            "profile_id": profile,
+                            "budget": {
+                                "duration_seconds": 1200,
+                                "max_steps": 30,
+                                "artifact_bytes": 16777216,
+                            },
+                            "diagnostic_retries": 0,
+                            "exclusions": [],
                         },
-                        "diagnostic_retries": 0,
-                        "exclusions": [],
                     },
-                },
-            )
+                )
             task(
                 env,
                 actor,
@@ -219,6 +222,17 @@ def main():
                 "register-worker",
                 worker=str(uuid.uuid4()),
                 profile=profile,
+            )
+            request(
+                owner,
+                "PUT",
+                f"/api/apps/{app}/default-test-plan",
+                {
+                    "mutation_id": str(uuid.uuid4()),
+                    "expected_revision": 0,
+                    "plan_version_id": plan,
+                },
+                csrf,
             )
             preview = request(
                 owner, "GET", f"/api/apps/{app}/execution-plan?build_id={build['id']}"
@@ -234,6 +248,8 @@ def main():
                 },
                 csrf,
             )
+            if edit_after_queue is not None:
+                edit_after_queue(owner, csrf, app)
         results = []
         # Restart with a queued job: dispatch must use the persisted manifest.
         with server(env):
@@ -284,6 +300,7 @@ def main():
                     timeout=120,
                 )
                 report = request(owner, "GET", "/api/runs/" + run["id"])
+                assert report["manifest"] == queued["manifest"], report
                 assert report["state"] == "finished", report
                 assert report["attempts"][0]["outcome"] == expected, report
                 assert report["attempts"][0]["cleanup"] == "verified_clean"

@@ -93,7 +93,7 @@ async def navigate(
     result_path: Path,
     goal: str,
 ) -> None:
-    """Shared pinned SDK seam; the caller owns the approved navigation instruction."""
+    """Shared pinned SDK seam; the caller owns the authorized navigation instruction."""
     prepare_environment(result_path.parent)
     # Keep SDK ADB helpers on the same pinned tools/user state as the supervisor.
     os.environ["PATH"] = (

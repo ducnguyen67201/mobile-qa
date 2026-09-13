@@ -155,6 +155,7 @@ pub async fn import(
         ));
     }
     let result = get(&tx, input.app_id, field(&r, "id")?).await?;
+    super::test_library_mutations::link_import(&tx, actor, input.app_id, &result).await?;
     tx.commit().await?;
     Ok(result)
 }
@@ -186,14 +187,7 @@ pub async fn approve(
     digest: &str,
     purpose: ApprovalPurpose,
 ) -> ApiResult<DefinitionResponse> {
-    apps::authorized(ctx, actor, app).await?;
-    let user = users::Entity::find_by_id(actor)
-        .one(&ctx.db)
-        .await?
-        .ok_or_else(ApiFailure::unauthorized)?;
-    if user.disabled_at.is_some() {
-        return Err(ApiFailure::unauthorized());
-    }
+    super::test_library::authorize(ctx, actor, app).await?;
     let tx = ctx.db.begin().await?;
     one(
         &tx,
@@ -201,62 +195,34 @@ pub async fn approve(
         vec![app.into()],
     )
     .await?;
-    one(
+    let row = one(
         &tx,
-        "SELECT user_id FROM execution_reviewer_grants WHERE app_id=$1 \
-            AND user_id=$2 AND purpose=$3",
-        vec![app.into(), actor.into(), word(&purpose).into()],
+        "SELECT e.id, e.revision FROM test_library_versions v JOIN test_library_entries e ON
+        e.id=v.entry_id WHERE v.definition_id=$1 AND e.app_id=$2",
+        vec![id.into(), app.into()],
     )
-    .await
-    .map_err(|_| {
-        ApiFailure::new(
-            403,
-            "reviewer_required",
-            "This review permission is required",
-        )
-    })?;
-    let d = get(&tx, app, id).await?;
-    if d.content_hash != digest {
-        return Err(conflict("Reviewed content hash changed"));
-    }
-    if purpose == ApprovalPurpose::Executability {
-        match &d.definition {
-            TestDefinition::Case(c) => {
-                if c.adapter != "demo_persistence_v1"
-                    || c.package != "ai.mobileqa.demo"
-                    || c.checks.iter().any(|c| c.method == CheckMethod::Manual)
-                {
-                    return Err(ApiFailure::invalid(
-                        "Case has unsupported execution capabilities",
-                    ));
-                }
-            }
-            TestDefinition::Suite(s) => {
-                for c in &s.cases {
-                    require_case(&tx, app, c.case_version_id, true).await?;
-                }
-            }
-            TestDefinition::Plan(p) => {
-                resolve(&tx, app, p).await?;
-            }
-        }
-    }
-    exec(
+    .await?;
+    super::test_library_mutations::review(
         &tx,
-        "INSERT INTO execution_approvals(definition_id,purpose,actor_id,content_hash) \
-            VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING",
-        vec![
-            id.into(),
-            word(&purpose).into(),
-            actor.into(),
-            digest.into(),
-        ],
+        actor,
+        app,
+        field(&row, "id")?,
+        id,
+        &mobile_qa_contracts::test_library::ReviewLibraryVersionRequest {
+            mutation_id: Uuid::new_v4(),
+            expected_revision: field(&row, "revision")?,
+            content_hash: digest.into(),
+            purpose,
+            decision: mobile_qa_contracts::test_library::LibraryReviewDecision::Approve,
+            reason: None,
+        },
     )
     .await?;
     let result = get(&tx, app, id).await?;
     tx.commit().await?;
     Ok(result)
 }
+
 async fn require_case(
     db: &impl ConnectionTrait,
     app: Uuid,
@@ -264,6 +230,9 @@ async fn require_case(
     approval: bool,
 ) -> ApiResult<DefinitionResponse> {
     let d = get(db, app, id).await?;
+    if approval {
+        super::test_library::admitted(db, app, id).await?;
+    }
     if !matches!(d.definition, TestDefinition::Case(_)) || (approval && !approved(&d)) {
         return Err(ApiFailure::invalid("An approved case version is required"));
     }
@@ -327,6 +296,7 @@ pub async fn resolve(
     let mut selections = p.cases.clone();
     for id in &p.suite_version_ids {
         let d = get(db, app, *id).await?;
+        super::test_library::admitted(db, app, *id).await?;
         if !approved(&d) {
             return Err(ApiFailure::invalid("Suite is not approved"));
         }

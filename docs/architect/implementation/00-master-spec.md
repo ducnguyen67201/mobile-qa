@@ -2,7 +2,12 @@
 
 Status: canonical implementation roadmap. Spec 01 foundation and spec 03 local app setup
 are implemented. Spec 02 has verified local ADB and one live Minitap demo; the full
-reliability campaign and cloud qualification remain open. Specs 04–07 remain planned.
+reliability campaign and cloud qualification remain open. Spec 04 is locally implemented
+with simulated HTTP and one real API-to-emulator good-path run verified; browser,
+live fault/reliability and hosted acceptance remain open. Spec 05 authoring/review/default-plan source and simulated HTTP acceptance are locally
+implemented; rendered UI and UI-triggered real-device acceptance remain open. See its
+[implementation report](../../../.claude/PRPs/reports/05-test-library-and-plans-report.md).
+Specs 06–07 remain planned.
 [Current status and evidence](../status.md) own completion claims.
 This roadmap owns sequencing; [system architecture](../system.md), [contracts](../contracts.md),
 [environment](../environment.md), and [development workflow](../development.md) own their current details.

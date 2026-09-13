@@ -11,7 +11,20 @@ use sea_orm::{ConnectionTrait, DbBackend, Statement};
 async fn registered_handler_agrees_with_openapi_and_database() {
     let spec = serde_json::to_value(browser::openapi()).unwrap();
     let paths = spec["paths"].as_object().unwrap();
-    assert_eq!(paths.len(), 21);
+    let expected: std::collections::BTreeSet<_> = browser::OPERATIONS
+        .iter()
+        .chain(mobile_qa_contracts::execution_api::OPERATIONS)
+        .chain(mobile_qa_contracts::test_library_api::OPERATIONS)
+        .chain(mobile_qa_contracts::task_sessions_api::OPERATIONS)
+        .map(|(_, path, _, _)| *path)
+        .collect();
+    assert_eq!(
+        paths
+            .keys()
+            .map(String::as_str)
+            .collect::<std::collections::BTreeSet<_>>(),
+        expected
+    );
     let operation = &paths[HEALTH_PATH]["get"];
     assert_eq!(operation["operationId"], "getHealth");
     assert!(operation.get("requestBody").is_none());

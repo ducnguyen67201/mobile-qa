@@ -6,3 +6,7 @@ pub mod setup;
 pub mod runs;
 
 pub mod worker;
+
+pub mod test_library;
+
+pub mod task_sessions;

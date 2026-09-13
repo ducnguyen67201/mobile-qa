@@ -89,8 +89,20 @@ def main() -> int:
     nav = commands.add_parser("_execution-sdk", help=argparse.SUPPRESS)
     nav.add_argument("--request", type=Path, required=True)
     nav.add_argument("--result", type=Path, required=True)
+    phone = commands.add_parser(
+        "task-worker", help="Explicit real phone sessions and Minitap tasks"
+    )
+    phone.add_argument("--origin", required=True)
+    phone.add_argument("--state", type=Path, required=True)
+    phone.add_argument("--profile", type=Path, required=True)
+    phone.add_argument("--once", action="store_true")
     args = parser.parse_args()
     try:
+        if args.command == "task-worker":
+            from mobile_qa_worker.task_sessions import serve as serve_tasks
+
+            serve_tasks(args.origin, args.state, args.profile, args.once)
+            return 0
         if args.command == "execution-worker":
             from mobile_qa_worker.execution.runner import serve
 

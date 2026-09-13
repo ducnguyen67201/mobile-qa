@@ -98,6 +98,20 @@ async fn prepared(
         exclusions: vec![],
     });
     let plan = approved(ctx, owner, app.id, plan).await;
+    mobile_qa::services::test_library_mutations::apply(
+        ctx,
+        owner.user,
+        app.id,
+        mobile_qa::services::test_library_mutations::Mutation::Default(
+            mobile_qa_contracts::test_library::SetDefaultPlanRequest {
+                mutation_id: Uuid::new_v4(),
+                expected_revision: 0,
+                plan_version_id: plan.id,
+            },
+        ),
+    )
+    .await
+    .unwrap();
     let worker = worker_auth::Worker {
         id: Uuid::new_v4(),
         app_id: app.id,
@@ -150,6 +164,47 @@ async fn route_manifest_idempotency_and_worker_fencing() {
                 .await,
             409,
         );
+        let frozen = run.manifest.clone();
+        let case_id = frozen.cases[0].definition_id;
+        let row = one(
+            &ctx.db,
+            "SELECT entry_id FROM test_library_versions WHERE definition_id=$1",
+            vec![case_id.into()],
+        )
+        .await
+        .unwrap();
+        let entry = mobile_qa::services::test_library::entry(
+            &ctx.db,
+            owner.user,
+            app,
+            field(&row, "entry_id").unwrap(),
+        )
+        .await
+        .unwrap();
+        mobile_qa::services::test_library_mutations::apply(
+            &ctx,
+            owner.user,
+            app,
+            mobile_qa::services::test_library_mutations::Mutation::Archive(
+                entry.id,
+                mobile_qa_contracts::test_library::ArchiveLibraryEntryRequest {
+                    mutation_id: Uuid::new_v4(),
+                    expected_revision: entry.revision,
+                    archived: true,
+                },
+            ),
+        )
+        .await
+        .unwrap();
+        assert!(!runs::preview(&ctx.db, app, build, Some(plan))
+            .await
+            .unwrap()
+            .blockers
+            .is_empty());
+        assert_eq!(
+            runs::detail(&ctx.db, run.id).await.unwrap().manifest,
+            frozen
+        );
         let cid = Uuid::new_v4();
         let response = server
             .post("/api/worker/claims")
@@ -162,6 +217,7 @@ async fn route_manifest_idempotency_and_worker_fencing() {
             .await;
         response.assert_status_ok();
         let lease = response.json::<ClaimResponse>().lease.unwrap();
+        assert_eq!(lease.manifest, frozen);
         let second = scheduler::claim(
             &ctx,
             &w,

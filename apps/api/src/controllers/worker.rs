@@ -40,6 +40,17 @@ async fn heartbeat(
         scheduler::heartbeat(&ctx, &w, id, input.generation, token(&h)?).await?,
     ))
 }
+async fn preflight(
+    State(ctx): State<AppContext>,
+    w: Worker,
+    Path(id): Path<Uuid>,
+    h: HeaderMap,
+    Json(input): Json<mobile_qa_contracts::execution_lifecycle::PreflightRequest>,
+) -> ApiResult<Json<mobile_qa_contracts::execution_lifecycle::PreflightAcknowledgement>> {
+    Ok(Json(
+        crate::services::execution_preflight::acknowledge(&ctx, &w, id, token(&h)?, input).await?,
+    ))
+}
 async fn events(
     State(ctx): State<AppContext>,
     w: Worker,
@@ -79,6 +90,12 @@ async fn upload(
         run_artifacts::upload(&ctx, &w, id, artifact, g, token(&h)?, body).await?,
     ))
 }
+fn legacy_receipt(receipt: &mut AttemptReceipt) {
+    // Cleanup transport does not need history. Keep protocol 1/2 readers strict and compatible.
+    receipt.attempt.preflight = None;
+    receipt.attempt.recovery_events.clear();
+    receipt.attempt.original_cleanup = None;
+}
 async fn complete(
     State(ctx): State<AppContext>,
     w: Worker,
@@ -86,9 +103,9 @@ async fn complete(
     h: HeaderMap,
     Json(input): Json<CompleteRequest>,
 ) -> ApiResult<Json<AttemptReceipt>> {
-    Ok(Json(
-        scheduler::complete(&ctx, &w, id, token(&h)?, input).await?,
-    ))
+    let mut receipt = scheduler::complete(&ctx, &w, id, token(&h)?, input).await?;
+    legacy_receipt(&mut receipt);
+    Ok(Json(receipt))
 }
 async fn cleanup(
     State(ctx): State<AppContext>,
@@ -97,9 +114,9 @@ async fn cleanup(
     h: HeaderMap,
     Json(input): Json<CleanupRequest>,
 ) -> ApiResult<Json<AttemptReceipt>> {
-    Ok(Json(
-        scheduler::cleanup(&ctx, &w, id, token(&h)?, input).await?,
-    ))
+    let mut receipt = scheduler::cleanup(&ctx, &w, id, token(&h)?, input).await?;
+    legacy_receipt(&mut receipt);
+    Ok(Json(receipt))
 }
 #[derive(Deserialize)]
 struct BuildQuery {
@@ -150,6 +167,10 @@ pub fn routes() -> Routes {
         .add(
             "/api/worker/attempts/{attempt_id}/heartbeat",
             post(heartbeat),
+        )
+        .add(
+            "/api/worker/attempts/{attempt_id}/preflight",
+            post(preflight),
         )
         .add("/api/worker/attempts/{attempt_id}/events", post(events))
         .add("/api/worker/attempts/{attempt_id}/artifacts", post(reserve))

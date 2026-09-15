@@ -228,6 +228,8 @@ pub struct DefinitionResponse {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ExecutionProfile {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_context: Option<crate::execution_lifecycle::ExecutionContextV1>,
     pub id: Uuid,
     pub name: String,
     pub driver: Driver,
@@ -305,6 +307,12 @@ pub struct RunArtifact {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AttemptResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preflight: Option<crate::execution_lifecycle::PreflightReceipt>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recovery_events: Vec<crate::execution_lifecycle::RecoveryEvent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_cleanup: Option<CleanupRequest>,
     pub id: Uuid,
     pub case_version_id: Uuid,
     pub generation: i32,
@@ -577,14 +585,29 @@ impl ExecutionProfile {
         if !bounded(&self.name, 200)
             || !bounded(&self.device_identity, 200)
             || !bounded(&self.image, 200)
-            || self.adapter != "demo_persistence_v1"
-            || self.package != "ai.mobileqa.demo"
+            || !bounded(&self.package, 255)
             || !(1..=262144000).contains(&self.max_apk_bytes)
             || (self.qualified && !bounded(&self.qualification_reference, 1000))
             || (self.driver == Driver::Minitap
                 && (!bounded(&self.model, 100) || self.max_apk_bytes > 104857600))
         {
             return Err("invalid or unsupported execution profile");
+        }
+        match self.adapter.as_str() {
+            "demo_persistence_v1"
+                if self.package == "ai.mobileqa.demo" && self.execution_context.is_none() => {}
+            "android_direct_v1"
+                if self.driver == Driver::Direct
+                    && self.qualified
+                    && self.model.is_empty()
+                    && self.max_apk_bytes <= 104857600 =>
+            {
+                self.execution_context
+                    .as_ref()
+                    .ok_or("Clean-start qualification is required")?
+                    .validate(self)?;
+            }
+            _ => return Err("invalid or unsupported execution profile"),
         }
         Ok(())
     }

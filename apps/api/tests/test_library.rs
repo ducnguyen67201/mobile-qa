@@ -12,6 +12,7 @@ async fn setup(server: &TestServer, ctx: &AppContext) -> (Login, Uuid, Uuid) {
     input.android_package = "ai.mobileqa.demo".into();
     let app = apps::create(ctx, owner.user, input).await.unwrap().id;
     let profile = ExecutionProfile {
+        execution_context: None,
         id: Uuid::new_v4(),
         name: "Synthetic".into(),
         driver: Driver::Fake,

@@ -142,3 +142,15 @@ so historical hashes remain unchanged; boundary semantic validation enforces kin
 agreement. OpenAPI includes actual authoring routes; worker schemas include isolated model
 requests/responses. Phone protocol 2 and execution claim version 2 advertise direct support.
 Generated consumers remain the only browser/worker transport shapes.
+
+## Qualified direct start receipts (07A)
+
+`execution_lifecycle.rs` owns `ExecutionContextV1`, stage bounds and preflight envelopes.
+Optional `ExecutionProfile.execution_context` freezes the complete operator-qualified
+context in existing manifests; missing context is unknown legacy evidence, not a default.
+`POST /api/worker/attempts/{attempt_id}/preflight` authenticates worker and lease generation,
+checks exact context/APK identity and both sealed artifact references, verifies starting
+assertions, and acknowledges exact replays. Changed receipts/stale leases return409.
+New profiles require execution claim protocol3 (phone protocol4); legacy shapes are not
+sent new profile fields. API recovery preserves initial cleanup and appends actor/evidence
+history. Browser projections display that history; legacy worker receipts omit it.

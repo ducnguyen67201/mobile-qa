@@ -83,8 +83,11 @@ export type AttemptResponse = {
     generation: number;
     id: string;
     number: number;
+    original_cleanup?: null | CleanupRequest;
     outcome?: null | Outcome;
+    preflight?: null | PreflightReceipt;
     reason?: string | null;
+    recovery_events?: Array<RecoveryEvent>;
     state: JobState;
     usage: Array<ModelUsage>;
 };
@@ -343,6 +346,28 @@ export type ExecutionBudget = {
     max_steps: number;
 };
 
+export type ExecutionContextV1 = {
+    abi: string;
+    adapter_revision: string;
+    density: number;
+    height: number;
+    image: string;
+    launch_component: string;
+    locale: string;
+    package: string;
+    qualification_reference: string;
+    qualified_profile_id: string;
+    reset_policy_hash: string;
+    schema_version: number;
+    stages: StageBudgets;
+    starting_checks: Array<ExpectedCheck>;
+    state_scope: string;
+    timezone: string;
+    verifier_revision: string;
+    width: number;
+    worker_runtime_revision: string;
+};
+
 export type ExecutionEvent = {
     action_id: string;
     id: string;
@@ -370,6 +395,7 @@ export type ExecutionProfile = {
     adapter: string;
     device_identity: string;
     driver: Driver;
+    execution_context?: null | ExecutionContextV1;
     id: string;
     image: string;
     max_apk_bytes: number;
@@ -741,6 +767,28 @@ export type PlanPreviewResponse = {
     plan?: null | DefinitionResponse;
 };
 
+export type PreflightAcknowledgement = {
+    accepted: boolean;
+    attempt_id: string;
+    generation: number;
+};
+
+export type PreflightReceipt = {
+    artifact_ids: Array<string>;
+    attempt_id: string;
+    build_sha256: string;
+    context: ExecutionContextV1;
+    duration_ms: number;
+    instance_nonce: string;
+    ready_at: string;
+    started_at: string;
+};
+
+export type PreflightRequest = {
+    generation: number;
+    receipt: PreflightReceipt;
+};
+
 export type ReadinessResponse = {
     account: CheckState;
     account_configured: boolean;
@@ -751,6 +799,12 @@ export type ReadinessResponse = {
     install: string;
     reset: CheckState;
     reset_configured: boolean;
+};
+
+export type RecoveryEvent = {
+    actor_id: string;
+    created_at: string;
+    evidence_reference: string;
 };
 
 export type ResolvedCase = {
@@ -865,6 +919,13 @@ export type SettingsResponse = {
     session_ttl_seconds: number;
     storage: string;
     upload_ttl_seconds: number;
+};
+
+export type StageBudgets = {
+    boot_seconds: number;
+    cleanup_seconds: number;
+    install_seconds: number;
+    start_seconds: number;
 };
 
 export type StepReceipt = {
@@ -4364,6 +4425,57 @@ export type GetSettingsResponses = {
 };
 
 export type GetSettingsResponse = GetSettingsResponses[keyof GetSettingsResponses];
+
+export type AcknowledgeExecutionStartData = {
+    body: PreflightRequest;
+    headers: {
+        Authorization: string;
+        'x-lease-token': string;
+    };
+    path: {
+        attempt_id: string;
+    };
+    query?: never;
+    url: '/api/worker/attempts/{attempt_id}/preflight';
+};
+
+export type AcknowledgeExecutionStartErrors = {
+    /**
+     * Worker authentication required
+     */
+    401: ApiError;
+    /**
+     * Scoped attempt or evidence missing
+     */
+    404: ApiError;
+    /**
+     * Stale lease or conflicting receipt
+     */
+    409: ApiError;
+    /**
+     * Invalid start evidence
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type AcknowledgeExecutionStartError = AcknowledgeExecutionStartErrors[keyof AcknowledgeExecutionStartErrors];
+
+export type AcknowledgeExecutionStartResponses = {
+    /**
+     * Start evidence acknowledged
+     */
+    200: PreflightAcknowledgement;
+};
+
+export type AcknowledgeExecutionStartResponse = AcknowledgeExecutionStartResponses[keyof AcknowledgeExecutionStartResponses];
 
 export type CreateWorkspaceData = {
     body: CreateWorkspaceRequest;

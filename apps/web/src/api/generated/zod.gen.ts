@@ -240,20 +240,6 @@ export const zExecutionPlanQuery = z.object({
     plan_version_id: z.uuid().nullish()
 });
 
-export const zExecutionProfile = z.object({
-    adapter: z.string(),
-    device_identity: z.string(),
-    driver: zDriver,
-    id: z.uuid(),
-    image: z.string(),
-    max_apk_bytes: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    model: z.string(),
-    name: z.string(),
-    package: z.string(),
-    qualification_reference: z.string(),
-    qualified: z.boolean()
-});
-
 export const zForkLibraryDraftRequest = z.object({
     expected_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     mutation_id: z.uuid(),
@@ -507,13 +493,6 @@ export const zDiscoverySnapshot = z.object({
     id: z.uuid()
 });
 
-export const zPhoneOptions = z.object({
-    active_session: z.uuid().nullish(),
-    blockers: z.array(z.string()),
-    builds: z.array(zPhoneBuildChoice),
-    profiles: z.array(zExecutionProfile)
-});
-
 export const zPhoneSelection = z.object({
     control_id: z.string(),
     frame_id: z.uuid()
@@ -567,6 +546,12 @@ export const zPlanDraftContent = z.object({
     version: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
+export const zPreflightAcknowledgement = z.object({
+    accepted: z.boolean(),
+    attempt_id: z.uuid(),
+    generation: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
 export const zReadinessResponse = z.object({
     account: zCheckState,
     account_configured: z.boolean(),
@@ -577,6 +562,12 @@ export const zReadinessResponse = z.object({
     install: z.string(),
     reset: zCheckState,
     reset_configured: z.boolean()
+});
+
+export const zRecoveryEvent = z.object({
+    actor_id: z.uuid(),
+    created_at: z.iso.datetime(),
+    evidence_reference: z.string()
 });
 
 export const zReviewLibraryVersionRequest = z.object({
@@ -602,25 +593,6 @@ export const zRunArtifact = z.object({
 
 export const zArtifactReceipt = z.object({
     artifact: zRunArtifact
-});
-
-export const zAttemptResponse = z.object({
-    artifacts: z.array(zRunArtifact),
-    case_version_id: z.uuid(),
-    checks: z.array(zCheckResult),
-    cleanup: zCleanupState,
-    events: z.array(zExecutionEvent),
-    generation: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    id: z.uuid(),
-    number: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    outcome: zOutcome.nullish(),
-    reason: z.string().nullish(),
-    state: zJobState,
-    usage: z.array(zModelUsage)
-});
-
-export const zAttemptReceipt = z.object({
-    attempt: zAttemptResponse
 });
 
 export const zSavedAuthoredTests = z.object({
@@ -671,6 +643,13 @@ export const zSettingsResponse = z.object({
     session_ttl_seconds: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     storage: z.string(),
     upload_ttl_seconds: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+export const zStageBudgets = z.object({
+    boot_seconds: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    cleanup_seconds: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    install_seconds: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    start_seconds: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 export const zStepState = z.enum([
@@ -789,6 +768,43 @@ export const zCaseDefinition = z.object({
     version: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
+export const zExecutionContextV1 = z.object({
+    abi: z.string(),
+    adapter_revision: z.string(),
+    density: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    height: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    image: z.string(),
+    launch_component: z.string(),
+    locale: z.string(),
+    package: z.string(),
+    qualification_reference: z.string(),
+    qualified_profile_id: z.uuid(),
+    reset_policy_hash: z.string(),
+    schema_version: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    stages: zStageBudgets,
+    starting_checks: z.array(zExpectedCheck),
+    state_scope: z.string(),
+    timezone: z.string(),
+    verifier_revision: z.string(),
+    width: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    worker_runtime_revision: z.string()
+});
+
+export const zExecutionProfile = z.object({
+    adapter: z.string(),
+    device_identity: z.string(),
+    driver: zDriver,
+    execution_context: zExecutionContextV1.nullish(),
+    id: z.uuid(),
+    image: z.string(),
+    max_apk_bytes: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    model: z.string(),
+    name: z.string(),
+    package: z.string(),
+    qualification_reference: z.string(),
+    qualified: z.boolean()
+});
+
 export const zGenerationProposal = z.object({
     category: zCoverageKind,
     id: z.uuid(),
@@ -835,6 +851,13 @@ export const zPhoneCommandRequest = z.object({
     title: z.string()
 });
 
+export const zPhoneOptions = z.object({
+    active_session: z.uuid().nullish(),
+    blockers: z.array(z.string()),
+    builds: z.array(zPhoneBuildChoice),
+    profiles: z.array(zExecutionProfile)
+});
+
 export const zPhoneTask = z.object({
     control: zPhoneControl.nullish(),
     generation: zGenerateTestsRequest.nullish(),
@@ -859,6 +882,44 @@ export const zPhoneSession = z.object({
     revision: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).optional(),
     state: zPhoneState,
     tasks: z.array(zPhoneTask)
+});
+
+export const zPreflightReceipt = z.object({
+    artifact_ids: z.array(z.uuid()),
+    attempt_id: z.uuid(),
+    build_sha256: z.string(),
+    context: zExecutionContextV1,
+    duration_ms: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    instance_nonce: z.uuid(),
+    ready_at: z.iso.datetime(),
+    started_at: z.iso.datetime()
+});
+
+export const zAttemptResponse = z.object({
+    artifacts: z.array(zRunArtifact),
+    case_version_id: z.uuid(),
+    checks: z.array(zCheckResult),
+    cleanup: zCleanupState,
+    events: z.array(zExecutionEvent),
+    generation: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    id: z.uuid(),
+    number: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    original_cleanup: zCleanupRequest.nullish(),
+    outcome: zOutcome.nullish(),
+    preflight: zPreflightReceipt.nullish(),
+    reason: z.string().nullish(),
+    recovery_events: z.array(zRecoveryEvent).optional(),
+    state: zJobState,
+    usage: z.array(zModelUsage)
+});
+
+export const zAttemptReceipt = z.object({
+    attempt: zAttemptResponse
+});
+
+export const zPreflightRequest = z.object({
+    generation: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    receipt: zPreflightReceipt
 });
 
 export const zResolvedCase = z.object({
@@ -1639,6 +1700,22 @@ export const zCancelRunResponse = zRunResponse;
  * Success
  */
 export const zGetSettingsResponse = zSettingsResponse;
+
+export const zAcknowledgeExecutionStartBody = zPreflightRequest;
+
+export const zAcknowledgeExecutionStartHeaders = z.object({
+    Authorization: z.string(),
+    'x-lease-token': z.string()
+});
+
+export const zAcknowledgeExecutionStartPath = z.object({
+    attempt_id: z.uuid()
+});
+
+/**
+ * Start evidence acknowledged
+ */
+export const zAcknowledgeExecutionStartResponse = zPreflightAcknowledgement;
 
 export const zCreateWorkspaceBody = zCreateWorkspaceRequest;
 

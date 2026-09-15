@@ -157,7 +157,7 @@ pub async fn generate(
     if input.engine != Some(DiscoveryEngine::MinitapV1) {
         return Err(conflict("Refresh this page to explore with AI"));
     }
-    if s.protocol_version != 3 {
+    if ![3, 4].contains(&s.protocol_version) {
         return Err(conflict("Reconnect with the updated discovery worker"));
     }
     if s.profile.model.is_empty() || s.profile.driver != Driver::Minitap {
@@ -400,6 +400,7 @@ pub async fn save(
     {
         return Err(ApiFailure::invalid("Draft batch exceeds 1 MiB"));
     }
+    let adapter = super::execution_readiness::adapter(db, app, &package).await?;
     let mut proposal_ids = std::collections::BTreeMap::new();
     let source = if let Some(task) = input.source_task_id {
         let row=one(db,"SELECT t.payload FROM phone_tasks t JOIN phone_sessions s ON s.id=t.session_id WHERE t.id=$1 AND s.app_id=$2 AND s.creator_id=$3",vec![task.into(),app.into(),user.into()]).await?;
@@ -463,6 +464,17 @@ pub async fn save(
             }
             source.clone()
         };
+        if adapter == "android_direct_v1"
+            && input
+                .sequence
+                .actions
+                .iter()
+                .any(|a| a.kind == ActionKind::Navigate || a.checkpoint_id == "preflight")
+        {
+            return Err(ApiFailure::invalid(
+                "Use direct actions for this app's saved tests",
+            ));
+        }
         let id = Uuid::new_v4();
         let key = format!("test-{}", id.simple());
         let c = CaseDefinition {
@@ -472,7 +484,7 @@ pub async fn save(
             requirement: input.requirement,
             provenance,
             package: package.clone(),
-            adapter: "demo_persistence_v1".into(),
+            adapter: adapter.clone(),
             preconditions: vec![],
             actions: input.sequence.actions,
             checks: input.sequence.checks,

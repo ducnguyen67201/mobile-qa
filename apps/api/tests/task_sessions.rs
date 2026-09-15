@@ -26,6 +26,7 @@ async fn task_session_requires_no_plan_and_fences_worker_and_task_identity() {
             .await
             .assert_status_ok();
         let profile = ExecutionProfile {
+        execution_context: None,
             id: Uuid::new_v4(),
             name: "Synthetic protocol test".into(),
             driver: Driver::Minitap,

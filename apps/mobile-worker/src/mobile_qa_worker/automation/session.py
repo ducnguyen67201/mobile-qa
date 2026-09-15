@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mobile_qa_worker.automation.direct import check, execute
+from mobile_qa_worker.device.android import AndroidDevice as Device
 from mobile_qa_worker.generated.models import PhoneState, PhoneTask, PhoneTaskState, StepReceipt
 from mobile_qa_worker.qualification.config import Profile, QualificationError
-from mobile_qa_worker.qualification.device import Device
 
 if TYPE_CHECKING:
     from mobile_qa_worker.task_sessions import SessionConnection

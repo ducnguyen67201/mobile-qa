@@ -69,9 +69,16 @@ pub async fn options(ctx: &AppContext, user: Uuid, app: Uuid) -> ApiResult<Phone
     let a = apps::authorized(ctx, user, app).await?;
     reconcile(ctx).await?;
     let builds=rows(&ctx.db,"SELECT id,original_filename FROM builds WHERE app_id=$1 AND validation_state='validated' ORDER BY created_at DESC,id DESC LIMIT 50",vec![app.into()]).await?.iter().map(|r|Ok(PhoneBuildChoice{id:field(r,"id")?,name:field(r,"original_filename")?})).collect::<ApiResult<Vec<_>>>()?;
-    let profiles=rows(&ctx.db,"SELECT p.payload FROM execution_profiles p WHERE p.app_id=$1 AND EXISTS(SELECT 1 FROM execution_workers w WHERE w.profile_id=p.id AND w.revoked=false)",vec![app.into()]).await?.iter().map(|r|decode::<ExecutionProfile>(field(r,"payload")?)).collect::<ApiResult<Vec<_>>>()?.into_iter().filter(|p|p.qualified&&matches!(p.driver,Driver::Minitap|Driver::Direct)&&p.package==a.android_package).collect::<Vec<_>>();
+    let profiles=rows(&ctx.db,"SELECT p.payload FROM execution_profiles p WHERE p.app_id=$1 AND EXISTS(SELECT 1 FROM execution_workers w WHERE w.profile_id=p.id AND w.revoked=false)",vec![app.into()]).await?.iter().map(|r|decode::<ExecutionProfile>(field(r,"payload")?)).collect::<ApiResult<Vec<_>>>()?.into_iter().filter(|p|p.qualified&&p.validate().is_ok()&&matches!(p.driver,Driver::Minitap|Driver::Direct)&&p.package==a.android_package).collect::<Vec<_>>();
     let active_session=rows(&ctx.db,"SELECT id FROM phone_sessions WHERE app_id=$1 AND creator_id=$2 AND payload->>'state' NOT IN ('closed','quarantined') ORDER BY created_at DESC LIMIT 1",vec![app.into(),user.into()]).await?.first().map(|r|field(r,"id")).transpose()?;
     let mut blockers = vec![];
+    let env = one(&ctx.db,"SELECT account_secret_reference_id,reset_secret_reference_id FROM environments WHERE app_id=$1",vec![app.into()]).await?;
+    if field::<Option<Uuid>>(&env, "account_secret_reference_id")?.is_some()
+        || field::<Option<Uuid>>(&env, "reset_secret_reference_id")?.is_some()
+    {
+        blockers
+            .push("This app needs a verified account and reset setup before connecting.".into());
+    }
     if builds.is_empty() {
         blockers.push("Upload an APK to open your app.".into());
     }
@@ -285,7 +292,7 @@ pub async fn claim(
     w: &Worker,
     input: PhoneClaimRequest,
 ) -> ApiResult<PhoneClaimResponse> {
-    if ![0, 2, 3].contains(&input.protocol_version) {
+    if ![0, 2, 3, 4].contains(&input.protocol_version) {
         return Err(conflict("Unsupported phone protocol"));
     }
     reconcile(ctx).await?;
@@ -297,6 +304,10 @@ pub async fn claim(
     )
     .await?;
     let p = test_definitions::profile(&tx, w.app_id, w.profile_id).await?;
+    p.validate().map_err(ApiFailure::invalid)?;
+    if p.execution_context.is_some() && input.protocol_version < 4 {
+        return Ok(PhoneClaimResponse { lease: None });
+    }
     if !p.qualified || !matches!(p.driver, Driver::Minitap | Driver::Direct) {
         return Err(conflict("A qualified real device profile is required"));
     }
@@ -337,7 +348,7 @@ pub async fn claim(
     };
     let mut s: PhoneSession = decode(field(r, "payload")?)?;
     s.protocol_version = input.protocol_version;
-    if p.driver == Driver::Direct && ![2, 3].contains(&input.protocol_version) {
+    if p.driver == Driver::Direct && ![2, 3, 4].contains(&input.protocol_version) {
         return Err(conflict("Update this worker for direct execution"));
     }
     s.state = PhoneState::Preparing;

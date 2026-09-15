@@ -1,5 +1,44 @@
 # Implementation status and evidence
 
+## Phase 07A — qualified clean-start replay (2026-09-15)
+
+07A source and synthetic validation are complete. The new `android_direct_v1`
+profile declares one local-state app, Android35 image/ABI, launcher, fixed geometry,
+reset-policy/runtime/verifier revisions, stage limits and required starting assertions.
+Profiles remain immutable and operator-owned. Missing legacy context stays unknown.
+
+The worker retains clean-start PNG/XML, waits for the API's fenced acknowledgement,
+then executes direct commands without model calls. Start and cleanup have separate
+budgets. Missing start proof or uncertain cleanup quarantines the reservation; no
+mutation is retried after an uncertain response. Recovery appends a record without
+replacing the initial cleanup receipt or changing the machine verdict.
+
+The generic Android boundary owns install/launcher verification, fresh AVD disposal,
+package-aware captures and shared password masking. The demo wrapper retains its
+fixture backend and persistence reset oracle. Phone protocol4 and execution protocol3
+protect old workers from new profile fields. AI discovery remains demo-qualified;
+this increment does not establish real-app exploration or remote account reset.
+
+Run details show a compact clean-start/cleanup strip with evidence behind a disclosure.
+The GAN evaluator accepted the compact readiness design at 7.98/10 (threshold 7.5).
+This assessment is source/DOM only; rendered browser inspection remains restricted.
+Actual non-demo APK qualification, build comparison, pilot metrics and the reliability
+campaign remain pending in 07B–D. No customer APK was supplied for this acceptance.
+
+Validation: generated-contract drift, formatting, Clippy, TypeScript/ESLint,
+Ruff/Pyright and API/web builds pass. 49 Rust tests, 116 browser tests and 159 worker
+tests pass across the consolidated run and targeted retries. The pre-existing loopback
+HTTP worker test failed intermittently before passing alone; no transport behavior was
+changed to mask it. The CI-scope tests and contract-export helper pass. Both simulated
+HTTP smokes (`just smoke-execution`, `just smoke-direct-authoring`) preserve reports
+through API restart, including direct authoring and reviewed immutable manifests.
+These checks use no emulator or model calls and do not prove real-device qualification.
+
+Implementation report and remaining gates are in the owning
+[phase 07 specification](implementation/07-pilot-readiness-and-scale.md#07a-implementation-notes--2026-09-15).
+Temporary GAN specifications and evaluation files were removed after applying the review.
+The Phase07 plan remains active because 07B–D have not been implemented.
+
 ## Full local development supervisor (2026-09-15)
 
 `just dev` now builds the API once and starts PostgreSQL, API, Vite, phone and execution

@@ -485,12 +485,16 @@ pub async fn executable(
                 .await?,
                 "android_package",
             )?;
-            if c.adapter != "demo_persistence_v1"
-                || c.package != "ai.mobileqa.demo"
-                || c.package != package
-                || c.checks.iter().any(|c| c.method == CheckMethod::Manual)
-            {
-                return Err(ApiFailure::invalid("Automatic execution currently supports the demo persistence adapter and automated checks only"));
+            if c.package != package {
+                return Err(ApiFailure::invalid("Test belongs to another app"));
+            }
+            if c.adapter == "demo_persistence_v1" && c.package == "ai.mobileqa.demo" {
+                if c.checks.iter().any(|c| c.method == CheckMethod::Manual) {
+                    return Err(ApiFailure::invalid("Automatic checks are required"));
+                }
+            } else {
+                let p = super::execution_readiness::assigned(db, app, &package).await?;
+                super::execution_readiness::case_matches(&p, c)?;
             }
         }
         TestDefinition::Suite(s) => {
@@ -500,6 +504,7 @@ pub async fn executable(
             }
         }
         TestDefinition::Plan(p) => {
+            super::execution_readiness::plan_cases(db, app, p).await?;
             let profile = definitions::profile(db, app, p.profile_id).await?;
             if !profile.qualified {
                 return Err(ApiFailure::invalid("Execution profile is not qualified"));
@@ -513,7 +518,7 @@ pub async fn executable(
             }) || cases
                 .iter()
                 .map(|c| {
-                    u64::from(c.case.budget.duration_seconds)
+                    super::execution_readiness::duration(&profile, &c.case)
                         * (u64::from(p.diagnostic_retries) + 1)
                 })
                 .sum::<u64>()

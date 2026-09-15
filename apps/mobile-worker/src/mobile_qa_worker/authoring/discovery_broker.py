@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from mobile_qa_worker.automation.direct import execute, hierarchy, nodes
+from mobile_qa_worker.device.android import AndroidDevice as Device
 from mobile_qa_worker.execution.client import TransportError
 from mobile_qa_worker.generated.models import (
     DiscoveryCall,
@@ -22,7 +23,6 @@ from mobile_qa_worker.generated.models import (
     PhoneTask,
 )
 from mobile_qa_worker.qualification.config import Profile, QualificationError
-from mobile_qa_worker.qualification.device import Device
 from mobile_qa_worker.qualification.process import stop_group
 
 if TYPE_CHECKING:

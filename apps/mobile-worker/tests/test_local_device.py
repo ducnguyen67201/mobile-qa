@@ -11,8 +11,10 @@ import pytest
 from test_device import profile
 from test_qualification import result_data
 
-from mobile_qa_worker.qualification import device, host, local
+from mobile_qa_worker.device import android as device
+from mobile_qa_worker.qualification import host, local
 from mobile_qa_worker.qualification.config import Profile, QualificationError
+from mobile_qa_worker.qualification.device import Device
 from mobile_qa_worker.qualification.evidence import Evidence, sha256, validate_result
 
 
@@ -95,7 +97,7 @@ def test_mac_doctor_requires_matching_pinned_image_and_acceleration(tmp_path, mo
 
 def test_arm_apk_allowed_only_with_arm_profile(tmp_path, monkeypatch):
     p = replace(profile(tmp_path), system_image="system-images;android-35;google_apis;arm64-v8a")
-    d = device.Device(p, Evidence(tmp_path / "attempt"))
+    d = Device(p, Evidence(tmp_path / "attempt"))
     apk = tmp_path / "app.apk"
     with zipfile.ZipFile(apk, "w") as archive:
         archive.writestr("AndroidManifest.xml", b"manifest")
@@ -103,7 +105,13 @@ def test_arm_apk_allowed_only_with_arm_profile(tmp_path, monkeypatch):
     monkeypatch.setattr(
         device, "command", lambda *args: b"package: name='ai.mobileqa.demo'\nsdkVersion:'26'"
     )
-    monkeypatch.setattr(d, "adb", lambda *args, **kwargs: b"Success")
+    monkeypatch.setattr(
+        d,
+        "adb",
+        lambda *args, **kwargs: b"ai.mobileqa.demo/.MainActivity"
+        if "resolve-activity" in args
+        else b"Success",
+    )
     assert d.install(apk, sha256(apk)) == sha256(apk)
 
 
@@ -221,8 +229,8 @@ def test_explicit_local_recovery_requires_matching_adb_receipt(
         def stop(self):
             pass
 
-        def discard(self):
-            pass
+        def discard(self, *, recovery=False):
+            assert recovery
 
     monkeypatch.setattr(runner, "Device", StoppedDevice)
     if allowed:
@@ -243,7 +251,7 @@ def test_mac_boot_uses_effective_locale_and_unattended_flags(tmp_path, monkeypat
         headless=False,
     )
     p.state_root.mkdir()
-    d = device.Device(p, Evidence(tmp_path / "attempt"))
+    d = Device(p, Evidence(tmp_path / "attempt"))
     monkeypatch.setattr(device.platform, "system", lambda: "Darwin")
     monkeypatch.setattr(device, "assert_ports_available", lambda: None)
 
@@ -297,7 +305,7 @@ def test_stop_waits_for_listener_release(tmp_path, monkeypatch):
 
     monkeypatch.setattr(device, "assert_ports_available", available)
     monkeypatch.setattr(device.time, "sleep", lambda seconds: None)
-    d = device.Device(profile(tmp_path), Evidence(tmp_path / "attempt"))
+    d = Device(profile(tmp_path), Evidence(tmp_path / "attempt"))
     d.stop()
     assert len(attempts) == 3
 

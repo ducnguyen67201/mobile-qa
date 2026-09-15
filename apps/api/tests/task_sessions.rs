@@ -6,6 +6,15 @@ use support::*;
 
 #[tokio::test]
 async fn task_session_requires_no_plan_and_fences_worker_and_task_identity() {
+    assert_session_protocol(3).await;
+}
+
+#[tokio::test]
+async fn protocol_four_runs_direct_commands_and_ai_discovery() {
+    assert_session_protocol(4).await;
+}
+
+async fn assert_session_protocol(protocol_version: u32) {
     let _guard = DATABASE_BOOT.lock().await;
     request::<App, _, _>(|server, ctx| async move {
         let owner = login(&server, &ctx).await;
@@ -26,6 +35,7 @@ async fn task_session_requires_no_plan_and_fences_worker_and_task_identity() {
             .await
             .assert_status_ok();
         let profile = ExecutionProfile {
+        execution_context: None,
             id: Uuid::new_v4(),
             name: "Synthetic protocol test".into(),
             driver: Driver::Minitap,
@@ -282,7 +292,7 @@ async fn task_session_requires_no_plan_and_fences_worker_and_task_identity() {
             .post("/api/worker/phone-claims")
             .add_header("authorization", format!("Bearer {token}"))
             .json(&PhoneClaimRequest {
-                protocol_version: 3,
+                protocol_version,
                 claim_id: Uuid::new_v4(),
             })
             .await;

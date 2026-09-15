@@ -1,7 +1,6 @@
 """Bounded discovery drives the same direct commands testers record and rerun."""
 
 import base64
-import io
 import os
 import re
 import subprocess
@@ -11,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from xml.etree import ElementTree
 
+from mobile_qa_worker.device.android import AndroidDevice as Device
 from mobile_qa_worker.execution.journal import write
 from mobile_qa_worker.generated.models import (
     AuthoringModelRequest,
@@ -25,7 +25,6 @@ from mobile_qa_worker.generated.models import (
     PhoneTaskState,
 )
 from mobile_qa_worker.qualification.config import Profile, QualificationError
-from mobile_qa_worker.qualification.device import Device
 from mobile_qa_worker.qualification.process import stop_group
 
 if TYPE_CHECKING:
@@ -33,38 +32,25 @@ if TYPE_CHECKING:
 
 
 def redact(frame: PhoneFrame, xml: bytes) -> PhoneFrame:
-    """Mask password regions before any provider request, including screen pixels."""
-    from PIL import Image, ImageDraw
+    """Use the same pixel mask for retained evidence and provider requests."""
+    from mobile_qa_worker.device.capture import sanitize
 
-    if len(xml) > 1048576 or b"<!" in xml:
-        raise QualificationError("redaction_failed")
-    try:
-        tree = ElementTree.fromstring(xml)
-        image = Image.open(io.BytesIO(base64.b64decode(frame.png_base64, validate=True)))
-        if image.size != (1080, 1920):
+    _, png = sanitize(xml, base64.b64decode(frame.png_base64, validate=True))
+    clean = frame.model_copy(deep=True)
+    clean.png_base64 = base64.b64encode(png).decode()
+    for node in ElementTree.fromstring(xml).iter("node"):
+        if node.get("password") != "true":
+            continue
+        bounds = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.get("bounds", ""))
+        if bounds is None:
             raise QualificationError("redaction_failed")
-        draw = ImageDraw.Draw(image)
-        for node in tree.iter("node"):
-            if node.get("password") != "true":
-                continue
-            bounds = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.get("bounds", ""))
-            if not bounds:
-                raise QualificationError("redaction_failed")
-            left, top, right, bottom = map(int, bounds.groups())
-            draw.rectangle((left, top, right, bottom), fill="black")
-            frame = frame.model_copy(deep=True)
-            frame.controls = [
-                c
-                for c in frame.controls
-                if c.right <= left or c.left >= right or c.bottom <= top or c.top >= bottom
-            ]
-        output = io.BytesIO()
-        image.save(output, format="PNG")
-        clean = frame.model_copy(deep=True)
-        clean.png_base64 = base64.b64encode(output.getvalue()).decode()
-        return clean
-    except Exception as exc:
-        raise QualificationError("redaction_failed") from exc
+        left, top, right, bottom = map(int, bounds.groups())
+        clean.controls = [
+            c
+            for c in clean.controls
+            if c.right <= left or c.left >= right or c.bottom <= top or c.top >= bottom
+        ]
+    return clean
 
 
 def invoke(

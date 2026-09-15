@@ -194,23 +194,6 @@ class ExecutionEvent(BaseModel):
     sequence: Annotated[int, Field(ge=0)]
 
 
-class ExecutionProfile(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    adapter: str
-    device_identity: str
-    driver: Driver
-    id: UUID
-    image: str
-    max_apk_bytes: Annotated[int, Field(ge=0)]
-    model: str
-    name: str
-    package: str
-    qualification_reference: str
-    qualified: bool
-
-
 class GenerateTestsRequest(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -351,6 +334,15 @@ class PhoneTaskState(StrEnum):
     stopped = 'stopped'
 
 
+class PreflightAcknowledgement(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    accepted: bool
+    attempt_id: UUID
+    generation: int
+
+
 class QualificationArtifact1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -421,6 +413,15 @@ class QualificationUsage(BaseModel):
     unknown_calls: Annotated[int, Field(ge=0, le=10000)]
 
 
+class RecoveryEvent(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    actor_id: UUID
+    created_at: AwareDatetime
+    evidence_reference: str
+
+
 class RunArtifact(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -459,6 +460,16 @@ class Scenario3(BaseModel):
 
 class Scenario(RootModel[Scenario1 | Scenario2 | Scenario3]):
     root: Scenario1 | Scenario2 | Scenario3
+
+
+class StageBudgets(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    boot_seconds: Annotated[int, Field(ge=0)]
+    cleanup_seconds: Annotated[int, Field(ge=0)]
+    install_seconds: Annotated[int, Field(ge=0)]
+    start_seconds: Annotated[int, Field(ge=0)]
 
 
 class StepState(StrEnum):
@@ -767,24 +778,6 @@ class TestAction(BaseModel):
     kind: ActionKind
 
 
-class AttemptResponse(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    artifacts: list[RunArtifact]
-    case_version_id: UUID
-    checks: list[CheckResult]
-    cleanup: CleanupState
-    events: list[ExecutionEvent]
-    generation: int
-    id: UUID
-    number: Annotated[int, Field(ge=0)]
-    outcome: Outcome | None = None
-    reason: str | None = None
-    state: JobState
-    usage: list[ModelUsage]
-
-
 class AuthoringModelRequest1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -866,6 +859,49 @@ class DiscoveryReply(BaseModel):
     snapshot: DiscoverySnapshot | None = None
 
 
+class ExecutionContextV1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    abi: str
+    adapter_revision: str
+    density: Annotated[int, Field(ge=0)]
+    height: Annotated[int, Field(ge=0)]
+    image: str
+    launch_component: str
+    locale: str
+    package: str
+    qualification_reference: str
+    qualified_profile_id: UUID
+    reset_policy_hash: str
+    schema_version: Annotated[int, Field(ge=0, le=255)]
+    stages: StageBudgets
+    starting_checks: list[ExpectedCheck]
+    state_scope: str
+    timezone: str
+    verifier_revision: str
+    width: Annotated[int, Field(ge=0)]
+    worker_runtime_revision: str
+
+
+class ExecutionProfile(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    adapter: str
+    device_identity: str
+    driver: Driver
+    execution_context: ExecutionContextV1 | None = None
+    id: UUID
+    image: str
+    max_apk_bytes: Annotated[int, Field(ge=0)]
+    model: str
+    name: str
+    package: str
+    qualification_reference: str
+    qualified: bool
+
+
 class GenerationProposal(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -878,6 +914,28 @@ class GenerationProposal(BaseModel):
     sequence: AutomationSequence
     source_ids: list[UUID]
     title: str
+
+
+class PreflightReceipt(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    artifact_ids: list[UUID]
+    attempt_id: UUID
+    build_sha256: str
+    context: ExecutionContextV1
+    duration_ms: Annotated[int, Field(ge=0)]
+    instance_nonce: UUID
+    ready_at: AwareDatetime
+    started_at: AwareDatetime
+
+
+class PreflightRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    generation: int
+    receipt: PreflightReceipt
 
 
 class ProposalBatch(BaseModel):
@@ -924,11 +982,25 @@ class RunManifest(BaseModel):
     profile: ExecutionProfile
 
 
-class AttemptReceipt(BaseModel):
+class AttemptResponse(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    attempt: AttemptResponse
+    artifacts: list[RunArtifact]
+    case_version_id: UUID
+    checks: list[CheckResult]
+    cleanup: CleanupState
+    events: list[ExecutionEvent]
+    generation: int
+    id: UUID
+    number: Annotated[int, Field(ge=0)]
+    original_cleanup: CleanupRequest | None = None
+    outcome: Outcome | None = None
+    preflight: PreflightReceipt | None = None
+    reason: str | None = None
+    recovery_events: list[RecoveryEvent] | None = None
+    state: JobState
+    usage: list[ModelUsage]
 
 
 class AuthoringModelResponse(BaseModel):
@@ -1003,6 +1075,13 @@ class PhoneUpdate(BaseModel):
     task: PhoneTask | None = None
 
 
+class AttemptReceipt(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    attempt: AttemptResponse
+
+
 class ClaimResponse(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -1029,6 +1108,8 @@ class ExecutionContracts(BaseModel):
     lease_status: LeaseStatusResponse
     local_result: LocalExecutionResult
     navigation: NavigationRequest
+    preflight_ack: PreflightAcknowledgement
+    preflight_request: PreflightRequest
 
 
 class PhoneSession(BaseModel):

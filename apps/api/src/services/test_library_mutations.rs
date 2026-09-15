@@ -191,8 +191,9 @@ pub async fn apply(
                             title: String::new(),
                             requirement: String::new(),
                             provenance: "user_authored".into(),
+                            adapter: super::execution_readiness::adapter(&tx, app, &package)
+                                .await?,
                             package,
-                            adapter: "demo_persistence_v1".into(),
                             preconditions: vec![],
                             actions: vec![],
                             checks: vec![],

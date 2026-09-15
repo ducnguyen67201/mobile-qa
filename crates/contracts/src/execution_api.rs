@@ -1,4 +1,5 @@
 //! Browser execution OpenAPI merged into the canonical local export.
+use crate::execution_lifecycle::*;
 use crate::{browser::ApiError, execution::*};
 use utoipa::OpenApi;
 #[utoipa::path(get,path="/api/apps/{app_id}/execution-plan",operation_id="getExecutionPlan",security(("session_cookie"=[])),
@@ -32,10 +33,30 @@ params(("run_id" = Uuid, Path),("artifact_id" = Uuid, Path)),
 responses((status=200,description="Success",body=String,content_type="application/octet-stream"),(status=400,description="API error",body=ApiError),(status=401,description="API error",body=ApiError),(status=403,description="API error",body=ApiError),(status=404,description="API error",body=ApiError),(status=409,description="API error",body=ApiError),(status=413,description="API error",body=ApiError),(status=422,description="API error",body=ApiError),(status=429,description="API error",body=ApiError),(status=500,description="API error",body=ApiError),(status=503,description="API error",body=ApiError),(status="default",description="API error",body=ApiError)))]
 #[allow(dead_code)]
 fn endpoint_5() {}
+#[utoipa::path(post,path="/api/worker/attempts/{attempt_id}/preflight",operation_id="acknowledgeExecutionStart",
+params(("attempt_id" = Uuid, Path),("Authorization" = String, Header),("x-lease-token" = String, Header)),
+request_body=PreflightRequest,
+responses((status=200,description="Start evidence acknowledged",body=PreflightAcknowledgement),(status=401,description="Worker authentication required",body=ApiError),(status=404,description="Scoped attempt or evidence missing",body=ApiError),(status=409,description="Stale lease or conflicting receipt",body=ApiError),(status=422,description="Invalid start evidence",body=ApiError),(status=500,description="API error",body=ApiError),(status="default",description="API error",body=ApiError)))]
+#[allow(dead_code)]
+fn preflight_endpoint() {}
 #[derive(OpenApi)]
 #[openapi(
-    paths(endpoint_0, endpoint_1, endpoint_2, endpoint_3, endpoint_4, endpoint_5),
+    paths(
+        endpoint_0,
+        endpoint_1,
+        endpoint_2,
+        endpoint_3,
+        endpoint_4,
+        endpoint_5,
+        preflight_endpoint
+    ),
     components(schemas(
+        ExecutionContextV1,
+        StageBudgets,
+        PreflightReceipt,
+        PreflightRequest,
+        PreflightAcknowledgement,
+        RecoveryEvent,
         Outcome,
         JobState,
         CleanupState,
@@ -85,6 +106,12 @@ fn endpoint_5() {}
 )]
 pub struct ExecutionApi;
 pub const OPERATIONS: &[(&str, &str, &str, u16)] = &[
+    (
+        "post",
+        "/api/worker/attempts/{attempt_id}/preflight",
+        "acknowledgeExecutionStart",
+        200,
+    ),
     (
         "get",
         "/api/apps/{app_id}/execution-plan",

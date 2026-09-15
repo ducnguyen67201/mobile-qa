@@ -358,6 +358,6 @@ def recover(
         recovery_evidence = Evidence(profile.state_root / ("recovery-" + str(time.time_ns())))
         dummy = Device(profile, recovery_evidence)
         dummy.stop()
-        dummy.discard()
+        dummy.discard(recovery=True)
         # Retain quarantine until a fresh attempt proves full boot/install/reset.
         dirty.rename(profile.state_root / ("recovered-" + str(time.time_ns()) + ".json"))

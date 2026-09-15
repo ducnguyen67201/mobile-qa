@@ -16,3 +16,5 @@ pub mod task_sessions_api;
 
 pub mod automation;
 pub mod automation_api;
+
+pub mod execution_lifecycle;

@@ -48,27 +48,30 @@ function show(value = session, onReconnect?: () => void) {
   return success
 }
 afterEach(() => vi.unstubAllGlobals())
-it('waits for explicit exploration and sends the generated engine and scope', async () => {
-  const fetch = vi.fn(async (r: Request) => {
-    const body = zGenerateTestsRequest.parse(await r.json())
-    expect(body.engine).toBe('minitap_v1')
-    expect(body.allow_writes).toBe(true)
-    expect(body.journey).toContain('enter sample test data')
-    return Response.json(session)
-  })
-  vi.stubGlobal('fetch', fetch)
-  const success = show()
-  expect(fetch).not.toHaveBeenCalled()
-  expect(screen.getByRole('button', { name: 'Explore with AI' })).toBeDisabled()
-  await userEvent.click(screen.getByRole('button', { name: 'Explore with AI' }))
-  expect(fetch).not.toHaveBeenCalled()
-  await userEvent.click(
-    screen.getByRole('checkbox', { name: 'Allow AI to tap, type and change test data' }),
-  )
-  await userEvent.click(screen.getByRole('button', { name: 'Explore with AI' }))
-  await waitFor(() => expect(success).toHaveBeenCalled())
-  expect(fetch).toHaveBeenCalledTimes(1)
-})
+it.each([3, 4])(
+  'protocol %i sends explicit exploration with the engine and scope',
+  async (protocol) => {
+    const fetch = vi.fn(async (r: Request) => {
+      const body = zGenerateTestsRequest.parse(await r.json())
+      expect(body.engine).toBe('minitap_v1')
+      expect(body.allow_writes).toBe(true)
+      expect(body.journey).toContain('enter sample test data')
+      return Response.json(session)
+    })
+    vi.stubGlobal('fetch', fetch)
+    const success = show({ ...session, protocol_version: protocol })
+    expect(fetch).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Explore with AI' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Explore with AI' }))
+    expect(fetch).not.toHaveBeenCalled()
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: 'Allow AI to tap, type and change test data' }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Explore with AI' }))
+    await waitFor(() => expect(success).toHaveBeenCalled())
+    expect(fetch).toHaveBeenCalledTimes(1)
+  },
+)
 it('keeps exploration unavailable for incompatible sessions and offers reconnect', async () => {
   const reconnect = vi.fn()
   show({ ...session, protocol_version: 2 }, reconnect)

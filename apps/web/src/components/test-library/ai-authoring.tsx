@@ -73,7 +73,7 @@ export function GenerationPanel({
     mutationFn: (r: GenerateTestsRequest) => generateTests(session!.app_id, r),
     onSuccess: onSession,
   })
-  const ready = session?.state === 'ready' && session.protocol_version === 3
+  const ready = session?.state === 'ready' && (session.protocol_version ?? 0) >= 3
   const active = session?.tasks.find(
     (t) => t.generation && (t.state === 'queued' || t.state === 'acting'),
   )
@@ -173,7 +173,7 @@ export function GenerationPanel({
           </Button>
         )}
         {stop.isError && <ErrorNotice error={stop.error} retry={() => stop.mutate()} />}
-        {session && session.state === 'ready' && session.protocol_version !== 3 && (
+        {session && session.state === 'ready' && (session.protocol_version ?? 0) < 3 && (
           <Alert>
             <Stack gap="xs">
               <Text size="sm">

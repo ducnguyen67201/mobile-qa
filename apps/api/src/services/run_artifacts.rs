@@ -78,10 +78,20 @@ pub async fn reserve(
     }
     let manifest: RunManifest = decode(field(&r, "manifest")?)?;
     let c = &manifest.cases[field::<i32>(&r, "case_index")? as usize].case;
-    if !c
-        .actions
-        .iter()
-        .any(|a| a.checkpoint_id == input.checkpoint_id)
+    let preflight = manifest.profile.execution_context.is_some()
+        && input.checkpoint_id == "preflight"
+        && matches!(
+            (input.name.as_str(), input.mime.as_str()),
+            ("preflight.xml", "application/xml") | ("preflight.png", "image/png")
+        );
+    if !preflight {
+        super::execution_preflight::require(&tx, id, input.generation, &manifest).await?;
+    }
+    if !preflight
+        && !c
+            .actions
+            .iter()
+            .any(|a| a.checkpoint_id == input.checkpoint_id)
     {
         return Err(ApiFailure::invalid("Unknown checkpoint"));
     }

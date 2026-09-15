@@ -62,6 +62,7 @@ async fn prepared(
     let build = res.json::<BuildResponse>();
     assert_eq!(build.validation.state, ValidationState::Validated);
     let profile = ExecutionProfile {
+        execution_context: None,
         id: Uuid::new_v4(),
         name: "Synthetic worker".into(),
         driver: Driver::Fake,
@@ -620,4 +621,56 @@ async fn long_poll_rechecks_revocation_after_waking() {
         assert_eq!(result.unwrap_err().code, "unauthenticated");
     })
     .await;
+}
+
+#[tokio::test]
+async fn clean_start_route_is_fenced_and_recovery_keeps_original_evidence() {
+    use mobile_qa_contracts::execution_lifecycle::*;
+    let _guard = DATABASE_BOOT.lock().await;
+    request::<App,_,_>(|server,ctx|async move {
+        let owner=login(&server,&ctx).await;
+        let(app,build,_,_,_)=prepared(&server,&ctx,&owner).await;
+        // The APK is a synthetic fixture; this exercises generic admission, not real-app qualification.
+        let mut p=ExecutionProfile {execution_context:None,id:Uuid::new_v4(),name:"Direct fixture".into(),driver:Driver::Direct,package:"ai.mobileqa.demo".into(),adapter:"android_direct_v1".into(),device_identity:Uuid::new_v4().to_string(),image:"system-images;android-35;google_apis;x86_64".into(),model:String::new(),qualified:true,qualification_reference:"synthetic local-state qualification".into(),max_apk_bytes:104857600};
+        let start=ExpectedCheck {id:"empty".into(),checkpoint_id:"preflight".into(),description:"Input empty".into(),method:CheckMethod::UiPropertyEqualsV1,resource_id:"ai.mobileqa.demo:id/task_input".into(),text_filter:String::new(),property:UiProperty::Text,expected:String::new(),ready_resource_id:"ai.mobileqa.demo:id/task_input".into(),prerequisite_check_ids:vec![],required:true,observation_seconds:1};
+        p.execution_context=Some(ExecutionContextV1 {schema_version:1,adapter_revision:p.adapter.clone(),verifier_revision:"ui_v1".into(),worker_runtime_revision:"direct_v1".into(),reset_policy_hash:"a".repeat(64),qualified_profile_id:p.id,package:p.package.clone(),launch_component:"ai.mobileqa.demo/.MainActivity".into(),image:p.image.clone(),abi:"x86_64".into(),width:1080,height:1920,density:420,locale:"en-US".into(),timezone:"Etc/UTC".into(),state_scope:"local_only".into(),qualification_reference:p.qualification_reference.clone(),starting_checks:vec![start],stages:StageBudgets{boot_seconds:60,install_seconds:60,start_seconds:30,cleanup_seconds:60}});
+        defs::register_profile(&ctx,owner.user,app,p.clone()).await.unwrap();
+        let TestDefinition::Case(mut c)=definition() else {panic!()};
+        c.key="direct-clean".into();c.adapter=p.adapter.clone();
+        for a in &mut c.actions {if a.kind==ActionKind::Navigate {a.kind=ActionKind::Checkpoint;a.instruction.clear();}}
+        let case=approved(&ctx,&owner,app,TestDefinition::Case(c)).await;
+        let plan=approved(&ctx,&owner,app,TestDefinition::Plan(PlanDefinition{key:"direct-clean-plan".into(),version:1,title:"Clean replay".into(),suite_version_ids:vec![],cases:vec![CaseSelection{case_version_id:case.id,data_variant:"default".into(),required:true}],profile_id:p.id,budget:ExecutionBudget{duration_seconds:1800,max_steps:80,artifact_bytes:16777216},diagnostic_retries:0,exclusions:vec![]})).await;
+        let w=worker_auth::Worker{id:Uuid::new_v4(),app_id:app,profile_id:p.id};let token=loco_rs::hash::random_string(64);
+        worker_auth::register(&ctx,owner.user,app,w.id,p.id,&token).await.unwrap();
+        let(run,_)=runs::create(&ctx,owner.user,app,"clean",CreateRunRequest{build_id:build,plan_version_id:plan.id,environment_revision:1}).await.unwrap();
+        for version in [1,2] {assert!(scheduler::claim(&ctx,&w,ClaimRequest{version,claim_id:Uuid::new_v4(),profile_id:p.id}).await.unwrap().lease.is_none());}
+        let lease=scheduler::claim(&ctx,&w,ClaimRequest{version:3,claim_id:Uuid::new_v4(),profile_id:p.id}).await.unwrap().lease.unwrap();
+        let prefix=format!("/api/worker/attempts/{}",lease.attempt_id);
+        let event=EventRequest{generation:lease.generation,events:vec![ExecutionEvent{id:Uuid::new_v4(),sequence:1,action_id:"create".into(),phase:"started".into(),message:"Starting".into()}]};
+        error(&server.post(&format!("{prefix}/events")).add_header("authorization",format!("Bearer {token}")).add_header("x-lease-token",&lease.lease_token).json(&event).await,409);
+        let mut ids=vec![];
+        for(suffix,mime,data)in[("xml","application/xml",b"<hierarchy><node package=\"ai.mobileqa.demo\" resource-id=\"ai.mobileqa.demo:id/task_input\" text=\"\"/></hierarchy>".to_vec()),("png","image/png",include_bytes!("fixtures/execution/synthetic.png").to_vec())] {
+            let body=ArtifactRequest{generation:lease.generation,checkpoint_id:"preflight".into(),name:format!("preflight.{suffix}"),mime:mime.into(),byte_size:data.len() as u32,sha256:hash(&data)};
+            let response=server.post(&format!("{prefix}/artifacts")).add_header("authorization",format!("Bearer {token}")).add_header("x-lease-token",&lease.lease_token).json(&body).await;response.assert_status(axum::http::StatusCode::CREATED);
+            let a=response.json::<ArtifactReceipt>().artifact;ids.push(a.id);
+            server.put(&format!("{prefix}/artifacts/{}/content",a.id)).add_header("authorization",format!("Bearer {token}")).add_header("x-lease-token",&lease.lease_token).add_header("x-lease-generation",lease.generation.to_string()).bytes(axum::body::Bytes::from(data)).await.assert_status_ok();
+        }
+        let now=chrono::Utc::now();
+        let request=PreflightRequest{generation:lease.generation,receipt:PreflightReceipt{attempt_id:lease.attempt_id,instance_nonce:Uuid::new_v4(),context:p.execution_context.clone().unwrap(),build_sha256:run.manifest.build_sha256.clone(),started_at:now,ready_at:now,duration_ms:0,artifact_ids:ids}};
+        let url=format!("{prefix}/preflight");
+        error(&server.post(&url).json(&request).await,401);
+        for _ in 0..2 {let response=server.post(&url).add_header("authorization",format!("Bearer {token}")).add_header("x-lease-token",&lease.lease_token).json(&request).await;response.assert_status_ok();assert!(response.json::<PreflightAcknowledgement>().accepted);}
+        let mut changed=request.clone();changed.receipt.instance_nonce=Uuid::new_v4();
+        error(&server.post(&url).add_header("authorization",format!("Bearer {token}")).add_header("x-lease-token",&lease.lease_token).json(&changed).await,409);
+        changed=request.clone();changed.generation+=1;
+        error(&server.post(&url).add_header("authorization",format!("Bearer {token}")).add_header("x-lease-token",&lease.lease_token).json(&changed).await,409);
+        scheduler::events(&ctx,&w,lease.attempt_id,&lease.lease_token,event).await.unwrap();
+        let completion=CompleteRequest{generation:lease.generation,execution_outcome:Outcome::Passed,reason:"fixture has no action proof".into(),usage:vec![]};
+        assert_ne!(scheduler::complete(&ctx,&w,lease.attempt_id,&lease.lease_token,completion).await.unwrap().attempt.outcome,Some(Outcome::Passed));
+        let cleanup=CleanupRequest{generation:lease.generation,stopped:false,reset:CleanupState::Quarantined,evidence_reference:"stop uncertain".into(),boot_id:"fixture".into()};
+        scheduler::cleanup(&ctx,&w,lease.attempt_id,&lease.lease_token,cleanup.clone()).await.unwrap();
+        scheduler::recover(&ctx,owner.user,app,lease.attempt_id,"owned instance disposed").await.unwrap();
+        let a=runs::attempt(&ctx.db,lease.attempt_id).await.unwrap();
+        assert_eq!(a.original_cleanup,Some(cleanup));assert_eq!(a.recovery_events.len(),1);assert_eq!(a.preflight,Some(request.receipt));assert_ne!(a.outcome,Some(Outcome::Passed));
+    }).await;
 }

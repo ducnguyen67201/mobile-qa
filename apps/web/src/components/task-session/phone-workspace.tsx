@@ -139,11 +139,8 @@ export function PhoneWorkspace({
     mutationFn: (body: SaveAuthoredTestsRequest) => saveAuthoredTests(appId, body),
     onSuccess: () => void client.invalidateQueries({ queryKey: ['test-library'] }),
   })
-  const ready =
-    s?.state === 'ready' &&
-    [2, 3].includes(s.protocol_version ?? 0) &&
-    !phone.isError &&
-    !submit.isPending
+  const supportsDirect = [2, 3, 4].includes(s?.protocol_version ?? 0)
+  const ready = s?.state === 'ready' && supportsDirect && !phone.isError && !submit.isPending
   const usesAi = sequence.actions.some((a) => a.kind === 'navigate')
   useEffect(() => {
     for (const task of s?.tasks ?? []) {
@@ -436,7 +433,7 @@ export function PhoneWorkspace({
                 </Button>
               </>
             )}
-            {s && ![2, 3].includes(s.protocol_version ?? 0) && s.state === 'ready' && (
+            {s && !supportsDirect && s.state === 'ready' && (
               <Alert>
                 This session cannot run direct actions. Open a new session to try again.
               </Alert>

@@ -9,16 +9,15 @@ import sys
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
-from uuid import uuid4
 from xml.etree import ElementTree
 
-from mobile_qa_worker.automation.direct import execute, hierarchy
 from mobile_qa_worker.execution.journal import write
 from mobile_qa_worker.generated.models import (
     AuthoringModelRequest,
     AuthoringModelResponse,
     AuthoringUsage,
-    DiscoverySnapshot,
+    DiscoveryEngine,
+    DiscoveryOutcome,
     GenerationProgress,
     GenerationState,
     PhoneFrame,
@@ -51,7 +50,14 @@ def redact(frame: PhoneFrame, xml: bytes) -> PhoneFrame:
             bounds = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.get("bounds", ""))
             if not bounds:
                 raise QualificationError("redaction_failed")
-            draw.rectangle(tuple(map(int, bounds.groups())), fill="black")
+            left, top, right, bottom = map(int, bounds.groups())
+            draw.rectangle((left, top, right, bottom), fill="black")
+            frame = frame.model_copy(deep=True)
+            frame.controls = [
+                c
+                for c in frame.controls
+                if c.right <= left or c.left >= right or c.bottom <= top or c.top >= bottom
+            ]
         output = io.BytesIO()
         image.save(output, format="PNG")
         clean = frame.model_copy(deep=True)
@@ -114,14 +120,6 @@ def invoke(
             stop_group(child)
 
 
-def allowed(command: object, allow_writes: bool) -> bool:
-    from mobile_qa_worker.generated.models import DirectCommand
-
-    if not isinstance(command, DirectCommand):
-        return False
-    return allow_writes or command.root.operation in ("back", "swipe", "wait_for")
-
-
 def run(
     connection: "SessionConnection",
     device: Device,
@@ -130,12 +128,15 @@ def run(
     profile_path: Path,
     directory: Path,
 ) -> None:
-    from mobile_qa_worker.task_sessions import capture
+    from mobile_qa_worker.authoring.discovery_broker import explore
 
     request = task.generation
     if request is None:
         raise QualificationError("generation_request_missing")
     progress = task.progress or GenerationProgress(
+        engine=DiscoveryEngine.minitap_v1,
+        journal=[],
+        source_job_id=None,
         state=GenerationState.discovering,
         proposals=[],
         snapshots=[],
@@ -182,49 +183,28 @@ def run(
 
     try:
         progress.state = GenerationState.discovering
+        if request.engine != DiscoveryEngine.minitap_v1:
+            raise QualificationError("discovery_worker_upgrade_required")
         if not progress.snapshots:
-            for _ in range(8):
-                if connection.stopped.is_set() or time.monotonic() >= deadline:
-                    raise QualificationError("generation_stopped_or_timed_out")
-                frame = redact(capture(device), hierarchy(device))
-                progress.snapshots.append(DiscoverySnapshot(id=uuid4(), frame=frame))
-                publish(f"Explored {len(progress.snapshots)} screen states")
-                if len(progress.trace) >= 12 or len(progress.snapshots) >= 8:
-                    break
-                reply = ask(
-                    {
-                        "kind": "discover",
-                        "package": connection.session.profile.package,
-                        "journey": request.journey,
-                        "allow_writes": request.allow_writes,
-                        "frame": frame.model_dump(mode="json"),
-                        "trace": [c.model_dump(mode="json") for c in progress.trace],
-                    }
-                )
-                if not reply.decision:
-                    raise QualificationError("invalid_discovery_decision")
-                decision = reply.decision.root
-                if decision.decision == "finish":
-                    progress.gaps.append(decision.reason[:1000])
-                    break
-                if not allowed(decision.command, request.allow_writes):
-                    progress.gaps.append(
-                        "This action needs permission to change test data. "
-                        "Describe the journey and enable test-data changes."
-                    )
-                    break
-                execute(
-                    device,
-                    connection.session.profile.package,
-                    decision.command,
-                    stopped=connection.stopped.is_set,
-                )
-                progress.trace.append(decision.command)
+            explore(connection, device, task, profile, profile_path, directory, deadline)
+        if connection.stopped.is_set():
+            raise QualificationError("discovery_canceled")
+        if not progress.trace or progress.usage.unknown_calls:
+            progress.state = GenerationState.drafting
+            publish("Preparing discovery observations")
+            progress.state = GenerationState.needs_input
+            progress.gaps.append(
+                "No replayable flow was recorded. Describe a test-data journey and try again."
+            )
+            task.state = PhoneTaskState.completed
+            publish("Review the observations and missing prerequisites")
+            return
         progress.state = GenerationState.drafting
         publish("Generating named test scenarios")
         response = ask(
             {
                 "kind": "propose",
+                "journal": [r.model_dump(mode="json") for r in (progress.journal or [])],
                 "package": connection.session.profile.package,
                 "journey": request.journey,
                 "category": request.category.value,
@@ -236,6 +216,22 @@ def run(
             raise QualificationError("invalid_proposal_batch")
         sources = {str(s.id): s for s in progress.snapshots}
         for proposal in response.batch.proposals:
+            completed = [
+                r for r in (progress.journal or []) if r.outcome == DiscoveryOutcome.completed
+            ]
+            count = len(proposal.sequence.actions)
+            if not 1 <= count <= len(completed) or proposal.path_ids != [
+                r.id for r in completed[:count]
+            ]:
+                raise QualificationError("proposal_path_not_observed")
+            for action, receipt in zip(proposal.sequence.actions, completed, strict=False):
+                if (
+                    action.kind.value != "direct"
+                    or action.command != receipt.command
+                    or receipt.before_id not in proposal.source_ids
+                    or receipt.after_id not in proposal.source_ids
+                ):
+                    raise QualificationError("proposal_path_not_observed")
             if not proposal.source_ids or any(str(i) not in sources for i in proposal.source_ids):
                 raise QualificationError("invalid_proposal_source")
             controls = [c for i in proposal.source_ids for c in sources[str(i)].frame.controls]

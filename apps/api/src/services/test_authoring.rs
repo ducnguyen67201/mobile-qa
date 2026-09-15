@@ -93,7 +93,7 @@ async fn enqueue(
     if s.environment_revision != revision_now as u32 {
         return Err(conflict("Environment changed. Open a new session."));
     }
-    if s.protocol_version != 2 {
+    if ![2, 3].contains(&s.protocol_version) {
         return Err(conflict(
             "Reconnect with the updated device worker to run direct steps",
         ));
@@ -154,6 +154,12 @@ pub async fn generate(
     if s.app_id != app {
         return Err(ApiFailure::unauthorized());
     }
+    if input.engine != Some(DiscoveryEngine::MinitapV1) {
+        return Err(conflict("Refresh this page to explore with AI"));
+    }
+    if s.protocol_version != 3 {
+        return Err(conflict("Reconnect with the updated discovery worker"));
+    }
     if s.profile.model.is_empty() || s.profile.driver != Driver::Minitap {
         return Err(ApiFailure::invalid(
             "AI generation needs a configured model. Templates work without AI.",
@@ -182,14 +188,19 @@ pub async fn generate(
             "session_id",
         )?;
         if binding != s.id
-            || old
-                .generation
-                .as_ref()
-                .is_none_or(|g| g.allow_writes != input.allow_writes || g.journey != input.journey)
+            || old.generation.as_ref().is_none_or(|g| {
+                g.allow_writes != input.allow_writes
+                    || g.journey != input.journey
+                    || g.engine != input.engine
+            })
         {
             return Err(conflict("Discovery scope changed. Discover again."));
         }
+        if old.state != PhoneTaskState::Completed {
+            return Err(conflict("Only completed discovery evidence can be reused"));
+        }
         old.progress.map(|mut p| {
+            p.source_job_id = Some(job);
             p.state = GenerationState::Queued;
             p.proposals.clear();
             p.usage = AuthoringUsage::default();
@@ -389,7 +400,7 @@ pub async fn save(
     {
         return Err(ApiFailure::invalid("Draft batch exceeds 1 MiB"));
     }
-    let mut proposal_ids = std::collections::BTreeSet::new();
+    let mut proposal_ids = std::collections::BTreeMap::new();
     let source = if let Some(task) = input.source_task_id {
         let row=one(db,"SELECT t.payload FROM phone_tasks t JOIN phone_sessions s ON s.id=t.session_id WHERE t.id=$1 AND s.app_id=$2 AND s.creator_id=$3",vec![task.into(),app.into(),user.into()]).await?;
         let t: PhoneTask = decode(field(&row, "payload")?)?;
@@ -403,7 +414,7 @@ pub async fn save(
                 return Err(conflict("Generation is not ready"));
             }
             for p in t.progress.as_ref().into_iter().flat_map(|p| &p.proposals) {
-                proposal_ids.insert(p.id);
+                proposal_ids.insert(p.id, p.sequence.clone());
             }
         }
         format!("authored-task:{task}")
@@ -434,10 +445,18 @@ pub async fn save(
             }
             format!("template:{template}:1")
         } else if let Some(proposal) = input.proposal_id {
-            if !proposal_ids.contains(&proposal) {
+            if !proposal_ids.contains_key(&proposal) {
                 return Err(ApiFailure::invalid("Unknown source proposal"));
             }
-            format!("{source}:proposal:{proposal}")
+            format!(
+                "{source}:p:{}:{}",
+                proposal.simple(),
+                if proposal_ids.get(&proposal) == Some(&input.sequence) {
+                    "unchanged"
+                } else {
+                    "user-modified"
+                }
+            )
         } else {
             if !proposal_ids.is_empty() {
                 return Err(ApiFailure::invalid("Choose a source proposal"));

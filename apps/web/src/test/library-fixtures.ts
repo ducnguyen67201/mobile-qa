@@ -61,6 +61,7 @@ export const libraryEntry: LibraryEntryResponse = {
   kind: 'case',
   key: libraryCase.key,
   title: libraryCase.title,
+  ai_generated: false,
   revision: 1,
   archived_at: null,
   draft_version: 1,

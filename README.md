@@ -1,8 +1,8 @@
 # Mobile QA
 
 Rust/Loco API, authenticated Mantine dashboard, app/APK setup and an explicit Android
-test runner. Main's Google sign-in, workspaces, app setup and uploads are preserved;
-Tests/Runs and UI-to-worker job dispatch remain planned.
+test runner. Tests, runs, worker dispatch and AI discovery are implemented; see the
+[architecture status](docs/architect/status.md) for verified behavior and open qualification gates.
 
 ```text
 apps/api/             Loco source, configuration, migrations and tests
@@ -29,16 +29,20 @@ just dev
 
 Run `doppler setup` from this repository root and select its project/config. Local
 credentials and directory selection are managed by the Doppler CLI; no token belongs
-in Git. `just dev` injects secrets only into the API child using
-`doppler run --no-fallback --forward-signals`. No `.env` or secret export file is used.
+in Git. For the full stack, configure the existing qualified device/profile in
+`.private/dev/config.json` as described in [local development](docs/architect/development.md#one-command-full-local-stack).
+`just dev` builds the API once and starts API, Vite, PostgreSQL, phone and execution workers.
+Doppler injects API and worker children separately; the browser and build receive no secrets.
+Use `just dev-ui` for API/web development without a device profile. No `.env` or secret export file is used.
 See [environment setup](docs/architect/environment.md) for required variable names and deployment.
 
-Open http://127.0.0.1:5173. API uses5150; PostgreSQL uses55432, all loopback only.
+Open http://localhost:5173. API uses5150; PostgreSQL uses55432, all loopback only.
 Ctrl-C stops only child services and the PostgreSQL instance this command started.
 Existing PostgreSQL stays running; its persistent volume is never deleted.
-`.private/api.log` and `.private/web.log` truncate on explicit start. `.private/`
-and reserved `.private/artifacts/` are ignored and mode0700. No artifact upload API
-or production retention policy is implemented.
+`.private/dev/latest/` contains the current per-service logs. Use `just dev-logs` to
+follow them, `just dev-stop` to stop, or `just dev-restart` to rebuild and restart.
+Private logs, worker state and APK artifacts stay ignored. The emulator opens when
+requested through the phone preview; AI calls require an explicit AI action.
 
 Finish **all** source/test/config changes for the scoped feature before generating
 or running checks. Then perform the explicit final phase:

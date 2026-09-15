@@ -101,12 +101,58 @@ class DirectTarget(RootModel[DirectTarget1 | DirectTarget2]):
     root: DirectTarget1 | DirectTarget2
 
 
+class DiscoveryCall1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: UUID
+    kind: Literal['observe']
+
+
+class DiscoveryCall3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: UUID
+    kind: Literal['reserve']
+
+
+class DiscoveryCall4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: UUID
+    input_tokens: Annotated[int | None, Field(ge=0)] = None
+    kind: Literal['usage']
+    output_tokens: Annotated[int | None, Field(ge=0)] = None
+
+
+class DiscoveryCall5(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: UUID
+    kind: Literal['finish']
+
+
 class DiscoveryDecision2(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     decision: Literal['finish']
     reason: str
+
+
+class DiscoveryEngine(StrEnum):
+    legacy_custom = 'legacy_custom'
+    minitap_v1 = 'minitap_v1'
+
+
+class DiscoveryOutcome(StrEnum):
+    pending = 'pending'
+    completed = 'completed'
+    failed = 'failed'
+    uncertain = 'uncertain'
 
 
 class Driver(StrEnum):
@@ -171,6 +217,7 @@ class GenerateTestsRequest(BaseModel):
     )
     allow_writes: bool
     category: CoverageKind
+    engine: DiscoveryEngine | None = None
     expected_revision: Annotated[int, Field(ge=0)]
     id: UUID
     journey: str
@@ -541,6 +588,36 @@ class DirectCommand(
     )
 
 
+class DiscoveryCall2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    command: DirectCommand
+    id: UUID
+    kind: Literal['execute']
+
+
+class DiscoveryCall(
+    RootModel[
+        DiscoveryCall1
+        | DiscoveryCall2
+        | DiscoveryCall3
+        | DiscoveryCall4
+        | DiscoveryCall5
+    ]
+):
+    root: Annotated[
+        DiscoveryCall1
+        | DiscoveryCall2
+        | DiscoveryCall3
+        | DiscoveryCall4
+        | DiscoveryCall5,
+        Field(
+            description='Local child/parent IPC: no worker credentials, shell strings or filesystem paths.'
+        ),
+    ]
+
+
 class DiscoveryDecision1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -553,10 +630,38 @@ class DiscoveryDecision(RootModel[DiscoveryDecision1 | DiscoveryDecision2]):
     root: DiscoveryDecision1 | DiscoveryDecision2
 
 
+class DiscoveryDraftCheck(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    after_action: Annotated[int, Field(ge=1, le=12)]
+    description: str
+    expected: str
+    method: CheckMethod
+    observation_seconds: Annotated[int, Field(ge=1, le=30)]
+    property: UiProperty
+    ready_resource_id: str
+    required: bool
+    resource_id: str
+    text_filter: str
+
+
+class DiscoveryReceipt(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    after_id: UUID | None = None
+    before_id: UUID
+    command: DirectCommand
+    id: UUID
+    outcome: DiscoveryOutcome
+
+
 class DiscoverySnapshot(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
+    fingerprint: str | None = None
     frame: PhoneFrame
     id: UUID
 
@@ -697,6 +802,7 @@ class AuthoringModelRequest2(BaseModel):
         extra='forbid',
     )
     category: CoverageKind
+    journal: Annotated[list[DiscoveryReceipt], Field(validate_default=True)] = []
     journey: str
     kind: Literal['propose']
     package: str
@@ -733,12 +839,40 @@ class CaseDefinition(BaseModel):
     version: Annotated[int, Field(ge=0)]
 
 
+class DiscoveryDraft(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    checks: Annotated[list[DiscoveryDraftCheck], Field(max_length=20)]
+    questions: Annotated[list[str], Field(max_length=20)]
+    requirement: Annotated[str, Field(max_length=4000)]
+    through_action: Annotated[int, Field(ge=1, le=12)]
+    title: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class DiscoveryDraftBatch(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    proposals: Annotated[list[DiscoveryDraft], Field(max_length=5, min_length=1)]
+
+
+class DiscoveryReply(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    error: str | None = None
+    id: UUID
+    snapshot: DiscoverySnapshot | None = None
+
+
 class GenerationProposal(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     category: CoverageKind
     id: UUID
+    path_ids: list[UUID] | None = None
     questions: list[str]
     requirement: str
     sequence: AutomationSequence
@@ -832,9 +966,12 @@ class GenerationProgress(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
+    engine: DiscoveryEngine | None = None
     gaps: list[str]
+    journal: list[DiscoveryReceipt] | None = None
     proposals: list[GenerationProposal]
     snapshots: list[DiscoverySnapshot]
+    source_job_id: UUID | None = None
     state: GenerationState
     trace: list[DirectCommand]
     usage: AuthoringUsage
@@ -934,6 +1071,9 @@ class WorkerContracts(BaseModel):
     )
     authoring_request: AuthoringModelRequest
     authoring_response: AuthoringModelResponse
+    discovery_call: DiscoveryCall
+    discovery_drafts: DiscoveryDraftBatch
+    discovery_reply: DiscoveryReply
     execution: ExecutionContracts
     phone_claim: PhoneClaimResponse
     phone_claim_request: PhoneClaimRequest

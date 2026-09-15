@@ -53,9 +53,11 @@ pub async fn entry(
 ) -> ApiResult<LibraryEntryResponse> {
     let row=one(db,"SELECT e.*, d.version AS draft_version,
         COALESCE(d.payload->'content'->>'title',v.title,e.logical_key) AS title,
+        COALESCE(d.payload->'content'->>'provenance',v.provenance,'') AS provenance,
         v.definition_id AS latest_version_id,v.review_state AS latest_review_state
         FROM test_library_entries e LEFT JOIN test_library_drafts d ON d.entry_id=e.id
-        LEFT JOIN LATERAL (SELECT lv.definition_id,lv.review_state,ed.payload->'content'->>'title' AS title
+        LEFT JOIN LATERAL (SELECT lv.definition_id,lv.review_state,ed.payload->'content'->>'title' AS title,
+          ed.payload->'content'->>'provenance' AS provenance
           FROM test_library_versions lv JOIN execution_definitions ed ON ed.id=lv.definition_id
           WHERE lv.entry_id=e.id ORDER BY ed.version DESC LIMIT 1) v ON true
         WHERE e.id=$1 AND e.app_id=$2",vec![id.into(),app.into()]).await?;
@@ -73,6 +75,12 @@ pub async fn entry(
         kind: decode(json(&field::<String>(&row, "kind")?)?)?,
         key: field(&row, "logical_key")?,
         title: field(&row, "title")?,
+        // Proposal provenance is server-owned and already exists on older saved AI tests.
+        ai_generated: {
+            let provenance: String = field(&row, "provenance")?;
+            provenance.starts_with("authored-task:")
+                && (provenance.contains(":p:") || provenance.contains(":proposal:"))
+        },
         revision: field(&row, "revision")?,
         archived_at,
         draft_version: field::<Option<i32>>(&row, "draft_version")?.map(|v| v as u32),

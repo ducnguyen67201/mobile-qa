@@ -47,6 +47,9 @@ def ensure_ports():
     """Refuse occupied dev ports; never kill an unrelated process to claim a port."""
     for port in (5150, 5173):
         with socket.socket() as sock:
+            # Recently closed dev connections may remain in TIME_WAIT after shutdown.
+            # Reuse permits that state, but still refuses another active listener.
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
                 sock.bind(("127.0.0.1", port))
             except OSError as exc:

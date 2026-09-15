@@ -92,9 +92,16 @@ function EntryWorkspace({
         <>
           {entry.data.kind === 'case' ? (
             <Group justify="space-between" gap="sm">
-              <Title order={1} size="h3">
-                {entry.data.title || 'Untitled task'}
-              </Title>
+              <Group gap="xs">
+                <Title order={1} size="h3">
+                  {entry.data.title || 'Untitled task'}
+                </Title>
+                {entry.data.ai_generated && (
+                  <Badge color="grape" variant="light">
+                    AI generated
+                  </Badge>
+                )}
+              </Group>
               <EntryLifecycle entry={entry.data} />
             </Group>
           ) : (

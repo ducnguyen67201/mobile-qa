@@ -9,6 +9,15 @@
     "authoring_response": {
       "$ref": "#/$defs/AuthoringModelResponse"
     },
+    "discovery_call": {
+      "$ref": "#/$defs/DiscoveryCall"
+    },
+    "discovery_drafts": {
+      "$ref": "#/$defs/DiscoveryDraftBatch"
+    },
+    "discovery_reply": {
+      "$ref": "#/$defs/DiscoveryReply"
+    },
     "execution": {
       "$ref": "#/$defs/ExecutionContracts"
     },
@@ -35,6 +44,9 @@
     }
   },
   "required": [
+    "discovery_drafts",
+    "discovery_call",
+    "discovery_reply",
     "authoring_request",
     "authoring_response",
     "phone_claim",
@@ -239,6 +251,13 @@
           "properties": {
             "category": {
               "$ref": "#/$defs/CoverageKind"
+            },
+            "journal": {
+              "type": "array",
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/DiscoveryReceipt"
+              }
             },
             "journey": {
               "type": "string"
@@ -773,6 +792,121 @@
         }
       ]
     },
+    "DiscoveryCall": {
+      "description": "Local child/parent IPC: no worker credentials, shell strings or filesystem paths.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "kind": {
+              "type": "string",
+              "const": "observe"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "command": {
+              "$ref": "#/$defs/DirectCommand"
+            },
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "kind": {
+              "type": "string",
+              "const": "execute"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id",
+            "command"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "kind": {
+              "type": "string",
+              "const": "reserve"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "input_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "const": "usage"
+            },
+            "output_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "kind": {
+              "type": "string",
+              "const": "finish"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ]
+        }
+      ]
+    },
     "DiscoveryDecision": {
       "oneOf": [
         {
@@ -811,9 +945,209 @@
         }
       ]
     },
+    "DiscoveryDraft": {
+      "description": "The model selects a prefix and writes expectations; code owns commands and evidence IDs.",
+      "type": "object",
+      "properties": {
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DiscoveryDraftCheck"
+          },
+          "maxItems": 20
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20
+        },
+        "requirement": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "through_action": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 12,
+          "minimum": 1
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200,
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "through_action",
+        "title",
+        "requirement",
+        "questions",
+        "checks"
+      ]
+    },
+    "DiscoveryDraftBatch": {
+      "type": "object",
+      "properties": {
+        "proposals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DiscoveryDraft"
+          },
+          "maxItems": 5,
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "proposals"
+      ]
+    },
+    "DiscoveryDraftCheck": {
+      "description": "Use an action number at the model boundary; the recorder resolves checkpoint identities.",
+      "type": "object",
+      "properties": {
+        "after_action": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 12,
+          "minimum": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "expected": {
+          "type": "string"
+        },
+        "method": {
+          "$ref": "#/$defs/CheckMethod"
+        },
+        "observation_seconds": {
+          "type": "integer",
+          "format": "uint32",
+          "maximum": 30,
+          "minimum": 1
+        },
+        "property": {
+          "$ref": "#/$defs/UiProperty"
+        },
+        "ready_resource_id": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "text_filter": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "after_action",
+        "description",
+        "method",
+        "resource_id",
+        "ready_resource_id",
+        "text_filter",
+        "property",
+        "expected",
+        "required",
+        "observation_seconds"
+      ]
+    },
+    "DiscoveryEngine": {
+      "description": "Discovery-only protocol. Absence on historical payloads means the legacy custom loop.",
+      "type": "string",
+      "enum": [
+        "legacy_custom",
+        "minitap_v1"
+      ]
+    },
+    "DiscoveryOutcome": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "completed",
+        "failed",
+        "uncertain"
+      ]
+    },
+    "DiscoveryReceipt": {
+      "type": "object",
+      "properties": {
+        "after_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "before_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "command": {
+          "$ref": "#/$defs/DirectCommand"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "outcome": {
+          "$ref": "#/$defs/DiscoveryOutcome"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "before_id",
+        "command",
+        "outcome"
+      ]
+    },
+    "DiscoveryReply": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "snapshot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiscoverySnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ]
+    },
     "DiscoverySnapshot": {
       "type": "object",
       "properties": {
+        "fingerprint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "frame": {
           "$ref": "#/$defs/PhoneFrame"
         },
@@ -1240,6 +1574,16 @@
         "category": {
           "$ref": "#/$defs/CoverageKind"
         },
+        "engine": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiscoveryEngine"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "expected_revision": {
           "type": "integer",
           "format": "uint32",
@@ -1277,10 +1621,26 @@
     "GenerationProgress": {
       "type": "object",
       "properties": {
+        "engine": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiscoveryEngine"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "gaps": {
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "journal": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DiscoveryReceipt"
           }
         },
         "proposals": {
@@ -1294,6 +1654,13 @@
           "items": {
             "$ref": "#/$defs/DiscoverySnapshot"
           }
+        },
+        "source_job_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
         },
         "state": {
           "$ref": "#/$defs/GenerationState"
@@ -1327,6 +1694,13 @@
         "id": {
           "type": "string",
           "format": "uuid"
+        },
+        "path_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
         },
         "questions": {
           "type": "array",

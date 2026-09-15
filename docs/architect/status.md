@@ -1,5 +1,55 @@
 # Implementation status and evidence
 
+## Full local development supervisor (2026-09-15)
+
+`just dev` now builds the API once and starts PostgreSQL, API, Vite, phone and execution
+workers. `dev-stop`, `dev-restart` and `dev-logs` manage this stack. Each API/worker process
+gets its own Doppler injection; build tools and Vite receive an allowlisted environment.
+The existing registered local device profile is configured in ignored `.private/dev/config.json`.
+Logs are private per run, with `.private/dev/latest` pointing to the current folder.
+The phone worker advertises protocol 3 and drains pending idle claims on shutdown.
+
+Four supervisor policy tests, 149 worker tests, Ruff/Pyright and 28 CI scope cases passed.
+Real local startup authenticated both workers and returned HTTP 200 from the API, Vite
+and the proxied Google login challenge. Full restart preserves database contents and
+worker recovery journals. This verifies local orchestration, not browser rendering,
+arbitrary APK qualification or an additional paid AI discovery run.
+
+## Spec 08 — Minitap flow discovery (2026-09-14)
+
+[Spec 08](implementation/08-minitap-flow-discovery.md) is implemented on
+`codex/08-minitap-discovery`, based on merged main `0aaa20f`. Minitap's pinned graph explores
+through parent-owned observations/direct tools, with protocol 3, acknowledged action
+intents, immutable outcomes, measured call budgets and recorded-path proposals.
+The UI starts/stops exploration explicitly and saves editable drafts for direct replay.
+The old structured-model decision loop is removed; legacy payloads remain readable.
+Strict generated draft schemas use action numbers; code constructs replay and evidence IDs.
+
+Validation: 148 worker tests (including the real pinned SDK graph with synthetic model
+responses), 103 web tests, API integration/route tests, Rust contract tests, generated drift,
+Ruff/Pyright, ESLint/TypeScript, Clippy and production builds passed. The HTTP lease route
+covers protocol 2/3 compatibility, intent-before-effect, immutable receipts, chronological
+redraw observations, invalid proposal paths, idempotent draft saving and lease expiry.
+CI path selection passed 26 cases. One local HTTP fixture timed out under concurrent checks;
+its isolated rerun and the subsequent full worker suite passed.
+
+Real sample acceptance passed under Minitap 4.0.0 / gpt-4.1 on the qualified Android 35
+arm64 emulator. Attempt `6eff28bb-b289-4b34-a31b-1c0ed65aa4d2`, generation
+`6784f747-84a2-4aec-89a9-dd9d24751e15`, recorded `set_text("Hello")` then `tap(Save)`
+and proposed **Save task 'Hello' and verify it appears in the list**. A named draft was
+saved through the real API. Direct replay passed an independently supplied Hello assertion;
+a second replay correctly failed a deliberately wrong assertion. Discovery used 9 calls,
+19,111 input tokens and 993 output tokens, with zero unknown calls; both replays added
+zero model calls. Private evidence is under `.private/task-session-acceptance/`.
+
+Earlier live attempts rejected invalid draft references and exposed passive redraw handling;
+those failures led to action-number draft contracts and chronological observation validation.
+They are not counted as successful acceptance. Same-session sample replay does not establish
+clean-reset replay or arbitrary APK support. Rendered browser acceptance remains open under
+the existing browser access restriction. No old PRP/GAN report trees are retained.
+
+## Earlier implementation evidence
+
 Last reconciled: 2026-09-12. This branch builds phase 05 on integrated phase 02/04
 commit `b4970c7`. The authoring/library implementation and deterministic validation
 have passed locally. Phase 04 dispatch/report evidence below remains valid;

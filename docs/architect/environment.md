@@ -28,12 +28,14 @@ values. Project creation does not mean production database/model credentials are
 credentials are reused. Never paste tokens into source, command arguments or logs.
 `just setup` installs application dependencies and does not modify Doppler configuration.
 
-`just dev` and `just dev-api` wrap the API with
+`just dev` wraps API and workers separately; `just dev-api` wraps only the API with
 `doppler run --no-fallback --forward-signals`. Injection happens in that child, so
 secrets fetched for the API do not enter Vite's environment. `--no-fallback` disables
 Doppler's local secret fallback file; fetching must succeed before the API starts.
 `--forward-signals` preserves shutdown handling. No Doppler watch/restart loop is used.
-The supervisor records startup failures in `.private/api.log` as before.
+The full-stack supervisor records startup failures in `.private/dev/latest/`; `just dev-ui`
+retains `.private/api.log` and `.private/web.log`. The nonsecret dev config chooses the API
+Doppler scope, while the qualified host profile chooses worker/model scope.
 
 ## Current variables
 
@@ -139,4 +141,5 @@ Install worker extras with `uv sync --project apps/mobile-worker --frozen --extr
 execution profile with driver `direct` and empty model. Direct commands need no model secret.
 AI authoring requires an explicitly configured model and a Minitap-capable profile; only its
 isolated child is wrapped in Doppler. Ordinary tests and synthetic smoke remain Doppler-free.
-Use the same owned-device task-worker command documented in spec 06; protocol 2 is automatic.
+Use `just dev` for the complete local stack or the owned-device task-worker command
+documented in spec 06; current phone workers advertise protocol 3 for AI discovery.

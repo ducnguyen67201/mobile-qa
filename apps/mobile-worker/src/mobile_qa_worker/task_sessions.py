@@ -238,7 +238,12 @@ def run_session(
     shutdown: threading.Event | None = None,
 ) -> None:
     profile = Profile.load(profile_path)
-    if lease.session.profile.image != profile.system_image:
+    assignment = lease.session.profile
+    # The SDK reads the host profile; bind its model to the qualified session before side effects.
+    uses_model = assignment.driver.value == "minitap" or bool(assignment.model)
+    if assignment.image != profile.system_image or (
+        uses_model and assignment.model != profile.model
+    ):
         raise QualificationError("worker_profile_mismatch")
     with host_lock(profile.state_root) as dirty:
         if dirty.exists():

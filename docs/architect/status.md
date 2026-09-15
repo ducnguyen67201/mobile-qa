@@ -18,6 +18,9 @@ package-aware captures and shared password masking. The demo wrapper retains its
 fixture backend and persistence reset oracle. Phone protocol4 and execution protocol3
 protect old workers from new profile fields. AI discovery remains demo-qualified;
 this increment does not establish real-app exploration or remote account reset.
+Phone-session admission also binds the host model to the registered model for
+AI-capable profiles before acquiring the device or making network calls. Model-free
+direct profiles do not require a host model match.
 
 Run details show a compact clean-start/cleanup strip with evidence behind a disclosure.
 The GAN evaluator accepted the compact readiness design at 7.98/10 (threshold 7.5).

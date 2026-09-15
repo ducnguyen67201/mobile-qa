@@ -86,3 +86,58 @@ def test_shutdown_during_empty_claim_leaves_no_dirty_marker(tmp_path, monkeypatc
     monkeypatch.setattr(task_sessions, "Client", Client)
     task_sessions.serve("http://127.0.0.1:5150", tmp_path, tmp_path / "unused.toml")
     assert not (tmp_path / "dirty.json").exists()
+
+
+@pytest.mark.parametrize(
+    "driver,registered_model,host_model,image_matches,accepted",
+    [
+        ("minitap", "approved", "different", True, False),
+        ("minitap", "approved", "", True, False),
+        ("minitap", "approved", "approved", True, True),
+        ("minitap", "approved", "approved", False, False),
+        ("direct", "approved", "different", True, False),
+        ("direct", "approved", "approved", True, True),
+        ("direct", "", "unused-host-model", True, True),
+        ("direct", "", "", True, True),
+        ("direct", "", "", False, False),
+    ],
+)
+def test_session_binds_image_and_model_before_side_effects(
+    tmp_path, monkeypatch, driver, registered_model, host_model, image_matches, accepted
+):
+    from dataclasses import replace
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from test_device import profile as host_profile
+    from test_execution import job
+
+    from mobile_qa_worker import task_sessions
+    from mobile_qa_worker.generated.models import ExecutionProfile
+
+    host = replace(host_profile(tmp_path), model=host_model)
+    raw = job().manifest.profile.model_dump(mode="json")
+    raw.update(
+        driver=driver,
+        model=registered_model,
+        image=host.system_image if image_matches else "different-image",
+    )
+    lease = SimpleNamespace(session=SimpleNamespace(profile=ExecutionProfile.model_validate(raw)))
+    monkeypatch.setattr(task_sessions.Profile, "load", lambda _: host)
+
+    class AdmissionReached(Exception):
+        pass
+
+    # Stop at the first side-effect boundary: accepted profiles must reach it, mismatches must not.
+    lock = Mock(side_effect=AdmissionReached)
+    client = Mock()
+    monkeypatch.setattr(task_sessions, "host_lock", lock)
+    if accepted:
+        with pytest.raises(AdmissionReached):
+            task_sessions.run_session(client, lease, tmp_path, tmp_path / "host.toml")
+        lock.assert_called_once_with(host.state_root)
+    else:
+        with pytest.raises(QualificationError, match="^worker_profile_mismatch$"):
+            task_sessions.run_session(client, lease, tmp_path, tmp_path / "host.toml")
+        lock.assert_not_called()
+    assert client.mock_calls == []

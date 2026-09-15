@@ -1,5 +1,5 @@
 //! Shared adapter admission; no device calls and no inference from missing credentials.
-use super::{execution_store::*, test_definitions};
+use super::execution_store::*;
 use crate::errors::{ApiFailure, ApiResult};
 use mobile_qa_contracts::execution::*;
 use sea_orm::ConnectionTrait;
@@ -61,15 +61,4 @@ pub async fn adapter(db: &impl ConnectionTrait, app: Uuid, package: &str) -> Api
         return Ok("demo_persistence_v1".into());
     }
     Ok(assigned(db, app, package).await?.adapter)
-}
-pub async fn plan_cases(
-    db: &impl ConnectionTrait,
-    app: Uuid,
-    plan: &PlanDefinition,
-) -> ApiResult<()> {
-    let p = test_definitions::profile(db, app, plan.profile_id).await?;
-    for c in test_definitions::resolve(db, app, plan).await? {
-        case_matches(&p, &c.case)?;
-    }
-    Ok(())
 }

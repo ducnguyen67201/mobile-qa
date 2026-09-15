@@ -42,7 +42,7 @@ def execute(job: ExecutionJob, profile_path: Path, directory: Path) -> LocalExec
     host = Profile.load(profile_path)
     assignment = job.manifest.profile
     context = assignment.execution_context
-    case = job.manifest.cases[job.case_index].case
+    case = job.manifest.cases[job.case_index].case.model_copy(deep=True)
     if (
         context is None
         or case.adapter != assignment.adapter
@@ -50,6 +50,14 @@ def execute(job: ExecutionJob, profile_path: Path, directory: Path) -> LocalExec
         or any(a.kind.value == "navigate" for a in case.actions)
     ):
         raise QualificationError("unsupported_device_adapter")
+    # Match the server verifier's existing placeholder without changing the frozen manifest.
+    task_title = "qa-" + str(job.attempt_id)
+    for action in case.actions:
+        if action.command and action.command.root.operation == "set_text":
+            action.command.root.text = action.command.root.text.replace("${task_title}", task_title)
+    for expected in case.checks:
+        expected.expected = expected.expected.replace("${task_title}", task_title)
+        expected.text_filter = expected.text_filter.replace("${task_title}", task_title)
     evidence = Evidence(directory / "evidence", case.budget.artifact_bytes)
     device = device_for(assignment, host, evidence)
     nonce = str(uuid4())

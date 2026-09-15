@@ -112,6 +112,40 @@ def test_context_or_host_mismatch_never_opens_device(tmp_path):
         device_for(a, replace(profile(tmp_path), system_image="wrong"), Evidence(tmp_path / "two"))
 
 
+def test_failed_boot_preserves_prior_avd_until_explicit_recovery(tmp_path, monkeypatch):
+    d = device_for(assignment(), profile(tmp_path), Evidence(tmp_path / "evidence"))
+    d.current.mkdir(parents=True)
+    retained = d.current / "keep.txt"
+    retained.write_text("prior instance")
+    monkeypatch.setattr(android, "assert_ports_available", lambda: None)
+    with pytest.raises(QualificationError, match="dirty_avd_requires_recovery"):
+        d.boot()
+    d.stop()
+    with pytest.raises(QualificationError, match="dirty_avd_requires_recovery"):
+        d.discard()
+    assert retained.read_text() == "prior instance"
+    d.discard(recovery=True)
+    assert not d.current.exists()
+
+
+def test_partial_owned_boot_can_be_discarded(tmp_path, monkeypatch):
+    host = profile(tmp_path)
+    host.state_root.mkdir()
+    d = device_for(assignment(), host, Evidence(tmp_path / "evidence"))
+    monkeypatch.setattr(android, "assert_ports_available", lambda: None)
+
+    def fail_create(*args):
+        raise QualificationError("avd_creation_failed")
+
+    monkeypatch.setattr(android, "command", fail_create)
+    with pytest.raises(QualificationError, match="avd_creation_failed"):
+        d.boot()
+    assert d.current.exists()
+    d.stop()
+    d.discard()
+    assert not d.current.exists()
+
+
 def test_password_pixels_and_xml_are_masked_before_retention():
     xml = (
         b'<hierarchy><node package="com.example.notes" text="secret" '

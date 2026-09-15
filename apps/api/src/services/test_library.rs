@@ -504,16 +504,16 @@ pub async fn executable(
             }
         }
         TestDefinition::Plan(p) => {
-            super::execution_readiness::plan_cases(db, app, p).await?;
             let profile = definitions::profile(db, app, p.profile_id).await?;
             if !profile.qualified {
                 return Err(ApiFailure::invalid("Execution profile is not qualified"));
             }
             let cases = definitions::resolve(db, app, p).await?;
+            for c in &cases {
+                super::execution_readiness::case_matches(&profile, &c.case)?;
+            }
             if cases.iter().any(|c| {
-                c.case.package != profile.package
-                    || c.case.adapter != profile.adapter
-                    || c.case.budget.max_steps > p.budget.max_steps
+                c.case.budget.max_steps > p.budget.max_steps
                     || c.case.budget.artifact_bytes > p.budget.artifact_bytes
             }) || cases
                 .iter()

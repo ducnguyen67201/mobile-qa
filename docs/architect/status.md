@@ -21,6 +21,11 @@ this increment does not establish real-app exploration or remote account reset.
 Phone-session admission also binds the host model to the registered model for
 AI-capable profiles before acquiring the device or making network calls. Model-free
 direct profiles do not require a host model match.
+Review hardening preserves a pre-existing AVD until explicit operator recovery,
+expands `${task_title}` consistently with the server verifier without changing the
+frozen manifest, and keeps server quarantine visible even when local disposal succeeded.
+Protocol 4 is admitted by both the command queue and phone UI; direct commands and
+AI discovery retain their existing protocol 2/3 compatibility limits.
 
 Run details show a compact clean-start/cleanup strip with evidence behind a disclosure.
 The GAN evaluator accepted the compact readiness design at 7.98/10 (threshold 7.5).
@@ -35,6 +40,13 @@ HTTP worker test failed intermittently before passing alone; no transport behavi
 changed to mask it. The CI-scope tests and contract-export helper pass. Both simulated
 HTTP smokes (`just smoke-execution`, `just smoke-direct-authoring`) preserve reports
 through API restart, including direct authoring and reviewed immutable manifests.
+Review follow-up: 50 Rust tests, 120 web tests and 175 worker tests pass, with
+formatting, Clippy, TypeScript/ESLint, Ruff/Pyright and API/web builds. The final API
+rerun hit the shared test database's sign-in rate limit; all six test-library tests
+passed on targeted retry after that window expired. Production limits were unchanged.
+The simplification pass removed duplicate plan/profile loading and a repeated readiness
+label branch. Earlier contract-drift and simulated HTTP smoke evidence still applies;
+this follow-up changes no transport shapes.
 These checks use no emulator or model calls and do not prove real-device qualification.
 
 Implementation report and remaining gates are in the owning

@@ -93,7 +93,7 @@ async fn enqueue(
     if s.environment_revision != revision_now as u32 {
         return Err(conflict("Environment changed. Open a new session."));
     }
-    if ![2, 3].contains(&s.protocol_version) {
+    if ![2, 3, 4].contains(&s.protocol_version) {
         return Err(conflict(
             "Reconnect with the updated device worker to run direct steps",
         ));

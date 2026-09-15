@@ -21,20 +21,17 @@ export function AttemptReadiness({
     ? simulated
       ? 'Simulated clean start'
       : 'Clean start verified'
-    : !requiresCleanStart
+    : !requiresCleanStart || canceledWithoutReceipt
       ? 'Clean start not recorded'
-      : canceledWithoutReceipt
-        ? 'Clean start not recorded'
-        : preparing
-          ? 'Clean start pending'
-          : 'Clean start missing'
+      : preparing
+        ? 'Clean start pending'
+        : 'Clean start missing'
   // Recovery releases the phone; it does not replace the attempt's original cleanup proof.
   const original = attempt.original_cleanup
-  const cleanup = original
-    ? original.stopped && original.reset === 'verified_clean'
-      ? 'verified_clean'
-      : 'quarantined'
-    : attempt.cleanup
+  const cleanup =
+    original && (!original.stopped || original.reset !== 'verified_clean')
+      ? 'quarantined'
+      : attempt.cleanup
   const cleanupLabel =
     cleanup === 'verified_clean'
       ? simulated
@@ -107,7 +104,11 @@ export function AttemptReadiness({
           )}
           {original && (
             <Text size="xs">
-              Original cleanup: {cleanupLabel.toLowerCase()}. {original.evidence_reference}
+              Original cleanup:{' '}
+              {original.stopped && original.reset === 'verified_clean'
+                ? 'verified'
+                : 'not verified'}
+              . {original.evidence_reference}
             </Text>
           )}
           {recovery.length > 0 && (

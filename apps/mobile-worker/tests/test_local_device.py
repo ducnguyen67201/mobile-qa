@@ -229,8 +229,8 @@ def test_explicit_local_recovery_requires_matching_adb_receipt(
         def stop(self):
             pass
 
-        def discard(self):
-            pass
+        def discard(self, *, recovery=False):
+            assert recovery
 
     monkeypatch.setattr(runner, "Device", StoppedDevice)
     if allowed:

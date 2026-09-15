@@ -25,7 +25,7 @@ const profile = {
   qualification_reference: 'synthetic',
   max_apk_bytes: 104857600,
 }
-function show(blocked = false, embedded = false) {
+function show(blocked = false, embedded = false, protocolVersion = 4) {
   let current: PhoneSession = {
     id,
     app_id: appId,
@@ -63,7 +63,7 @@ function show(blocked = false, embedded = false) {
         },
       ],
     },
-    protocol_version: 2,
+    protocol_version: protocolVersion,
     revision: 0,
     environment_revision: 1,
     tasks: [],
@@ -145,8 +145,8 @@ function show(blocked = false, embedded = false) {
   return { opened, tasks }
 }
 afterEach(() => vi.unstubAllGlobals())
-it('picking binds a typed target without executing or invoking AI', async () => {
-  const { opened, tasks } = show()
+it.each([2, 3, 4])('protocol %i binds and runs a typed target without AI', async (protocol) => {
+  const { opened, tasks } = show(false, false, protocol)
   await waitFor(() => expect(opened).toHaveLength(1))
   await userEvent.click(await screen.findByRole('combobox', { name: 'Action 1 action' }))
   await userEvent.click(screen.getByRole('option', { name: 'Enter text' }))

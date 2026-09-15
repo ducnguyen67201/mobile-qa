@@ -118,3 +118,25 @@ it('distinguishes verified receipts from simulated receipts', () => {
   expect(screen.getByText('Simulated cleanup')).toBeInTheDocument()
   expect(screen.queryByText('Clean start verified')).not.toBeInTheDocument()
 })
+
+it('keeps server quarantine visible even when local disposal succeeded', () => {
+  show(
+    {
+      ...attempt(),
+      state: 'recovery_required',
+      outcome: 'inconclusive',
+      cleanup: 'quarantined',
+      original_cleanup: {
+        generation: 1,
+        stopped: true,
+        reset: 'verified_clean',
+        evidence_reference: 'Local disposal completed without a start acknowledgement',
+        boot_id: 'fixture',
+      },
+    },
+    true,
+  )
+  expect(screen.getByText('Clean start missing')).toBeInTheDocument()
+  expect(screen.getByText('Cleanup needs attention')).toBeInTheDocument()
+  expect(screen.queryByText('Cleanup verified')).not.toBeInTheDocument()
+})

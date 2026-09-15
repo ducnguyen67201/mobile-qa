@@ -101,6 +101,7 @@ class AndroidDevice:
         self.child: subprocess.Popen[bytes] | None = None
         self.env = host_environment(profile)
         self.current = profile.state_root / "current"
+        self.owns_current = False
         self.inventory: dict[str, str] = {}
         self.video_pid: str | None = None
         self.direct_automation = False
@@ -120,6 +121,7 @@ class AndroidDevice:
         if self.current.exists():
             raise QualificationError("dirty_avd_requires_recovery")
         self.current.mkdir(mode=0o700)
+        self.owns_current = True
         command(
             [
                 str(self.profile.sdk_root / "cmdline-tools/19.0/bin/avdmanager"),
@@ -369,7 +371,7 @@ class AndroidDevice:
                     raise QualificationError("emulator_still_running") from exc
                 time.sleep(0.1)
 
-    def discard(self) -> None:
+    def discard(self, *, recovery: bool = False) -> None:
         if self.child is not None:
             raise QualificationError("cannot_delete_running_avd")
         if self.current.exists():
@@ -378,4 +380,8 @@ class AndroidDevice:
                 or self.current.resolve().parent != self.profile.state_root
             ):
                 raise QualificationError("unsafe_avd_path")
+            # Only the explicit operator recovery path may discard a prior instance.
+            if not self.owns_current and not recovery:
+                raise QualificationError("dirty_avd_requires_recovery")
             shutil.rmtree(self.current)
+            self.owns_current = False

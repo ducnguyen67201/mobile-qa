@@ -9,7 +9,8 @@ implemented; rendered UI and UI-triggered real-device acceptance remain open. Se
 [current status](../status.md).
 Spec 06 task-session source is locally implemented; its direct-execution, template and
 AI-authoring revamp is locally implemented and validated. Real-model quality and rendered
-browser acceptance remain open. Spec 07 remains planned.
+browser acceptance remain open. Spec 07 remains planned. Spec 08 is implemented in source and separately replaces
+the current custom discovery loop with Minitap-powered exploration and recorded test proposals.
 [Current status and evidence](../status.md) own completion claims.
 This roadmap owns sequencing; [system architecture](../system.md), [contracts](../contracts.md),
 [environment](../environment.md), and [development workflow](../development.md) own their current details.
@@ -41,17 +42,22 @@ Runnable applications live under `apps/api`, `apps/web` and `apps/mobile-worker`
 
 ## Ordered smaller specs
 
-| Order | Spec                                                                       | Observable completion                                                       |
-| ----- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| 1     | [Source setup and fast development](01-source-setup-and-fast-dev.md)       | Working starter, one typed endpoint, cached checks, fake-worker development |
-| 2     | [Cloud phone and execution feasibility](02-cloud-phone-and-feasibility.md) | Real emulator runs a fixed case and captures trustworthy evidence           |
-| 3     | [App setup and first UI/backend slice](03-app-setup-and-ui-backend.md)     | Sign in, create app, upload APK, see real readiness status                  |
-| 4     | [Run one test and report](04-execution-and-reports.md)                     | Browser → durable job → Python → phone → persisted report                   |
-| 5     | [Test cases, suites and plans](05-test-library-and-plans.md)               | Edit, review, version and rerun approved definitions                        |
-| 6     | [Direct execution and AI test authoring](06-test-generation.md)            | Direct steps and templates run; AI proposes named, reviewable tests         |
-| 7     | [Regression, pilot readiness and scaling](07-pilot-readiness-and-scale.md) | New-build comparison, recovery, measured reliability and costs              |
+| Order | Spec                                                                       | Observable completion                                                              |
+| ----- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 1     | [Source setup and fast development](01-source-setup-and-fast-dev.md)       | Working starter, one typed endpoint, cached checks, fake-worker development        |
+| 2     | [Cloud phone and execution feasibility](02-cloud-phone-and-feasibility.md) | Real emulator runs a fixed case and captures trustworthy evidence                  |
+| 3     | [App setup and first UI/backend slice](03-app-setup-and-ui-backend.md)     | Sign in, create app, upload APK, see real readiness status                         |
+| 4     | [Run one test and report](04-execution-and-reports.md)                     | Browser → durable job → Python → phone → persisted report                          |
+| 5     | [Test cases, suites and plans](05-test-library-and-plans.md)               | Edit, review, version and rerun approved definitions                               |
+| 6     | [Direct execution and AI test authoring](06-test-generation.md)            | Direct steps and templates run; AI proposes named, reviewable tests                |
+| 7     | [Regression, pilot readiness and scaling](07-pilot-readiness-and-scale.md) | New-build comparison, recovery, measured reliability and costs                     |
+| 8     | [Minitap flow discovery](08-minitap-flow-discovery.md)                     | Minitap explores; observed flows become editable tests with zero-AI direct replays |
 
 Dependencies: 01 → 02 and 03; both 02 and 03 → 04 → 05 → 06 → 07. Work on the small App screen can continue while infrastructure access is pending, but device qualification gates real execution. Avoid completing a large UI before proving the runner.
+
+Spec 08 depends on 06 and the relevant device qualification from 02. It is a separate
+follow-up and does not require completion of 07 scaling work. SDK integration and
+real-model acceptance must pass before advertising Minitap-powered discovery.
 
 ## Concurrent execution plan
 

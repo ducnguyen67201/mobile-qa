@@ -109,8 +109,9 @@ def goal_for(task: PhoneTask, frame: PhoneFrame) -> str:
 
 
 class SessionConnection:
-    def __init__(self, client: Client, lease: PhoneLease):
+    def __init__(self, client: Client, lease: PhoneLease, shutdown: threading.Event | None = None):
         self.client = client
+        self.shutdown = shutdown
         self.lease = lease
         self.session = lease.session
         self.lock = threading.Lock()
@@ -144,6 +145,8 @@ class SessionConnection:
 
     def heartbeat(self) -> None:
         while not self.done.wait(5):
+            if self.shutdown is not None and self.shutdown.is_set():
+                self.stopped.set()
             try:
                 self.update(message=self.session.message)
             except Exception:
@@ -198,7 +201,7 @@ def act(
     ]
     env = {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG", "VIRTUAL_ENV")}
     task.state = PhoneTaskState.acting
-    task.message = "Minitap is planning and performing your task"
+    task.message = "AI is planning and performing your task"
     if publish:
         connection.update(task=task, message=task.message)
     with (directory / "sdk.log").open("wb") as log:
@@ -224,14 +227,20 @@ def act(
         finally:
             stop_group(child)
     task.state = PhoneTaskState.completed
-    task.message = "Minitap finished. Inspect the screen; this is not a verified test pass."
+    task.message = "AI finished. Inspect the screen; this is not a verified test pass."
     if publish:
         connection.update(
             state=PhoneState.ready, task=task, frame=capture(device), message=task.message
         )
 
 
-def run_session(client: Client, lease: PhoneLease, state: Path, profile_path: Path) -> None:
+def run_session(
+    client: Client,
+    lease: PhoneLease,
+    state: Path,
+    profile_path: Path,
+    shutdown: threading.Event | None = None,
+) -> None:
     profile = Profile.load(profile_path)
     if (
         lease.session.profile.package != "ai.mobileqa.demo"
@@ -248,7 +257,7 @@ def run_session(client: Client, lease: PhoneLease, state: Path, profile_path: Pa
         root.mkdir(mode=0o700)
         evidence = Evidence(root / "device")
         device = Device(profile, evidence)
-        connection = SessionConnection(client, lease)
+        connection = SessionConnection(client, lease, shutdown)
         heart = threading.Thread(target=connection.heartbeat, daemon=True)
         heart.start()
         try:
@@ -324,27 +333,41 @@ def run_session(client: Client, lease: PhoneLease, state: Path, profile_path: Pa
 
 
 def serve(origin: str, state: Path, profile_path: Path, once: bool = False) -> None:
+    shutdown = threading.Event()
+
     def stop_requested(signum: int, frame: object) -> None:
-        raise KeyboardInterrupt
+        # Let an in-flight claim resolve before deciding whether a lease needs closing.
+        shutdown.set()
 
     signal.signal(signal.SIGTERM, stop_requested)
+    signal.signal(signal.SIGINT, stop_requested)
     state = state.resolve()
     state.mkdir(parents=True, mode=0o700, exist_ok=True)
     client = Client(origin, os.environ.get("MOBILE_QA_WORKER_TOKEN", ""))
     with host_lock(state) as pending:
         if pending.exists():
             raise QualificationError("worker_claim_recovery_required")
-        while True:
+        connected = False
+        while not shutdown.is_set():
             claim_id = uuid4()
             write(pending, {"claim_id": str(claim_id)})
             response = client.send(
                 "/api/worker/phone-claims",
-                {"claim_id": str(claim_id), "protocol_version": 2},
+                {"claim_id": str(claim_id), "protocol_version": 3},
                 PhoneClaimResponse,
             )
+            if not connected:
+                print("Worker connected: phone sessions, protocol 3", flush=True)
+                connected = True
             if response.lease:
-                run_session(client, response.lease, state, profile_path.resolve())
+                if shutdown.is_set():
+                    # No device effect has started, so this newly delivered lease is clean.
+                    SessionConnection(client, response.lease).update(
+                        state=PhoneState.closed, message="Session closed", clean=True
+                    )
+                else:
+                    run_session(client, response.lease, state, profile_path.resolve(), shutdown)
             pending.unlink()
             if once:
                 return
-            time.sleep(3)
+            shutdown.wait(3)

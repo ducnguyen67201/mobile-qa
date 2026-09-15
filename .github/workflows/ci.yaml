@@ -59,6 +59,9 @@ jobs:
             scope_tests:
               - '.github/workflows/**'
               - 'scripts/test_ci_scope.py'
+              - 'scripts/dev_stack.py'
+              - 'scripts/test_dev_stack.py'
+              - 'scripts/runtime.py'
             api:
               - '.github/workflows/**'
               - 'Cargo.toml'
@@ -77,6 +80,7 @@ jobs:
               - 'scripts/execution_smoke.py'
               - 'scripts/test_library_smoke.py'
               - 'scripts/direct_authoring_smoke.py'
+              - 'scripts/minitap_discovery_smoke.py'
               - 'scripts/task_session_smoke.py'
             web:
               - '.github/workflows/**'
@@ -88,6 +92,8 @@ jobs:
               - 'crates/contracts/src/test_library.rs'
               - 'crates/contracts/src/test_library_api.rs'
               - 'crates/contracts/src/task_sessions.rs'
+              - 'crates/contracts/src/automation.rs'
+              - 'crates/contracts/src/automation_api.rs'
               - 'crates/contracts/src/task_sessions_api.rs'
               - 'contracts/browser.openapi.json'
               - 'crates/contracts/Cargo.toml'
@@ -98,9 +104,12 @@ jobs:
               - 'crates/contracts/src/worker.rs'
               - 'crates/contracts/src/execution.rs'
               - 'crates/contracts/src/task_sessions.rs'
+              - 'crates/contracts/src/automation.rs'
+              - 'crates/contracts/src/automation_api.rs'
               - 'scripts/execution_smoke.py'
               - 'scripts/test_library_smoke.py'
               - 'scripts/direct_authoring_smoke.py'
+              - 'scripts/minitap_discovery_smoke.py'
               - 'scripts/task_session_smoke.py'
               - 'crates/contracts/src/worker/**'
               - 'infra/device-host/**'
@@ -270,3 +279,4 @@ jobs:
       - run: pnpm --dir apps/web install --frozen-lockfile --ignore-scripts
       - run: uv sync --project apps/mobile-worker --frozen
       - run: uv run --no-sync --project apps/mobile-worker --frozen python scripts/test_ci_scope.py
+      - run: python3 -m unittest scripts.test_dev_stack

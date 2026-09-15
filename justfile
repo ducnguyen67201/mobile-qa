@@ -9,7 +9,21 @@ default:
 setup:
     python3 scripts/setup.py
 
+# Full local app, explicitly including real-device workers. Model calls remain opt-in in the UI.
 dev:
+    python3 scripts/dev_stack.py start
+
+dev-stop:
+    python3 scripts/dev_stack.py stop
+
+dev-restart:
+    python3 scripts/dev_stack.py restart
+
+dev-logs:
+    python3 scripts/dev_stack.py logs
+
+# API/web only, for work that needs no device worker.
+dev-ui:
     python3 scripts/runtime.py dev
 
 dev-web:
@@ -110,3 +124,7 @@ smoke-test-library:
 # Typed direct definitions through the real API; simulated evidence, no model calls.
 smoke-direct-authoring:
     python3 scripts/direct_authoring_smoke.py
+
+# Explicit real Minitap discovery and direct replay; supply an existing qualified profile and APK.
+smoke-minitap-discovery profile apk:
+    python3 scripts/minitap_discovery_smoke.py --profile {{quote(profile)}} --apk {{quote(apk)}}

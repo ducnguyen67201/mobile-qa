@@ -1,0 +1,94 @@
+.saveBar {
+  position: sticky;
+  top: calc(var(--app-shell-header-height, 40px) + 8px);
+  z-index: 5;
+  padding: 10px 12px;
+  background: var(--mantine-color-body);
+  border: 1px solid var(--mantine-color-gray-3);
+  border-radius: var(--mantine-radius-md);
+}
+
+.proposal {
+  padding: 12px;
+  border: 1px solid var(--mantine-color-gray-3);
+  border-radius: var(--mantine-radius-md);
+  overflow-wrap: anywhere;
+}
+
+.heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.duplicate {
+  flex: 0 1 auto;
+  max-width: 40%;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--mantine-color-orange-0);
+  color: var(--mantine-color-orange-9);
+}
+
+.actions {
+  margin: 0;
+  padding: 8px 10px 8px 32px;
+  background: var(--mantine-color-gray-0);
+  border-radius: 6px;
+}
+
+.actions li::marker {
+  color: var(--mantine-color-green-8);
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+}
+
+.actions li + li {
+  margin-top: 4px;
+}
+
+.details > summary {
+  cursor: pointer;
+  font-size: var(--mantine-font-size-sm);
+  color: var(--mantine-color-green-8);
+  width: fit-content;
+  max-width: 100%;
+  padding-block: 3px;
+}
+
+.details > summary:focus-visible {
+  outline: 2px solid var(--mantine-color-green-7);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.notes > summary {
+  color: var(--mantine-color-orange-9);
+}
+
+.questions {
+  margin: 6px 0 0;
+  padding: 8px 12px 8px 28px;
+  background: var(--mantine-color-orange-0);
+  border-radius: 6px;
+  font-size: var(--mantine-font-size-sm);
+  line-height: 1.5;
+}
+
+.questions li + li {
+  margin-top: 4px;
+}
+
+.screenshots {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.screenshots img {
+  width: 64px;
+  flex: 0 0 64px;
+  height: auto;
+  align-self: flex-start;
+  border-radius: 6px;
+}

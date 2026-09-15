@@ -63,3 +63,26 @@ def test_goal_uses_current_control_and_rejects_missing_identity():
         goal_for(task, frame)
     task.control = None
     assert goal_for(task, frame) == "Save my task"
+
+
+def test_shutdown_during_empty_claim_leaves_no_dirty_marker(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from mobile_qa_worker import task_sessions
+
+    handlers = {}
+    monkeypatch.setattr(
+        task_sessions.signal, "signal", lambda sig, callback: handlers.update({sig: callback})
+    )
+
+    class Client:
+        def __init__(self, *_):
+            pass
+
+        def send(self, *_):
+            handlers[task_sessions.signal.SIGTERM](0, None)
+            return SimpleNamespace(lease=None)
+
+    monkeypatch.setattr(task_sessions, "Client", Client)
+    task_sessions.serve("http://127.0.0.1:5150", tmp_path, tmp_path / "unused.toml")
+    assert not (tmp_path / "dirty.json").exists()

@@ -276,13 +276,20 @@ function WorkspaceTests() {
                       <Stack gap={6} miw={0}>
                         <Group gap="xs">
                           <ReviewBadge state={entry.latest_review_state} />
+                          {entry.ai_generated && (
+                            <Badge color="grape" variant="light">
+                              AI generated
+                            </Badge>
+                          )}
                           {entry.draft_version != null && (
                             <Badge color="gray">Draft v{entry.draft_version}</Badge>
                           )}
                           {entry.archived_at && <Badge color="orange">Archived</Badge>}
-                          {entry.latest_version_id === defaultPlan.data?.plan_version_id && (
-                            <Badge>Default</Badge>
-                          )}
+                          {entry.kind === 'plan' &&
+                            entry.latest_version_id != null &&
+                            entry.latest_version_id === defaultPlan.data?.plan_version_id && (
+                              <Badge>Default</Badge>
+                            )}
                         </Group>
                         <Text fw={600}>{entry.title || `Untitled ${kinds[kind].single}`}</Text>
                         <Text size="xs" c="dimmed">

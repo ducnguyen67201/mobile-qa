@@ -33,6 +33,11 @@ import { useWorkspace } from '@/hooks/use-workspace'
 import { ErrorNotice } from '@/components/app/feedback'
 import { openPhone, phoneOptionsQuery, phoneQuery, stopPhone } from '@/api/task-sessions'
 import { runPhoneCommand, saveAuthoredTests } from '@/api/test-authoring'
+import {
+  DiscoveryActivity,
+  DiscoveryTarget,
+  explorationLabel,
+} from '@/components/test-library/discovery-activity'
 import { GenerationPanel, ProposalReview } from '@/components/test-library/ai-authoring'
 import { BudgetFields } from '@/components/test-library/definition-fields'
 import { ResizableWorkspace } from './resizable-workspace'
@@ -66,6 +71,7 @@ export function PhoneWorkspace({
   const [record, setRecord] = useState(false)
   const [typing, setTyping] = useState<PhoneControl | null>(null)
   const [text, setText] = useState('')
+  const [reconnectRequested, setReconnectRequested] = useState(false)
   const [ai, setAi] = useState(params.get('generate') === '1')
   const initiated = useRef(false)
   const [openId] = useState(() => crypto.randomUUID())
@@ -110,17 +116,34 @@ export function PhoneWorkspace({
   const phone = useQuery(phoneQuery(id))
   const s = phone.data
   const frame = s?.frame
+  const activeExploration = s?.tasks.find(
+    (task) => task.generation && ['queued', 'acting'].includes(task.state),
+  )
   const submit = useMutation({
     mutationFn: (body: PhoneCommandRequest) => runPhoneCommand(id, body),
     onSuccess: sessionSaved,
   })
   const stop = useMutation({ mutationFn: () => stopPhone(id), onSuccess: sessionSaved })
+  const { mutate: reopenSession } = reopen
+  useEffect(() => {
+    if (!reconnectRequested || !s) return
+    // Wait for device cleanup before requesting another exclusive session.
+    if (s.state === 'closed') {
+      setReconnectRequested(false)
+      reopenSession(s.profile.id)
+    } else if (s.state === 'quarantined') {
+      setReconnectRequested(false)
+    }
+  }, [reconnectRequested, s, reopenSession])
   const save = useMutation({
     mutationFn: (body: SaveAuthoredTestsRequest) => saveAuthoredTests(appId, body),
     onSuccess: () => void client.invalidateQueries({ queryKey: ['test-library'] }),
   })
   const ready =
-    s?.state === 'ready' && s.protocol_version === 2 && !phone.isError && !submit.isPending
+    s?.state === 'ready' &&
+    [2, 3].includes(s.protocol_version ?? 0) &&
+    !phone.isError &&
+    !submit.isPending
   const usesAi = sequence.actions.some((a) => a.kind === 'navigate')
   useEffect(() => {
     for (const task of s?.tasks ?? []) {
@@ -216,11 +239,33 @@ export function PhoneWorkspace({
             <Title order={2} size="h3">
               Set up your test
             </Title>
-            <Button variant="light" onClick={() => setAi(!ai)}>
+            <Button
+              variant="light"
+              onClick={() => {
+                setAi(!ai)
+                if (
+                  !ai &&
+                  !s &&
+                  !create.isPending &&
+                  choices.data?.profiles.length === 1 &&
+                  !choices.data.blockers.length
+                )
+                  create.mutate(null)
+              }}
+            >
               {ai ? 'Hide AI generation' : 'Generate with AI'}
             </Button>
           </Group>
-          {ai && <GenerationPanel session={s} onSession={sessionSaved} />}
+          {ai && (
+            <GenerationPanel
+              session={s}
+              onSession={sessionSaved}
+              reconnecting={stop.isPending || reconnectRequested || reopen.isPending}
+              onReconnect={() =>
+                stop.mutate(undefined, { onSuccess: () => setReconnectRequested(true) })
+              }
+            />
+          )}
           <TextInput
             label="Test name"
             value={value?.title ?? title}
@@ -341,13 +386,13 @@ export function PhoneWorkspace({
             .slice()
             .reverse()
             .map((task) => (
-              <Card withBorder key={task.id}>
+              <Card withBorder key={task.id} style={{ overflow: 'visible' }}>
                 <Stack gap="sm">
                   <Group justify="space-between">
                     <Text fw={600}>{task.goal}</Text>
-                    <Badge>{task.state}</Badge>
+                    <Badge>{task.generation ? explorationLabel(task) : task.state}</Badge>
                   </Group>
-                  <Text size="sm">{task.message}</Text>
+                  {!task.generation && <Text size="sm">{task.message}</Text>}
                   {task.steps?.map((step, i) => (
                     <Text key={step.action_id} size="sm">
                       Step {i + 1}: {step.state} — {step.message}
@@ -371,6 +416,7 @@ export function PhoneWorkspace({
             <Text size="sm" role="status">
               {s?.message ?? 'Connect the phone to pick controls or try your test.'}
             </Text>
+            {activeExploration && <DiscoveryActivity task={activeExploration} />}
             {!id && choices.data && !choices.data.blockers.length && (
               <>
                 {choices.data.profiles.length > 1 && (
@@ -390,8 +436,10 @@ export function PhoneWorkspace({
                 </Button>
               </>
             )}
-            {s && s.protocol_version !== 2 && s.state === 'ready' && (
-              <Alert>Reconnect with the updated worker to use direct steps.</Alert>
+            {s && ![2, 3].includes(s.protocol_version ?? 0) && s.state === 'ready' && (
+              <Alert>
+                This session cannot run direct actions. Open a new session to try again.
+              </Alert>
             )}
             {create.isError && (
               <ErrorNotice error={create.error} retry={() => create.mutate(device)} />
@@ -471,6 +519,7 @@ export function PhoneWorkspace({
                     alt="Current screen of your Android app"
                     style={{ width: '100%', display: 'block', borderRadius: 16 }}
                   />
+                  <DiscoveryTarget task={activeExploration} frame={frame} />
                   {ready &&
                     (mode === 'control' || picking) &&
                     frame.controls

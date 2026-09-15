@@ -10,6 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yaml").read_text())
 filters = yaml.safe_load(workflow["jobs"]["scope"]["steps"][1]["with"]["filters"])
 cases = [
+    (["scripts/dev_stack.py", "scripts/test_dev_stack.py"], ["scope_tests"]),
+    (["scripts/runtime.py"], ["scope_tests", "api"]),
+    (["crates/contracts/src/automation.rs"], ["api", "web", "worker", "contracts"]),
+    (["scripts/minitap_discovery_smoke.py"], ["api", "worker"]),
     (["crates/contracts/src/task_sessions.rs"], ["api", "web", "worker", "contracts"]),
     (["crates/contracts/src/task_sessions_api.rs"], ["api", "web", "contracts"]),
     (["scripts/task_session_smoke.py"], ["api", "worker"]),

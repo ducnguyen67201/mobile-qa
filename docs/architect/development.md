@@ -14,7 +14,7 @@ commands use --no-sync. Moved virtual environments can be refreshed explicitly w
 
 | Command         | Work                                                                            |
 | --------------- | ------------------------------------------------------------------------------- |
-| dev             | Isolated PostgreSQL, Doppler-injected API startup, Vite; owned-child cleanup    |
+| dev             | Full stack: PostgreSQL, API, Vite, phone and execution workers; private logs    |
 | types           | Pure Rust exporter, local Hey API SDK/Zod, worker Pydantic; content-only writes |
 | check-contracts | Temporary regeneration/drift + content-sync test                                |
 | check-web       | Strict tsc including generator config, ESLint, Vitest                           |
@@ -29,7 +29,7 @@ Production static assets resolve ../web/dist. Worker tests resolve root fixtures
 ordinary fake commands can run from the root with an explicit --project.
 
 Runtime secrets use [Doppler injection](environment.md), with no env files. Only the
-API child is wrapped; checks/fake runs need no Doppler access. Development and test
+API and real worker children are wrapped separately; checks/fake runs need no Doppler access. Development and test
 use fixed local database URLs, ignoring inherited DATABASE_URL.
 All destructive flags stay false; integration uses the existing mobile_qa_test DB
 without create/drop helpers. Compose project mobile-qa-local binds loopback, initializes
@@ -42,6 +42,35 @@ CI runs pull_request and pushes to main. Superseded PR runs are cancelled. Paths
 compared against the whole PR base, including additions/deletions, rather than only the
 last commit: a still-failing earlier change must not disappear from required coverage.
 Root docs-only changes skip app builds. The path map lives in .github/workflows/ci.yaml.
+
+### One-command full local stack
+
+`just dev` explicitly starts PostgreSQL, builds the Rust API once, starts API/Vite and
+both Python workers, and waits for their first authenticated API claim. The emulator
+opens when the tester connects the phone; model calls start only on an explicit AI action.
+`just dev-ui` retains API/web-only development. No checks or compiler watchers run on startup.
+
+- `just dev` — start in the foreground; Ctrl-C stops owned services.
+- `just dev-stop` — stop the managed stack from another terminal.
+- `just dev-restart` — stop, rebuild and start with current source.
+- `just dev-logs` — follow build, API, web, phone-worker and execution-worker logs.
+
+The local nonsecret `.private/dev/config.json` selects `profile` (qualified host TOML),
+`profile_id` (registered API UUID), `java_home` (JDK 17), `api_project` and `api_config`.
+Paths may be absolute; the profile path may be relative to the repository. This machine's
+existing qualified profile is configured there. Other operators must supply their own
+registered profile and token through Doppler; startup never invents qualification or
+registers/rotates credentials. The host TOML selects worker/model Doppler project/config.
+Only those children receive injected secrets; Vite/build tools receive an allowlisted
+nonsecret environment. The API's local origin is `http://localhost:5173`.
+
+Each start writes restricted logs under `.private/dev/<timestamp>/`; `.private/dev/latest`
+points to the current run. No environment dumps or secret files are produced. The
+supervisor refuses occupied ports and duplicate stacks rather than killing unrelated
+processes. Shutdown keeps API/PostgreSQL available while workers stop; unfinished device
+work retains its recovery journal and cannot be silently replayed on restart. Idle phone
+workers finish pending claims before exiting. Existing database contents are preserved.
+API restart invalidates local login sessions, so sign in again afterward.
 
 ### Codebase navigation graph
 
@@ -354,3 +383,12 @@ automatic execution remains blocked with a visible readiness explanation.
 
 The existing browser admin-policy restriction is binding. Source design review,
 DOM tests and HTTP acceptance must be reported separately from rendered/device proof.
+
+### Minitap discovery acceptance
+
+`just smoke-minitap-discovery /absolute/qualified-profile.toml /absolute/sample.apk` is an
+explicit real SDK/device acceptance command. It uses the existing isolated HTTP fixture
+and Doppler profile, creates private evidence, saves a suggested test and replays direct
+actions with positive and negative assertions. It is never part of normal checks or CI.
+Ordinary worker tests include the actual pinned SDK graph with synthetic model responses
+and blocked network access; no emulator or provider credentials are needed.

@@ -283,7 +283,23 @@ export type DirectTarget = {
     value: string;
 };
 
+/**
+ * Discovery-only protocol. Absence on historical payloads means the legacy custom loop.
+ */
+export type DiscoveryEngine = 'legacy_custom' | 'minitap_v1';
+
+export type DiscoveryOutcome = 'pending' | 'completed' | 'failed' | 'uncertain';
+
+export type DiscoveryReceipt = {
+    after_id?: string | null;
+    before_id: string;
+    command: DirectCommand;
+    id: string;
+    outcome: DiscoveryOutcome;
+};
+
 export type DiscoverySnapshot = {
+    fingerprint?: string | null;
     frame: PhoneFrame;
     id: string;
 };
@@ -388,6 +404,7 @@ export type ForkLibraryDraftRequest = {
 export type GenerateTestsRequest = {
     allow_writes: boolean;
     category: CoverageKind;
+    engine?: null | DiscoveryEngine;
     expected_revision: number;
     id: string;
     journey: string;
@@ -396,9 +413,12 @@ export type GenerateTestsRequest = {
 };
 
 export type GenerationProgress = {
+    engine?: null | DiscoveryEngine;
     gaps: Array<string>;
+    journal?: Array<DiscoveryReceipt>;
     proposals: Array<GenerationProposal>;
     snapshots: Array<DiscoverySnapshot>;
+    source_job_id?: string | null;
     state: GenerationState;
     trace: Array<DirectCommand>;
     usage: AuthoringUsage;
@@ -407,6 +427,7 @@ export type GenerationProgress = {
 export type GenerationProposal = {
     category: CoverageKind;
     id: string;
+    path_ids?: Array<string>;
     questions: Array<string>;
     requirement: string;
     sequence: AutomationSequence;
@@ -477,6 +498,10 @@ export type LibraryDraftResponse = {
 };
 
 export type LibraryEntryResponse = {
+    /**
+     * Derived from saved proposal provenance; remains true after editing the draft.
+     */
+    ai_generated?: boolean;
     app_id: string;
     archived_at?: string | null;
     capabilities: LibraryCapabilities;

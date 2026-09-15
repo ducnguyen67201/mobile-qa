@@ -95,6 +95,9 @@ pub struct LibraryEntryResponse {
     pub kind: DefinitionKind,
     pub key: String,
     pub title: String,
+    /// Derived from saved proposal provenance; remains true after editing the draft.
+    #[serde(default)]
+    pub ai_generated: bool,
     pub revision: i32,
     pub archived_at: Option<DateTime<Utc>>,
     pub draft_version: Option<u32>,

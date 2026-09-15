@@ -152,3 +152,19 @@ Worker extras explicitly pin `uiautomator2==3.5.0` (`device`), `langchain-openai
 and `Pillow==12.3.0` (`ai`), matching existing transitive versions. Device operations lazily
 load uiautomator2; model SDKs are imported only in explicit AI paths. No Appium/Redis service
 is added. The `sdk` extra remains for explicit Minitap navigation.
+
+## Spec 08 discovery adapter
+
+`authoring/minitap_discovery.py` uses the pinned Minitap 4.0.0 graph and the existing
+langgraph-prebuilt 1.1.0 compatibility adapter. It replaces only child-process context
+and tool bindings, never installed package files. Native SDK initialization is bypassed
+because the parent owns the existing device lease and initial redacted observation.
+Foreground lookup and cortex image compression are mediated too. The child has no native
+ADB, UiAutomator or cloud-controller handles. Model callbacks reserve each real role/fallback
+call before provider work; retries are disabled and unmeasured calls stop further spending.
+
+`tests/sdk_discovery_fixture.py` invokes actual `Agent.run_task` with scripted LangChain
+models and blocked sockets. It verifies planning, context, executor tool injection and
+usage accounting offline. Upgrade this fixture and the exact version guard together when
+upgrading the SDK. The former custom Discover model request remains parseable for history,
+but its execution path is rejected. Propose remains one structured drafting call.

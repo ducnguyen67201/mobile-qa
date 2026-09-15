@@ -9103,6 +9103,56 @@
           }
         ]
       },
+      "DiscoveryEngine": {
+        "type": "string",
+        "description": "Discovery-only protocol. Absence on historical payloads means the legacy custom loop.",
+        "enum": [
+          "legacy_custom",
+          "minitap_v1"
+        ]
+      },
+      "DiscoveryOutcome": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "completed",
+          "failed",
+          "uncertain"
+        ]
+      },
+      "DiscoveryReceipt": {
+        "type": "object",
+        "required": [
+          "id",
+          "before_id",
+          "command",
+          "outcome"
+        ],
+        "properties": {
+          "after_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "before_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "command": {
+            "$ref": "#/components/schemas/DirectCommand"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/DiscoveryOutcome"
+          }
+        },
+        "additionalProperties": false
+      },
       "DiscoverySnapshot": {
         "type": "object",
         "required": [
@@ -9110,6 +9160,12 @@
           "frame"
         ],
         "properties": {
+          "fingerprint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "frame": {
             "$ref": "#/components/schemas/PhoneFrame"
           },
@@ -9545,6 +9601,16 @@
           "category": {
             "$ref": "#/components/schemas/CoverageKind"
           },
+          "engine": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DiscoveryEngine"
+              }
+            ]
+          },
           "expected_revision": {
             "type": "integer",
             "format": "int32",
@@ -9582,10 +9648,26 @@
           "usage"
         ],
         "properties": {
+          "engine": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DiscoveryEngine"
+              }
+            ]
+          },
           "gaps": {
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "journal": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscoveryReceipt"
             }
           },
           "proposals": {
@@ -9599,6 +9681,13 @@
             "items": {
               "$ref": "#/components/schemas/DiscoverySnapshot"
             }
+          },
+          "source_job_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           },
           "state": {
             "$ref": "#/components/schemas/GenerationState"
@@ -9633,6 +9722,13 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "path_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           },
           "questions": {
             "type": "array",
@@ -9932,6 +10028,10 @@
           "capabilities"
         ],
         "properties": {
+          "ai_generated": {
+            "type": "boolean",
+            "description": "Derived from saved proposal provenance; remains true after editing the draft."
+          },
           "app_id": {
             "type": "string",
             "format": "uuid"

@@ -40,6 +40,9 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description="Mobile QA local fixture adapter")
     commands = parser.add_subparsers(dest="command", required=True)
+    discovery = commands.add_parser("_minitap-discovery", help=argparse.SUPPRESS)
+    discovery.add_argument("--request", type=Path, required=True)
+    discovery.add_argument("--profile", type=Path, required=True)
     authoring = commands.add_parser("_authoring-model", help=argparse.SUPPRESS)
     authoring.add_argument("--request", type=Path, required=True)
     authoring.add_argument("--result", type=Path, required=True)
@@ -101,6 +104,11 @@ def main() -> int:
     phone.add_argument("--profile", type=Path, required=True)
     phone.add_argument("--once", action="store_true")
     args = parser.parse_args()
+    if args.command == "_minitap-discovery":
+        from mobile_qa_worker.authoring.minitap_discovery import run as discover
+
+        discover(args.request, args.profile)
+        return 0
     if args.command == "_authoring-model":
         from mobile_qa_worker.authoring.model_adapter import run as authoring_model
 

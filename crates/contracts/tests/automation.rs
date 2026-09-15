@@ -39,3 +39,18 @@ fn direct_and_mixed_sequences_expose_ai_explicitly_and_reject_duplicate_ids() {
     sequence.validate("ai.mobileqa.demo").unwrap();
     assert!(sequence.uses_ai());
 }
+
+#[test]
+fn legacy_generation_payloads_keep_absent_discovery_fields() {
+    let request = json!({"id":uuid::Uuid::nil(),"session_id":uuid::Uuid::nil(),"expected_revision":0,"category":"smoke","journey":"","allow_writes":false,"reuse_job_id":null});
+    let parsed: GenerateTestsRequest = serde_json::from_value(request.clone()).unwrap();
+    assert_eq!(parsed.engine, None);
+    assert_eq!(serde_json::to_value(parsed).unwrap(), request);
+    let progress = json!({"state":"ready","proposals":[],"snapshots":[],"trace":[],"gaps":[],"usage":{"calls":1,"input_tokens":1,"output_tokens":1,"unknown_calls":0}});
+    let parsed: GenerationProgress = serde_json::from_value(progress.clone()).unwrap();
+    assert_eq!(serde_json::to_value(parsed).unwrap(), progress);
+    assert!(serde_json::from_value::<DiscoveryCall>(
+        json!({"kind":"execute","id":uuid::Uuid::nil(),"command":{"operation":"shell","text":"no"}})
+    )
+    .is_err());
+}

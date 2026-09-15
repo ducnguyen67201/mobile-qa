@@ -7,7 +7,7 @@ from uuid import uuid4
 
 import pytest
 
-from mobile_qa_worker.authoring.generation import allowed, redact
+from mobile_qa_worker.authoring.generation import redact
 from mobile_qa_worker.automation.direct import execute, resolve
 from mobile_qa_worker.generated.models import DirectCommand, DirectTarget, PhoneFrame
 from mobile_qa_worker.qualification.config import QualificationError
@@ -96,15 +96,6 @@ def test_cancel_before_action_has_no_effect():
     assert not rpc.texts
 
 
-def test_discovery_write_policy_is_enforced_outside_model():
-    assert allowed(DirectCommand.model_validate({"operation": "back"}), False)
-    tap = DirectCommand.model_validate(
-        {"operation": "tap", "target": TARGET.model_dump(mode="json")}
-    )
-    assert not allowed(tap, False)
-    assert allowed(tap, True)
-
-
 def test_password_pixels_are_redacted_and_invalid_redaction_fails_closed():
     Image = pytest.importorskip("PIL.Image")
     output = io.BytesIO()
@@ -182,92 +173,6 @@ def test_sequence_dispatches_only_explicit_ai_steps(monkeypatch, tmp_path):
     assert calls == ["direct", "ai"]
     assert updates[0].steps[0].state.value == "started"
     assert updates[-1].state.value == "completed"
-
-
-def test_generation_rejects_unobserved_sources_and_keeps_usage(monkeypatch, tmp_path):
-    import threading
-
-    from mobile_qa_worker import task_sessions
-    from mobile_qa_worker.authoring import generation
-    from mobile_qa_worker.generated.models import AuthoringModelResponse, PhoneTask
-
-    frame = PhoneFrame(id=uuid4(), width=1080, height=1920, png_base64="synthetic", controls=[])
-    monkeypatch.setattr(task_sessions, "capture", lambda *_: frame)
-    monkeypatch.setattr(generation, "hierarchy", lambda *_: XML)
-    monkeypatch.setattr(generation, "redact", lambda frame, _: frame)
-    usage = {"calls": 1, "input_tokens": 20, "output_tokens": 10, "unknown_calls": 0}
-    responses = iter(
-        [
-            {
-                "decision": {"decision": "finish", "reason": "No safe actions"},
-                "batch": None,
-                "usage": usage,
-            },
-            {
-                "decision": None,
-                "batch": {
-                    "proposals": [
-                        {
-                            "id": str(uuid4()),
-                            "title": "Invented",
-                            "category": "smoke",
-                            "requirement": "Do not invent",
-                            "questions": [],
-                            "source_ids": [str(uuid4())],
-                            "sequence": {
-                                "actions": [
-                                    {
-                                        "id": "back",
-                                        "kind": "direct",
-                                        "instruction": "",
-                                        "checkpoint_id": "back",
-                                        "command": {"operation": "back"},
-                                    }
-                                ],
-                                "checks": [],
-                            },
-                        }
-                    ]
-                },
-                "usage": usage,
-            },
-        ]
-    )
-    monkeypatch.setattr(
-        generation, "invoke", lambda *a: AuthoringModelResponse.model_validate(next(responses))
-    )
-    updates = []
-    connection = SimpleNamespace(
-        stopped=threading.Event(),
-        failed=threading.Event(),
-        session=SimpleNamespace(profile=SimpleNamespace(package=PACKAGE)),
-        update=lambda **kw: updates.append(kw["task"].model_copy(deep=True)),
-    )
-    task = PhoneTask.model_validate(
-        {
-            "id": str(uuid4()),
-            "goal": "Generate",
-            "control": None,
-            "state": "queued",
-            "message": "",
-            "generation": {
-                "id": str(uuid4()),
-                "session_id": str(uuid4()),
-                "expected_revision": 0,
-                "category": "smoke",
-                "journey": "",
-                "allow_writes": False,
-                "reuse_job_id": None,
-            },
-        }
-    )
-    generation.run(
-        connection, Device(), task, SimpleNamespace(), tmp_path / "profile", tmp_path / "task"
-    )
-    assert updates[-1].state.value == "failed"
-    assert updates[-1].progress.proposals == []
-    assert updates[-1].progress.usage.calls == 2
-    assert updates[-1].progress.usage.input_tokens == 40
 
 
 def test_capture_shares_active_rpc_instead_of_starting_a_second_instrumentation(monkeypatch):

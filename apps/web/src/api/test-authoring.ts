@@ -45,3 +45,13 @@ export const saveAuthoredTests = (appId: string, body: SaveAuthoredTestsRequest)
     }),
     z.zSavedAuthoredTests,
   )
+
+export const cancelTestGeneration = (appId: string, jobId: string) =>
+  checked(
+    sdk.cancelTestGeneration({
+      ...options,
+      headers: headers(),
+      path: { app_id: appId, job_id: jobId },
+    }),
+    z.zPhoneSession,
+  )

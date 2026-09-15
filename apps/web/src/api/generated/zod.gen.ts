@@ -180,6 +180,18 @@ export const zDirectTarget = z.union([
     })
 ]);
 
+/**
+ * Discovery-only protocol. Absence on historical payloads means the legacy custom loop.
+ */
+export const zDiscoveryEngine = z.enum(['legacy_custom', 'minitap_v1']);
+
+export const zDiscoveryOutcome = z.enum([
+    'pending',
+    'completed',
+    'failed',
+    'uncertain'
+]);
+
 export const zDriver = z.enum([
     'direct',
     'fake',
@@ -251,6 +263,7 @@ export const zForkLibraryDraftRequest = z.object({
 export const zGenerateTestsRequest = z.object({
     allow_writes: z.boolean(),
     category: zCoverageKind,
+    engine: zDiscoveryEngine.nullish(),
     expected_revision: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     id: z.uuid(),
     journey: z.string(),
@@ -376,6 +389,7 @@ export const zLibraryReviewState = z.enum([
 ]);
 
 export const zLibraryEntryResponse = z.object({
+    ai_generated: z.boolean().optional(),
     app_id: z.uuid(),
     archived_at: z.iso.datetime().nullish(),
     capabilities: zLibraryCapabilities,
@@ -488,6 +502,7 @@ export const zPhoneFrame = z.object({
 });
 
 export const zDiscoverySnapshot = z.object({
+    fingerprint: z.string().nullish(),
     frame: zPhoneFrame,
     id: z.uuid()
 });
@@ -717,6 +732,14 @@ export const zDirectCommand = z.union([
     })
 ]);
 
+export const zDiscoveryReceipt = z.object({
+    after_id: z.uuid().nullish(),
+    before_id: z.uuid(),
+    command: zDirectCommand,
+    id: z.uuid(),
+    outcome: zDiscoveryOutcome
+});
+
 export const zTestAction = z.object({
     checkpoint_id: z.string(),
     command: zDirectCommand.nullish(),
@@ -769,6 +792,7 @@ export const zCaseDefinition = z.object({
 export const zGenerationProposal = z.object({
     category: zCoverageKind,
     id: z.uuid(),
+    path_ids: z.array(z.uuid()).optional(),
     questions: z.array(z.string()),
     requirement: z.string(),
     sequence: zAutomationSequence,
@@ -777,9 +801,12 @@ export const zGenerationProposal = z.object({
 });
 
 export const zGenerationProgress = z.object({
+    engine: zDiscoveryEngine.nullish(),
     gaps: z.array(z.string()),
+    journal: z.array(zDiscoveryReceipt).optional(),
     proposals: z.array(zGenerationProposal),
     snapshots: z.array(zDiscoverySnapshot),
+    source_job_id: z.uuid().nullish(),
     state: zGenerationState,
     trace: z.array(zDirectCommand),
     usage: zAuthoringUsage

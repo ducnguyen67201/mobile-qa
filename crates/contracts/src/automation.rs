@@ -1,5 +1,5 @@
 //! Structured device commands and bounded authoring. Rust owns every consumer shape.
-use crate::execution::{CaseDefinition, ExpectedCheck, TestAction};
+use crate::execution::{CaseDefinition, CheckMethod, ExpectedCheck, TestAction, UiProperty};
 use crate::task_sessions::PhoneFrame;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -180,6 +180,8 @@ pub struct TestTemplates {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GenerateTestsRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine: Option<DiscoveryEngine>,
     pub id: Uuid,
     pub session_id: Uuid,
     pub expected_revision: u32,
@@ -202,6 +204,8 @@ pub enum GenerationState {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GenerationProposal {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub path_ids: Vec<Uuid>,
     pub id: Uuid,
     pub title: String,
     pub category: CoverageKind,
@@ -221,12 +225,20 @@ pub struct AuthoringUsage {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DiscoverySnapshot {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<String>,
     pub id: Uuid,
     pub frame: PhoneFrame,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GenerationProgress {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine: Option<DiscoveryEngine>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_job_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub journal: Vec<DiscoveryReceipt>,
     pub state: GenerationState,
     pub proposals: Vec<GenerationProposal>,
     pub snapshots: Vec<DiscoverySnapshot>,
@@ -256,6 +268,8 @@ pub enum AuthoringModelRequest {
         trace: Vec<DirectCommand>,
     },
     Propose {
+        #[serde(default)]
+        journal: Vec<DiscoveryReceipt>,
         package: String,
         journey: String,
         category: CoverageKind,
@@ -293,4 +307,98 @@ pub struct SaveAuthoredTestsRequest {
 #[serde(deny_unknown_fields)]
 pub struct SavedAuthoredTests {
     pub entry_ids: Vec<Uuid>,
+}
+
+/// Discovery-only protocol. Absence on historical payloads means the legacy custom loop.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DiscoveryEngine {
+    LegacyCustom,
+    MinitapV1,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DiscoveryOutcome {
+    Pending,
+    Completed,
+    Failed,
+    Uncertain,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiscoveryReceipt {
+    pub id: Uuid,
+    pub before_id: Uuid,
+    pub command: DirectCommand,
+    pub outcome: DiscoveryOutcome,
+    pub after_id: Option<Uuid>,
+}
+/// Local child/parent IPC: no worker credentials, shell strings or filesystem paths.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum DiscoveryCall {
+    Observe {
+        id: Uuid,
+    },
+    Execute {
+        id: Uuid,
+        command: DirectCommand,
+    },
+    Reserve {
+        id: Uuid,
+    },
+    Usage {
+        id: Uuid,
+        input_tokens: Option<u32>,
+        output_tokens: Option<u32>,
+    },
+    Finish {
+        id: Uuid,
+    },
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiscoveryReply {
+    pub id: Uuid,
+    pub error: Option<String>,
+    pub snapshot: Option<DiscoverySnapshot>,
+}
+
+/// The model selects a prefix and writes expectations; code owns commands and evidence IDs.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiscoveryDraft {
+    #[schemars(range(min = 1, max = 12))]
+    pub through_action: u8,
+    #[schemars(length(min = 1, max = 200))]
+    pub title: String,
+    #[schemars(length(max = 4000))]
+    pub requirement: String,
+    #[schemars(length(max = 20))]
+    pub questions: Vec<String>,
+    #[schemars(length(max = 20))]
+    pub checks: Vec<DiscoveryDraftCheck>,
+}
+/// Use an action number at the model boundary; the recorder resolves checkpoint identities.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiscoveryDraftCheck {
+    #[schemars(range(min = 1, max = 12))]
+    pub after_action: u8,
+    pub description: String,
+    pub method: CheckMethod,
+    pub resource_id: String,
+    pub ready_resource_id: String,
+    pub text_filter: String,
+    pub property: UiProperty,
+    pub expected: String,
+    pub required: bool,
+    #[schemars(range(min = 1, max = 30))]
+    pub observation_seconds: u32,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiscoveryDraftBatch {
+    #[schemars(length(min = 1, max = 5))]
+    pub proposals: Vec<DiscoveryDraft>,
 }

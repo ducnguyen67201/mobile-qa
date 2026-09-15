@@ -244,7 +244,7 @@ pub async fn task(
         goal: input.goal,
         control,
         state: PhoneTaskState::Queued,
-        message: "Waiting for Minitap".into(),
+        message: "Waiting for AI".into(),
     };
     exec(
         &tx,
@@ -285,7 +285,7 @@ pub async fn claim(
     w: &Worker,
     input: PhoneClaimRequest,
 ) -> ApiResult<PhoneClaimResponse> {
-    if ![0, 2].contains(&input.protocol_version) {
+    if ![0, 2, 3].contains(&input.protocol_version) {
         return Err(conflict("Unsupported phone protocol"));
     }
     reconcile(ctx).await?;
@@ -337,7 +337,7 @@ pub async fn claim(
     };
     let mut s: PhoneSession = decode(field(r, "payload")?)?;
     s.protocol_version = input.protocol_version;
-    if p.driver == Driver::Direct && input.protocol_version != 2 {
+    if p.driver == Driver::Direct && ![2, 3].contains(&input.protocol_version) {
         return Err(conflict("Update this worker for direct execution"));
     }
     s.state = PhoneState::Preparing;
@@ -465,7 +465,14 @@ pub async fn update(
             let mut task:PhoneTask=decode(field(&row,"payload")?)?;
             task.state=PhoneTaskState::Stopped;
             task.message="Session stopped".into();
-            if let Some(progress)=&mut task.progress {progress.state=mobile_qa_contracts::automation::GenerationState::Canceled;}
+            if let Some(progress)=&mut task.progress {
+                progress.state=mobile_qa_contracts::automation::GenerationState::Canceled;
+                for receipt in &mut progress.journal {
+                    if receipt.outcome==mobile_qa_contracts::automation::DiscoveryOutcome::Pending {
+                        receipt.outcome=mobile_qa_contracts::automation::DiscoveryOutcome::Uncertain;
+                    }
+                }
+            }
             for step in &mut task.steps {if step.state==mobile_qa_contracts::automation::StepState::Started {step.state=mobile_qa_contracts::automation::StepState::Inconclusive;step.message="Session stopped before the result was acknowledged".into();}}
             exec(&tx,"UPDATE phone_tasks SET payload=$2 WHERE id=$1",vec![task.id.into(),json(&task)?.into()]).await?;
         }

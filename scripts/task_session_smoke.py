@@ -25,7 +25,7 @@ from app_setup_smoke import (
 from execution_smoke import task
 
 
-def main():
+def main(scenario=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument("--apk", type=Path, required=True)
@@ -182,52 +182,55 @@ def main():
                     (directory / "initial.png").write_bytes(
                         base64.b64decode(ready["frame"]["png_base64"])
                     )
-                    goals = [
-                        "Enter Buy milk in the task input and tap Save. Leave the saved task visible.",
-                        "Replace the text in the task input with Walk the dog, tap Save, and leave Walk the dog visible.",
-                    ]
-                    results = []
-                    for index, goal in enumerate(goals):
-                        current = request(owner, "GET", path)
-                        selection = None
-                        if index == 1:
-                            control = next(
-                                c
-                                for c in current["frame"]["controls"]
-                                if c["resource_id"].endswith("task_input")
-                            )
-                            selection = {
-                                "frame_id": current["frame"]["id"],
-                                "control_id": control["id"],
-                            }
-                        request(
-                            owner,
-                            "POST",
-                            path + "/tasks",
-                            {
-                                "id": str(uuid.uuid4()),
-                                "goal": goal,
-                                "selection": selection,
-                            },
-                            csrf,
-                        )
-                        result = wait_for(
-                            lambda s: len(s["tasks"]) == index + 1
-                            and s["tasks"][-1]["state"] in ("completed", "failed")
-                        )
-                        results.append(result["tasks"][-1])
-                        (directory / f"task-{index + 1}.png").write_bytes(
-                            base64.b64decode(result["frame"]["png_base64"])
-                        )
-                        assert results[-1]["state"] == "completed", results[-1][
-                            "message"
+                    if scenario:
+                        results = scenario(owner, csrf, app, path, wait_for, directory)
+                    else:
+                        goals = [
+                            "Enter Buy milk in the task input and tap Save. Leave the saved task visible.",
+                            "Replace the text in the task input with Walk the dog, tap Save, and leave Walk the dog visible.",
                         ]
-                        expected = "Buy milk" if index == 0 else "Walk the dog"
-                        assert any(
-                            c["label"] == expected
-                            and c["resource_id"].endswith("task_row")
-                            for c in result["frame"]["controls"]
-                        ), "Expected saved task missing from device evidence"
+                        results = []
+                        for index, goal in enumerate(goals):
+                            current = request(owner, "GET", path)
+                            selection = None
+                            if index == 1:
+                                control = next(
+                                    c
+                                    for c in current["frame"]["controls"]
+                                    if c["resource_id"].endswith("task_input")
+                                )
+                                selection = {
+                                    "frame_id": current["frame"]["id"],
+                                    "control_id": control["id"],
+                                }
+                            request(
+                                owner,
+                                "POST",
+                                path + "/tasks",
+                                {
+                                    "id": str(uuid.uuid4()),
+                                    "goal": goal,
+                                    "selection": selection,
+                                },
+                                csrf,
+                            )
+                            result = wait_for(
+                                lambda s: len(s["tasks"]) == index + 1
+                                and s["tasks"][-1]["state"] in ("completed", "failed")
+                            )
+                            results.append(result["tasks"][-1])
+                            (directory / f"task-{index + 1}.png").write_bytes(
+                                base64.b64decode(result["frame"]["png_base64"])
+                            )
+                            assert results[-1]["state"] == "completed", results[-1][
+                                "message"
+                            ]
+                            expected = "Buy milk" if index == 0 else "Walk the dog"
+                            assert any(
+                                c["label"] == expected
+                                and c["resource_id"].endswith("task_row")
+                                for c in result["frame"]["controls"]
+                            ), "Expected saved task missing from device evidence"
                     request(owner, "POST", path + "/stop", csrf=csrf)
                     closed = wait_for(lambda s: s["state"] == "closed", 60)
                     worker.wait(timeout=15)

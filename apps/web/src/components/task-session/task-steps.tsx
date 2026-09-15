@@ -415,7 +415,7 @@ export function TaskSteps({
                       <Textarea
                         aria-label={`Action ${index + 1} AI instruction`}
                         placeholder="Describe what AI should do"
-                        title="Uses Minitap and model calls"
+                        title="Uses AI model calls"
                         size="xs"
                         autosize
                         minRows={1}

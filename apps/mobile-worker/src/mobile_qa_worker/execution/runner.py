@@ -275,6 +275,7 @@ def serve(
     with host_lock(state):
         if journal.exists() and read(journal).get("state") == "active":
             raise ValueError("active_execution_requires_operator_recovery")
+        connected = False
         while True:
             claim_id = str(read(journal)["claim_id"]) if journal.exists() else str(uuid4())
             write(journal, {"state": "claiming", "claim_id": claim_id})
@@ -289,6 +290,9 @@ def serve(
                     raise
                 time.sleep(5)
                 continue
+            if not connected:
+                print("Worker connected: execution jobs", flush=True)
+                connected = True
             if response.lease is None:
                 journal.unlink(missing_ok=True)
                 if once:

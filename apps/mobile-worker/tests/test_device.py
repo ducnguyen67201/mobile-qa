@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from mobile_qa_worker.qualification import device as device_module
+from mobile_qa_worker.device import android as device_module
 from mobile_qa_worker.qualification.config import Profile, QualificationError
 from mobile_qa_worker.qualification.device import Device, host_environment
 from mobile_qa_worker.qualification.evidence import Evidence, sha256
@@ -82,7 +82,13 @@ def test_apk_metadata_and_checksum(tmp_path, monkeypatch):
         "command",
         lambda *a, **k: b"package: name='ai.mobileqa.demo'\nsdkVersion:'26'",
     )
-    monkeypatch.setattr(d, "adb", lambda *a, **k: b"Success")
+    monkeypatch.setattr(
+        d,
+        "adb",
+        lambda *a, **k: b"ai.mobileqa.demo/.MainActivity"
+        if "resolve-activity" in a
+        else b"Success",
+    )
     assert d.install(apk, sha256(apk)) == sha256(apk)
     with pytest.raises(QualificationError, match="checksum"):
         d.install(apk, "a" * 64)

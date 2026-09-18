@@ -100,6 +100,10 @@ def sdk_action(
 def execute(
     job: ExecutionJob, profile_path: Path, directory: Path, scenario: str
 ) -> LocalExecutionResult:
+    if job.manifest.profile.execution_context is not None:
+        from mobile_qa_worker.execution.lifecycle import execute as direct_replay
+
+        return direct_replay(job, profile_path, directory)
     profile = Profile.load(profile_path)
     definition = job.manifest.cases[job.case_index].case
     if (

@@ -114,7 +114,7 @@ pub async fn claim(
     worker: &Worker,
     input: ClaimRequest,
 ) -> ApiResult<ClaimResponse> {
-    if ![1, 2].contains(&input.version) || input.profile_id != worker.profile_id {
+    if ![1, 2, 3].contains(&input.version) || input.profile_id != worker.profile_id {
         return Err(conflict("Unsupported protocol or worker profile"));
     }
     reconcile(ctx).await?;
@@ -126,6 +126,13 @@ pub async fn claim(
     )
     .await?;
     let profile = test_definitions::profile(&tx, worker.app_id, worker.profile_id).await?;
+    if profile.execution_context.is_some() && input.version < 3 {
+        return Ok(ClaimResponse {
+            lease: None,
+            poll_after_seconds: 5,
+        });
+    }
+    profile.validate().map_err(ApiFailure::invalid)?;
     // The advisory lock serializes shared physical identity even across app-scoped workers.
     rows(
         &tx,
@@ -170,7 +177,7 @@ pub async fn claim(
             r.app_id=$1 AND a.state='queued' AND r.cancel_requested=false AND \
             r.manifest->'profile'->>'id'=$2 AND ($3 OR NOT jsonb_path_exists(r.manifest, '$.cases[*].case.actions[*] ? (@.kind == \"direct\")')) ORDER BY r.created_at,a.case_index,a.number FOR \
             UPDATE OF a SKIP LOCKED LIMIT 1",
-            vec![worker.app_id.into(), worker.profile_id.to_string().into(), (input.version==2).into()],
+            vec![worker.app_id.into(), worker.profile_id.to_string().into(), (input.version>=2).into()],
         )
         .await?;
         let Some(r) = jobs.first() else {
@@ -267,6 +274,7 @@ pub async fn events(
     let tx = ctx.db.begin().await?;
     let r = lease(&tx, w, id, input.generation, token, true).await?;
     let manifest: RunManifest = decode(field(&r, "manifest")?)?;
+    super::execution_preflight::require(&tx, id, input.generation, &manifest).await?;
     let case = &manifest.cases[field::<i32>(&r, "case_index")? as usize].case;
     let mut last: i64 = field(
         &one(
@@ -377,6 +385,11 @@ pub async fn complete(
         tx.commit().await?;
         return Ok(AttemptReceipt { attempt: result });
     }
+    if manifest.profile.execution_context.is_some()
+        && !super::execution_preflight::recorded(&tx, id, input.generation).await?
+    {
+        outcome = Outcome::Inconclusive;
+    }
     if field::<bool>(&r, "cancel_requested")? && outcome != Outcome::Failed {
         outcome = Outcome::Canceled;
     }
@@ -438,7 +451,11 @@ pub async fn cleanup(
             "Persist attempt evidence before acknowledging cleanup",
         ));
     }
-    let clean = input.stopped && input.reset == CleanupState::VerifiedClean;
+    let manifest: RunManifest = decode(field(&r, "manifest")?)?;
+    let clean = input.stopped
+        && input.reset == CleanupState::VerifiedClean
+        && (manifest.profile.execution_context.is_none()
+            || super::execution_preflight::recorded(&tx, id, input.generation).await?);
     exec(
         &tx,
         "UPDATE execution_attempts SET state=$2,cleanup=$3,cleanup_hash=$4,\
@@ -516,14 +533,12 @@ pub async fn recover(
     )
     .await?;
     let _: Uuid = field(&r, "id")?;
+    exec(&tx,"INSERT INTO execution_recovery_events(id,attempt_id,actor_id,evidence_reference) VALUES($1,$2,$3,$4)",
+        vec![Uuid::new_v4().into(),id.into(),actor.into(),evidence.into()]).await?;
     exec(
         &tx,
-        "UPDATE execution_attempts SET state='finished',cleanup='verified_clean',\
-            cleanup_receipt=$2 WHERE id=$1",
-        vec![
-            id.into(),
-            serde_json::json!({"operator_id":actor,"recovery_evidence":evidence}).into(),
-        ],
+        "UPDATE execution_attempts SET state='finished',cleanup='verified_clean' WHERE id=$1",
+        vec![id.into()],
     )
     .await?;
     exec(

@@ -71,6 +71,11 @@ pub async fn preview(
         out.blockers
             .push("This plan includes Ask AI steps but the device has no model".into());
     }
+    for c in &cases {
+        if let Err(e) = super::execution_readiness::case_matches(&profile, &c.case) {
+            out.blockers.push(e.message);
+        }
+    }
     let env = one(
         db,
         "SELECT revision,account_secret_reference_id,reset_secret_reference_id FROM \
@@ -120,7 +125,10 @@ pub async fn preview(
     }
     let required_duration: u64 = cases
         .iter()
-        .map(|c| u64::from(c.case.budget.duration_seconds) * (u64::from(p.diagnostic_retries) + 1))
+        .map(|c| {
+            super::execution_readiness::duration(&profile, &c.case)
+                * (u64::from(p.diagnostic_retries) + 1)
+        })
         .sum();
     if required_duration > u64::from(p.budget.duration_seconds) {
         out.blockers
@@ -265,6 +273,9 @@ pub async fn attempt(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<AttemptRe
     .map(super::run_artifacts::record)
     .collect::<ApiResult<Vec<_>>>()?;
     Ok(AttemptResponse {
+        preflight: rows(db,"SELECT payload FROM execution_preflight_receipts WHERE attempt_id=$1 ORDER BY generation DESC LIMIT 1",vec![id.into()]).await?.first().map(|r| decode(field(r,"payload")?)).transpose()?,
+        recovery_events: rows(db,"SELECT actor_id,evidence_reference,created_at FROM execution_recovery_events WHERE attempt_id=$1 ORDER BY created_at,id",vec![id.into()]).await?.iter().map(|r| Ok(mobile_qa_contracts::execution_lifecycle::RecoveryEvent {actor_id:field(r,"actor_id")?,evidence_reference:field(r,"evidence_reference")?,created_at:field(r,"created_at")?})).collect::<ApiResult<Vec<_>>>()?,
+        original_cleanup: field::<Option<serde_json::Value>>(&r,"cleanup_receipt")?.and_then(|v| serde_json::from_value(v).ok()),
         id,
         case_version_id: manifest.cases[index as usize].definition_id,
         generation: field(&r, "generation")?,
@@ -358,6 +369,11 @@ pub fn summary(manifest: &RunManifest, attempts: &[AttemptResponse]) -> String {
                     a.outcome != Some(Outcome::Passed)
                         || a.state != JobState::Finished
                         || a.cleanup != CleanupState::VerifiedClean
+                        || !a.recovery_events.is_empty()
+                        || a.original_cleanup
+                            .as_ref()
+                            .is_some_and(|r| !r.stopped || r.reset != CleanupState::VerifiedClean)
+                        || (manifest.profile.execution_context.is_some() && a.preflight.is_none())
                 })
         })
     {

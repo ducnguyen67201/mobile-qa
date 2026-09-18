@@ -3,6 +3,8 @@ use crate::execution::*;
 use schemars::JsonSchema;
 #[derive(JsonSchema)]
 pub struct ExecutionContracts {
+    pub preflight_request: crate::execution_lifecycle::PreflightRequest,
+    pub preflight_ack: crate::execution_lifecycle::PreflightAcknowledgement,
     pub job: ExecutionJob,
     pub navigation: NavigationRequest,
     pub local_result: LocalExecutionResult,

@@ -7,9 +7,9 @@ from collections.abc import Callable
 from typing import Protocol, cast
 from xml.etree import ElementTree
 
+from mobile_qa_worker.device.android import AndroidDevice as Device
 from mobile_qa_worker.generated.models import DirectCommand, DirectTarget, ExpectedCheck
 from mobile_qa_worker.qualification.config import SERIAL, QualificationError
-from mobile_qa_worker.qualification.device import Device
 
 
 class ElementRpc(Protocol):

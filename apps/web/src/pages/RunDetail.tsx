@@ -19,6 +19,7 @@ import { appQuery } from '@/api/setup'
 import { cancelRun, runQuery } from '@/api/runs'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { ErrorNotice, LoadingPanel, PageHeading } from '@/components/app/feedback'
+import { AttemptReadiness } from '@/components/app/attempt-readiness'
 export function RunDetail() {
   const { run_id: id = '' } = useParams()
   const { workspaceId = '' } = useWorkspace()
@@ -61,11 +62,12 @@ export function RunDetail() {
         </Button>
       </Group>
       {r.state === 'cancel_requested' && (
-        <Alert>Cancellation requested. Waiting for the worker to stop and clean up.</Alert>
+        <Alert>Cancellation requested. Waiting for your phone to stop and clean up.</Alert>
       )}
       {r.state === 'recovery_required' && (
         <Alert color="orange">
-          The device is held for operator recovery. It cannot accept another run.
+          Your phone needs attention before another run can start. The recorded test result is
+          unchanged.
         </Alert>
       )}
       {cancel.isError && <ErrorNotice error={cancel.error} retry={() => cancel.mutate()} />}
@@ -73,14 +75,32 @@ export function RunDetail() {
       <Code style={{ overflowWrap: 'anywhere' }}>{r.manifest.build_sha256}</Code>
       {r.attempts.map((a) => (
         <Card key={a.id} withBorder>
-          <Stack>
-            <Title order={2}>
-              {r.manifest.cases.find((c) => c.definition_id === a.case_version_id)?.case.title} ·
-              attempt {a.number}
-            </Title>
-            <Text>
-              {a.outcome ?? 'Not yet evaluated'} · {a.state} · reset: {a.cleanup}
-            </Text>
+          <Stack gap="sm">
+            <Group justify="space-between" align="flex-start" gap="xs">
+              <Title order={2} fz="lg">
+                {r.manifest.cases.find((c) => c.definition_id === a.case_version_id)?.case.title ??
+                  'Test attempt'}
+              </Title>
+              <Text size="xs" c="dimmed">
+                Attempt {a.number}
+              </Text>
+            </Group>
+            <Group gap="xs">
+              <Badge
+                color={a.outcome === 'failed' ? 'red' : a.outcome === 'passed' ? 'forest' : 'gray'}
+              >
+                Result: {a.outcome ?? 'Not yet evaluated'}
+              </Badge>
+              <Text size="xs" c="dimmed">
+                {a.state.replaceAll('_', ' ')}
+              </Text>
+            </Group>
+            <AttemptReadiness
+              attempt={a}
+              runId={r.id}
+              requiresCleanStart={!!r.manifest.profile.execution_context}
+              simulated={r.manifest.profile.driver === 'fake'}
+            />
             {a.reason && <Text size="sm">{a.reason}</Text>}
             <List>
               {r.manifest.cases
@@ -120,32 +140,34 @@ export function RunDetail() {
                 </List.Item>
               ))}
             </List>
-            {a.artifacts.map((f) => {
-              const url = `/api/runs/${r.id}/artifacts/${f.id}/content`
-              return (
-                <div key={f.id}>
-                  {f.state === 'sealed' ? (
-                    <>
-                      {f.mime === 'image/png' && (
-                        <Image
-                          src={url}
-                          alt={`${f.checkpoint_id} evidence`}
-                          maw={320}
-                          fit="contain"
-                        />
-                      )}
-                      <Anchor href={url} target="_blank" rel="noreferrer">
-                        {f.name}
-                      </Anchor>
-                    </>
-                  ) : (
-                    <Text>
-                      {f.name}: {f.reason ?? f.state}
-                    </Text>
-                  )}
-                </div>
-              )
-            })}
+            {a.artifacts
+              .filter((f) => !a.preflight?.artifact_ids.includes(f.id))
+              .map((f) => {
+                const url = `/api/runs/${r.id}/artifacts/${f.id}/content`
+                return (
+                  <div key={f.id}>
+                    {f.state === 'sealed' ? (
+                      <>
+                        {f.mime === 'image/png' && (
+                          <Image
+                            src={url}
+                            alt={`${f.checkpoint_id} evidence`}
+                            maw={320}
+                            fit="contain"
+                          />
+                        )}
+                        <Anchor href={url} target="_blank" rel="noreferrer">
+                          {f.name}
+                        </Anchor>
+                      </>
+                    ) : (
+                      <Text>
+                        {f.name}: {f.reason ?? f.state}
+                      </Text>
+                    )}
+                  </div>
+                )
+              })}
             {a.usage.map((u, i) => (
               <Text size="sm" key={`${u.model}:${i}`}>
                 {u.model}: {u.calls} calls; {u.input_tokens ?? 'unknown'} input /{' '}

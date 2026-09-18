@@ -7726,6 +7726,121 @@
         ]
       }
     },
+    "/api/worker/attempts/{attempt_id}/preflight": {
+      "post": {
+        "tags": [],
+        "operationId": "acknowledgeExecutionStart",
+        "parameters": [
+          {
+            "name": "attempt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-lease-token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreflightRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Start evidence acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreflightAcknowledgement"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Worker authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scoped attempt or evidence missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale lease or conflicting receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid start evidence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces": {
       "post": {
         "tags": [],
@@ -8233,6 +8348,16 @@
             "format": "int32",
             "minimum": 0
           },
+          "original_cleanup": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CleanupRequest"
+              }
+            ]
+          },
           "outcome": {
             "oneOf": [
               {
@@ -8243,11 +8368,27 @@
               }
             ]
           },
+          "preflight": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PreflightReceipt"
+              }
+            ]
+          },
           "reason": {
             "type": [
               "string",
               "null"
             ]
+          },
+          "recovery_events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecoveryEvent"
+            }
           },
           "state": {
             "$ref": "#/components/schemas/JobState"
@@ -9352,6 +9493,102 @@
         },
         "additionalProperties": false
       },
+      "ExecutionContextV1": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "adapter_revision",
+          "verifier_revision",
+          "worker_runtime_revision",
+          "reset_policy_hash",
+          "qualified_profile_id",
+          "package",
+          "launch_component",
+          "image",
+          "abi",
+          "width",
+          "height",
+          "density",
+          "locale",
+          "timezone",
+          "state_scope",
+          "qualification_reference",
+          "starting_checks",
+          "stages"
+        ],
+        "properties": {
+          "abi": {
+            "type": "string"
+          },
+          "adapter_revision": {
+            "type": "string"
+          },
+          "density": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "image": {
+            "type": "string"
+          },
+          "launch_component": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "package": {
+            "type": "string"
+          },
+          "qualification_reference": {
+            "type": "string"
+          },
+          "qualified_profile_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reset_policy_hash": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "stages": {
+            "$ref": "#/components/schemas/StageBudgets"
+          },
+          "starting_checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpectedCheck"
+            }
+          },
+          "state_scope": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "verifier_revision": {
+            "type": "string"
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "worker_runtime_revision": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "ExecutionEvent": {
         "type": "object",
         "required": [
@@ -9469,6 +9706,16 @@
           },
           "driver": {
             "$ref": "#/components/schemas/Driver"
+          },
+          "execution_context": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExecutionContextV1"
+              }
+            ]
           },
           "id": {
             "type": "string",
@@ -11126,6 +11373,95 @@
         },
         "additionalProperties": false
       },
+      "PreflightAcknowledgement": {
+        "type": "object",
+        "required": [
+          "attempt_id",
+          "generation",
+          "accepted"
+        ],
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PreflightReceipt": {
+        "type": "object",
+        "required": [
+          "attempt_id",
+          "instance_nonce",
+          "context",
+          "build_sha256",
+          "started_at",
+          "ready_at",
+          "duration_ms",
+          "artifact_ids"
+        ],
+        "properties": {
+          "artifact_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "build_sha256": {
+            "type": "string"
+          },
+          "context": {
+            "$ref": "#/components/schemas/ExecutionContextV1"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "instance_nonce": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ready_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PreflightRequest": {
+        "type": "object",
+        "required": [
+          "generation",
+          "receipt"
+        ],
+        "properties": {
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/PreflightReceipt"
+          }
+        },
+        "additionalProperties": false
+      },
       "ReadinessResponse": {
         "type": "object",
         "required": [
@@ -11168,6 +11504,28 @@
           },
           "reset_configured": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecoveryEvent": {
+        "type": "object",
+        "required": [
+          "actor_id",
+          "evidence_reference",
+          "created_at"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidence_reference": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -11637,6 +11995,38 @@
             "type": "string"
           },
           "upload_ttl_seconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "StageBudgets": {
+        "type": "object",
+        "required": [
+          "boot_seconds",
+          "install_seconds",
+          "start_seconds",
+          "cleanup_seconds"
+        ],
+        "properties": {
+          "boot_seconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "cleanup_seconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "install_seconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "start_seconds": {
             "type": "integer",
             "format": "int32",
             "minimum": 0

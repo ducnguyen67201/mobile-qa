@@ -217,3 +217,19 @@ in this phase. Never label a cloud run qualified from offline/mocked tests alone
 - [ADB evidence/control](https://developer.android.com/tools/adb)
 - [Minitap SDK installation](https://www.minitap.ai/docs/mobile-use-sdk/installation)
 - [AGP compatibility](https://developer.android.com/build/releases/agp-8-13-0-release-notes)
+
+## Local-state direct app profile (07A)
+
+`android_direct_v1` is an explicit operator qualification, not automatic arbitrary-APK
+support. Register a new immutable profile with a complete execution context: exact app
+package/launcher, Android35 image/ABI,1080×1920 density420 portrait,en-US,Etc/UTC,local_only,
+qualified starting assertions, reset-policy digest and qualification reference. Runtime
+and verifier revisions are `direct_v1` and `ui_v1`. Direct profiles have no model.
+A fresh owned AVD must install the checksum-matched APK and satisfy every start assertion.
+No customer account/backend state reset is supported by this policy.
+
+Before marking a real app qualified, prove state disappears after disposing the first
+AVD and installing on a second instance, and record expected clean-start evidence.
+Fake ADB/HTTP tests establish code boundaries only. No non-demo APK has been qualified
+by this increment. Execution/preview use the shared Android device boundary; AI discovery
+still requires its separately qualified demo/model profile.

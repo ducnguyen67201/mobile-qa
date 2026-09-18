@@ -20,6 +20,8 @@ from mobile_qa_worker.generated.models import (
     ExecutionLease,
     LeaseStatusResponse,
     LocalExecutionResult,
+    PreflightAcknowledgement,
+    PreflightRequest,
 )
 from mobile_qa_worker.qualification.evidence import sha256
 from mobile_qa_worker.qualification.process import host_lock, stop_group
@@ -70,12 +72,16 @@ def dispatch_child(
     write(directory / "result.json", result.model_dump(mode="json"))
 
 
-def transfer(client: Client, lease: ExecutionLease, directory: Path) -> None:
+def transfer(
+    client: Client, lease: ExecutionLease, directory: Path, preflight: bool = False
+) -> list[str]:
     prefix = f"/api/worker/attempts/{lease.attempt_id}"
     case = lease.manifest.cases[lease.case_index].case
-    for action in case.actions:
+    ids: list[str] = []
+    checkpoints = ["preflight"] if preflight else [a.checkpoint_id for a in case.actions]
+    for checkpoint in checkpoints:
         for suffix, mime in [(".xml", "application/xml"), (".png", "image/png")]:
-            path = directory / "evidence" / (action.checkpoint_id + suffix)
+            path = directory / "evidence" / (checkpoint + suffix)
             if not path.is_file() or path.is_symlink():
                 continue
             client.send(
@@ -88,7 +94,7 @@ def transfer(client: Client, lease: ExecutionLease, directory: Path) -> None:
                 prefix + "/artifacts",
                 {
                     "generation": lease.generation,
-                    "checkpoint_id": action.checkpoint_id,
+                    "checkpoint_id": checkpoint,
                     "name": path.name,
                     "mime": mime,
                     "byte_size": path.stat().st_size,
@@ -105,7 +111,35 @@ def transfer(client: Client, lease: ExecutionLease, directory: Path) -> None:
                 lease.generation,
                 mime,
             )
-            ArtifactReceipt.model_validate_json(data, strict=True)
+            sealed = ArtifactReceipt.model_validate_json(data, strict=True)
+            ids.append(str(sealed.artifact.id))
+    return ids
+
+
+def acknowledge_start(client: Client, lease: ExecutionLease, directory: Path) -> None:
+    path = directory / "preflight.json"
+    ack_path = directory / "preflight-ack.json"
+    if not path.is_file() or path.is_symlink() or ack_path.exists():
+        return
+    receipt = read(path)
+    receipt["artifact_ids"] = transfer(client, lease, directory, preflight=True)
+    request = PreflightRequest.model_validate({"generation": lease.generation, "receipt": receipt})
+    ack = client.send(
+        f"/api/worker/attempts/{lease.attempt_id}/preflight",
+        request,
+        PreflightAcknowledgement,
+        lease.lease_token,
+    )
+    if not ack.accepted or ack.attempt_id != lease.attempt_id or ack.generation != lease.generation:
+        raise ValueError("start_acknowledgement_mismatch")
+    write(
+        ack_path,
+        {
+            "attempt_id": str(ack.attempt_id),
+            "instance_nonce": str(request.receipt.instance_nonce),
+            "accepted": True,
+        },
+    )
 
 
 def run_lease(
@@ -158,6 +192,17 @@ def run_lease(
         last_ack = time.monotonic()
         next_heartbeat = last_ack
         stop_at: float | None = None
+        context = lease.manifest.profile.execution_context
+        maximum = lease.manifest.cases[lease.case_index].case.budget.duration_seconds
+        if context:
+            maximum += (
+                context.stages.boot_seconds
+                + context.stages.install_seconds
+                + context.stages.start_seconds
+                + 40
+            )
+        deadline = last_ack + maximum
+        cleanup_grace = context.stages.cleanup_seconds + 10 if context else 610
         try:
             while child.poll() is None:
                 now = time.monotonic()
@@ -170,6 +215,8 @@ def run_lease(
                             lease.lease_token,
                         )
                         last_ack = time.monotonic()
+                        if not heartbeat.cancel_requested and stop_at is None and context:
+                            acknowledge_start(client, lease, directory)
                         event_path = directory / "events.json"
                         if event_path.is_file():
                             pending = read(event_path)
@@ -188,10 +235,10 @@ def run_lease(
                             child.send_signal(signal.SIGTERM)
                             stop_at = now
                     next_heartbeat = now + 10
-                if now - last_ack >= 40 and stop_at is None:
+                if (now - last_ack >= 40 or now >= deadline) and stop_at is None:
                     child.send_signal(signal.SIGTERM)
                     stop_at = now
-                if stop_at is not None and now - stop_at > 610:
+                if stop_at is not None and now - stop_at > cleanup_grace:
                     raise ValueError("cleanup_not_acknowledged")
                 time.sleep(0.2)
         finally:
@@ -253,6 +300,12 @@ def run_lease(
             )
             if receipt.attempt.cleanup.value != "verified_clean":
                 raise ValueError("resource_quarantined")
+            if lease.manifest.profile.execution_context is not None and profile:
+                from mobile_qa_worker.qualification.config import Profile
+
+                with host_lock(Profile.load(profile).state_root) as dirty:
+                    if dirty.exists() and read(dirty).get("attempt_id") == str(lease.attempt_id):
+                        dirty.unlink()
             return
         except TransportError as exc:
             if exc.status not in (0, 408, 429, 500, 503) or time.monotonic() >= deadline:
@@ -282,7 +335,7 @@ def serve(
             try:
                 response = client.send(
                     "/api/worker/claims",
-                    {"version": 2, "claim_id": claim_id, "profile_id": str(profile_id)},
+                    {"version": 3, "claim_id": claim_id, "profile_id": str(profile_id)},
                     ClaimResponse,
                 )
             except TransportError as exc:

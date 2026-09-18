@@ -168,10 +168,30 @@
           "format": "uint32",
           "minimum": 0
         },
+        "original_cleanup": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CleanupRequest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "outcome": {
           "anyOf": [
             {
               "$ref": "#/$defs/Outcome"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "preflight": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PreflightReceipt"
             },
             {
               "type": "null"
@@ -183,6 +203,12 @@
             "string",
             "null"
           ]
+        },
+        "recovery_events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RecoveryEvent"
+          }
         },
         "state": {
           "$ref": "#/$defs/JobState"
@@ -1238,6 +1264,103 @@
         "artifact_bytes"
       ]
     },
+    "ExecutionContextV1": {
+      "type": "object",
+      "properties": {
+        "abi": {
+          "type": "string"
+        },
+        "adapter_revision": {
+          "type": "string"
+        },
+        "density": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "image": {
+          "type": "string"
+        },
+        "launch_component": {
+          "type": "string"
+        },
+        "locale": {
+          "type": "string"
+        },
+        "package": {
+          "type": "string"
+        },
+        "qualification_reference": {
+          "type": "string"
+        },
+        "qualified_profile_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "reset_policy_hash": {
+          "type": "string"
+        },
+        "schema_version": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "stages": {
+          "$ref": "#/$defs/StageBudgets"
+        },
+        "starting_checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExpectedCheck"
+          }
+        },
+        "state_scope": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "verifier_revision": {
+          "type": "string"
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "worker_runtime_revision": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "adapter_revision",
+        "verifier_revision",
+        "worker_runtime_revision",
+        "reset_policy_hash",
+        "qualified_profile_id",
+        "package",
+        "launch_component",
+        "image",
+        "abi",
+        "width",
+        "height",
+        "density",
+        "locale",
+        "timezone",
+        "state_scope",
+        "qualification_reference",
+        "starting_checks",
+        "stages"
+      ]
+    },
     "ExecutionContracts": {
       "type": "object",
       "properties": {
@@ -1282,9 +1405,17 @@
         },
         "navigation": {
           "$ref": "#/$defs/NavigationRequest"
+        },
+        "preflight_ack": {
+          "$ref": "#/$defs/PreflightAcknowledgement"
+        },
+        "preflight_request": {
+          "$ref": "#/$defs/PreflightRequest"
         }
       },
       "required": [
+        "preflight_request",
+        "preflight_ack",
         "job",
         "navigation",
         "local_result",
@@ -1408,6 +1539,16 @@
         },
         "driver": {
           "$ref": "#/$defs/Driver"
+        },
+        "execution_context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExecutionContextV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "id": {
           "type": "string",
@@ -2280,6 +2421,95 @@
         "clean"
       ]
     },
+    "PreflightAcknowledgement": {
+      "type": "object",
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "generation",
+        "accepted"
+      ]
+    },
+    "PreflightReceipt": {
+      "type": "object",
+      "properties": {
+        "artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "attempt_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "build_sha256": {
+          "type": "string"
+        },
+        "context": {
+          "$ref": "#/$defs/ExecutionContextV1"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "instance_nonce": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "ready_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "instance_nonce",
+        "context",
+        "build_sha256",
+        "started_at",
+        "ready_at",
+        "duration_ms",
+        "artifact_ids"
+      ]
+    },
+    "PreflightRequest": {
+      "type": "object",
+      "properties": {
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "receipt": {
+          "$ref": "#/$defs/PreflightReceipt"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "receipt"
+      ]
+    },
     "ProposalBatch": {
       "type": "object",
       "properties": {
@@ -2586,6 +2816,28 @@
         "unknown_calls"
       ]
     },
+    "RecoveryEvent": {
+      "type": "object",
+      "properties": {
+        "actor_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidence_reference": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "actor_id",
+        "evidence_reference",
+        "created_at"
+      ]
+    },
     "ResolvedCase": {
       "type": "object",
       "properties": {
@@ -2777,6 +3029,38 @@
             "kind"
           ]
         }
+      ]
+    },
+    "StageBudgets": {
+      "type": "object",
+      "properties": {
+        "boot_seconds": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "cleanup_seconds": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "install_seconds": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "start_seconds": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "boot_seconds",
+        "install_seconds",
+        "start_seconds",
+        "cleanup_seconds"
       ]
     },
     "StepReceipt": {

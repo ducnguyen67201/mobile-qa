@@ -485,12 +485,16 @@ pub async fn executable(
                 .await?,
                 "android_package",
             )?;
-            if c.adapter != "demo_persistence_v1"
-                || c.package != "ai.mobileqa.demo"
-                || c.package != package
-                || c.checks.iter().any(|c| c.method == CheckMethod::Manual)
-            {
-                return Err(ApiFailure::invalid("Automatic execution currently supports the demo persistence adapter and automated checks only"));
+            if c.package != package {
+                return Err(ApiFailure::invalid("Test belongs to another app"));
+            }
+            if c.adapter == "demo_persistence_v1" && c.package == "ai.mobileqa.demo" {
+                if c.checks.iter().any(|c| c.method == CheckMethod::Manual) {
+                    return Err(ApiFailure::invalid("Automatic checks are required"));
+                }
+            } else {
+                let p = super::execution_readiness::assigned(db, app, &package).await?;
+                super::execution_readiness::case_matches(&p, c)?;
             }
         }
         TestDefinition::Suite(s) => {
@@ -505,15 +509,16 @@ pub async fn executable(
                 return Err(ApiFailure::invalid("Execution profile is not qualified"));
             }
             let cases = definitions::resolve(db, app, p).await?;
+            for c in &cases {
+                super::execution_readiness::case_matches(&profile, &c.case)?;
+            }
             if cases.iter().any(|c| {
-                c.case.package != profile.package
-                    || c.case.adapter != profile.adapter
-                    || c.case.budget.max_steps > p.budget.max_steps
+                c.case.budget.max_steps > p.budget.max_steps
                     || c.case.budget.artifact_bytes > p.budget.artifact_bytes
             }) || cases
                 .iter()
                 .map(|c| {
-                    u64::from(c.case.budget.duration_seconds)
+                    super::execution_readiness::duration(&profile, &c.case)
                         * (u64::from(p.diagnostic_retries) + 1)
                 })
                 .sum::<u64>()

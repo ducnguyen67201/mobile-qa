@@ -79,7 +79,7 @@ it('shows simulated run and pending cancellation without claiming physical stop'
   show()
   expect(await screen.findByText(/Simulated execution/)).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Cancel run' }))
-  expect(await screen.findByText(/Waiting for the worker to stop/)).toBeInTheDocument()
+  expect(await screen.findByText(/Waiting for your phone to stop/)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Cancel run' })).toBeDisabled()
 })
 it('does not present malformed persisted results as a report', async () => {

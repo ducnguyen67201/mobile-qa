@@ -13,6 +13,9 @@ from pathlib import Path
 from uuid import uuid4
 from xml.etree import ElementTree
 
+from mobile_qa_worker.device.android import AndroidDevice as Device
+from mobile_qa_worker.device.android import doctor
+from mobile_qa_worker.execution.adapters import device_for
 from mobile_qa_worker.execution.client import Client
 from mobile_qa_worker.execution.journal import write
 from mobile_qa_worker.generated.models import (
@@ -28,10 +31,8 @@ from mobile_qa_worker.generated.models import (
     PhoneUpdate,
 )
 from mobile_qa_worker.qualification.config import Profile, QualificationError
-from mobile_qa_worker.qualification.device import Device, doctor
 from mobile_qa_worker.qualification.evidence import Evidence, sha256
 from mobile_qa_worker.qualification.process import host_lock, stop_group
-from mobile_qa_worker.qualification.verifier import validate_png
 
 
 def controls(xml: bytes) -> list[PhoneControl]:
@@ -69,13 +70,8 @@ def controls(xml: bytes) -> list[PhoneControl]:
 
 
 def capture(device: Device, selectable: bool = True) -> PhoneFrame:
-    items: list[PhoneControl] = []
-    if selectable:
-        from mobile_qa_worker.automation.direct import hierarchy
-
-        items = controls(hierarchy(device))
-    png = device.adb("exec-out", "screencap", "-p")
-    validate_png(png)
+    xml, png = device.raw_snapshot()
+    items = controls(xml) if selectable else []
     if len(png) > 1572864:
         raise QualificationError("screen_too_large")
     return PhoneFrame.model_validate(
@@ -242,13 +238,13 @@ def run_session(
     shutdown: threading.Event | None = None,
 ) -> None:
     profile = Profile.load(profile_path)
-    if (
-        lease.session.profile.package != "ai.mobileqa.demo"
-        or lease.session.profile.model != profile.model
+    assignment = lease.session.profile
+    # The SDK reads the host profile; bind its model to the qualified session before side effects.
+    uses_model = assignment.driver.value == "minitap" or bool(assignment.model)
+    if assignment.image != profile.system_image or (
+        uses_model and assignment.model != profile.model
     ):
         raise QualificationError("worker_profile_mismatch")
-    # This first slice uses the already-qualified demo device adapter. No arbitrary
-    # package is admitted through the qualification SDK seam.
     with host_lock(profile.state_root) as dirty:
         if dirty.exists():
             raise QualificationError("device_recovery_required")
@@ -256,7 +252,7 @@ def run_session(
         root = state / str(lease.session.id)
         root.mkdir(mode=0o700)
         evidence = Evidence(root / "device")
-        device = Device(profile, evidence)
+        device = device_for(lease.session.profile, profile, evidence)
         connection = SessionConnection(client, lease, shutdown)
         heart = threading.Thread(target=connection.heartbeat, daemon=True)
         heart.start()
@@ -293,6 +289,12 @@ def run_session(
                     from mobile_qa_worker.authoring.generation import run as generate
                     from mobile_qa_worker.automation.session import run as run_steps
 
+                    if lease.session.profile.execution_context is not None and (
+                        pending.generation
+                        or not pending.sequence
+                        or any(a.kind.value == "navigate" for a in pending.sequence.actions)
+                    ):
+                        raise QualificationError("app_exploration_not_qualified")
                     runner = (
                         generate if pending.generation else run_steps if pending.sequence else act
                     )
@@ -353,7 +355,7 @@ def serve(origin: str, state: Path, profile_path: Path, once: bool = False) -> N
             write(pending, {"claim_id": str(claim_id)})
             response = client.send(
                 "/api/worker/phone-claims",
-                {"claim_id": str(claim_id), "protocol_version": 3},
+                {"claim_id": str(claim_id), "protocol_version": 4},
                 PhoneClaimResponse,
             )
             if not connected:

@@ -493,6 +493,16 @@
         "expected": {
           "type": "string"
         },
+        "observation_kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObservationKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "observed": {
           "type": [
             "string",
@@ -2049,6 +2059,13 @@
         "max_steps"
       ]
     },
+    "ObservationKind": {
+      "type": "string",
+      "enum": [
+        "present_value",
+        "absent"
+      ]
+    },
     "Outcome": {
       "type": "string",
       "enum": [
@@ -2962,14 +2979,30 @@
           }
         },
         "plan_hash": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "plan_version_id": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "uuid"
         },
         "profile": {
           "$ref": "#/$defs/ExecutionProfile"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false,
@@ -2978,14 +3011,52 @@
         "build_id",
         "build_sha256",
         "build_bytes",
-        "plan_version_id",
-        "plan_hash",
         "environment_revision",
         "profile",
         "cases",
         "budget",
         "diagnostic_retries",
         "exclusions"
+      ]
+    },
+    "RunSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "case_version_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "kind": {
+              "type": "string",
+              "const": "saved_case_v1"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "case_version_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "release_plan_v1"
+            },
+            "plan_version_id": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "plan_version_id"
+          ]
+        }
       ]
     },
     "Scenario": {

@@ -14,3 +14,5 @@ pub mod errors;
 pub mod middleware;
 pub mod services;
 pub mod storage;
+
+pub mod domain;

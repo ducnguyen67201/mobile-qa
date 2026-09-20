@@ -112,9 +112,59 @@ async fn artifact(
     );
     Ok(response)
 }
+async fn case_preview(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path(app): Path<Uuid>,
+    Json(input): Json<mobile_qa_contracts::regression::CaseRunRequest>,
+) -> ApiResult<Json<mobile_qa_contracts::regression::CaseRunPreview>> {
+    Ok(Json(
+        crate::services::case_runs::preview(&ctx, session.user.id, app, input).await?,
+    ))
+}
+async fn case_create(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path(app): Path<Uuid>,
+    headers: HeaderMap,
+    Json(input): Json<mobile_qa_contracts::regression::CaseRunRequest>,
+) -> ApiResult<(StatusCode, Json<RunResponse>)> {
+    let key = headers
+        .get("idempotency-key")
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| ApiFailure::invalid("Idempotency-Key is required"))?;
+    let (run, new) =
+        crate::services::case_runs::create(&ctx, session.user.id, app, key, input).await?;
+    Ok((
+        if new {
+            StatusCode::CREATED
+        } else {
+            StatusCode::OK
+        },
+        Json(run),
+    ))
+}
+#[derive(Deserialize)]
+struct HistoryQuery {
+    source: Option<String>,
+    cursor: Option<String>,
+}
+async fn history(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path(app): Path<Uuid>,
+    Query(q): Query<HistoryQuery>,
+) -> ApiResult<Json<mobile_qa_contracts::regression::RunHistory>> {
+    Ok(Json(
+        crate::services::run_history::list(&ctx, session.user.id, app, q.source, q.cursor).await?,
+    ))
+}
 pub fn routes() -> Routes {
     use axum::routing::{get, post};
     Routes::new()
+        .add("/api/apps/{app_id}/case-runs/preview", post(case_preview))
+        .add("/api/apps/{app_id}/case-runs", post(case_create))
+        .add("/api/apps/{app_id}/run-history", get(history))
         .add("/api/apps/{app_id}/execution-plan", get(preview))
         .add("/api/apps/{app_id}/runs", get(list).post(create))
         .add("/api/runs/{run_id}", get(detail))

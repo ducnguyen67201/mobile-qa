@@ -132,6 +132,8 @@ impl AutomationSequence {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PhoneCommandRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<crate::regression::CommandPurpose>,
     pub id: Uuid,
     pub expected_revision: u32,
     pub frame_id: Option<Uuid>,

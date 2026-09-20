@@ -104,6 +104,9 @@ pub fn observe(
     if check.method == CheckMethod::UiElementPresenceV1 {
         return Ok((!targets.is_empty()).to_string());
     }
+    if targets.is_empty() {
+        return Err("target_absent_on_ready_screen");
+    }
     if targets.len() != 1 {
         return Err("target_not_unique");
     }
@@ -183,6 +186,7 @@ pub async fn evaluate(
     for check in &case.checks {
         let expected = check.expected.replace("${task_title}", &task);
         let mut result = CheckResult {
+            observation_kind: None,
             check_id: check.id.clone(),
             expected: expected.clone(),
             observed: None,
@@ -230,10 +234,17 @@ pub async fn evaluate(
                             }
                             .into();
                             result.observed = Some(actual);
+                            result.observation_kind = Some(
+                                mobile_qa_contracts::regression::ObservationKind::PresentValue,
+                            );
                         }
                         Err(reason) => {
                             result.reason = reason.into();
-                            if reason == "prerequisite_unavailable" {
+                            if reason == "target_absent_on_ready_screen" {
+                                result.outcome = Outcome::Failed;
+                                result.observation_kind =
+                                    Some(mobile_qa_contracts::regression::ObservationKind::Absent);
+                            } else if reason == "prerequisite_unavailable" {
                                 result.outcome = Outcome::Blocked;
                             }
                         }

@@ -1,5 +1,27 @@
 # Implementation status and evidence
 
+## 07B regression labels and history — local implementation (2026-09-20)
+
+The [focused delivery](implementation/07b-regression-label-and-history.md) now creates
+saved-case runs through the existing execution pipeline, with explicit build selection,
+an immutable test version and pinned baseline. Runs lists durable executions and
+creator-private authoring trials; legacy phone activity has its own filter and no
+inferred regression verdict. The backend persists comparisons; the shared result card
+shows the label, failed action, expected/observed values and baseline/current evidence.
+
+Execution protocol 4 gates saved-case manifests. Legacy release-plan manifests remain
+unchanged. Comparison requires conclusive checks and verified clean start/cleanup on
+both sides; old demo phone results cannot establish that proof. The local real-device
+fixture acceptance and automated validation are recorded in the specification report.
+Real local fixture acceptance passed: good → Passed, broken → Regression at the
+restart check, repeated broken → Still failing. Reports and pinned baselines stayed
+unchanged after API restart and all runs appeared in history. The fixture used an
+isolated test workspace, not the existing demonstration workspace. 59 Rust, 127 web
+and 181 worker tests passed across the consolidated pass and focused retries; static
+checks, generated drift and builds passed. Full authenticated rendered acceptance is
+still pending sign-in after the dev restart. Audited triage, release-baseline
+management, retention and fleet work remain planned.
+
 ## Save without human reviews (2026-09-20)
 
 Implemented Edit → Save → Run for cases, suites and release plans, including selected
@@ -81,7 +103,7 @@ These checks use no emulator or model calls and do not prove real-device qualifi
 Implementation report and remaining gates are in the owning
 [phase 07 specification](implementation/07-pilot-readiness-and-scale.md#07a-implementation-notes--2026-09-15).
 Temporary GAN specifications and evaluation files were removed after applying the review.
-The Phase07 plan remains active because 07B–D have not been implemented.
+The Phase07 plan remains active; the later 07B–D operational deliverables remain open.
 
 ## Full local development supervisor (2026-09-15)
 
@@ -195,7 +217,7 @@ hosted token permissions or repeat the unrelated application suites.
 | Spec 04 worker HTTP leases/runs/evidence reports                           | Planned; local fake protocol is not a scheduler                                                      |
 | Spec 05 versioned case/suite/plan editor and approvals                     | Planned                                                                                              |
 | Spec 06 requirements-to-tests generation                                   | Planned                                                                                              |
-| Spec 07 regression, retention, production deployment and pilot reliability | Planned                                                                                              |
+| Spec 07 regression, retention, production deployment and pilot reliability | First regression/history delivery implemented locally; later operational phases planned                                                                                              |
 | Paid pilot/customer validation                                             | No accepted customer app, signed pilot or demonstrated willingness to pay recorded                   |
 
 Doppler project creation does not provision database/model credentials, deploy a service,

@@ -511,3 +511,87 @@ it.each(['failed refresh', 'submitted elsewhere'])(
     ).toBeInTheDocument()
   },
 )
+
+it('locates saved setup errors in collapsed checks and focuses the exact field', async () => {
+  const draft: LibraryDraftResponse = {
+    ...libraryDraft,
+    definition: {
+      kind: 'case',
+      content: {
+        ...libraryCase,
+        requirement: '',
+        checks: [
+          { ...libraryCase.checks[0]!, id: 'first', checkpoint_id: 'created' },
+          {
+            ...libraryCase.checks[0]!,
+            id: 'broken',
+            resource_id: '',
+            ready_resource_id: '',
+            description: '',
+          },
+        ],
+      },
+    },
+    issues: [
+      {
+        code: 'required',
+        field: 'checks.resource_id',
+        item_id: 'broken',
+        message: 'Set evidence targets belonging to this Android package',
+      },
+      {
+        code: 'required',
+        field: 'checks.description',
+        item_id: 'broken',
+        message: 'Describe the expected result',
+      },
+      {
+        code: 'required',
+        field: 'requirement',
+        item_id: null,
+        message: 'Describe the intended behavior',
+      },
+    ],
+  }
+  const requests = fixtureFetch(async (request) => {
+    if (new URL(request.url).pathname.endsWith('/draft')) return Response.json(draft)
+  })
+  vi.stubGlobal('fetch', requests)
+  show(`/tests/${appId}/${entryId}`)
+  const jump = await screen.findByRole('button', { name: /Action 2 → Check 2 → Control/ })
+  expect(screen.getByRole('button', { name: 'Edit action 2' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  )
+  await userEvent.click(jump)
+  await waitFor(() => expect(screen.getByLabelText('Check 2 control')).toHaveFocus())
+  expect(screen.getByLabelText('Check 2 control')).toHaveAttribute('aria-invalid', 'true')
+  expect(screen.getByLabelText('Check 2 control')).toHaveAccessibleDescription(
+    /Pick the control to check on the phone/,
+  )
+  expect(screen.getByRole('button', { name: 'Show checks for action 2' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  )
+  // Repeated jumps must reopen disclosures the user closed in between.
+  await userEvent.click(screen.getByRole('button', { name: 'Edit action 2' }))
+  await userEvent.click(jump)
+  await waitFor(() => expect(screen.getByLabelText('Check 2 control')).toHaveFocus())
+  await userEvent.type(screen.getByLabelText('Check 2 description'), 'Saved task is visible')
+  expect(screen.queryByRole('button', { name: /Check 2 → Description/ })).not.toBeInTheDocument()
+  expect(jump).toBeInTheDocument()
+  expect(screen.getByText('Save to recheck the fields you changed.')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: /Requirement and setup —/ }))
+  await waitFor(() =>
+    expect(screen.getByLabelText('Expected behavior / requirement')).toHaveFocus(),
+  )
+  expect(screen.getByLabelText('Expected behavior / requirement')).toHaveAttribute(
+    'aria-invalid',
+    'true',
+  )
+  expect(
+    requests.mock.calls.some(
+      ([r]) => r.method === 'POST' && new URL(r.url).pathname.endsWith('/phone-sessions'),
+    ),
+  ).toBe(false)
+})

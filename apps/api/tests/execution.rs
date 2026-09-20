@@ -656,3 +656,199 @@ async fn clean_start_route_is_fenced_and_recovery_keeps_original_evidence() {
         assert_eq!(a.original_cleanup,Some(cleanup));assert_eq!(a.recovery_events.len(),1);assert_eq!(a.preflight,Some(request.receipt));assert_ne!(a.outcome,Some(Outcome::Passed));
     }).await;
 }
+
+#[tokio::test]
+async fn saved_case_routes_pin_inputs_retry_once_and_use_protocol_four() {
+    use mobile_qa_contracts::regression::*;
+    let _guard = DATABASE_BOOT.lock().await;
+    request::<App, _, _>(|server, ctx| async move {
+        let owner = login(&server, &ctx).await;
+        let foreign = login(&server, &ctx).await;
+        let (app, build, plan, worker, _) = prepared(&server, &ctx, &owner).await;
+        let preview = runs::preview(&ctx.db, app, build, Some(plan))
+            .await
+            .unwrap();
+        let m = preview.manifest.unwrap();
+        let body = CaseRunRequest {
+            case_version_id: m.cases[0].definition_id,
+            build_id: build,
+            profile_id: worker.profile_id,
+            environment_revision: 1,
+            baseline_run_id: None,
+        };
+        let path = format!("/api/apps/{app}/case-runs");
+        error(&server.post(&path).json(&body).await, 401);
+        assert!(!foreign
+            .write(server.post(&path))
+            .add_header("idempotency-key", "case-run")
+            .json(&body)
+            .await
+            .status_code()
+            .is_success());
+        owner
+            .write(server.post(&format!("{path}/preview")))
+            .json(&body)
+            .await
+            .assert_status_ok();
+        let response = owner
+            .write(server.post(&path))
+            .add_header("idempotency-key", "case-run")
+            .json(&body)
+            .await;
+        response.assert_status(axum::http::StatusCode::CREATED);
+        let first = response.json::<RunResponse>();
+        assert_eq!(
+            first.manifest.source,
+            Some(RunSource::SavedCaseV1 {
+                case_version_id: body.case_version_id
+            })
+        );
+        assert!(first.manifest.plan_version_id.is_none());
+        let retry = owner
+            .write(server.post(&path))
+            .add_header("idempotency-key", "case-run")
+            .json(&body)
+            .await;
+        retry.assert_status_ok();
+        assert_eq!(retry.json::<RunResponse>().id, first.id);
+        let mut changed = body.clone();
+        changed.environment_revision = 2;
+        error(
+            &owner
+                .write(server.post(&path))
+                .add_header("idempotency-key", "case-run")
+                .json(&changed)
+                .await,
+            409,
+        );
+        error(
+            &owner
+                .write(server.post(&path))
+                .add_header("idempotency-key", "stale")
+                .json(&changed)
+                .await,
+            409,
+        );
+        for version in [1, 2, 3] {
+            assert!(scheduler::claim(
+                &ctx,
+                &worker,
+                ClaimRequest {
+                    version,
+                    claim_id: Uuid::new_v4(),
+                    profile_id: worker.profile_id
+                }
+            )
+            .await
+            .unwrap()
+            .lease
+            .is_none());
+        }
+        let claim = ClaimRequest {
+            version: 4,
+            claim_id: Uuid::new_v4(),
+            profile_id: worker.profile_id,
+        };
+        assert_eq!(
+            scheduler::claim(&ctx, &worker, claim.clone())
+                .await
+                .unwrap()
+                .lease
+                .unwrap()
+                .run_id,
+            first.id
+        );
+        error(
+            &owner
+                .write(server.post(&path))
+                .add_header("idempotency-key", "active-baseline")
+                .json(&CaseRunRequest {
+                    baseline_run_id: Some(first.id),
+                    ..body.clone()
+                })
+                .await,
+            409,
+        );
+        let history = owner
+            .read(server.get(&format!("/api/apps/{app}/run-history")))
+            .await;
+        history.assert_status_ok();
+        let h = history.json::<RunHistory>();
+        assert_eq!(h.items.len(), 1);
+        assert_eq!(h.items[0].run.as_ref().unwrap().id, first.id);
+        assert!(!foreign
+            .read(server.get(&format!("/api/apps/{app}/run-history")))
+            .await
+            .status_code()
+            .is_success());
+        // A read does not finalize or mutate an unfinished comparison.
+        assert!(runs::detail(&ctx.db, first.id)
+            .await
+            .unwrap()
+            .comparison
+            .is_none());
+        runs::cancel(&ctx, owner.user, first.id).await.unwrap();
+    })
+    .await;
+}
+
+#[test]
+fn assertion_absence_requires_a_ready_unambiguous_screen() {
+    let TestDefinition::Case(c) = definition() else {
+        panic!()
+    };
+    let mut check = c.checks[0].clone();
+    check.method = CheckMethod::UiPropertyEqualsV1;
+    let xml=br#"<hierarchy><node package="ai.mobileqa.demo" resource-id="ai.mobileqa.demo:id/ready_marker" text="Ready"/></hierarchy>"#;
+    assert_eq!(
+        verification::observe(xml, &c.package, &check, "demo"),
+        Err("target_absent_on_ready_screen")
+    );
+    check.ready_resource_id = "ai.mobileqa.demo:id/other_screen".into();
+    assert_eq!(
+        verification::observe(xml, &c.package, &check, "demo"),
+        Err("screen_not_ready")
+    );
+}
+
+#[tokio::test]
+async fn comparison_finalization_is_durable_idempotent_and_baseline_is_pinned() {
+    use mobile_qa::services::{case_runs, run_comparisons};
+    use mobile_qa_contracts::regression::*;
+    let _guard = DATABASE_BOOT.lock().await;
+    request::<App,_,_>(|server,ctx|async move {
+        let owner=login(&server,&ctx).await;
+        let(app,build,plan,w,_)=prepared(&server,&ctx,&owner).await;
+        let original=runs::preview(&ctx.db,app,build,Some(plan)).await.unwrap().manifest.unwrap();
+        let input=CaseRunRequest{case_version_id:original.cases[0].definition_id,build_id:build,profile_id:w.profile_id,environment_revision:1,baseline_run_id:None};
+        let (base,_)=case_runs::create(&ctx,owner.user,app,"baseline",input.clone()).await.unwrap();
+        // Seed retained synthetic facts to isolate persistence/finalization from worker transport.
+        // Device/check publication and fencing are exercised by the route tests above.
+        async fn finish(ctx:&AppContext,run:&RunResponse,failed:bool) {
+            let mut fixture:RunResponse=serde_json::from_str(include_str!("fixtures/execution/comparison.json")).unwrap();
+            fixture.manifest.app_id=run.manifest.app_id;fixture.manifest.build_id=run.manifest.build_id;
+            fixture.manifest.cases[0].definition_id=run.manifest.cases[0].definition_id;
+            if failed {fixture.manifest.build_sha256="f".repeat(64);}
+            let attempt=&mut fixture.attempts[0];attempt.id=run.attempts[0].id;
+            let receipt=attempt.preflight.as_mut().unwrap();receipt.attempt_id=attempt.id;receipt.build_sha256=fixture.manifest.build_sha256.clone();
+            let artifact=Uuid::new_v4();attempt.checks[0].artifact_ids=vec![artifact];
+            if failed {attempt.checks[0].outcome=Outcome::Failed;attempt.checks[0].observed=Some("".into());}
+            exec(&ctx.db,"UPDATE execution_runs SET manifest=$2 WHERE id=$1",vec![run.id.into(),json(&fixture.manifest).unwrap().into()]).await.unwrap();
+            exec(&ctx.db,"UPDATE execution_attempts SET state='finished',outcome=$2,cleanup='verified_clean',checks=$3,cleanup_receipt=$4 WHERE id=$1",vec![attempt.id.into(),(if failed {"failed"}else{"passed"}).into(),json(&attempt.checks).unwrap().into(),json(&attempt.original_cleanup).unwrap().into()]).await.unwrap();
+            exec(&ctx.db,"INSERT INTO execution_preflight_receipts(attempt_id,generation,digest,payload) VALUES($1,1,'fixture',$2)",vec![attempt.id.into(),json(receipt).unwrap().into()]).await.unwrap();
+            exec(&ctx.db,"INSERT INTO execution_artifacts(id,attempt_id,checkpoint_id,name,mime,byte_size,sha256,state,storage_key,storage_backend) VALUES($1,$2,'created','created.xml','application/xml',1,'fixture','sealed',$3,'local')",vec![artifact.into(),attempt.id.into(),artifact.to_string().into()]).await.unwrap();
+        }
+        finish(&ctx,&base,false).await;
+        let (current,_)=case_runs::create(&ctx,owner.user,app,"current",CaseRunRequest{baseline_run_id:Some(base.id),..input}).await.unwrap();
+        finish(&ctx,&current,true).await;
+        assert!(runs::detail(&ctx.db,current.id).await.unwrap().comparison.is_none());
+        run_comparisons::finalize_pending(&ctx).await.unwrap();
+        let snapshot=runs::detail(&ctx.db,current.id).await.unwrap();
+        assert_eq!(snapshot.comparison.as_ref().unwrap().cases[0].kind,ComparisonKind::Regression);
+        assert_eq!(snapshot.baseline_run_id,Some(base.id));
+        run_comparisons::finalize_pending(&ctx).await.unwrap();
+        let reloaded=owner.read(server.get(&format!("/api/runs/{}",current.id))).await.json::<RunResponse>();
+        assert_eq!(reloaded.comparison,snapshot.comparison);
+        assert_eq!(reloaded.baseline_run_id,snapshot.baseline_run_id);
+    }).await;
+}

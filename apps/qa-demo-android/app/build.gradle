@@ -15,7 +15,18 @@ android {
     flavorDimensions += 'persistence'
     productFlavors {
         good { dimension 'persistence'; buildConfigField 'boolean', 'PERSIST', 'true' }
-        broken { dimension 'persistence'; buildConfigField 'boolean', 'PERSIST', 'false' }
+        broken {
+            dimension 'persistence'
+            versionNameSuffix '-broken'
+            buildConfigField 'boolean', 'PERSIST', 'false'
+        }
+        // Local-only regression fixture for the same direct persistence test.
+        sampleBroken {
+            dimension 'persistence'
+            versionNameSuffix '-sample-broken'
+            buildConfigField 'boolean', 'PERSIST', 'false'
+            buildConfigField 'boolean', 'REQUIRE_SESSION', 'false'
+        }
         sample {
             dimension 'persistence'
             versionNameSuffix '-sample'

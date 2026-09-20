@@ -325,6 +325,7 @@ async fn assert_session_protocol(protocol_version: u32) {
         publish2().json(&status).await.assert_status_ok();
         let sequence:AutomationSequence=serde_json::from_value(serde_json::json!({"actions":[{"id":"back","checkpoint_id":"back","kind":"direct","instruction":"","command":{"operation":"back"}}],"checks":[]})).unwrap();
         let command = PhoneCommandRequest {
+            purpose:Some(mobile_qa_contracts::regression::CommandPurpose::Trial),
             id: Uuid::new_v4(),
             expected_revision: 0,
             frame_id: status.frame.as_ref().map(|f| f.id),

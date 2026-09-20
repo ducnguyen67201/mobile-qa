@@ -72,7 +72,7 @@ pub async fn options(ctx: &AppContext, user: Uuid, app: Uuid) -> ApiResult<Phone
     let profiles=rows(&ctx.db,"SELECT p.payload FROM execution_profiles p WHERE p.app_id=$1 AND EXISTS(SELECT 1 FROM execution_workers w WHERE w.profile_id=p.id AND w.revoked=false)",vec![app.into()]).await?.iter().map(|r|decode::<ExecutionProfile>(field(r,"payload")?)).collect::<ApiResult<Vec<_>>>()?.into_iter().filter(|p|p.qualified&&p.validate().is_ok()&&matches!(p.driver,Driver::Minitap|Driver::Direct)&&p.package==a.android_package).collect::<Vec<_>>();
     let active_session=rows(&ctx.db,"SELECT id FROM phone_sessions WHERE app_id=$1 AND creator_id=$2 AND payload->>'state' NOT IN ('closed','quarantined') ORDER BY created_at DESC LIMIT 1",vec![app.into(),user.into()]).await?.first().map(|r|field(r,"id")).transpose()?;
     let mut blockers = vec![];
-    let env = one(&ctx.db,"SELECT revision,account_secret_reference_id,reset_secret_reference_id FROM environments WHERE app_id=$1",vec![app.into()]).await?;
+    let env = one(&ctx.db,"SELECT account_secret_reference_id,reset_secret_reference_id FROM environments WHERE app_id=$1",vec![app.into()]).await?;
     if field::<Option<Uuid>>(&env, "account_secret_reference_id")?.is_some()
         || field::<Option<Uuid>>(&env, "reset_secret_reference_id")?.is_some()
     {
@@ -88,7 +88,6 @@ pub async fn options(ctx: &AppContext, user: Uuid, app: Uuid) -> ApiResult<Phone
         );
     }
     Ok(PhoneOptions {
-        environment_revision: field(&env, "revision")?,
         builds,
         profiles,
         active_session,
@@ -244,7 +243,6 @@ pub async fn task(
         None
     };
     let task = PhoneTask {
-        purpose: Some(input.purpose),
         sequence: None,
         steps: vec![],
         generation: None,
@@ -520,7 +518,6 @@ pub async fn update(
             }
             super::authoring_validation::task_update(&old, &task, &s.profile.package)?;
             task.sequence = old.sequence;
-            task.purpose = old.purpose;
             task.generation = old.generation;
             task.goal = old.goal;
             task.control = old.control;

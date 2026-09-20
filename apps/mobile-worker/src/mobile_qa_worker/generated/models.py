@@ -244,30 +244,6 @@ class LeaseStatusResponse(BaseModel):
     state: JobState
 
 
-class ManifestSource1(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    content_hash: str
-    kind: Literal['release_plan']
-    plan_version_id: UUID
-    version: Annotated[int, Field(ge=0, le=255)]
-
-
-class ManifestSource2(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    case_version_id: UUID
-    content_hash: str
-    kind: Literal['saved_case']
-    version: Annotated[int, Field(ge=0, le=255)]
-
-
-class ManifestSource(RootModel[ManifestSource1 | ManifestSource2]):
-    root: ManifestSource1 | ManifestSource2
-
-
 class ModelUsage(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -289,6 +265,11 @@ class NavigationRequest(BaseModel):
     package: str
     profile_path: str
     serial: str
+
+
+class ObservationKind(StrEnum):
+    present_value = 'present_value'
+    absent = 'absent'
 
 
 class Outcome(StrEnum):
@@ -348,12 +329,6 @@ class PhoneState(StrEnum):
     stopping = 'stopping'
     closed = 'closed'
     quarantined = 'quarantined'
-
-
-class PhoneTaskPurpose(StrEnum):
-    manual_control = 'manual_control'
-    trial = 'trial'
-    exploration = 'exploration'
 
 
 class PhoneTaskState(StrEnum):
@@ -467,6 +442,26 @@ class RunArtifact(BaseModel):
     state: EvidenceState
 
 
+class RunSource1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    case_version_id: UUID
+    kind: Literal['saved_case_v1']
+
+
+class RunSource2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['release_plan_v1']
+    plan_version_id: UUID
+
+
+class RunSource(RootModel[RunSource1 | RunSource2]):
+    root: RunSource1 | RunSource2
+
+
 class Scenario1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -538,6 +533,7 @@ class CheckResult(BaseModel):
     artifact_ids: list[UUID]
     check_id: str
     expected: str
+    observation_kind: ObservationKind | None = None
     observed: str | None = None
     outcome: Outcome
     reason: str
@@ -1008,19 +1004,9 @@ class RunManifest(BaseModel):
     environment_revision: int
     exclusions: list[str]
     plan_hash: str | None = None
-    plan_version_id: Annotated[
-        UUID | None,
-        Field(
-            description='Legacy release-plan fields remain optional so historical JSON and hashes round-trip.'
-        ),
-    ] = None
+    plan_version_id: UUID | None = None
     profile: ExecutionProfile
-    source: Annotated[
-        ManifestSource | None,
-        Field(
-            description='Absent only for manifests persisted before source versioning was introduced.'
-        ),
-    ] = None
+    source: RunSource | None = None
 
 
 class AttemptResponse(BaseModel):
@@ -1100,12 +1086,6 @@ class PhoneTask(BaseModel):
     id: UUID
     message: str
     progress: GenerationProgress | None = None
-    purpose: Annotated[
-        PhoneTaskPurpose | None,
-        Field(
-            description='Historical tasks predate explicit purpose and remain legacy session activity.'
-        ),
-    ] = None
     sequence: AutomationSequence | None = None
     state: PhoneTaskState
     steps: Annotated[list[StepReceipt], Field(validate_default=True)] = []

@@ -1,5 +1,5 @@
 /** The editor keeps generated structured actions intact through save and run. */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Alert,
   Box,
@@ -20,6 +20,7 @@ import type {
   DirectCommand,
   DirectTarget,
   ExpectedCheck,
+  LibraryIssue,
   TestAction,
 } from '@/api/generated/types.gen'
 import {
@@ -35,6 +36,12 @@ import {
   ListChecks,
   ChevronDown,
 } from 'lucide-react'
+import {
+  caseIssueMessage,
+  focusIssueField,
+  issueFieldId,
+  type IssueFocus,
+} from '@/components/test-library/case-issues'
 import { moveItem, Ordering } from '@/components/test-library/definition-fields'
 
 export function newTaskStep(
@@ -88,6 +95,9 @@ export function TaskSteps({
   pickingId,
   onPick,
   disabled = false,
+  issues = [],
+  issuePrefix = 'steps',
+  issueFocus,
 }: {
   value: AutomationSequence
   onChange: (value: AutomationSequence) => void
@@ -95,6 +105,9 @@ export function TaskSteps({
   pickingId?: string | null
   onPick?: (id: string) => void
   disabled?: boolean
+  issues?: LibraryIssue[]
+  issuePrefix?: string
+  issueFocus?: IssueFocus | null
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(value.actions[0]?.id ?? null)
   const activeId =
@@ -104,6 +117,28 @@ export function TaskSteps({
         ? expandedId
         : value.actions[0]?.id
   const [checksId, setChecksId] = useState<string | null>(null)
+  const fieldProps = (field: string, itemId?: string) => {
+    const issue = issues.find((i) => i.field === field && (i.item_id ?? undefined) === itemId)
+    return {
+      id: issueFieldId(issuePrefix, field, itemId),
+      error: issue ? caseIssueMessage(issue) : undefined,
+    }
+  }
+  useEffect(() => {
+    if (!issueFocus) return
+    const { issue } = issueFocus
+    if (!issue.field.startsWith('actions') && !issue.field.startsWith('checks')) return
+    const check = value.checks.find((c) => c.id === issue.item_id)
+    const action = value.actions.find((a) =>
+      check ? a.checkpoint_id === check.checkpoint_id : a.id === issue.item_id,
+    )
+    if (action) {
+      setExpandedId(action.id)
+      if (check) setChecksId(action.id)
+    }
+    return focusIssueField(issueFieldId(issuePrefix, issue.field, issue.item_id))
+    // A new request opens the disclosure; ordinary edits must not keep reopening it.
+  }, [issueFocus, issuePrefix])
   const update = (id: string, update: Partial<TestAction>) =>
     onChange({
       ...value,
@@ -111,13 +146,16 @@ export function TaskSteps({
     })
   const check = (id: string, update: Partial<ExpectedCheck>) =>
     onChange({ ...value, checks: value.checks.map((c) => (c.id === id ? { ...c, ...update } : c)) })
-  const targetPicker = (id: string) => (
+  const targetPicker = (id: string, label?: string) => (
     <ActionIcon
       size="sm"
       title={pickingId === id ? 'Cancel picking' : 'Pick on phone'}
       variant="light"
       disabled={disabled || !canPick}
-      aria-label={`Pick target for ${value.actions.some((a) => a.id === id) ? `action ${value.actions.findIndex((a) => a.id === id) + 1}` : `check ${value.checks.findIndex((c) => c.id === id) + 1}`} on phone`}
+      aria-label={
+        label ??
+        `Pick target for ${value.actions.some((a) => a.id === id) ? `action ${value.actions.findIndex((a) => a.id === id) + 1}` : `check ${value.checks.findIndex((c) => c.id === id) + 1}`} on phone`
+      }
       aria-pressed={pickingId === id}
       onClick={() => onPick?.(id)}
     >
@@ -127,7 +165,13 @@ export function TaskSteps({
   const renderCheck = (c: ExpectedCheck) => {
     const index = value.checks.findIndex((item) => item.id === c.id)
     return (
-      <Box key={c.id} p="sm" style={{ borderLeft: '3px solid var(--mantine-color-green-3)' }}>
+      <Box
+        key={c.id}
+        p="sm"
+        style={{
+          borderLeft: `3px solid var(--mantine-color-${issues.some((i) => i.item_id === c.id) ? 'red' : 'green'}-3)`,
+        }}
+      >
         <Stack gap="sm">
           <>
             {!value.actions.some((a) => a.checkpoint_id === c.checkpoint_id) && (
@@ -150,6 +194,7 @@ export function TaskSteps({
           </Group>
           <TextInput
             label={`Check ${index + 1} description`}
+            {...fieldProps('checks.description', c.id)}
             value={c.description}
             disabled={disabled}
             onChange={(e) => check(c.id, { description: e.currentTarget.value })}
@@ -157,6 +202,7 @@ export function TaskSteps({
           {!value.actions.some((a) => a.checkpoint_id === c.checkpoint_id) && (
             <Select
               label={`Check ${index + 1} after step`}
+              {...fieldProps('checks.checkpoint_id', c.id)}
               disabled={disabled}
               value={c.checkpoint_id}
               data={value.actions.map((a, i) => ({
@@ -169,6 +215,7 @@ export function TaskSteps({
           <Group align="flex-end">
             <TextInput
               label={`Check ${index + 1} control`}
+              {...fieldProps('checks.resource_id', c.id)}
               value={c.resource_id}
               readOnly
               style={{ flex: 1 }}
@@ -196,6 +243,24 @@ export function TaskSteps({
             disabled={disabled}
             onChange={(e) => check(c.id, { expected: e.currentTarget.value })}
           />
+          <details>
+            <summary>Screen readiness</summary>
+            <Text size="xs" c="dimmed" my="xs">
+              Pick a control that stays visible even when the expected result is missing.
+            </Text>
+            <Group align="flex-end">
+              <TextInput
+                label={`Check ${index + 1} screen readiness control`}
+                value={c.ready_resource_id}
+                readOnly
+                style={{ flex: 1 }}
+              />
+              {targetPicker(
+                `ready:${c.id}`,
+                `Pick screen readiness for check ${index + 1} on phone`,
+              )}
+            </Group>
+          </details>
           <Checkbox
             label="Required result"
             checked={c.required}
@@ -211,6 +276,14 @@ export function TaskSteps({
       <Text size="sm" c="dimmed">
         Add actions in order. Checks are optional when trying your actions.
       </Text>
+      {['actions', 'checks'].map((field) => {
+        const error = fieldProps(field).error
+        return error ? (
+          <Alert key={field} color="red" id={issueFieldId(issuePrefix, field)} tabIndex={-1}>
+            {error}
+          </Alert>
+        ) : null
+      })}
       {value.actions.map((a, index) => {
         const operation =
           a.kind === 'navigate'
@@ -220,6 +293,11 @@ export function TaskSteps({
               : a.kind === 'checkpoint'
                 ? 'checkpoint'
                 : (a.command?.operation ?? 'tap')
+        const actionIssues = issues.filter(
+          (issue) =>
+            issue.item_id === a.id ||
+            value.checks.some((c) => c.id === issue.item_id && c.checkpoint_id === a.checkpoint_id),
+        )
         const target = commandTarget(a.command)
         const Icon = {
           tap: MousePointer2,
@@ -233,7 +311,13 @@ export function TaskSteps({
         }[operation]
 
         return (
-          <Card key={a.id} withBorder padding="xs" radius="sm">
+          <Card
+            key={a.id}
+            withBorder
+            padding="xs"
+            radius="sm"
+            style={actionIssues.length ? { borderColor: 'var(--mantine-color-red-5)' } : undefined}
+          >
             <Stack gap={4}>
               <Group gap={6} wrap="nowrap">
                 <ActionIcon
@@ -308,6 +392,19 @@ export function TaskSteps({
                       })
                   }}
                 />
+                {actionIssues.length > 0 && (
+                  <Button
+                    variant="subtle"
+                    color="red"
+                    size="compact-xs"
+                    onClick={() => {
+                      setExpandedId(a.id)
+                      setChecksId(a.id)
+                    }}
+                  >
+                    Needs setup
+                  </Button>
+                )}
                 <Button
                   variant="subtle"
                   size="xs"
@@ -414,6 +511,7 @@ export function TaskSteps({
                     {a.kind === 'navigate' && (
                       <Textarea
                         aria-label={`Action ${index + 1} AI instruction`}
+                        {...fieldProps('actions.instruction', a.id)}
                         placeholder="Describe what AI should do"
                         title="Uses AI model calls"
                         size="xs"

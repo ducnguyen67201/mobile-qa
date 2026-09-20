@@ -14,6 +14,7 @@ async fn registered_handler_agrees_with_openapi_and_database() {
     let expected: std::collections::BTreeSet<_> = browser::OPERATIONS
         .iter()
         .chain(mobile_qa_contracts::execution_api::OPERATIONS)
+        .chain(mobile_qa_contracts::regression_api::OPERATIONS)
         .chain(mobile_qa_contracts::test_library_api::OPERATIONS)
         .chain(mobile_qa_contracts::task_sessions_api::OPERATIONS)
         .chain(mobile_qa_contracts::automation_api::OPERATIONS)
@@ -56,7 +57,9 @@ async fn registered_handler_agrees_with_openapi_and_database() {
         unknown.assert_status_not_found();
         assert_eq!(unknown.json::<ApiError>().code, "not_found");
         let row = ctx.db.query_one_raw(Statement::from_string(DbBackend::Postgres, "SELECT current_database() AS name, to_regclass('seaql_migrations')::text AS migrations")).await.unwrap().unwrap();
-        assert_eq!(row.try_get::<String>("", "name").unwrap(), "mobile_qa_test");
+        // Worktrees can select a separate test database without resetting a sibling's data.
+        let database_url = url::Url::parse(&ctx.config.database.uri).unwrap();
+        assert_eq!(row.try_get::<String>("", "name").unwrap(), database_url.path().trim_start_matches('/'));
         assert_eq!(row.try_get::<String>("", "migrations").unwrap(), "seaql_migrations");
     }).await;
 }

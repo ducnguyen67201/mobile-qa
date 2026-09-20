@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useId, useState } from 'react'
 import { Alert, Badge, Button, Card, Group, Modal, Stack, Table, Text, Title } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useBlocker } from 'react-router'
@@ -12,15 +12,22 @@ import {
 import type {
   LibraryDraftDefinition,
   LibraryDraftResponse,
+  LibraryIssue,
   SaveLibraryDraftRequest,
 } from '@/api/generated/types.gen'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { useMounted } from '@/hooks/use-mounted'
 import { ErrorNotice, LoadingPanel } from '@/components/app/feedback'
+import { SavedCaseRun } from '@/components/runs/saved-case-run'
 import { PhoneWorkspace } from '@/components/task-session/phone-workspace'
 import { PlanFields, SuiteFields } from './membership-fields'
 import { Coverage, LibraryIssues } from './library-presentation'
-import { SavedCaseRunControls } from './saved-case-run-controls'
+import {
+  caseIssueLocation,
+  caseIssueMessage,
+  currentCaseIssues,
+  type IssueFocus,
+} from './case-issues'
 
 /** Compare validated form values as individual fields, never use raw JSON as the editor. */
 export function changedFields(local: LibraryDraftDefinition, remote: LibraryDraftDefinition) {
@@ -55,6 +62,8 @@ export function DraftEditor({
   const entryId = initial.entry.id
   const client = useQueryClient()
   const mounted = useMounted()
+  const issuePrefix = useId()
+  const [issueFocus, setIssueFocus] = useState<IssueFocus | null>(null)
   const [saved, setSaved] = useState(initial)
   const [definition, setDefinition] = useState(initial.definition)
   const [incoming, setIncoming] = useState<LibraryDraftResponse | null>(null)
@@ -86,25 +95,27 @@ export function DraftEditor({
       invalidate()
     },
   })
-  const saveRequest = (): SaveLibraryDraftRequest =>
-    save.isError &&
-    save.variables &&
-    save.variables.expected_revision === saved.entry.revision &&
-    JSON.stringify(save.variables.definition) === JSON.stringify(definition)
-      ? save.variables
-      : {
-          mutation_id: crypto.randomUUID(),
-          expected_revision: saved.entry.revision,
-          definition,
-        }
-  const saveAndGetVersion = async () => {
-    const response = await save.mutateAsync(saveRequest())
-    if (!response.saved_version_id) {
-      throw new Error('Complete the required test fields before running')
-    }
-    return response.saved_version_id
-  }
   const details = libraryErrorDetails(save.error)
+  const savedIssues =
+    saved.definition.kind === 'case' && definition.kind === 'case'
+      ? currentCaseIssues(saved.issues, saved.definition.content, definition.content)
+      : saved.issues
+  const failedDefinition = save.variables?.definition
+  const failedIssues =
+    details?.kind === 'validation'
+      ? failedDefinition?.kind === 'case' && definition.kind === 'case'
+        ? currentCaseIssues(details.issues, failedDefinition.content, definition.content)
+        : details.issues
+      : []
+  const issuePresentation =
+    definition.kind === 'case'
+      ? {
+          locate: (issue: LibraryIssue) => caseIssueLocation(definition.content, issue),
+          message: caseIssueMessage,
+          onSelect: (issue: LibraryIssue) =>
+            setIssueFocus((previous) => ({ issue, request: (previous?.request ?? 0) + 1 })),
+        }
+      : {}
   const stale = details?.kind === 'stale_revision'
   const busy = save.isPending || loadingCurrent
   const canEdit = available && initial.entry.capabilities.can_edit && !initial.entry.archived_at
@@ -143,7 +154,20 @@ export function DraftEditor({
               variant="default"
               disabled={!canEdit || busy || stale}
               loading={save.isPending}
-              onClick={() => save.mutate(saveRequest())}
+              onClick={() =>
+                save.mutate(
+                  save.isError &&
+                    save.variables &&
+                    save.variables.expected_revision === saved.entry.revision &&
+                    JSON.stringify(save.variables.definition) === JSON.stringify(definition)
+                    ? save.variables
+                    : {
+                        mutation_id: crypto.randomUUID(),
+                        expected_revision: saved.entry.revision,
+                        definition,
+                      },
+                )
+              }
             >
               Save
             </Button>
@@ -161,8 +185,8 @@ export function DraftEditor({
       )}
       {dirty && (
         <Text size="sm" c="dimmed">
-          Unsaved changes. Try actions uses the preview session; Save & run creates an immutable
-          version and durable run.
+          Unsaved changes. Save & run records an exact version before executing. Try actions is an
+          authoring trial.
         </Text>
       )}
       {stale ? (
@@ -201,9 +225,14 @@ export function DraftEditor({
       )}
       {loadError != null && <ErrorNotice error={loadError} retry={() => void reviewCurrent()} />}
       {details?.kind === 'validation' && (
-        <LibraryIssues issues={details.issues} title="Could not save" />
+        <LibraryIssues issues={failedIssues} title="Could not save" {...issuePresentation} />
       )}
-      <LibraryIssues issues={saved.issues} />
+      <LibraryIssues issues={savedIssues} {...issuePresentation} />
+      {dirty && (saved.issues.length > 0 || failedIssues.length > 0) && (
+        <Text size="sm" c="dimmed">
+          Save to recheck the fields you changed.
+        </Text>
+      )}
       {options.isError && (
         <ErrorNotice error={options.error} retry={() => void options.refetch()} />
       )}
@@ -215,6 +244,30 @@ export function DraftEditor({
           <PhoneWorkspace
             appId={appId}
             autoOpen={false}
+            runControl={
+              <SavedCaseRun
+                appId={appId}
+                versionId={saved.saved_version_id}
+                dirty={dirty}
+                save={() =>
+                  save.mutateAsync(
+                    save.isError &&
+                      save.variables &&
+                      save.variables.expected_revision === saved.entry.revision &&
+                      JSON.stringify(save.variables.definition) === JSON.stringify(definition)
+                      ? save.variables
+                      : {
+                          mutation_id: crypto.randomUUID(),
+                          expected_revision: saved.entry.revision,
+                          definition,
+                        },
+                  )
+                }
+              />
+            }
+            issues={[...savedIssues, ...failedIssues]}
+            issuePrefix={issuePrefix}
+            issueFocus={issueFocus}
             disabled={!canEdit || busy}
             value={definition.content}
             onChange={(content) => setDefinition({ kind: 'case', content })}
@@ -238,15 +291,6 @@ export function DraftEditor({
           ))
         )}
       </fieldset>
-      {definition.kind === 'case' && (
-        <SavedCaseRunControls
-          appId={appId}
-          savedVersionId={saved.saved_version_id}
-          dirty={dirty}
-          disabled={!canEdit || busy}
-          saveAndGetVersion={saveAndGetVersion}
-        />
-      )}
       {definition.kind !== 'case' && <Coverage value={saved.coverage} saved={!dirty} />}
       {!dirty && renderSaved?.(saved)}
       <Modal

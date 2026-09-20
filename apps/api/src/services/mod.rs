@@ -12,8 +12,6 @@ pub mod execution_store;
 
 pub mod test_definitions;
 
-pub mod run_comparison;
-pub mod run_history;
 pub mod runs;
 
 pub mod scheduler;
@@ -39,3 +37,7 @@ pub mod execution_preflight;
 pub mod execution_readiness;
 
 pub mod test_library_save;
+
+pub mod case_runs;
+pub mod run_comparisons;
+pub mod run_history;

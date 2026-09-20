@@ -25,13 +25,6 @@ pub enum PhoneTaskState {
     Failed,
     Stopped,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum PhoneTaskPurpose {
-    ManualControl,
-    Trial,
-    Exploration,
-}
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PhoneControl {
@@ -75,14 +68,10 @@ pub struct PhoneTaskRequest {
     pub id: Uuid,
     pub goal: String,
     pub selection: Option<PhoneSelection>,
-    pub purpose: PhoneTaskPurpose,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PhoneTask {
-    /// Historical tasks predate explicit purpose and remain legacy session activity.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub purpose: Option<PhoneTaskPurpose>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sequence: Option<crate::automation::AutomationSequence>,
     #[serde(default)]
@@ -124,7 +113,6 @@ pub struct PhoneBuildChoice {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PhoneOptions {
-    pub environment_revision: i32,
     pub builds: Vec<PhoneBuildChoice>,
     pub profiles: Vec<ExecutionProfile>,
     pub active_session: Option<Uuid>,

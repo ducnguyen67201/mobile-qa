@@ -1,3 +1,4 @@
+import { RunResult } from '@/components/runs/run-result'
 import { actionLabel } from '@/lib/action-label'
 import {
   Alert,
@@ -16,7 +17,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'react-router'
 import { appQuery } from '@/api/setup'
-import { cancelRun, runComparisonQuery, runQuery } from '@/api/runs'
+import { cancelRun, runQuery } from '@/api/runs'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { ErrorNotice, LoadingPanel, PageHeading } from '@/components/app/feedback'
 import { AttemptReadiness } from '@/components/app/attempt-readiness'
@@ -25,11 +26,6 @@ export function RunDetail() {
   const { workspaceId = '' } = useWorkspace()
   const client = useQueryClient()
   const run = useQuery(runQuery(workspaceId, id))
-  const comparison = useQuery(runComparisonQuery(workspaceId, id, run.data?.state === 'finished'))
-  const baseline = useQuery({
-    ...runQuery(workspaceId, run.data?.baseline_run_id ?? ''),
-    enabled: !!run.data?.baseline_run_id,
-  })
   const app = useQuery({ ...appQuery(run.data?.manifest.app_id ?? ''), enabled: !!run.data })
   const cancel = useMutation({
     mutationFn: () => cancelRun(id),
@@ -47,14 +43,11 @@ export function RunDetail() {
   const r = run.data
   return (
     <Stack>
-      <PageHeading
-        eyebrow={r.manifest.source?.kind === 'saved_case' ? 'Saved test run' : 'Release check'}
-        title={r.summary}
-        description={app.data.name}
-      />
+      <PageHeading eyebrow="Release check" title={r.summary} description={app.data.name} />
       {r.manifest.profile.driver === 'fake' && (
         <Alert color="yellow">Simulated execution. No real phone or model was used.</Alert>
       )}
+      <RunResult run={r} />
       <Group>
         <Badge>{r.state}</Badge>
         <Text>
@@ -82,71 +75,6 @@ export function RunDetail() {
       {cancel.isError && <ErrorNotice error={cancel.error} retry={() => cancel.mutate()} />}
       <Text size="sm">Build checksum</Text>
       <Code style={{ overflowWrap: 'anywhere' }}>{r.manifest.build_sha256}</Code>
-      {comparison.data && (
-        <Card withBorder>
-          <Stack gap="sm">
-            <Group justify="space-between">
-              <Title order={2} size="h4">
-                Comparison
-              </Title>
-              <Badge
-                color={
-                  comparison.data.label === 'regression' ||
-                  comparison.data.label === 'new_failure_same_build'
-                    ? 'red'
-                    : comparison.data.label === 'recovered'
-                      ? 'forest'
-                      : 'gray'
-                }
-              >
-                {comparison.data.label.replaceAll('_', ' ')}
-              </Badge>
-            </Group>
-            {comparison.data.reason && <Text size="sm">{comparison.data.reason}</Text>}
-            {baseline.data && (
-              <Group align="flex-start" grow>
-                <Stack gap={2}>
-                  <Text size="xs" c="dimmed">
-                    Baseline build
-                  </Text>
-                  <Code style={{ overflowWrap: 'anywhere' }}>
-                    {baseline.data.manifest.build_sha256}
-                  </Code>
-                </Stack>
-                <Stack gap={2}>
-                  <Text size="xs" c="dimmed">
-                    Current build
-                  </Text>
-                  <Code style={{ overflowWrap: 'anywhere' }}>{r.manifest.build_sha256}</Code>
-                </Stack>
-              </Group>
-            )}
-            {comparison.data.checks.map((check) => (
-              <Card key={check.check_id} bg="var(--mantine-color-gray-0)">
-                <Text fw={600}>{check.check_id}</Text>
-                <Text size="sm">Expected: {check.expected}</Text>
-                <Text size="sm">
-                  Baseline: {check.baseline_observed ?? 'Unknown'} · Current:{' '}
-                  {check.current_observed ?? 'Unknown'}
-                </Text>
-                {check.baseline_observed == null && (
-                  <Text size="xs" c="dimmed">
-                    Baseline reason: {check.baseline_reason || 'No observation was retained.'}
-                  </Text>
-                )}
-                {check.current_observed == null && (
-                  <Text size="xs" c="dimmed">
-                    Current reason: {check.current_reason || 'No observation was retained.'}
-                  </Text>
-                )}
-              </Card>
-            ))}
-          </Stack>
-        </Card>
-      )}
-      {comparison.isError && (
-        <ErrorNotice error={comparison.error} retry={() => void comparison.refetch()} />
-      )}
       {r.attempts.map((a) => (
         <Card key={a.id} withBorder>
           <Stack gap="sm">

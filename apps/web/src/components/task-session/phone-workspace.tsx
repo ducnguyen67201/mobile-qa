@@ -1,5 +1,5 @@
 /** Real device capture and structured commands share the case draft's state. */
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import {
   Accordion,
   Alert,
@@ -22,6 +22,7 @@ import { Link, useSearchParams } from 'react-router'
 import type {
   AutomationSequence,
   CaseDefinition,
+  LibraryIssue,
   DirectCommand,
   DirectTarget,
   PhoneCommandRequest,
@@ -43,6 +44,12 @@ import { BudgetFields } from '@/components/test-library/definition-fields'
 import { ResizableWorkspace } from './resizable-workspace'
 import { newTaskStep, sequenceReady, TaskSteps } from './task-steps'
 import classes from './phone-workspace.module.css'
+import {
+  caseIssueMessage,
+  focusIssueField,
+  issueFieldId,
+  type IssueFocus,
+} from '@/components/test-library/case-issues'
 
 export function PhoneWorkspace({
   appId,
@@ -50,13 +57,31 @@ export function PhoneWorkspace({
   value,
   onChange,
   disabled = false,
+  issues = [],
+  issuePrefix = 'phone',
+  issueFocus,
+  runControl,
 }: {
   appId: string
+  runControl?: ReactNode
   autoOpen?: boolean
   value?: CaseDefinition
   onChange?: (v: CaseDefinition) => void
   disabled?: boolean
+  issues?: LibraryIssue[]
+  issuePrefix?: string
+  issueFocus?: IssueFocus | null
 }) {
+  const [detailsOpen, setDetailsOpen] = useState<string | null>(null)
+  const fieldError = (field: string) => {
+    const issue = issues.find((i) => i.field === field && !i.item_id)
+    return issue ? caseIssueMessage(issue) : undefined
+  }
+  useEffect(() => {
+    if (!issueFocus || !['title', 'requirement'].includes(issueFocus.issue.field)) return
+    if (issueFocus.issue.field === 'requirement') setDetailsOpen('details')
+    return focusIssueField(issueFieldId(issuePrefix, issueFocus.issue.field))
+  }, [issueFocus, issuePrefix])
   const { href } = useWorkspace()
   const [params] = useSearchParams()
   const client = useQueryClient()
@@ -116,6 +141,12 @@ export function PhoneWorkspace({
   const phone = useQuery(phoneQuery(id))
   const s = phone.data
   const frame = s?.frame
+  const disconnected = s?.state === 'closed'
+  const previewMessage = disconnected
+    ? reopen.isPending
+      ? 'Reconnecting…'
+      : 'Phone disconnected. Reconnect to continue testing.'
+    : (s?.message ?? 'Connect the phone to pick controls or try your test.')
   const activeExploration = s?.tasks.find(
     (task) => task.generation && ['queued', 'acting'].includes(task.state),
   )
@@ -175,7 +206,7 @@ export function PhoneWorkspace({
       frame_id: manual ? (frame?.id ?? null) : null,
       title: manual ? 'Phone interaction' : value?.title || title,
       sequence: next,
-      purpose: manual ? 'manual_control' : 'trial',
+      purpose: manual ? 'manual' : 'trial',
     })
   }
   const targetFor = (control: PhoneControl): DirectTarget | undefined =>
@@ -211,9 +242,19 @@ export function PhoneWorkspace({
       setSequence({
         ...sequence,
         checks: sequence.checks.map((check) =>
-          check.id === picking
-            ? { ...check, resource_id: c.resource_id, ready_resource_id: c.resource_id }
-            : check,
+          `ready:${check.id}` === picking
+            ? { ...check, ready_resource_id: c.resource_id }
+            : check.id === picking
+              ? {
+                  ...check,
+                  resource_id: c.resource_id,
+                  // Readiness follows the result until a different marker is chosen.
+                  ready_resource_id:
+                    !check.ready_resource_id || check.ready_resource_id === check.resource_id
+                      ? c.resource_id
+                      : check.ready_resource_id,
+                }
+              : check,
         ),
       })
     setPicking(null)
@@ -266,6 +307,8 @@ export function PhoneWorkspace({
           )}
           <TextInput
             label="Test name"
+            id={issueFieldId(issuePrefix, 'title')}
+            error={fieldError('title')}
             value={value?.title ?? title}
             disabled={disabled}
             maxLength={200}
@@ -277,6 +320,9 @@ export function PhoneWorkspace({
           />
           <TaskSteps
             value={sequence}
+            issues={issues}
+            issuePrefix={issuePrefix}
+            issueFocus={issueFocus}
             disabled={disabled}
             canPick={!!ready && !!frame?.controls.length}
             pickingId={picking}
@@ -290,13 +336,23 @@ export function PhoneWorkspace({
               submit.reset()
             }}
           />
-          <Accordion variant="contained">
+          <Accordion variant="contained" value={detailsOpen} onChange={setDetailsOpen}>
             <Accordion.Item value="details">
-              <Accordion.Control>Requirement and setup</Accordion.Control>
+              <Accordion.Control>
+                Requirement and setup
+                {fieldError('requirement') && (
+                  <Text span c="red" size="sm">
+                    {' '}
+                    · Needs setup
+                  </Text>
+                )}
+              </Accordion.Control>
               <Accordion.Panel>
                 <Stack>
                   <Textarea
                     label="Expected behavior / requirement"
+                    id={issueFieldId(issuePrefix, 'requirement')}
+                    error={fieldError('requirement')}
                     value={value?.requirement ?? requirement}
                     onChange={(e) =>
                       value && onChange
@@ -331,8 +387,10 @@ export function PhoneWorkspace({
               ? 'Uses AI for the explicitly selected Ask AI steps.'
               : 'Direct execution · no AI calls'}
           </Text>
+          {runControl}
           <Group>
             <Button
+              variant="subtle"
               disabled={
                 !ready ||
                 !sequenceReady(sequence) ||
@@ -343,7 +401,7 @@ export function PhoneWorkspace({
               loading={submit.isPending}
               onClick={() => run(sequence)}
             >
-              Try actions
+              {runControl ? 'Try actions (trial)' : 'Run test'}
             </Button>
             {!value && (
               <Button
@@ -387,7 +445,11 @@ export function PhoneWorkspace({
                 <Stack gap="sm">
                   <Group justify="space-between">
                     <Text fw={600}>{task.goal}</Text>
-                    <Badge>{task.generation ? explorationLabel(task) : task.state}</Badge>
+                    <Badge>
+                      {task.generation
+                        ? explorationLabel(task)
+                        : `Session activity · ${task.state}`}
+                    </Badge>
                   </Group>
                   {!task.generation && <Text size="sm">{task.message}</Text>}
                   {task.steps?.map((step, i) => (
@@ -408,11 +470,20 @@ export function PhoneWorkspace({
               <Title order={2} size="h3">
                 App preview
               </Title>
-              {s && <Badge>{s.state}</Badge>}
+              {s && (
+                <Badge color={disconnected ? 'gray' : undefined}>
+                  {disconnected ? 'Disconnected' : s.state}
+                </Badge>
+              )}
             </Group>
             <Text size="sm" role="status">
-              {s?.message ?? 'Connect the phone to pick controls or try your test.'}
+              {previewMessage}
             </Text>
+            {disconnected && s && (
+              <Button loading={reopen.isPending} onClick={() => reopen.mutate(s.profile.id)}>
+                {reopen.isPending ? 'Reconnecting…' : 'Reconnect'}
+              </Button>
+            )}
             {activeExploration && <DiscoveryActivity task={activeExploration} />}
             {!id && choices.data && !choices.data.blockers.length && (
               <>
@@ -435,7 +506,7 @@ export function PhoneWorkspace({
             )}
             {s && !supportsDirect && s.state === 'ready' && (
               <Alert>
-                This session cannot run direct actions. Open a new session to try again.
+                This connection cannot run direct actions. Disconnect and reconnect to try again.
               </Alert>
             )}
             {create.isError && (
@@ -513,7 +584,11 @@ export function PhoneWorkspace({
                 >
                   <img
                     src={`data:image/png;base64,${frame.png_base64}`}
-                    alt="Current screen of your Android app"
+                    alt={
+                      disconnected
+                        ? 'Last captured screen of your Android app'
+                        : 'Current screen of your Android app'
+                    }
                     style={{ width: '100%', display: 'block', borderRadius: 16 }}
                   />
                   <DiscoveryTarget task={activeExploration} frame={frame} />
@@ -542,15 +617,19 @@ export function PhoneWorkspace({
                 </div>
               ) : (
                 <Stack align="center" justify="center" className={classes.placeholder}>
-                  {id && <Loader />}
+                  {id && !disconnected && <Loader />}
                   <Text ta="center">
-                    {s?.message ?? 'Your app screen appears here after connecting.'}
+                    {disconnected
+                      ? previewMessage
+                      : (s?.message ?? 'Your app screen appears here after connecting.')}
                   </Text>
                 </Stack>
               )}
             </Card>
             <Text size="xs" c="dimmed">
-              Latest device capture. Pick target binds a step; Control phone performs the action.
+              {disconnected
+                ? 'Last captured screen. Reconnect to see and control the app again.'
+                : 'Latest device capture. Pick target binds a step; Control phone performs the action.'}
             </Text>
             {s && !['closed', 'quarantined'].includes(s.state) && (
               <Button
@@ -564,11 +643,6 @@ export function PhoneWorkspace({
               </Button>
             )}
             {stop.isError && <ErrorNotice error={stop.error} retry={() => stop.mutate()} />}
-            {s?.state === 'closed' && (
-              <Button loading={reopen.isPending} onClick={() => reopen.mutate(s.profile.id)}>
-                Open a new session
-              </Button>
-            )}
             {reopen.isError && (
               <ErrorNotice error={reopen.error} retry={() => s && reopen.mutate(s.profile.id)} />
             )}

@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Button, Card, Group, Select, Stack, Text } from '@mantine/core'
-import { useQuery } from '@tanstack/react-query'
+import { Anchor, Button, Card, Group, Select, Stack, Text } from '@mantine/core'
 import { Link } from 'react-router'
+import { useQuery } from '@tanstack/react-query'
 import { appsQuery } from '@/api/setup'
-import { runHistoryQuery } from '@/api/runs'
-import type { RunHistoryFilter } from '@/api/generated/types.gen'
+import { historyQuery } from '@/api/regression'
+import { RunResult } from '@/components/runs/run-result'
+import { SessionResult } from '@/components/runs/session-result'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { ErrorNotice, LoadingPanel, PageHeading } from '@/components/app/feedback'
 export function Runs() {
@@ -16,15 +17,15 @@ function WorkspaceRuns() {
   const apps = useQuery(appsQuery(workspaceId))
   const [appId, setAppId] = useState<string | null>(null)
   const selected = appId ?? apps.data?.items[0]?.id ?? ''
-  const [filter, setFilter] = useState<RunHistoryFilter>('all')
   const [cursors, setCursors] = useState<(string | undefined)[]>([undefined])
-  const history = useQuery(runHistoryQuery(workspaceId, selected, filter, cursors.at(-1)))
+  const [source, setSource] = useState('all')
+  const runs = useQuery(historyQuery(workspaceId, selected, source, cursors.at(-1)))
   return (
     <Stack>
       <PageHeading
         eyebrow="Execution"
         title="Runs"
-        description="Durable test and release runs, plus clearly labeled editor trials."
+        description="Test results, build comparisons and evidence."
       />
       {apps.isError && <ErrorNotice error={apps.error} retry={() => void apps.refetch()} />}
       <Select
@@ -38,62 +39,69 @@ function WorkspaceRuns() {
         }}
       />
       <Select
-        label="History"
-        value={filter}
-        data={[
-          { value: 'all', label: 'Test runs, release runs and trials' },
-          { value: 'test_runs', label: 'Saved test runs' },
-          { value: 'release_runs', label: 'Release runs' },
-          { value: 'trials', label: 'Editor trials' },
-          { value: 'legacy', label: 'Legacy session activity' },
-        ]}
-        onChange={(value) => {
-          if (!value) return
-          setFilter(value as RunHistoryFilter)
+        label="Show"
+        value={source}
+        onChange={(v) => {
+          setSource(v ?? 'all')
           setCursors([undefined])
         }}
+        data={[
+          { value: 'all', label: 'Runs and trials' },
+          { value: 'runs', label: 'Saved test runs' },
+          { value: 'trials', label: 'Authoring trials' },
+          { value: 'legacy', label: 'Earlier test activity' },
+        ]}
       />
       {!selected && <Text>Add an app and upload a build to configure a release check.</Text>}
-      {selected && history.isPending && <LoadingPanel label="Loading history…" />}
-      {history.isError && (
-        <ErrorNotice error={history.error} retry={() => void history.refetch()} />
-      )}
-      {history.data?.items.length === 0 && <Text>No activity matches this history filter.</Text>}
-      {history.data?.items.map((item) => {
-        if (item.kind === 'execution') {
-          const run = item.run
-          const savedCase = run.manifest.source?.kind === 'saved_case'
-          return (
-            <Card key={item.stable_id} component={Link} to={href(`/runs/${run.id}`)} withBorder>
-              <Group justify="space-between">
-                <Text fw={600}>{run.summary}</Text>
-                <Text size="xs">{savedCase ? 'Saved test' : 'Release run'}</Text>
-              </Group>
-              <Text size="sm">
-                {run.state} ·{' '}
-                {run.manifest.profile.driver === 'fake' ? 'Simulated' : 'Android emulator'} ·{' '}
-                {item.created_at}
-              </Text>
-            </Card>
-          )
-        }
-        return (
-          <Card key={item.stable_id} withBorder>
-            <Group justify="space-between">
-              <Text fw={600}>{item.title}</Text>
-              <Text size="xs">{item.kind === 'trial' ? 'Trial' : 'Legacy session activity'}</Text>
-            </Group>
-            <Text size="sm">
-              {item.state.replaceAll('_', ' ')} · {item.created_at}
-            </Text>
+      {selected && runs.isPending && <LoadingPanel label="Loading runs…" />}
+      {runs.isError && <ErrorNotice error={runs.error} retry={() => void runs.refetch()} />}
+      {selected && (source === 'legacy' || source === 'trials') && (
+        <Card withBorder padding="md" bg="var(--mantine-color-gray-0)">
+          <Stack gap="xs">
+            <Text fw={600}>Looking for a regression?</Text>
             <Text size="sm" c="dimmed">
-              {item.kind === 'legacy_session_activity'
-                ? 'No comparable baseline — saved-version and clean-start proof were not recorded.'
-                : item.message}
+              These results show what happened in the phone preview. They don’t have a verified
+              build comparison. Run a saved test on the working build, then run the same version on
+              the updated build and select the first run under Compare with. A comparable pass →
+              fail shows a Regression badge.
             </Text>
-          </Card>
-        )
-      })}
+            <Anchor component={Link} to={href(`/tests?app=${selected}&kind=case`)} size="sm">
+              Open saved tests →
+            </Anchor>
+          </Stack>
+        </Card>
+      )}
+      {runs.data?.items.length === 0 && (
+        <Stack gap="xs">
+          <Text>
+            {source === 'legacy'
+              ? 'No earlier test activity found.'
+              : 'No results in this view. Open a saved test, choose its build and run it.'}
+          </Text>
+          {source !== 'legacy' && (
+            <Button
+              variant="subtle"
+              onClick={() => {
+                setSource('legacy')
+                setCursors([undefined])
+              }}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              View earlier test activity
+            </Button>
+          )}
+        </Stack>
+      )}
+      {runs.data?.items.map((item) =>
+        item.run ? (
+          <Stack key={item.id} gap={4}>
+            <Text size="sm">Build: {item.build_label}</Text>
+            <RunResult run={item.run} compact />
+          </Stack>
+        ) : (
+          <SessionResult key={item.id} item={item} />
+        ),
+      )}
       <Group>
         <Button
           variant="default"
@@ -104,8 +112,8 @@ function WorkspaceRuns() {
         </Button>
         <Button
           variant="default"
-          disabled={!history.data?.next_cursor}
-          onClick={() => setCursors([...cursors, history.data?.next_cursor ?? undefined])}
+          disabled={!runs.data?.next_cursor}
+          onClick={() => setCursors([...cursors, runs.data?.next_cursor ?? undefined])}
         >
           Next
         </Button>

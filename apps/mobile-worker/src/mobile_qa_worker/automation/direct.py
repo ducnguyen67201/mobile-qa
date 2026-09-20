@@ -166,7 +166,11 @@ def check(
                 reason = "assertion_failed" if actual != expected.expected else ""
             elif expected.method.value == "manual":
                 raise QualificationError("manual_check_required")
-            elif len(matches) != 1:
+            elif not matches:
+                # A ready screen missing the expected element violates the assertion.
+                # Multiple matches remain inconclusive because the target is ambiguous.
+                reason = "assertion_failed"
+            elif len(matches) > 1:
                 reason = "target_not_unique"
             else:
                 key = {

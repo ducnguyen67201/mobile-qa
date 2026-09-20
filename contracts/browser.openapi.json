@@ -556,136 +556,6 @@
         ]
       }
     },
-    "/api/apps/{app_id}/baseline-candidates": {
-      "get": {
-        "tags": [],
-        "operationId": "listBaselineCandidates",
-        "parameters": [
-          {
-            "name": "app_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "build_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "case_version_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "profile_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "environment_revision",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BaselineCandidateResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session_cookie": []
-          }
-        ]
-      }
-    },
     "/api/apps/{app_id}/build-uploads": {
       "post": {
         "tags": [],
@@ -1838,6 +1708,332 @@
         ]
       }
     },
+    "/api/apps/{app_id}/case-runs": {
+      "post": {
+        "tags": [],
+        "operationId": "createCaseRun",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
+    "/api/apps/{app_id}/case-runs/preview": {
+      "post": {
+        "tags": [],
+        "operationId": "previewCaseRun",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseRunPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
     "/api/apps/{app_id}/default-test-plan": {
       "get": {
         "tags": [],
@@ -2797,7 +2993,7 @@
     "/api/apps/{app_id}/run-history": {
       "get": {
         "tags": [],
-        "operationId": "listRunHistory",
+        "operationId": "getRunHistory",
         "parameters": [
           {
             "name": "app_id",
@@ -2809,11 +3005,11 @@
             }
           },
           {
-            "name": "filter",
+            "name": "source",
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/RunHistoryFilter"
+              "type": "string"
             }
           },
           {
@@ -2831,7 +3027,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RunHistoryResponse"
+                  "$ref": "#/components/schemas/RunHistory"
                 }
               }
             }
@@ -2876,7 +3072,67 @@
               }
             }
           },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "500": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
             "description": "API error",
             "content": {
               "application/json": {
@@ -3200,137 +3456,6 @@
             }
           },
           "default": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session_cookie": []
-          }
-        ]
-      }
-    },
-    "/api/apps/{app_id}/saved-case-preview": {
-      "get": {
-        "tags": [],
-        "operationId": "getSavedCasePreview",
-        "parameters": [
-          {
-            "name": "app_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "build_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "case_version_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "profile_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlanPreviewResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "500": {
             "description": "API error",
             "content": {
               "application/json": {
@@ -7376,90 +7501,6 @@
         ]
       }
     },
-    "/api/runs/{run_id}/comparison": {
-      "get": {
-        "tags": [],
-        "operationId": "getRunComparison",
-        "parameters": [
-          {
-            "name": "run_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RunComparisonResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session_cookie": []
-          }
-        ]
-      }
-    },
     "/api/settings": {
       "get": {
         "tags": [],
@@ -8353,83 +8394,39 @@
         },
         "additionalProperties": false
       },
-      "BaselineCandidate": {
+      "BaselineChoice": {
         "type": "object",
         "required": [
-          "run_id",
+          "id",
           "build_id",
-          "build_name",
-          "build_sha256",
+          "build_label",
           "created_at",
-          "outcome"
+          "compatible",
+          "reason"
         ],
         "properties": {
           "build_id": {
             "type": "string",
             "format": "uuid"
           },
-          "build_name": {
+          "build_label": {
             "type": "string"
           },
-          "build_sha256": {
-            "type": "string"
+          "compatible": {
+            "type": "boolean"
           },
           "created_at": {
             "type": "string",
             "format": "date-time"
           },
-          "outcome": {
-            "$ref": "#/components/schemas/Outcome"
-          },
-          "run_id": {
+          "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
           }
-        },
-        "additionalProperties": false
-      },
-      "BaselineCandidateQuery": {
-        "type": "object",
-        "required": [
-          "build_id",
-          "case_version_id",
-          "profile_id",
-          "environment_revision"
-        ],
-        "properties": {
-          "build_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "case_version_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "environment_revision": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "profile_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "additionalProperties": false
-      },
-      "BaselineCandidateResponse": {
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/BaselineCandidate"
-            }
-          }
-        },
-        "additionalProperties": false
+        }
       },
       "BuildListResponse": {
         "type": "object",
@@ -8561,6 +8558,81 @@
         },
         "additionalProperties": false
       },
+      "CaseComparison": {
+        "type": "object",
+        "required": [
+          "case_key",
+          "title",
+          "data_variant",
+          "kind",
+          "reason",
+          "baseline_checks",
+          "current_checks"
+        ],
+        "properties": {
+          "baseline_case_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "baseline_checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckResult"
+            }
+          },
+          "baseline_outcome": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Outcome"
+              }
+            ]
+          },
+          "case_key": {
+            "type": "string"
+          },
+          "current_case_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "current_checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckResult"
+            }
+          },
+          "current_outcome": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Outcome"
+              }
+            ]
+          },
+          "data_variant": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ComparisonKind"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "CaseDefinition": {
         "type": "object",
         "required": [
@@ -8624,6 +8696,74 @@
         },
         "additionalProperties": false
       },
+      "CaseRunPreview": {
+        "type": "object",
+        "required": [
+          "blockers",
+          "environment_revision",
+          "baselines"
+        ],
+        "properties": {
+          "baselines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BaselineChoice"
+            }
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "environment_revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "suggested_baseline_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "CaseRunRequest": {
+        "type": "object",
+        "required": [
+          "case_version_id",
+          "build_id",
+          "profile_id",
+          "environment_revision"
+        ],
+        "properties": {
+          "baseline_run_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "build_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "case_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environment_revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "profile_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
       "CaseSelection": {
         "type": "object",
         "required": [
@@ -8641,66 +8781,6 @@
           },
           "required": {
             "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
-      "CheckComparison": {
-        "type": "object",
-        "required": [
-          "check_id",
-          "expected",
-          "baseline_reason",
-          "current_reason",
-          "baseline_artifact_ids",
-          "current_artifact_ids",
-          "baseline_outcome",
-          "current_outcome"
-        ],
-        "properties": {
-          "baseline_artifact_ids": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          "baseline_observed": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "baseline_outcome": {
-            "$ref": "#/components/schemas/Outcome"
-          },
-          "baseline_reason": {
-            "type": "string"
-          },
-          "check_id": {
-            "type": "string"
-          },
-          "current_artifact_ids": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          "current_observed": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "current_outcome": {
-            "$ref": "#/components/schemas/Outcome"
-          },
-          "current_reason": {
-            "type": "string"
-          },
-          "expected": {
-            "type": "string"
           }
         },
         "additionalProperties": false
@@ -8743,6 +8823,16 @@
           },
           "expected": {
             "type": "string"
+          },
+          "observation_kind": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ObservationKind"
+              }
+            ]
           },
           "observed": {
             "type": [
@@ -8852,17 +8942,25 @@
           "quarantined"
         ]
       },
-      "ComparisonLabel": {
+      "CommandPurpose": {
         "type": "string",
         "enum": [
-          "comparison_pending",
+          "trial",
+          "manual"
+        ]
+      },
+      "ComparisonKind": {
+        "type": "string",
+        "enum": [
           "regression",
           "still_failing",
           "recovered",
           "unchanged",
-          "new_failure_same_build",
+          "new_failure",
           "no_baseline",
-          "not_comparable"
+          "not_comparable",
+          "added",
+          "removed"
         ]
       },
       "CompleteRequest": {
@@ -8997,17 +9095,10 @@
         "type": "object",
         "required": [
           "build_id",
-          "source",
+          "plan_version_id",
           "environment_revision"
         ],
         "properties": {
-          "baseline_run_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          },
           "build_id": {
             "type": "string",
             "format": "uuid"
@@ -9016,8 +9107,9 @@
             "type": "integer",
             "format": "int32"
           },
-          "source": {
-            "$ref": "#/components/schemas/RunSourceRequest"
+          "plan_version_id": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -10678,68 +10770,6 @@
         },
         "additionalProperties": false
       },
-      "ManifestSource": {
-        "oneOf": [
-          {
-            "type": "object",
-            "required": [
-              "version",
-              "plan_version_id",
-              "content_hash",
-              "kind"
-            ],
-            "properties": {
-              "content_hash": {
-                "type": "string"
-              },
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "release_plan"
-                ]
-              },
-              "plan_version_id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "version": {
-                "type": "integer",
-                "format": "int32",
-                "minimum": 0
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "version",
-              "case_version_id",
-              "content_hash",
-              "kind"
-            ],
-            "properties": {
-              "case_version_id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "content_hash": {
-                "type": "string"
-              },
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "saved_case"
-                ]
-              },
-              "version": {
-                "type": "integer",
-                "format": "int32",
-                "minimum": 0
-              }
-            }
-          }
-        ]
-      },
       "MembershipRole": {
         "type": "string",
         "enum": [
@@ -10786,6 +10816,13 @@
           }
         },
         "additionalProperties": false
+      },
+      "ObservationKind": {
+        "type": "string",
+        "enum": [
+          "present_value",
+          "absent"
+        ]
       },
       "OpenPhoneRequest": {
         "type": "object",
@@ -10869,8 +10906,7 @@
           "id",
           "expected_revision",
           "title",
-          "sequence",
-          "purpose"
+          "sequence"
         ],
         "properties": {
           "expected_revision": {
@@ -10890,7 +10926,14 @@
             "format": "uuid"
           },
           "purpose": {
-            "$ref": "#/components/schemas/PhoneTaskPurpose"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommandPurpose"
+              }
+            ]
           },
           "sequence": {
             "$ref": "#/components/schemas/AutomationSequence"
@@ -10990,7 +11033,6 @@
       "PhoneOptions": {
         "type": "object",
         "required": [
-          "environment_revision",
           "builds",
           "profiles",
           "blockers"
@@ -11014,10 +11056,6 @@
             "items": {
               "$ref": "#/components/schemas/PhoneBuildChoice"
             }
-          },
-          "environment_revision": {
-            "type": "integer",
-            "format": "int32"
           },
           "profiles": {
             "type": "array",
@@ -11173,17 +11211,6 @@
               }
             ]
           },
-          "purpose": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/PhoneTaskPurpose",
-                "description": "Historical tasks predate explicit purpose and remain legacy session activity."
-              }
-            ]
-          },
           "sequence": {
             "oneOf": [
               {
@@ -11206,20 +11233,11 @@
         },
         "additionalProperties": false
       },
-      "PhoneTaskPurpose": {
-        "type": "string",
-        "enum": [
-          "manual_control",
-          "trial",
-          "exploration"
-        ]
-      },
       "PhoneTaskRequest": {
         "type": "object",
         "required": [
           "id",
-          "goal",
-          "purpose"
+          "goal"
         ],
         "properties": {
           "goal": {
@@ -11228,9 +11246,6 @@
           "id": {
             "type": "string",
             "format": "uuid"
-          },
-          "purpose": {
-            "$ref": "#/components/schemas/PhoneTaskPurpose"
           },
           "selection": {
             "oneOf": [
@@ -11646,12 +11661,11 @@
         },
         "additionalProperties": false
       },
-      "RunComparisonResponse": {
+      "RunComparison": {
         "type": "object",
         "required": [
-          "run_id",
-          "label",
-          "checks"
+          "policy_version",
+          "cases"
         ],
         "properties": {
           "baseline_run_id": {
@@ -11661,172 +11675,20 @@
             ],
             "format": "uuid"
           },
-          "checks": {
+          "cases": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CheckComparison"
+              "$ref": "#/components/schemas/CaseComparison"
             }
           },
-          "label": {
-            "$ref": "#/components/schemas/ComparisonLabel"
-          },
-          "reason": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "run_id": {
-            "type": "string",
-            "format": "uuid"
+          "policy_version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
-        },
-        "additionalProperties": false
+        }
       },
-      "RunHistoryFilter": {
-        "type": "string",
-        "enum": [
-          "all",
-          "test_runs",
-          "release_runs",
-          "trials",
-          "legacy"
-        ]
-      },
-      "RunHistoryItem": {
-        "oneOf": [
-          {
-            "type": "object",
-            "required": [
-              "stable_id",
-              "created_at",
-              "run",
-              "kind"
-            ],
-            "properties": {
-              "created_at": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "execution"
-                ]
-              },
-              "run": {
-                "$ref": "#/components/schemas/RunResponse"
-              },
-              "stable_id": {
-                "type": "string"
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "stable_id",
-              "created_at",
-              "task_id",
-              "title",
-              "state",
-              "message",
-              "kind"
-            ],
-            "properties": {
-              "created_at": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "trial"
-                ]
-              },
-              "message": {
-                "type": "string"
-              },
-              "stable_id": {
-                "type": "string"
-              },
-              "state": {
-                "type": "string"
-              },
-              "task_id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "title": {
-                "type": "string"
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
-              "stable_id",
-              "created_at",
-              "task_id",
-              "title",
-              "state",
-              "message",
-              "kind"
-            ],
-            "properties": {
-              "created_at": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "legacy_session_activity"
-                ]
-              },
-              "message": {
-                "type": "string"
-              },
-              "stable_id": {
-                "type": "string"
-              },
-              "state": {
-                "type": "string"
-              },
-              "task_id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "title": {
-                "type": "string"
-              }
-            }
-          }
-        ]
-      },
-      "RunHistoryQuery": {
-        "type": "object",
-        "properties": {
-          "cursor": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "filter": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/RunHistoryFilter"
-              }
-            ]
-          }
-        },
-        "additionalProperties": false
-      },
-      "RunHistoryResponse": {
+      "RunHistory": {
         "type": "object",
         "required": [
           "items"
@@ -11844,8 +11706,58 @@
               "null"
             ]
           }
-        },
-        "additionalProperties": false
+        }
+      },
+      "RunHistoryItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "source",
+          "created_at",
+          "build_label"
+        ],
+        "properties": {
+          "build_label": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "run": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RunResponse"
+              }
+            ]
+          },
+          "session_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "source": {
+            "type": "string"
+          },
+          "trial": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PhoneTask"
+              }
+            ]
+          }
+        }
       },
       "RunListResponse": {
         "type": "object",
@@ -11934,8 +11846,7 @@
               "string",
               "null"
             ],
-            "format": "uuid",
-            "description": "Legacy release-plan fields remain optional so historical JSON and hashes round-trip."
+            "format": "uuid"
           },
           "profile": {
             "$ref": "#/components/schemas/ExecutionProfile"
@@ -11946,8 +11857,7 @@
                 "type": "null"
               },
               {
-                "$ref": "#/components/schemas/ManifestSource",
-                "description": "Absent only for manifests persisted before source versioning was introduced."
+                "$ref": "#/components/schemas/RunSource"
               }
             ]
           }
@@ -11978,6 +11888,22 @@
             ],
             "format": "uuid"
           },
+          "build_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "comparison": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RunComparison"
+              }
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -11998,32 +11924,12 @@
         },
         "additionalProperties": false
       },
-      "RunSourceRequest": {
+      "RunSource": {
         "oneOf": [
           {
             "type": "object",
             "required": [
-              "plan_version_id",
-              "kind"
-            ],
-            "properties": {
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "release_plan"
-                ]
-              },
-              "plan_version_id": {
-                "type": "string",
-                "format": "uuid"
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": [
               "case_version_id",
-              "profile_id",
               "kind"
             ],
             "properties": {
@@ -12034,10 +11940,25 @@
               "kind": {
                 "type": "string",
                 "enum": [
-                  "saved_case"
+                  "saved_case_v1"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "plan_version_id",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "release_plan_v1"
                 ]
               },
-              "profile_id": {
+              "plan_version_id": {
                 "type": "string",
                 "format": "uuid"
               }
@@ -12139,29 +12060,6 @@
               "type": "string",
               "format": "uuid"
             }
-          }
-        },
-        "additionalProperties": false
-      },
-      "SavedCasePreviewQuery": {
-        "type": "object",
-        "required": [
-          "build_id",
-          "case_version_id",
-          "profile_id"
-        ],
-        "properties": {
-          "build_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "case_version_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "profile_id": {
-            "type": "string",
-            "format": "uuid"
           }
         },
         "additionalProperties": false

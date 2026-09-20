@@ -108,6 +108,12 @@ original failure. Lost mutation responses never authorize a blind retry.
 
 ### Comparison rules
 
+The first 07B delivery is specified in
+[Regression labels and durable test history](07b-regression-label-and-history.md).
+It closes the editor/Runs history split before adding the Regression badge. The
+specification now includes local implementation and acceptance evidence; the remaining
+audited-triage scope stays here.
+
 Match a case by app, stable case key and data variant. Require exact case version/hash,
 environment revision and qualified execution signature (including reset/verifier/runtime)
 for a comparable result. Build checksum may differ; that is the comparison axis.
@@ -209,8 +215,7 @@ release; a failed start with local disposal still needs recovery acknowledgement
 Cleanup uses disposable-AVD qualification rather than a second boot on every generic
 attempt. The demo's stronger fixture reset remains intact. Blank credential references
 do not qualify a remote app; only explicitly declared `local_only` state is supported.
-A real customer APK campaign is still required. The first 07B delivery is implemented;
-audited triage and 07C–D remain planned.
+A real customer APK campaign is still required. 07B–D remain planned.
 
 UI decisions: status words for clean start and cleanup remain independent of the raw
 assertion verdict; canceled or historical missing receipts never imply a verified start.
@@ -251,53 +256,12 @@ Scope decisions: disposable-AVD cleanup replaces an extra reset boot for this ex
 qualified local-only policy; the demo fixture reset remains separate. Attempt membership
 continues to use stored case_index when reading the manifest; a public comparison index
 belongs to 07B. Reports remain in this canonical document, rather than adding completed
-plan/report files. The full plan remains pending for the rest of 07B and 07C–D. Real non-demo APK qualification,
+plan/report files. The full plan remains pending for 07B–D. Real non-demo APK qualification,
 the reliability campaign and hosted acceptance are not claimed by this delivery.
 
-### 07B first-delivery implementation notes — 2026-09-20
+### 07B first delivery — 2026-09-20
 
-A saved case now enters the same execution queue as a release plan without a hidden suite
-or plan. Admission resolves the immutable case, explicit build, selected qualified profile
-and current environment into the existing manifest, attempt, lease, evidence and verifier
-pipeline. Unsaved editor content is saved first; an incomplete save queues nothing. Save
-and run retries preserve the save mutation identity, and run retries preserve a separate
-idempotency key.
-
-Migration000009 makes `plan_id` nullable for saved-case runs, adds the indexed source kind
-and freezes an optional baseline run ID. New manifests carry version1 `saved_case` or
-`release_plan` source metadata. Legacy plan manifests retain their original JSON fields,
-and protocol1–3 workers cannot claim the new shape. The Python execution worker now claims
-protocol4.
-
-The baseline candidate service compares the frozen source, case identity/version/hash,
-data variant, environment and qualified execution signature before suggesting the newest
-eligible terminal run by timestamp and UUID. Both sides must have consistent terminal
-pass/fail checks and verified cleanup; qualified direct contexts additionally require
-their clean-start receipt. Mixed retries, recovery, unknown lifecycle state or changed
-context produce Not comparable. The baseline ID is stored at submission and cannot drift.
-
-The Runs page reads a cursor-paginated union projection. Durable saved-test and release
-runs are visible to authorized app members. Only the creating user can see their explicitly
-purposed editor trials. Manual control and exploration are excluded, while pre-purpose
-phone records remain isolated behind Legacy session activity and state that no comparable
-baseline exists. No shadow history table or inferred saved-case link was introduced.
-
-The compact editor control exposes build, qualified device and baseline selection, releases
-an active preview before queueing, and blocks quarantined cleanup. The active card reads the
-durable run. Run detail keeps the assertion outcome separate from Regression, Still failing,
-Recovered, Unchanged, New failure on same build, No baseline, Comparison pending and Not
-comparable. Expected and observed values come from retained checks; null remains Unknown
-and the recorded reason is shown.
-
-This delivery intentionally does not add audited triage, multi-case coverage-delta rows,
-retention/cost operations, the 50-run reliability campaign or hosted pilot evidence. Those
-remain in the rest of 07B and 07C–D.
-
-Validation passed for contract drift; Rustfmt/Clippy; TypeScript/ESLint; Ruff/Pyright;
-54 Rust, 122 browser and 175 worker tests across the consolidated pass and isolated retry
-of the existing intermittent loopback test; API/web builds; and test-library, execution
-and direct-authoring HTTP smokes. Smokes used simulated workers and preserved results across
-API restart. A disposable PostgreSQL container isolated validation from another branch's
-shared migration and was removed afterward. No device/model call or rendered browser review
-was performed. The detailed implementation report is
-[07B first delivery](../../../.claude/PRPs/reports/07b-regression-labels-durable-test-history-report.md).
+Saved-case admission, durable history and conservative persisted regression comparisons
+are implemented locally. See the [owning specification and implementation report](07b-regression-label-and-history.md#implementation-report--2026-09-20)
+for contracts, compatibility decisions, validation and device acceptance. This delivery
+adds no review gate and does not complete audited triage or the later operational phases.

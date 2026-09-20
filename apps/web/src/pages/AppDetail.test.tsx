@@ -66,12 +66,8 @@ it('queues the default release plan resolved by the preview', async () => {
     build_id: buildId,
     build_sha256: build.sha256,
     build_bytes: build.byte_size,
-    source: {
-      version: 1,
-      kind: 'release_plan',
-      plan_version_id: planVersionId,
-      content_hash: 'b'.repeat(64),
-    },
+    plan_version_id: planVersionId,
+    plan_hash: 'b'.repeat(64),
     environment_revision: app.environment.revision,
     profile: {
       id: runId,
@@ -83,17 +79,16 @@ it('queues the default release plan resolved by the preview', async () => {
       image: 'fixture',
       model: 'none',
       qualified: true,
-      qualification_reference: 'fixture-only',
+      qualification_reference: 'fixture',
       max_apk_bytes: 1048576,
     },
     cases: [],
-    budget: { duration_seconds: 60, max_steps: 10, artifact_bytes: 1024 },
+    budget: { duration_seconds: 600, max_steps: 30, artifact_bytes: 16777216 },
     diagnostic_retries: 0,
     exclusions: [],
   }
   const run: RunResponse = {
     id: runId,
-    baseline_run_id: null,
     state: 'queued',
     created_at: '2026-09-20T00:00:00Z',
     summary: 'Queued',
@@ -114,14 +109,6 @@ it('queues the default release plan resolved by the preview', async () => {
         submissions.push(zCreateRunRequest.parse(await request.json()))
         return Response.json(run, { status: 201 })
       }
-      if (url.pathname.endsWith(`/runs/${runId}/comparison`))
-        return Response.json({
-          run_id: runId,
-          baseline_run_id: null,
-          label: 'comparison_pending',
-          reason: null,
-          checks: [],
-        })
       if (url.pathname.endsWith(`/runs/${runId}`)) return Response.json(run)
       return base(request)
     }),
@@ -129,8 +116,10 @@ it('queues the default release plan resolved by the preview', async () => {
   show(`/apps/${appId}?build=${buildId}`)
   await userEvent.click(await screen.findByRole('button', { name: 'Run release check' }))
   await waitFor(() => expect(submissions).toHaveLength(1))
-  expect(submissions[0]).toMatchObject({
-    source: { kind: 'release_plan', plan_version_id: planVersionId },
+  expect(submissions[0]).toEqual({
+    build_id: buildId,
+    plan_version_id: planVersionId,
+    environment_revision: app.environment.revision,
   })
 })
 it('distinguishes infrastructure failure from an invalid APK', async () => {

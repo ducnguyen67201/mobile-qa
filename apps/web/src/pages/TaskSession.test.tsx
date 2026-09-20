@@ -83,7 +83,6 @@ function show(blocked = false, embedded = false, protocolVersion = 4) {
       if (path.endsWith('/versions')) return Response.json({ items: [], next_cursor: null })
       if (path.endsWith('/phone-options'))
         return Response.json({
-          environment_revision: 1,
           builds: [{ id, name: 'sample.apk' }],
           profiles: blocked ? [] : [profile],
           active_session: null,
@@ -104,7 +103,6 @@ function show(blocked = false, embedded = false, protocolVersion = 4) {
           tasks: [
             {
               id: body.id,
-              purpose: body.purpose,
               goal: body.title,
               sequence: body.sequence,
               generation: null,
@@ -157,7 +155,7 @@ it.each([2, 3, 4])('protocol %i binds and runs a typed target without AI', async
   await userEvent.type(screen.getByLabelText('Action 1 text'), 'Hello')
   expect(tasks).toHaveLength(0)
   expect(screen.getByText('Direct execution · no AI calls')).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: 'Try actions' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Run test' }))
   await waitFor(() => expect(tasks).toHaveLength(1))
   expect(tasks[0]?.sequence.actions[0]?.command).toEqual({
     operation: 'set_text',
@@ -165,7 +163,6 @@ it.each([2, 3, 4])('protocol %i binds and runs a typed target without AI', async
     text: 'Hello',
   })
   expect(tasks[0]?.frame_id).toBeNull()
-  expect(tasks[0]?.purpose).toBe('trial')
 })
 it('controls the phone immediately and records each completed receipt once', async () => {
   const { opened, tasks } = show()
@@ -177,7 +174,6 @@ it('controls the phone immediately and records each completed receipt once', asy
   await userEvent.click(screen.getByRole('button', { name: 'Enter text' }))
   await waitFor(() => expect(tasks).toHaveLength(1))
   expect(tasks[0]?.frame_id).toBe(id)
-  expect(tasks[0]?.purpose).toBe('manual_control')
   await waitFor(() => expect(screen.getByLabelText('Action 1 text')).toHaveValue('Xin chào'))
   expect(screen.queryByLabelText('Action 2 action')).not.toBeInTheDocument()
 })
@@ -191,7 +187,7 @@ it('reorders direct steps and only marks an explicit Ask AI step as AI', async (
   await userEvent.click(screen.getByRole('option', { name: 'Ask AI' }))
   await userEvent.type(screen.getByLabelText('Action 2 AI instruction'), 'Explore settings')
   await userEvent.click(screen.getByRole('button', { name: 'Move action 2 up' }))
-  await userEvent.click(screen.getByRole('button', { name: 'Try actions' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Run test' }))
   await waitFor(() => expect(tasks).toHaveLength(1))
   expect(tasks[0]?.sequence.actions.map((a) => a.kind)).toEqual(['navigate', 'direct'])
 })
@@ -217,7 +213,7 @@ it('shows missing setup and lets Escape cancel target picking', async () => {
     await screen.findByText('A device worker needs to be connected for this app.'),
   ).toBeInTheDocument()
   expect(opened).toHaveLength(0)
-  expect(screen.getByRole('button', { name: 'Try actions' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Run test' })).toBeDisabled()
 })
 
 it('adds optional checks inside an action and keeps their binding when reordered', async () => {
@@ -245,3 +241,37 @@ it('adds optional checks inside an action and keeps their binding when reordered
   await userEvent.click(screen.getByRole('button', { name: 'Remove check' }))
   expect(screen.queryByLabelText('Check 1 description')).not.toBeInTheDocument()
 })
+
+it.each([false, true])(
+  'repicks result targets with independent readiness: %s',
+  async (independent) => {
+    const { opened, tasks } = show()
+    await waitFor(() => expect(opened).toHaveLength(1))
+    await userEvent.click(screen.getByRole('button', { name: 'Pick target for action 1 on phone' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Select Save' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add check to action 1' }))
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Pick target for check 1 on phone' }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Select Task input' }))
+    if (independent) {
+      await userEvent.click(screen.getByText('Screen readiness', { exact: true }))
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Pick screen readiness for check 1 on phone' }),
+      )
+      await userEvent.click(screen.getByRole('button', { name: 'Select Save' }))
+    }
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Pick target for check 1 on phone' }),
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: independent ? 'Select Task input' : 'Select Save' }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Run test' }))
+    await waitFor(() => expect(tasks).toHaveLength(1))
+    expect(tasks[0]?.sequence.checks[0]).toMatchObject({
+      resource_id: independent ? 'ai.mobileqa.demo:id/task_input' : 'ai.mobileqa.demo:id/save',
+      ready_resource_id: 'ai.mobileqa.demo:id/save',
+    })
+  },
+)

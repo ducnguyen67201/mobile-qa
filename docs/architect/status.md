@@ -1,38 +1,26 @@
 # Implementation status and evidence
 
-## Phase 07B first delivery — durable saved-test runs (2026-09-20)
+## 07B regression labels and history — local implementation (2026-09-20)
 
-The editor now admits a complete saved case directly into the existing execution
-scheduler using an explicit build, qualified profile, environment revision and optional
-frozen baseline run. Unsaved content uses Save & run and submits only the immutable version
-returned by that save. Try actions remains a phone-session Trial and AI/manual activity is
-not relabeled as a durable test execution.
+The [focused delivery](implementation/07b-regression-label-and-history.md) now creates
+saved-case runs through the existing execution pipeline, with explicit build selection,
+an immutable test version and pinned baseline. Runs lists durable executions and
+creator-private authoring trials; legacy phone activity has its own filter and no
+inferred regression verdict. The backend persists comparisons; the shared result card
+shows the label, failed action, expected/observed values and baseline/current evidence.
 
-New manifests carry a versioned saved-case or release-plan source. Historical manifests
-continue to decode and serialize with their original plan fields. Execution protocol4 is
-required before a worker can claim the new shape. Migration000009 records the source and
-baseline without adding a shadow run table.
-
-Runs is a cursor-paginated read projection over durable execution runs and creator-scoped
-phone trials. Legacy phone activity is available only through its explicit filter and has
-no invented baseline. Comparison freezes the selected baseline and requires the exact case
-version/hash, data variant, environment and execution profile plus terminal, consistent
-attempts with clean lifecycle evidence. It reports Regression, Still failing, Recovered,
-Unchanged, New failure on same build, No baseline, Comparison pending or Not comparable.
-Null observations remain Unknown with their retained reason.
-
-Validation passed for generated-contract drift, formatting, Clippy, TypeScript/ESLint,
-Ruff/Pyright, production API/web builds, 54 Rust tests, 122 browser tests and 175 worker
-tests across the consolidated run plus the isolated retry of the existing intermittent
-loopback HTTP test. Test-library, execution and direct-authoring HTTP smokes passed with
-simulated workers and API restart persistence. The shared test database contained another
-branch's migration, so API validation used and removed a disposable PostgreSQL container;
-the shared database and original checkout were untouched. Vite retains its existing large
-bundle advisory.
-
-Audited triage, multi-case coverage deltas and the operational 07C–D work remain pending.
-No real device/model run, rendered browser acceptance or customer APK qualification is
-claimed. See the [implementation report](../../.claude/PRPs/reports/07b-regression-labels-durable-test-history-report.md).
+Execution protocol 4 gates saved-case manifests. Legacy release-plan manifests remain
+unchanged. Comparison requires conclusive checks and verified clean start/cleanup on
+both sides; old demo phone results cannot establish that proof. The local real-device
+fixture acceptance and automated validation are recorded in the specification report.
+Real local fixture acceptance passed: good → Passed, broken → Regression at the
+restart check, repeated broken → Still failing. Reports and pinned baselines stayed
+unchanged after API restart and all runs appeared in history. The fixture used an
+isolated test workspace, not the existing demonstration workspace. 59 Rust, 127 web
+and 181 worker tests passed across the consolidated pass and focused retries; static
+checks, generated drift and builds passed. Full authenticated rendered acceptance is
+still pending sign-in after the dev restart. Audited triage, release-baseline
+management, retention and fleet work remain planned.
 
 ## Save without human reviews (2026-09-20)
 
@@ -115,7 +103,7 @@ These checks use no emulator or model calls and do not prove real-device qualifi
 Implementation report and remaining gates are in the owning
 [phase 07 specification](implementation/07-pilot-readiness-and-scale.md#07a-implementation-notes--2026-09-15).
 Temporary GAN specifications and evaluation files were removed after applying the review.
-The Phase07 plan remains active because the remainder of 07B and 07C–D have not been implemented.
+The Phase07 plan remains active; the later 07B–D operational deliverables remain open.
 
 ## Full local development supervisor (2026-09-15)
 
@@ -229,7 +217,7 @@ hosted token permissions or repeat the unrelated application suites.
 | Spec 04 worker HTTP leases/runs/evidence reports                           | Planned; local fake protocol is not a scheduler                                                      |
 | Spec 05 versioned case/suite/plan editor and approvals                     | Planned                                                                                              |
 | Spec 06 requirements-to-tests generation                                   | Planned                                                                                              |
-| Spec 07 regression, retention, production deployment and pilot reliability | Planned                                                                                              |
+| Spec 07 regression, retention, production deployment and pilot reliability | First regression/history delivery implemented locally; later operational phases planned              |
 | Paid pilot/customer validation                                             | No accepted customer app, signed pilot or demonstrated willingness to pay recorded                   |
 
 Doppler project creation does not provision database/model credentials, deploy a service,

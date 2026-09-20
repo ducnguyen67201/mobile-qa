@@ -1,9 +1,7 @@
 //! Authenticated browser execution routes. Binary evidence remains private.
 use crate::{
     errors::{ApiFailure, ApiResult},
-    services::{
-        apps, auth::Session, execution_store::*, run_artifacts, run_comparison, run_history, runs,
-    },
+    services::{apps, auth::Session, execution_store::*, run_artifacts, runs},
 };
 use axum::{
     body::Body,
@@ -31,24 +29,6 @@ async fn preview(
     Ok(Json(
         runs::preview(&ctx.db, app, q.build_id, q.plan_version_id).await?,
     ))
-}
-async fn preview_saved_case(
-    State(ctx): State<AppContext>,
-    session: Session,
-    Path(app): Path<Uuid>,
-    Query(query): Query<SavedCasePreviewQuery>,
-) -> ApiResult<Json<PlanPreviewResponse>> {
-    apps::authorized(&ctx, session.user.id, app).await?;
-    Ok(Json(runs::preview_saved_case(&ctx.db, app, query).await?))
-}
-async fn baseline_candidates(
-    State(ctx): State<AppContext>,
-    session: Session,
-    Path(app): Path<Uuid>,
-    Query(query): Query<BaselineCandidateQuery>,
-) -> ApiResult<Json<BaselineCandidateResponse>> {
-    apps::authorized(&ctx, session.user.id, app).await?;
-    Ok(Json(run_comparison::candidates(&ctx.db, app, query).await?))
 }
 async fn create(
     State(ctx): State<AppContext>,
@@ -88,25 +68,6 @@ async fn list(
     Ok(Json(
         runs::list(&ctx, session.user.id, app, q.cursor).await?,
     ))
-}
-async fn history(
-    State(ctx): State<AppContext>,
-    session: Session,
-    Path(app): Path<Uuid>,
-    Query(query): Query<RunHistoryQuery>,
-) -> ApiResult<Json<RunHistoryResponse>> {
-    apps::authorized(&ctx, session.user.id, app).await?;
-    Ok(Json(
-        run_history::list(&ctx.db, session.user.id, app, query).await?,
-    ))
-}
-async fn comparison(
-    State(ctx): State<AppContext>,
-    session: Session,
-    Path(id): Path<Uuid>,
-) -> ApiResult<Json<RunComparisonResponse>> {
-    runs::authorize(&ctx, session.user.id, id).await?;
-    Ok(Json(run_comparison::comparison(&ctx.db, id).await?))
 }
 async fn cancel(
     State(ctx): State<AppContext>,
@@ -151,22 +112,62 @@ async fn artifact(
     );
     Ok(response)
 }
+async fn case_preview(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path(app): Path<Uuid>,
+    Json(input): Json<mobile_qa_contracts::regression::CaseRunRequest>,
+) -> ApiResult<Json<mobile_qa_contracts::regression::CaseRunPreview>> {
+    Ok(Json(
+        crate::services::case_runs::preview(&ctx, session.user.id, app, input).await?,
+    ))
+}
+async fn case_create(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path(app): Path<Uuid>,
+    headers: HeaderMap,
+    Json(input): Json<mobile_qa_contracts::regression::CaseRunRequest>,
+) -> ApiResult<(StatusCode, Json<RunResponse>)> {
+    let key = headers
+        .get("idempotency-key")
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| ApiFailure::invalid("Idempotency-Key is required"))?;
+    let (run, new) =
+        crate::services::case_runs::create(&ctx, session.user.id, app, key, input).await?;
+    Ok((
+        if new {
+            StatusCode::CREATED
+        } else {
+            StatusCode::OK
+        },
+        Json(run),
+    ))
+}
+#[derive(Deserialize)]
+struct HistoryQuery {
+    source: Option<String>,
+    cursor: Option<String>,
+}
+async fn history(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path(app): Path<Uuid>,
+    Query(q): Query<HistoryQuery>,
+) -> ApiResult<Json<mobile_qa_contracts::regression::RunHistory>> {
+    Ok(Json(
+        crate::services::run_history::list(&ctx, session.user.id, app, q.source, q.cursor).await?,
+    ))
+}
 pub fn routes() -> Routes {
     use axum::routing::{get, post};
     Routes::new()
-        .add("/api/apps/{app_id}/execution-plan", get(preview))
-        .add(
-            "/api/apps/{app_id}/saved-case-preview",
-            get(preview_saved_case),
-        )
-        .add(
-            "/api/apps/{app_id}/baseline-candidates",
-            get(baseline_candidates),
-        )
-        .add("/api/apps/{app_id}/runs", get(list).post(create))
+        .add("/api/apps/{app_id}/case-runs/preview", post(case_preview))
+        .add("/api/apps/{app_id}/case-runs", post(case_create))
         .add("/api/apps/{app_id}/run-history", get(history))
+        .add("/api/apps/{app_id}/execution-plan", get(preview))
+        .add("/api/apps/{app_id}/runs", get(list).post(create))
         .add("/api/runs/{run_id}", get(detail))
-        .add("/api/runs/{run_id}/comparison", get(comparison))
         .add("/api/runs/{run_id}/cancel", post(cancel))
         .add(
             "/api/runs/{run_id}/artifacts/{artifact_id}/content",

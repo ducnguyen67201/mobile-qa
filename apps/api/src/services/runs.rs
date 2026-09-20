@@ -6,112 +6,6 @@ use mobile_qa_contracts::execution::*;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use uuid::Uuid;
 
-struct ManifestInput {
-    source: ManifestSource,
-    profile: ExecutionProfile,
-    cases: Vec<ResolvedCase>,
-    budget: ExecutionBudget,
-    diagnostic_retries: u8,
-    exclusions: Vec<String>,
-}
-
-async fn assemble_manifest(
-    db: &impl ConnectionTrait,
-    app: Uuid,
-    build: Uuid,
-    input: ManifestInput,
-) -> ApiResult<(RunManifest, Vec<String>)> {
-    let ManifestInput {
-        source,
-        profile,
-        cases,
-        budget,
-        diagnostic_retries,
-        exclusions,
-    } = input;
-    let mut blockers = Vec::new();
-    let build_row = one(
-        db,
-        "SELECT * FROM builds WHERE id=$1 AND app_id=$2",
-        vec![build.into(), app.into()],
-    )
-    .await?;
-    let environment = one(
-        db,
-        "SELECT revision,account_secret_reference_id,reset_secret_reference_id FROM environments WHERE app_id=$1",
-        vec![app.into()],
-    )
-    .await?;
-    let build_bytes: i64 = field(&build_row, "byte_size")?;
-
-    if field::<String>(&build_row, "validation_state")? != "validated" {
-        blockers.push("APK intake validation must pass".into());
-    }
-    if !profile.qualified {
-        blockers.push("Device profile has not been qualified".into());
-    }
-    if build_bytes < 1 || build_bytes > i64::from(profile.max_apk_bytes) {
-        blockers.push("APK exceeds worker capability".into());
-    }
-    if cases.iter().any(|resolved| {
-        resolved
-            .case
-            .actions
-            .iter()
-            .any(|action| action.kind == ActionKind::Navigate)
-    }) && profile.model.is_empty()
-    {
-        blockers.push("This run includes Ask AI steps but the device has no model".into());
-    }
-    for resolved in &cases {
-        if let Err(error) = super::execution_readiness::case_matches(&profile, &resolved.case) {
-            blockers.push(error.message);
-        }
-    }
-    if field::<Option<Uuid>>(&environment, "account_secret_reference_id")?.is_some()
-        || field::<Option<Uuid>>(&environment, "reset_secret_reference_id")?.is_some()
-    {
-        blockers.push("Customer credential/reset references need a qualified adapter".into());
-    }
-    let required_duration: u64 = cases
-        .iter()
-        .map(|resolved| {
-            super::execution_readiness::duration(&profile, &resolved.case)
-                * (u64::from(diagnostic_retries) + 1)
-        })
-        .sum();
-    if required_duration > u64::from(budget.duration_seconds) {
-        blockers.push("Run duration does not cover its case budgets and permitted retries".into());
-    }
-    if cases.iter().any(|resolved| {
-        resolved.case.budget.artifact_bytes > budget.artifact_bytes
-            || resolved.case.budget.max_steps > budget.max_steps
-    }) {
-        blockers.push("Case budget exceeds run policy".into());
-    }
-    blockers.sort();
-    blockers.dedup();
-
-    Ok((
-        RunManifest {
-            app_id: app,
-            build_id: build,
-            build_sha256: field(&build_row, "sha256")?,
-            build_bytes: u32::try_from(build_bytes).unwrap_or(0),
-            source: Some(source),
-            plan_version_id: None,
-            plan_hash: None,
-            environment_revision: field(&environment, "revision")?,
-            profile,
-            cases,
-            budget,
-            diagnostic_retries,
-            exclusions,
-        },
-        blockers,
-    ))
-}
-
 pub async fn preview(
     db: &impl ConnectionTrait,
     app: Uuid,
@@ -149,101 +43,141 @@ pub async fn preview(
     let TestDefinition::Plan(p) = &d.definition else {
         return Err(ApiFailure::invalid("Expected a plan version"));
     };
-    let profile = definitions::profile(db, app, p.profile_id).await?;
     let cases = match definitions::resolve(db, app, p).await {
-        Ok(v) => v,
-        Err(e) => {
-            out.blockers.push(e.message);
+        Ok(cases) => cases,
+        Err(error) if !error.status.is_server_error() => {
+            out.blockers.push(error.message);
             return Ok(out);
         }
+        Err(error) => return Err(error),
     };
-    let (manifest, blockers) = assemble_manifest(
-        db,
-        app,
-        build,
-        ManifestInput {
-            source: ManifestSource::ReleasePlan {
-                version: 1,
-                plan_version_id: d.id,
-                content_hash: d.content_hash.clone(),
-            },
-            profile,
-            cases,
-            budget: p.budget.clone(),
-            diagnostic_retries: p.diagnostic_retries,
-            exclusions: p.exclusions.clone(),
-        },
-    )
-    .await?;
-    out.blockers.extend(blockers);
-    out.manifest = Some(manifest);
-    Ok(out)
+    assemble(db, app, build, d.clone(), p.clone(), cases, None).await
 }
 
-pub async fn preview_saved_case(
+pub(crate) async fn assemble(
     db: &impl ConnectionTrait,
     app: Uuid,
-    query: SavedCasePreviewQuery,
+    build: Uuid,
+    d: DefinitionResponse,
+    p: PlanDefinition,
+    cases: Vec<ResolvedCase>,
+    source: Option<mobile_qa_contracts::regression::RunSource>,
 ) -> ApiResult<PlanPreviewResponse> {
-    let mut response = PlanPreviewResponse {
-        plan: None,
-        manifest: None,
-        blockers: Vec::new(),
-    };
-    if let Err(error) = super::test_library::admitted(db, app, query.case_version_id).await {
-        if error.status.is_server_error() {
-            return Err(error);
-        }
-        response.blockers.push(error.message);
-        return Ok(response);
-    }
-    let definition = definitions::get(db, app, query.case_version_id).await?;
-    let TestDefinition::Case(case) = definition.definition else {
-        return Err(ApiFailure::invalid("Choose a saved case version"));
-    };
-    if let Err(error) =
-        super::test_library::executable(db, app, &TestDefinition::Case(case.clone())).await
-    {
-        if error.status.is_server_error() {
-            return Err(error);
-        }
-        response.blockers.push(error.message);
-        return Ok(response);
-    }
-    let profile = definitions::profile(db, app, query.profile_id).await?;
-    let duration = super::execution_readiness::duration(&profile, &case);
-    let budget = ExecutionBudget {
-        duration_seconds: u32::try_from(duration).unwrap_or(u32::MAX),
-        max_steps: case.budget.max_steps,
-        artifact_bytes: case.budget.artifact_bytes,
-    };
-    let (manifest, blockers) = assemble_manifest(
-        db,
-        app,
-        query.build_id,
-        ManifestInput {
-            source: ManifestSource::SavedCase {
-                version: 1,
-                case_version_id: definition.id,
-                content_hash: definition.content_hash.clone(),
-            },
-            profile,
-            cases: vec![ResolvedCase {
-                definition_id: definition.id,
-                content_hash: definition.content_hash,
-                data_variant: "default".into(),
-                required: true,
-                case,
-            }],
-            budget,
-            diagnostic_retries: 0,
-            exclusions: Vec::new(),
+    let mut out = PlanPreviewResponse {
+        plan: if source.is_none() {
+            Some(d.clone())
+        } else {
+            None
         },
+        manifest: None,
+        blockers: vec![],
+    };
+    let b = one(
+        db,
+        "SELECT * FROM builds WHERE id=$1 AND app_id=$2",
+        vec![build.into(), app.into()],
     )
     .await?;
-    response.blockers.extend(blockers);
-    response.manifest = Some(manifest);
-    Ok(response)
+    let profile = definitions::profile(db, app, p.profile_id).await?;
+    if cases.iter().any(|c| {
+        c.case
+            .actions
+            .iter()
+            .any(|a| a.kind == ActionKind::Navigate)
+    }) && profile.model.is_empty()
+    {
+        out.blockers
+            .push("This plan includes Ask AI steps but the device has no model".into());
+    }
+    for c in &cases {
+        if let Err(e) = super::execution_readiness::case_matches(&profile, &c.case) {
+            out.blockers.push(e.message);
+        }
+    }
+    let env = one(
+        db,
+        "SELECT revision,account_secret_reference_id,reset_secret_reference_id FROM \
+            environments WHERE app_id=$1",
+        vec![app.into()],
+    )
+    .await?;
+    let size: i64 = field(&b, "byte_size")?;
+    if field::<String>(&b, "validation_state")? != "validated" {
+        out.blockers.push("APK intake validation must pass".into());
+    }
+    if !profile.qualified {
+        out.blockers
+            .push("Device profile has not been qualified".into());
+    }
+    if size < 1 || size > i64::from(profile.max_apk_bytes) {
+        out.blockers.push("APK exceeds worker capability".into());
+    }
+    let app_package: String = field(
+        &one(
+            db,
+            "SELECT android_package FROM apps WHERE id=$1",
+            vec![app.into()],
+        )
+        .await?,
+        "android_package",
+    )?;
+    if app_package != profile.package
+        || cases.iter().any(|c| {
+            c.case.package != profile.package
+                || c.case.adapter != profile.adapter
+                || c.case
+                    .checks
+                    .iter()
+                    .any(|check| check.method == CheckMethod::Manual)
+        })
+    {
+        out.blockers
+            .push("App or checks are incompatible with this adapter".into());
+    }
+    // This adapter owns its synthetic backend and has no customer account or remote reset.
+    if field::<Option<Uuid>>(&env, "account_secret_reference_id")?.is_some()
+        || field::<Option<Uuid>>(&env, "reset_secret_reference_id")?.is_some()
+    {
+        out.blockers
+            .push("Customer credential/reset references need a qualified adapter".into());
+    }
+    let required_duration: u64 = cases
+        .iter()
+        .map(|c| {
+            super::execution_readiness::duration(&profile, &c.case)
+                * (u64::from(p.diagnostic_retries) + 1)
+        })
+        .sum();
+    if required_duration > u64::from(p.budget.duration_seconds) {
+        out.blockers
+            .push("Plan duration does not cover its case budgets and permitted retries".into());
+    }
+    if cases.iter().any(|c| {
+        c.case.budget.artifact_bytes > p.budget.artifact_bytes
+            || c.case.budget.max_steps > p.budget.max_steps
+    }) {
+        out.blockers.push("Case budget exceeds plan policy".into());
+    }
+    out.manifest = Some(RunManifest {
+        app_id: app,
+        build_id: build,
+        build_sha256: field(&b, "sha256")?,
+        build_bytes: u32::try_from(size).unwrap_or(0),
+        source: source.clone(),
+        plan_version_id: if source.is_some() { None } else { Some(d.id) },
+        plan_hash: if source.is_some() {
+            None
+        } else {
+            Some(d.content_hash)
+        },
+        environment_revision: field(&env, "revision")?,
+        profile,
+        cases,
+        budget: p.budget.clone(),
+        diagnostic_retries: p.diagnostic_retries,
+        exclusions: p.exclusions.clone(),
+    });
+    Ok(out)
 }
 
 pub async fn create(
@@ -288,30 +222,7 @@ pub async fn create(
         vec![app.into()],
     )
     .await?;
-    let (preview, plan_id, source_kind) = match input.source {
-        RunSourceRequest::ReleasePlan { plan_version_id } => (
-            preview(&tx, app, input.build_id, Some(plan_version_id)).await?,
-            Some(plan_version_id),
-            "release_plan",
-        ),
-        RunSourceRequest::SavedCase {
-            case_version_id,
-            profile_id,
-        } => (
-            preview_saved_case(
-                &tx,
-                app,
-                SavedCasePreviewQuery {
-                    build_id: input.build_id,
-                    case_version_id,
-                    profile_id,
-                },
-            )
-            .await?,
-            None,
-            "saved_case",
-        ),
-    };
+    let preview = preview(&tx, app, input.build_id, Some(input.plan_version_id)).await?;
     if !preview.blockers.is_empty() {
         return Err(ApiFailure::invalid(preview.blockers.join("; ")));
     }
@@ -319,25 +230,20 @@ pub async fn create(
     if input.environment_revision != manifest.environment_revision {
         return Err(conflict("Environment changed; refresh the preview"));
     }
-    if let Some(baseline_id) = input.baseline_run_id {
-        super::run_comparison::validate_baseline(&tx, app, baseline_id, &manifest).await?;
-    }
     let id = Uuid::new_v4();
     exec(
         &tx,
         "INSERT INTO execution_runs(id,app_id,creator_id,build_id,plan_id,idempotency_key,\
-            fingerprint,manifest,source_kind,baseline_run_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+            fingerprint,manifest) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
         vec![
             id.into(),
             app.into(),
             actor.into(),
             input.build_id.into(),
-            plan_id.into(),
+            input.plan_version_id.into(),
             key.into(),
             fingerprint.into(),
             json(&manifest)?.into(),
-            source_kind.into(),
-            input.baseline_run_id.into(),
         ],
     )
     .await?;
@@ -352,7 +258,7 @@ pub async fn create(
     let result = detail(&tx, id).await?;
     tx.commit().await?;
     super::execution_wakeup::notify(ctx);
-    tracing::info!(run_id=%id,app_id=%app,phase="queued","Execution queued");
+    tracing::info!(run_id=%id,app_id=%app,phase="queued","Approved execution queued");
     Ok((result, true))
 }
 
@@ -421,7 +327,7 @@ pub async fn attempt(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<AttemptRe
 pub async fn detail(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<RunResponse> {
     let row = one(
         db,
-        "SELECT * FROM execution_runs WHERE id=$1",
+        "SELECT r.*,COALESCE(b.metadata->>'version_name',b.original_filename) AS build_label FROM execution_runs r JOIN builds b ON b.id=r.build_id WHERE r.id=$1",
         vec![id.into()],
     )
     .await?;
@@ -457,9 +363,13 @@ pub async fn detail(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<RunRespons
     };
     let summary = summary(&manifest, &attempts);
     Ok(RunResponse {
+        build_label: Some(field(&row, "build_label")?),
+        comparison: field::<Option<serde_json::Value>>(&row, "comparison")?
+            .map(decode)
+            .transpose()?,
+        baseline_run_id: field(&row, "baseline_run_id")?,
         id,
         manifest,
-        baseline_run_id: field(&row, "baseline_run_id")?,
         state,
         summary,
         created_at: field(&row, "created_at")?,
@@ -544,9 +454,8 @@ pub async fn list(
     apps::authorized(ctx, user, app).await?;
     let ids = rows(
         &ctx.db,
-        "SELECT id FROM execution_runs WHERE app_id=$1 AND ($2::uuid IS NULL OR
-            (created_at,id)<(SELECT created_at,id FROM execution_runs WHERE id=$2 AND app_id=$1))
-            ORDER BY created_at DESC,id DESC LIMIT 21",
+        "SELECT id FROM execution_runs WHERE app_id=$1 AND ($2::uuid IS NULL OR id<$2) ORDER \
+            BY id DESC LIMIT 21",
         vec![app.into(), cursor.into()],
     )
     .await?;

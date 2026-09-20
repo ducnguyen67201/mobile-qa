@@ -38,14 +38,9 @@ export function RunPreview({
   const start = useMutation({
     mutationFn: async () => {
       const manifest = query.data?.manifest
-      if (!manifest || query.data?.blockers.length)
+      if (!manifest?.plan_version_id || query.data?.blockers.length)
         throw new Error('Refresh the release check before running')
-      const resolvedPlanVersionId =
-        planVersionId ??
-        (manifest.source?.kind === 'release_plan' ? manifest.source.plan_version_id : undefined) ??
-        manifest.plan_version_id
-      if (!resolvedPlanVersionId) throw new Error('Choose a saved release plan before running')
-      const storageKey = `mobile-qa:run:${session.user.id}:${workspaceId}:${appId}:${buildId}:${resolvedPlanVersionId}:${manifest.environment_revision}`
+      const storageKey = `mobile-qa:run:${session.user.id}:${workspaceId}:${appId}:${buildId}:${manifest.plan_version_id}:${manifest.environment_revision}`
       let key = sessionStorage.getItem(storageKey)
       if (!key) {
         key = crypto.randomUUID()
@@ -55,9 +50,8 @@ export function RunPreview({
         appId,
         {
           build_id: buildId,
-          source: { kind: 'release_plan', plan_version_id: resolvedPlanVersionId },
+          plan_version_id: manifest.plan_version_id,
           environment_revision: manifest.environment_revision,
-          baseline_run_id: null,
         },
         key,
       )

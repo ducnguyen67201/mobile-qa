@@ -231,9 +231,8 @@ def main(author=None, edit_after_queue=None):
                 app,
                 {
                     "build_id": build["id"],
-                    "source": {"kind": "release_plan", "plan_version_id": plan},
+                    "plan_version_id": plan,
                     "environment_revision": 1,
-                    "baseline_run_id": None,
                 },
                 csrf,
             )
@@ -257,9 +256,8 @@ def main(author=None, edit_after_queue=None):
                         app,
                         {
                             "build_id": build["id"],
-                            "source": {"kind": "release_plan", "plan_version_id": plan},
+                            "plan_version_id": plan,
                             "environment_revision": 1,
-                            "baseline_run_id": None,
                         },
                         session["csrf_token"],
                     )

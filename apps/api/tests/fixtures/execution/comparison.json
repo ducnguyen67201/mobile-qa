@@ -1,0 +1,226 @@
+{
+  "id": "52220a85-0072-472a-80c5-854e71a2a6af",
+  "manifest": {
+    "source": {
+      "kind": "saved_case_v1",
+      "case_version_id": "1aea9b8d-1a50-4892-ad32-06b3aacc0e74"
+    },
+    "app_id": "a6afc414-f524-4472-b7d0-482c7fc3220e",
+    "build_id": "66828143-ccbd-4eb5-9956-936241cc7b37",
+    "build_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "build_bytes": 1,
+    "environment_revision": 1,
+    "profile": {
+      "id": "bcf09f04-81db-420f-9b41-3f61060cfc49",
+      "name": "Synthetic policy fixture",
+      "driver": "direct",
+      "package": "ai.mobileqa.demo",
+      "adapter": "android_direct_v1",
+      "device_identity": "fixture",
+      "image": "system-images;android-35;google_apis;x86_64",
+      "model": "",
+      "qualified": true,
+      "qualification_reference": "fixture-only",
+      "max_apk_bytes": 100000000,
+      "execution_context": {
+        "schema_version": 1,
+        "adapter_revision": "android_direct_v1",
+        "verifier_revision": "ui_v1",
+        "worker_runtime_revision": "direct_v1",
+        "reset_policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "qualified_profile_id": "bcf09f04-81db-420f-9b41-3f61060cfc49",
+        "package": "ai.mobileqa.demo",
+        "launch_component": "ai.mobileqa.demo/.MainActivity",
+        "image": "system-images;android-35;google_apis;x86_64",
+        "abi": "x86_64",
+        "width": 1080,
+        "height": 1920,
+        "density": 420,
+        "locale": "en-US",
+        "timezone": "Etc/UTC",
+        "state_scope": "local_only",
+        "qualification_reference": "fixture-only",
+        "starting_checks": [
+          {
+            "id": "created",
+            "checkpoint_id": "created",
+            "description": "The unique task was created before testing persistence",
+            "method": "ui_element_presence_v1",
+            "resource_id": "ai.mobileqa.demo:id/task_row",
+            "text_filter": "${task_title}",
+            "property": "text",
+            "expected": "true",
+            "ready_resource_id": "ai.mobileqa.demo:id/ready_marker",
+            "prerequisite_check_ids": [],
+            "required": false,
+            "observation_seconds": 10
+          }
+        ],
+        "stages": {
+          "boot_seconds": 60,
+          "install_seconds": 60,
+          "start_seconds": 30,
+          "cleanup_seconds": 60
+        }
+      }
+    },
+    "cases": [
+      {
+        "definition_id": "1aea9b8d-1a50-4892-ad32-06b3aacc0e74",
+        "content_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "data_variant": "default",
+        "required": true,
+        "case": {
+          "key": "TASK-PERSIST",
+          "version": 1,
+          "title": "Saved task survives restart",
+          "requirement": "A created task must remain in the task list after an app process restart.",
+          "provenance": "operator_authored",
+          "package": "ai.mobileqa.demo",
+          "adapter": "demo_persistence_v1",
+          "preconditions": ["Clean demo device", "Controlled demo backend available"],
+          "actions": [
+            {
+              "id": "create",
+              "kind": "navigate",
+              "instruction": "Create exactly one task named ${task_title}, press Save, return to the list and stop. Do not close the app or change settings.",
+              "checkpoint_id": "created"
+            },
+            {
+              "id": "restart",
+              "kind": "restart_app",
+              "instruction": "",
+              "checkpoint_id": "reopened"
+            }
+          ],
+          "checks": [
+            {
+              "id": "created",
+              "checkpoint_id": "created",
+              "description": "The unique task was created before testing persistence",
+              "method": "ui_element_presence_v1",
+              "resource_id": "ai.mobileqa.demo:id/task_row",
+              "text_filter": "${task_title}",
+              "property": "text",
+              "expected": "true",
+              "ready_resource_id": "ai.mobileqa.demo:id/ready_marker",
+              "prerequisite_check_ids": [],
+              "required": true,
+              "observation_seconds": 10
+            }
+          ],
+          "budget": {
+            "duration_seconds": 600,
+            "max_steps": 30,
+            "artifact_bytes": 16777216
+          }
+        }
+      }
+    ],
+    "budget": {
+      "duration_seconds": 600,
+      "max_steps": 30,
+      "artifact_bytes": 16777216
+    },
+    "diagnostic_retries": 0,
+    "exclusions": []
+  },
+  "state": "finished",
+  "summary": "Passed",
+  "created_at": "2026-09-20T12:00:00Z",
+  "attempts": [
+    {
+      "id": "f8aba7fb-a247-4d7e-80ee-0cc88180c467",
+      "case_version_id": "1aea9b8d-1a50-4892-ad32-06b3aacc0e74",
+      "generation": 1,
+      "number": 1,
+      "state": "finished",
+      "outcome": "passed",
+      "cleanup": "verified_clean",
+      "reason": null,
+      "checks": [
+        {
+          "observation_kind": "present_value",
+          "check_id": "created",
+          "expected": "Buy milk",
+          "observed": "Buy milk",
+          "outcome": "passed",
+          "reason": "expected_value_observed",
+          "artifact_ids": ["0db52229-6528-4783-a62f-68035633c8c7"]
+        }
+      ],
+      "artifacts": [
+        {
+          "id": "0db52229-6528-4783-a62f-68035633c8c7",
+          "attempt_id": "f8aba7fb-a247-4d7e-80ee-0cc88180c467",
+          "checkpoint_id": "created",
+          "name": "created.xml",
+          "mime": "application/xml",
+          "byte_size": 100,
+          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "state": "sealed",
+          "reason": null
+        }
+      ],
+      "usage": [],
+      "events": [],
+      "preflight": {
+        "attempt_id": "f8aba7fb-a247-4d7e-80ee-0cc88180c467",
+        "instance_nonce": "ed0f5599-d18f-4e0b-8d4f-823e4f6a24ed",
+        "context": {
+          "schema_version": 1,
+          "adapter_revision": "android_direct_v1",
+          "verifier_revision": "ui_v1",
+          "worker_runtime_revision": "direct_v1",
+          "reset_policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "qualified_profile_id": "bcf09f04-81db-420f-9b41-3f61060cfc49",
+          "package": "ai.mobileqa.demo",
+          "launch_component": "ai.mobileqa.demo/.MainActivity",
+          "image": "system-images;android-35;google_apis;x86_64",
+          "abi": "x86_64",
+          "width": 1080,
+          "height": 1920,
+          "density": 420,
+          "locale": "en-US",
+          "timezone": "Etc/UTC",
+          "state_scope": "local_only",
+          "qualification_reference": "fixture-only",
+          "starting_checks": [
+            {
+              "id": "created",
+              "checkpoint_id": "created",
+              "description": "The unique task was created before testing persistence",
+              "method": "ui_element_presence_v1",
+              "resource_id": "ai.mobileqa.demo:id/task_row",
+              "text_filter": "${task_title}",
+              "property": "text",
+              "expected": "true",
+              "ready_resource_id": "ai.mobileqa.demo:id/ready_marker",
+              "prerequisite_check_ids": [],
+              "required": false,
+              "observation_seconds": 10
+            }
+          ],
+          "stages": {
+            "boot_seconds": 60,
+            "install_seconds": 60,
+            "start_seconds": 30,
+            "cleanup_seconds": 60
+          }
+        },
+        "build_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "started_at": "2026-09-20T12:00:00Z",
+        "ready_at": "2026-09-20T12:00:00Z",
+        "duration_ms": 1,
+        "artifact_ids": ["0db52229-6528-4783-a62f-68035633c8c7"]
+      },
+      "original_cleanup": {
+        "generation": 1,
+        "stopped": true,
+        "reset": "verified_clean",
+        "evidence_reference": "fixture",
+        "boot_id": "fixture"
+      }
+    }
+  ]
+}

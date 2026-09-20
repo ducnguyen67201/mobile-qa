@@ -17,6 +17,7 @@ pub async fn reconcile(ctx: &AppContext) -> ApiResult<()> {
         vec![],
     )
     .await?;
+    super::run_comparisons::finalize_pending(ctx).await?;
     Ok(())
 }
 
@@ -142,11 +143,18 @@ pub async fn claim(
     .await?;
     let prior = rows(
         &tx,
-        "SELECT id,state FROM execution_attempts WHERE worker_id=$1 AND claim_id=$2",
+        "SELECT a.id,a.state,r.manifest FROM execution_attempts a JOIN execution_runs r ON r.id=a.run_id WHERE a.worker_id=$1 AND a.claim_id=$2",
         vec![worker.id.into(), input.claim_id.into()],
     )
     .await?;
     let id = if let Some(r) = prior.first() {
+        if input.version < 4
+            && field::<serde_json::Value>(r, "manifest")?
+                .get("source")
+                .is_some()
+        {
+            return Err(conflict("This run needs an updated execution worker"));
+        }
         let state: String = field(r, "state")?;
         if !["leased", "running", "finalizing", "cancel_requested"].contains(&state.as_str()) {
             return Err(conflict("Claim already ended; reconcile local journal"));
@@ -175,8 +183,7 @@ pub async fn claim(
             &tx,
             "SELECT a.id FROM execution_attempts a JOIN execution_runs r ON r.id=a.run_id WHERE \
             r.app_id=$1 AND a.state='queued' AND r.cancel_requested=false AND \
-            r.manifest->'profile'->>'id'=$2 AND ($3 OR NOT jsonb_path_exists(r.manifest, '$.cases[*].case.actions[*] ? (@.kind == \"direct\")'))
-            AND ($4 OR NOT (r.manifest ? 'source')) ORDER BY r.created_at,a.case_index,a.number FOR \
+            r.manifest->'profile'->>'id'=$2 AND ($4 OR NOT (r.manifest ? 'source')) AND ($3 OR NOT jsonb_path_exists(r.manifest, '$.cases[*].case.actions[*] ? (@.kind == \"direct\")')) ORDER BY r.created_at,a.case_index,a.number FOR \
             UPDATE OF a SKIP LOCKED LIMIT 1",
             vec![worker.app_id.into(), worker.profile_id.to_string().into(), (input.version>=2).into(), (input.version>=4).into()],
         )
@@ -510,6 +517,14 @@ pub async fn cleanup(
     }
     let result = runs::attempt(&tx, id).await?;
     tx.commit().await?;
+    // Cleanup acknowledgement stays successful even if projection persistence is
+    // temporarily unavailable; reconciliation retries from durable attempt facts.
+    if let Err(error) = super::run_comparisons::finalize_pending(ctx).await {
+        tracing::warn!(
+            ?error,
+            "Comparison finalization will retry during reconciliation"
+        );
+    }
     super::execution_wakeup::notify(ctx);
     Ok(AttemptReceipt { attempt: result })
 }
@@ -549,6 +564,14 @@ pub async fn recover(
     )
     .await?;
     tx.commit().await?;
+    // Cleanup acknowledgement stays successful even if projection persistence is
+    // temporarily unavailable; reconciliation retries from durable attempt facts.
+    if let Err(error) = super::run_comparisons::finalize_pending(ctx).await {
+        tracing::warn!(
+            ?error,
+            "Comparison finalization will retry during reconciliation"
+        );
+    }
     super::execution_wakeup::notify(ctx);
     Ok(())
 }

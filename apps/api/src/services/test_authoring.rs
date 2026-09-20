@@ -29,12 +29,11 @@ pub async fn command(
     enqueue(
         ctx,
         id,
-        input.id,
         input.expected_revision,
         input.frame_id,
         fingerprint,
+        input.purpose,
         PhoneTask {
-            purpose: Some(input.purpose),
             id: input.id,
             goal: input.title,
             control: None,
@@ -51,10 +50,10 @@ pub async fn command(
 async fn enqueue(
     ctx: &AppContext,
     id: Uuid,
-    task_id: Uuid,
     revision: u32,
     frame: Option<Uuid>,
     fingerprint: String,
+    purpose: Option<mobile_qa_contracts::regression::CommandPurpose>,
     task: PhoneTask,
 ) -> ApiResult<PhoneSession> {
     let tx = ctx.db.begin().await?;
@@ -68,7 +67,7 @@ async fn enqueue(
     if let Some(prior) = rows(
         &tx,
         "SELECT session_id,fingerprint FROM phone_tasks WHERE id=$1",
-        vec![task_id.into()],
+        vec![task.id.into()],
     )
     .await?
     .first()
@@ -121,12 +120,18 @@ async fn enqueue(
     }
     exec(
         &tx,
-        "INSERT INTO phone_tasks(id,session_id,fingerprint,payload) VALUES($1,$2,$3,$4)",
+        "INSERT INTO phone_tasks(id,session_id,fingerprint,payload,purpose) VALUES($1,$2,$3,$4,$5)",
         vec![
-            task_id.into(),
+            task.id.into(),
             id.into(),
             fingerprint.into(),
             json(&task)?.into(),
+            purpose
+                .map(|p| match p {
+                    mobile_qa_contracts::regression::CommandPurpose::Trial => "trial",
+                    mobile_qa_contracts::regression::CommandPurpose::Manual => "manual",
+                })
+                .into(),
         ],
     )
     .await?;
@@ -214,12 +219,11 @@ pub async fn generate(
     enqueue(
         ctx,
         s.id,
-        input.id,
         input.expected_revision,
         None,
         fingerprint,
+        None,
         PhoneTask {
-            purpose: Some(PhoneTaskPurpose::Exploration),
             id: input.id,
             goal: format!("Generate {:?} tests", input.category),
             control: None,

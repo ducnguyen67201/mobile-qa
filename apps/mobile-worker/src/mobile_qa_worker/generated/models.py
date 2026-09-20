@@ -267,6 +267,11 @@ class NavigationRequest(BaseModel):
     serial: str
 
 
+class ObservationKind(StrEnum):
+    present_value = 'present_value'
+    absent = 'absent'
+
+
 class Outcome(StrEnum):
     passed = 'passed'
     failed = 'failed'
@@ -437,6 +442,26 @@ class RunArtifact(BaseModel):
     state: EvidenceState
 
 
+class RunSource1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    case_version_id: UUID
+    kind: Literal['saved_case_v1']
+
+
+class RunSource2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['release_plan_v1']
+    plan_version_id: UUID
+
+
+class RunSource(RootModel[RunSource1 | RunSource2]):
+    root: RunSource1 | RunSource2
+
+
 class Scenario1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -508,6 +533,7 @@ class CheckResult(BaseModel):
     artifact_ids: list[UUID]
     check_id: str
     expected: str
+    observation_kind: ObservationKind | None = None
     observed: str | None = None
     outcome: Outcome
     reason: str
@@ -977,9 +1003,10 @@ class RunManifest(BaseModel):
     diagnostic_retries: Annotated[int, Field(ge=0, le=255)]
     environment_revision: int
     exclusions: list[str]
-    plan_hash: str
-    plan_version_id: UUID
+    plan_hash: str | None = None
+    plan_version_id: UUID | None = None
     profile: ExecutionProfile
+    source: RunSource | None = None
 
 
 class AttemptResponse(BaseModel):

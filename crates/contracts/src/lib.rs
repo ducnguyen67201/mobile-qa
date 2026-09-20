@@ -18,3 +18,6 @@ pub mod automation;
 pub mod automation_api;
 
 pub mod execution_lifecycle;
+
+pub mod regression;
+pub mod regression_api;

@@ -758,6 +758,7 @@ pub struct BrowserApi;
 pub fn openapi() -> utoipa::openapi::OpenApi {
     let mut api = BrowserApi::openapi();
     api.merge(crate::execution_api::ExecutionApi::openapi());
+    api.merge(crate::regression_api::RegressionApi::openapi());
     api.merge(crate::task_sessions_api::TaskSessionsApi::openapi());
     api.merge(crate::automation_api::AutomationApi::openapi());
     api.merge(crate::test_library_api::TestLibraryApi::openapi());

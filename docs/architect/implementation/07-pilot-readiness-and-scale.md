@@ -108,6 +108,12 @@ original failure. Lost mutation responses never authorize a blind retry.
 
 ### Comparison rules
 
+The first 07B delivery is specified in
+[Regression labels and durable test history](07b-regression-label-and-history.md).
+It closes the editor/Runs history split before adding the Regression badge. The
+specification now includes local implementation and acceptance evidence; the remaining
+audited-triage scope stays here.
+
 Match a case by app, stable case key and data variant. Require exact case version/hash,
 environment revision and qualified execution signature (including reset/verifier/runtime)
 for a comparable result. Build checksum may differ; that is the comparison axis.
@@ -252,3 +258,10 @@ continues to use stored case_index when reading the manifest; a public compariso
 belongs to 07B. Reports remain in this canonical document, rather than adding completed
 plan/report files. The full plan remains pending for 07B–D. Real non-demo APK qualification,
 the reliability campaign and hosted acceptance are not claimed by this delivery.
+
+### 07B first delivery — 2026-09-20
+
+Saved-case admission, durable history and conservative persisted regression comparisons
+are implemented locally. See the [owning specification and implementation report](07b-regression-label-and-history.md#implementation-report--2026-09-20)
+for contracts, compatibility decisions, validation and device acceptance. This delivery
+adds no review gate and does not complete audited triage or the later operational phases.

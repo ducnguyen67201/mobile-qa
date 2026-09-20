@@ -18,6 +18,16 @@ The API owns a single save service inside the existing app transaction and lock.
 Manual edits, templates and selected AI proposals use it. It preserves bounded
 incomplete content and returns field issues. Complete content with valid references
 creates an immutable executable snapshot; identical saves reuse that snapshot.
+In the case editor, setup issues link to their action/check and field. Selecting an
+issue expands the relevant section, scrolls to the field and focuses it; invalid
+fields and collapsed action rows are marked. Error locations follow stable item IDs
+when actions move. Editing an affected field clears its previous server error; Save
+revalidates the new value. Other unresolved errors remain visible.
+Check details expose an optional screen-readiness picker independently of the result
+target. Choose a stable control when the result may disappear; a missing result on
+that ready screen fails the assertion, while a missing readiness control or ambiguous
+result remains blocked. Picking a new result preserves an explicitly selected readiness control.
+
 The server allocates versions. AI provenance stays on editor content and the catalog;
 the executable case uses the permitted user-authored representation.
 

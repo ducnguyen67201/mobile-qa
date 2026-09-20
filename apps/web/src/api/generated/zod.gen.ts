@@ -66,6 +66,30 @@ export const zAuthoringUsage = z.object({
     unknown_calls: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
+export const zBaselineChoice = z.object({
+    build_id: z.uuid(),
+    build_label: z.string(),
+    compatible: z.boolean(),
+    created_at: z.iso.datetime(),
+    id: z.uuid(),
+    reason: z.string()
+});
+
+export const zCaseRunPreview = z.object({
+    baselines: z.array(zBaselineChoice),
+    blockers: z.array(z.string()),
+    environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    suggested_baseline_id: z.uuid().nullish()
+});
+
+export const zCaseRunRequest = z.object({
+    baseline_run_id: z.uuid().nullish(),
+    build_id: z.uuid(),
+    case_version_id: z.uuid(),
+    environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    profile_id: z.uuid()
+});
+
 export const zCaseSelection = z.object({
     case_version_id: z.uuid(),
     data_variant: z.string(),
@@ -109,6 +133,20 @@ export const zCleanupRequest = z.object({
     reset: zCleanupState,
     stopped: z.boolean()
 });
+
+export const zCommandPurpose = z.enum(['trial', 'manual']);
+
+export const zComparisonKind = z.enum([
+    'regression',
+    'still_failing',
+    'recovered',
+    'unchanged',
+    'new_failure',
+    'no_baseline',
+    'not_comparable',
+    'added',
+    'removed'
+]);
 
 export const zCoverageKind = z.enum([
     'smoke',
@@ -392,6 +430,8 @@ export const zModelUsage = z.object({
     unknown_calls: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
+export const zObservationKind = z.enum(['present_value', 'absent']);
+
 export const zOpenPhoneRequest = z.object({
     build_id: z.uuid().nullish(),
     id: z.uuid(),
@@ -417,9 +457,24 @@ export const zCheckResult = z.object({
     artifact_ids: z.array(z.uuid()),
     check_id: z.string(),
     expected: z.string(),
+    observation_kind: zObservationKind.nullish(),
     observed: z.string().nullish(),
     outcome: zOutcome,
     reason: z.string()
+});
+
+export const zCaseComparison = z.object({
+    baseline_case_id: z.uuid().nullish(),
+    baseline_checks: z.array(zCheckResult),
+    baseline_outcome: zOutcome.nullish(),
+    case_key: z.string(),
+    current_case_id: z.uuid().nullish(),
+    current_checks: z.array(zCheckResult),
+    current_outcome: zOutcome.nullish(),
+    data_variant: z.string(),
+    kind: zComparisonKind,
+    reason: z.string(),
+    title: z.string()
 });
 
 export const zCompleteRequest = z.object({
@@ -552,6 +607,23 @@ export const zRunArtifact = z.object({
 export const zArtifactReceipt = z.object({
     artifact: zRunArtifact
 });
+
+export const zRunComparison = z.object({
+    baseline_run_id: z.uuid().nullish(),
+    cases: z.array(zCaseComparison),
+    policy_version: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+export const zRunSource = z.union([
+    z.object({
+        case_version_id: z.uuid(),
+        kind: z.enum(['saved_case_v1'])
+    }),
+    z.object({
+        kind: z.enum(['release_plan_v1']),
+        plan_version_id: z.uuid()
+    })
+]);
 
 export const zSavedAuthoredTests = z.object({
     entry_ids: z.array(z.uuid())
@@ -800,6 +872,7 @@ export const zPhoneCommandRequest = z.object({
     expected_revision: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     frame_id: z.uuid().nullish(),
     id: z.uuid(),
+    purpose: zCommandPurpose.nullish(),
     sequence: zAutomationSequence,
     title: z.string()
 });
@@ -909,9 +982,10 @@ export const zRunManifest = z.object({
     diagnostic_retries: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     exclusions: z.array(z.string()),
-    plan_hash: z.string(),
-    plan_version_id: z.uuid(),
-    profile: zExecutionProfile
+    plan_hash: z.string().nullish(),
+    plan_version_id: z.uuid().nullish(),
+    profile: zExecutionProfile,
+    source: zRunSource.nullish()
 });
 
 export const zExecutionLease = z.object({
@@ -931,11 +1005,29 @@ export const zClaimResponse = z.object({
 
 export const zRunResponse = z.object({
     attempts: z.array(zAttemptResponse),
+    baseline_run_id: z.uuid().nullish(),
+    build_label: z.string().nullish(),
+    comparison: zRunComparison.nullish(),
     created_at: z.iso.datetime(),
     id: z.uuid(),
     manifest: zRunManifest,
     state: zJobState,
     summary: z.string()
+});
+
+export const zRunHistoryItem = z.object({
+    build_label: z.string(),
+    created_at: z.iso.datetime(),
+    id: z.string(),
+    run: zRunResponse.nullish(),
+    session_id: z.uuid().nullish(),
+    source: z.string(),
+    trial: zPhoneTask.nullish()
+});
+
+export const zRunHistory = z.object({
+    items: z.array(zRunHistoryItem),
+    next_cursor: z.string().nullish()
 });
 
 export const zRunListResponse = z.object({
@@ -1222,6 +1314,32 @@ export const zGetBuildPath = z.object({
  */
 export const zGetBuildResponse = zBuildResponse;
 
+export const zCreateCaseRunBody = zCaseRunRequest;
+
+export const zCreateCaseRunHeaders = z.object({
+    'Idempotency-Key': z.string()
+});
+
+export const zCreateCaseRunPath = z.object({
+    app_id: z.uuid()
+});
+
+/**
+ * Idempotent replay
+ */
+export const zCreateCaseRunResponse = zRunResponse;
+
+export const zPreviewCaseRunBody = zCaseRunRequest;
+
+export const zPreviewCaseRunPath = z.object({
+    app_id: z.uuid()
+});
+
+/**
+ * Success
+ */
+export const zPreviewCaseRunResponse = zCaseRunPreview;
+
 export const zGetDefaultTestPlanPath = z.object({
     app_id: z.uuid()
 });
@@ -1294,6 +1412,20 @@ export const zOpenPhonePath = z.object({
  * Success
  */
 export const zOpenPhoneResponse = zPhoneSession;
+
+export const zGetRunHistoryPath = z.object({
+    app_id: z.uuid()
+});
+
+export const zGetRunHistoryQuery = z.object({
+    source: z.string().optional(),
+    cursor: z.string().optional()
+});
+
+/**
+ * Success
+ */
+export const zGetRunHistoryResponse = zRunHistory;
 
 export const zListRunsPath = z.object({
     app_id: z.uuid()

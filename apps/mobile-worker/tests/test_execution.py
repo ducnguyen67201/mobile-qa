@@ -247,3 +247,18 @@ def test_user_authored_published_case_uses_the_existing_worker_protocol():
     parsed = ExecutionJob.model_validate(published)
     assert parsed.manifest.cases[0].case.provenance == "user_authored"
     assert ExecutionJob.model_validate_json(parsed.model_dump_json()) == parsed
+
+
+def test_saved_case_manifest_keeps_legacy_plan_shape_optional():
+    """Protocol four accepts saved-case sources without inventing a plan."""
+    from mobile_qa_worker.generated.models import RunManifest
+
+    raw = job().manifest.model_dump(mode="json", exclude_none=True)
+    legacy = RunManifest.model_validate(raw)
+    assert legacy.plan_version_id is not None
+    raw.pop("plan_version_id")
+    raw.pop("plan_hash")
+    raw["source"] = {"kind": "saved_case_v1", "case_version_id": raw["cases"][0]["definition_id"]}
+    current = RunManifest.model_validate(raw)
+    assert current.plan_version_id is None
+    assert current.model_dump(mode="json", exclude_none=True)["source"] == raw["source"]

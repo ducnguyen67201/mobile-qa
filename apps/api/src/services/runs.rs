@@ -17,12 +17,6 @@ pub async fn preview(
         manifest: None,
         blockers: vec![],
     };
-    let b = one(
-        db,
-        "SELECT * FROM builds WHERE id=$1 AND app_id=$2",
-        vec![build.into(), app.into()],
-    )
-    .await?;
     let plan = if let Some(id) = plan {
         id
     } else {
@@ -49,14 +43,42 @@ pub async fn preview(
     let TestDefinition::Plan(p) = &d.definition else {
         return Err(ApiFailure::invalid("Expected a plan version"));
     };
-    let profile = definitions::profile(db, app, p.profile_id).await?;
     let cases = match definitions::resolve(db, app, p).await {
-        Ok(v) => v,
-        Err(e) => {
-            out.blockers.push(e.message);
+        Ok(cases) => cases,
+        Err(error) if !error.status.is_server_error() => {
+            out.blockers.push(error.message);
             return Ok(out);
         }
+        Err(error) => return Err(error),
     };
+    assemble(db, app, build, d.clone(), p.clone(), cases, None).await
+}
+
+pub(crate) async fn assemble(
+    db: &impl ConnectionTrait,
+    app: Uuid,
+    build: Uuid,
+    d: DefinitionResponse,
+    p: PlanDefinition,
+    cases: Vec<ResolvedCase>,
+    source: Option<mobile_qa_contracts::regression::RunSource>,
+) -> ApiResult<PlanPreviewResponse> {
+    let mut out = PlanPreviewResponse {
+        plan: if source.is_none() {
+            Some(d.clone())
+        } else {
+            None
+        },
+        manifest: None,
+        blockers: vec![],
+    };
+    let b = one(
+        db,
+        "SELECT * FROM builds WHERE id=$1 AND app_id=$2",
+        vec![build.into(), app.into()],
+    )
+    .await?;
+    let profile = definitions::profile(db, app, p.profile_id).await?;
     if cases.iter().any(|c| {
         c.case
             .actions
@@ -141,8 +163,13 @@ pub async fn preview(
         build_id: build,
         build_sha256: field(&b, "sha256")?,
         build_bytes: u32::try_from(size).unwrap_or(0),
-        plan_version_id: d.id,
-        plan_hash: d.content_hash,
+        source: source.clone(),
+        plan_version_id: if source.is_some() { None } else { Some(d.id) },
+        plan_hash: if source.is_some() {
+            None
+        } else {
+            Some(d.content_hash)
+        },
         environment_revision: field(&env, "revision")?,
         profile,
         cases,
@@ -300,7 +327,7 @@ pub async fn attempt(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<AttemptRe
 pub async fn detail(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<RunResponse> {
     let row = one(
         db,
-        "SELECT * FROM execution_runs WHERE id=$1",
+        "SELECT r.*,COALESCE(b.metadata->>'version_name',b.original_filename) AS build_label FROM execution_runs r JOIN builds b ON b.id=r.build_id WHERE r.id=$1",
         vec![id.into()],
     )
     .await?;
@@ -336,6 +363,11 @@ pub async fn detail(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<RunRespons
     };
     let summary = summary(&manifest, &attempts);
     Ok(RunResponse {
+        build_label: Some(field(&row, "build_label")?),
+        comparison: field::<Option<serde_json::Value>>(&row, "comparison")?
+            .map(decode)
+            .transpose()?,
+        baseline_run_id: field(&row, "baseline_run_id")?,
         id,
         manifest,
         state,

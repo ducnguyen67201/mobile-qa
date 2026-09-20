@@ -38,7 +38,7 @@ export function RunPreview({
   const start = useMutation({
     mutationFn: async () => {
       const manifest = query.data?.manifest
-      if (!manifest || query.data?.blockers.length)
+      if (!manifest?.plan_version_id || query.data?.blockers.length)
         throw new Error('Refresh the release check before running')
       const storageKey = `mobile-qa:run:${session.user.id}:${workspaceId}:${appId}:${buildId}:${manifest.plan_version_id}:${manifest.environment_revision}`
       let key = sessionStorage.getItem(storageKey)

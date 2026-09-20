@@ -1,3 +1,4 @@
+import { RunResult } from '@/components/runs/run-result'
 import { actionLabel } from '@/lib/action-label'
 import {
   Alert,
@@ -46,6 +47,7 @@ export function RunDetail() {
       {r.manifest.profile.driver === 'fake' && (
         <Alert color="yellow">Simulated execution. No real phone or model was used.</Alert>
       )}
+      <RunResult run={r} />
       <Group>
         <Badge>{r.state}</Badge>
         <Text>

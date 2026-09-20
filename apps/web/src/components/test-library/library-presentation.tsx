@@ -1,5 +1,16 @@
 import { actionLabel } from '@/lib/action-label'
-import { Accordion, Alert, Badge, Card, Group, List, Stack, Text, Title } from '@mantine/core'
+import {
+  Accordion,
+  Alert,
+  Anchor,
+  Badge,
+  Card,
+  Group,
+  List,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core'
 import { Link } from 'react-router'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type {
@@ -11,9 +22,15 @@ import type {
 export function LibraryIssues({
   issues,
   title = 'Saved content needs setup',
+  locate,
+  onSelect,
+  message,
 }: {
   issues: LibraryIssue[]
   title?: string
+  locate?: (issue: LibraryIssue) => string | null
+  onSelect?: (issue: LibraryIssue) => void
+  message?: (issue: LibraryIssue) => string
 }) {
   if (!issues.length) return null
   return (
@@ -21,11 +38,25 @@ export function LibraryIssues({
       <List size="sm">
         {issues.map((issue, i) => (
           <List.Item key={`${issue.field}:${issue.item_id}:${i}`}>
-            {issue.message}
-            <Text span size="xs" c="dimmed">
-              {' '}
-              · {issue.field.replaceAll('_', ' ')}
-            </Text>
+            {locate?.(issue) && onSelect ? (
+              <Anchor
+                component="button"
+                type="button"
+                size="sm"
+                ta="left"
+                onClick={() => onSelect(issue)}
+              >
+                {locate(issue)} — {message?.(issue) ?? issue.message}
+              </Anchor>
+            ) : (
+              (message?.(issue) ?? issue.message)
+            )}
+            {!locate && (
+              <Text span size="xs" c="dimmed">
+                {' '}
+                · {issue.field.replaceAll('_', ' ')}
+              </Text>
+            )}
           </List.Item>
         ))}
       </List>

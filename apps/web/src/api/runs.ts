@@ -29,7 +29,11 @@ export const runQuery = (workspace: string, runId: string) =>
     enabled: !!runId,
     queryFn: () => checked(sdk.getRun({ ...options, path: { run_id: runId } }), z.zRunResponse),
     refetchInterval: (query) =>
-      query.state.data?.state === 'finished' ? false : document.hidden ? 15_000 : 2_000,
+      query.state.data?.state === 'finished' && query.state.data.comparison
+        ? false
+        : document.hidden
+          ? 15_000
+          : 2_000,
     refetchIntervalInBackground: true,
   })
 export const runsQuery = (workspace: string, appId: string, cursor?: string) =>

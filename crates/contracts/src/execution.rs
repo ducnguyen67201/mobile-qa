@@ -258,8 +258,12 @@ pub struct RunManifest {
     pub build_id: Uuid,
     pub build_sha256: String,
     pub build_bytes: u32,
-    pub plan_version_id: Uuid,
-    pub plan_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<crate::regression::RunSource>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan_version_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan_hash: Option<String>,
     pub environment_revision: i32,
     pub profile: ExecutionProfile,
     pub cases: Vec<ResolvedCase>,
@@ -284,6 +288,8 @@ pub struct CreateRunRequest {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CheckResult {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observation_kind: Option<crate::regression::ObservationKind>,
     pub check_id: String,
     pub expected: String,
     pub observed: Option<String>,
@@ -329,6 +335,12 @@ pub struct AttemptResponse {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RunResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comparison: Option<crate::regression::RunComparison>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline_run_id: Option<Uuid>,
     pub id: Uuid,
     pub manifest: RunManifest,
     pub state: JobState,

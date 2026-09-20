@@ -193,3 +193,48 @@ def test_capture_shares_active_rpc_instead_of_starting_a_second_instrumentation(
         lambda *args: pytest.fail("shell dumper conflicts with active instrumentation"),
     )
     assert direct.hierarchy(device) == XML
+
+
+@pytest.mark.parametrize(
+    ("ready", "rows", "reason"),
+    [
+        (True, [], "assertion_failed"),
+        (True, ["Buy eggs"], "assertion_failed"),
+        (True, ["Buy milk", "Buy milk"], "target_not_unique"),
+        (False, [], "screen_not_ready"),
+        (True, ["Buy milk"], None),
+    ],
+)
+def test_result_missing_on_ready_screen_is_failure(ready, rows, reason, monkeypatch):
+    from mobile_qa_worker.automation import direct
+    from mobile_qa_worker.generated.models import ExpectedCheck
+
+    def node(name, text=""):
+        return f'<node package="{PACKAGE}" resource-id="{PACKAGE}:id/{name}" text="{text}" />'
+
+    xml = "<hierarchy>" + node("container") + (node("ready") if ready else "")
+    xml += "".join(node("row", text) for text in rows) + "</hierarchy>"
+    monkeypatch.setattr(direct, "hierarchy", lambda _: xml.encode())
+    clock = iter([0, 2])
+    monkeypatch.setattr(direct.time, "monotonic", lambda: next(clock))
+    expected = ExpectedCheck.model_validate(
+        {
+            "id": "persisted",
+            "checkpoint_id": "restarted",
+            "description": "Task survives restart",
+            "method": "ui_property_equals_v1",
+            "resource_id": PACKAGE + ":id/row",
+            "ready_resource_id": PACKAGE + ":id/ready",
+            "property": "text",
+            "expected": "Buy milk",
+            "text_filter": "",
+            "required": True,
+            "observation_seconds": 1,
+            "prerequisite_check_ids": [],
+        }
+    )
+    if reason:
+        with pytest.raises(QualificationError, match=reason):
+            direct.check(Device(), PACKAGE, expected)
+    else:
+        direct.check(Device(), PACKAGE, expected)

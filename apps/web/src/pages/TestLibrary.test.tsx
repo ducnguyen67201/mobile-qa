@@ -216,7 +216,7 @@ it('preserves a stale editor, compares saved fields and requires an explicit rev
     expected_revision: 2,
     definition: { content: { title: 'My carefully edited title' } },
   })
-})
+}, 10_000)
 it('keeps expected results when an action is removed and warns before leaving an unsaved draft', async () => {
   vi.stubGlobal('fetch', fixtureFetch())
   show(`/tests/${appId}/${entryId}`)

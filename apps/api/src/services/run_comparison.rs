@@ -1,6 +1,7 @@
 //! Baseline selection and comparison are projections over immutable run evidence.
 use super::{execution_store::*, runs};
 use crate::errors::{ApiFailure, ApiResult};
+use chrono::{DateTime, Utc};
 use mobile_qa_contracts::execution::*;
 use sea_orm::ConnectionTrait;
 use std::collections::BTreeMap;
@@ -197,32 +198,53 @@ pub async fn candidates(
         ));
     }
     let mut items = Vec::new();
-    for row in rows(
-        db,
-        "SELECT r.id,b.original_filename FROM execution_runs r JOIN builds b ON b.id=r.build_id
-         WHERE r.app_id=$1 AND r.source_kind='saved_case'
-         ORDER BY r.created_at DESC,r.id DESC LIMIT 100",
-        vec![app.into()],
-    )
-    .await?
-    {
-        let run = runs::detail(db, field(&row, "id")?).await?;
-        if context_mismatch(&run.manifest, &current).is_some() {
-            continue;
-        }
-        let Ok(result) = clean_result(&run) else {
-            continue;
+    let mut cursor: Option<(DateTime<Utc>, Uuid)> = None;
+    loop {
+        let batch = if let Some((created_at, id)) = cursor {
+            rows(
+                db,
+                "SELECT r.id,r.created_at,b.original_filename FROM execution_runs r
+                 JOIN builds b ON b.id=r.build_id
+                 WHERE r.app_id=$1 AND r.source_kind='saved_case'
+                   AND (r.created_at,r.id)<($2,$3)
+                 ORDER BY r.created_at DESC,r.id DESC LIMIT 100",
+                vec![app.into(), created_at.into(), id.into()],
+            )
+            .await?
+        } else {
+            rows(
+                db,
+                "SELECT r.id,r.created_at,b.original_filename FROM execution_runs r
+                 JOIN builds b ON b.id=r.build_id
+                 WHERE r.app_id=$1 AND r.source_kind='saved_case'
+                 ORDER BY r.created_at DESC,r.id DESC LIMIT 100",
+                vec![app.into()],
+            )
+            .await?
         };
-        items.push(BaselineCandidate {
-            run_id: run.id,
-            build_id: run.manifest.build_id,
-            build_name: field(&row, "original_filename")?,
-            build_sha256: run.manifest.build_sha256,
-            created_at: run.created_at,
-            outcome: result.outcome,
-        });
-        if items.len() == 20 {
+        let Some(last) = batch.last() else {
             break;
+        };
+        cursor = Some((field(last, "created_at")?, field(last, "id")?));
+        for row in batch {
+            let run = runs::detail(db, field(&row, "id")?).await?;
+            if context_mismatch(&run.manifest, &current).is_some() {
+                continue;
+            }
+            let Ok(result) = clean_result(&run) else {
+                continue;
+            };
+            items.push(BaselineCandidate {
+                run_id: run.id,
+                build_id: run.manifest.build_id,
+                build_name: field(&row, "original_filename")?,
+                build_sha256: run.manifest.build_sha256,
+                created_at: run.created_at,
+                outcome: result.outcome,
+            });
+            if items.len() == 20 {
+                return Ok(BaselineCandidateResponse { items });
+            }
         }
     }
     Ok(BaselineCandidateResponse { items })

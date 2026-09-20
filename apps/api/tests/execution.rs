@@ -590,6 +590,34 @@ async fn saved_case_runs_freeze_baselines_compare_and_project_history() {
         .await
         .unwrap();
 
+        // Recent unfinished runs must not hide an older eligible baseline at a page boundary.
+        let noise_namespace = Uuid::new_v4().to_string();
+        exec(
+            &ctx.db,
+            "INSERT INTO execution_runs(id,app_id,creator_id,build_id,plan_id,idempotency_key,
+                 fingerprint,manifest,cancel_requested,created_at,source_kind,baseline_run_id)
+             SELECT md5($2 || ':run:' || generated.position::text)::uuid,
+                 app_id,creator_id,build_id,plan_id,
+                 $2 || ':key:' || generated.position::text,fingerprint,manifest,cancel_requested,
+                 created_at + (generated.position + 1) * interval '1 second',source_kind,NULL
+             FROM execution_runs
+             CROSS JOIN generate_series(1,101) AS generated(position)
+             WHERE id=$1",
+            vec![baseline.id.into(), noise_namespace.clone().into()],
+        )
+        .await
+        .unwrap();
+        exec(
+            &ctx.db,
+            "INSERT INTO execution_attempts(id,run_id,case_index)
+             SELECT md5($1 || ':attempt:' || generated.position::text)::uuid,
+                 md5($1 || ':run:' || generated.position::text)::uuid,0
+             FROM generate_series(1,101) AS generated(position)",
+            vec![noise_namespace.clone().into()],
+        )
+        .await
+        .unwrap();
+
         let candidates = owner
             .read(server.get(&format!(
                 "/api/apps/{app}/baseline-candidates?build_id={build}&case_version_id={case_version_id}&profile_id={}&environment_revision=1",
@@ -601,6 +629,23 @@ async fn saved_case_runs_freeze_baselines_compare_and_project_history() {
         assert_eq!(candidates.items[0].run_id, known_failure.id);
         assert_eq!(candidates.items[0].outcome, Outcome::Failed);
         assert!(candidates.items.iter().any(|item| item.run_id == baseline.id));
+        let noise_pattern = format!("{noise_namespace}:key:%");
+        exec(
+            &ctx.db,
+            "DELETE FROM execution_attempts WHERE run_id IN (
+                 SELECT id FROM execution_runs WHERE app_id=$1 AND idempotency_key LIKE $2
+             )",
+            vec![app.into(), noise_pattern.clone().into()],
+        )
+        .await
+        .unwrap();
+        exec(
+            &ctx.db,
+            "DELETE FROM execution_runs WHERE app_id=$1 AND idempotency_key LIKE $2",
+            vec![app.into(), noise_pattern.into()],
+        )
+        .await
+        .unwrap();
 
         let current_response = submit("saved-current", Some(baseline.id)).await;
         current_response.assert_status(axum::http::StatusCode::CREATED);

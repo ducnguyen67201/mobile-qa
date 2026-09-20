@@ -4,12 +4,12 @@
 - cluster-only mode — file stats not available
 
 ## Summary
-- 2409 nodes · 6690 edges · 155 communities (106 shown, 32 thin omitted)
-- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 480 edges (avg confidence: 0.88)
+- 2409 nodes · 6693 edges · 154 communities (105 shown, 32 thin omitted)
+- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 481 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `37c2fce0`
+- Built from commit: `9c2a1fec`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -120,7 +120,7 @@
 - Community 103
 - Community 104
 - Community 105
-- Community 106
+- Community 107
 - Community 108
 - Community 109
 - Community 110
@@ -144,14 +144,13 @@
 - Community 128
 - Community 129
 - Community 130
-- Community 131
+- Community 132
 - Community 133
 - Community 134
 - Community 135
 - Community 136
 - Community 137
-- Community 138
-- Community 154
+- Community 153
 
 ## God Nodes (most connected - your core abstractions)
 1. `QualificationError` - 162 edges
@@ -180,11 +179,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (155 total, 32 thin omitted)
+## Communities (154 total, 32 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.06
-Nodes (99): artifact(), cancel(), case_create(), case_preview(), create(), detail(), history(), HistoryQuery (+91 more)
+Cohesion: 0.05
+Nodes (104): artifact(), cancel(), case_create(), case_preview(), create(), detail(), history(), HistoryQuery (+96 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.09
@@ -195,7 +194,7 @@ Cohesion: 0.07
 Nodes (59): b64(), client(), google_fixture(), google_sign_in(), main(), provision(), Secret-free HTTP acceptance using owned test accounts/processes and a synthetic…, Ephemeral RSA fixture keys; the API accepts these only in Environment::Test. (+51 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.06
+Cohesion: 0.07
 Nodes (66): every_declared_route_requires_the_declared_security_and_errors(), google_identity_binding_expiry_replay_and_password_removal(), persisted_workflow_auth_scope_and_real_validation(), public_registration_approval_and_multiple_workspace_isolation(), rejection_recovery_and_infrastructure_failure(), throttles_quota_and_revision_scope(), assertion_absence_requires_a_ready_unambiguous_screen(), clean_start_route_is_fenced_and_recovery_keeps_original_evidence() (+58 more)
 
 ### Community 4 - "Community 4"
@@ -219,28 +218,28 @@ Cohesion: 0.10
 Nodes (47): execute(), Path, Sequential approved actions on the qualified demo adapter, with supervised SDK…, sdk_action(), await_start_ack(), execute(), Path, Explicit bounded navigation; imports the SDK after process environment… (+39 more)
 
 ### Community 9 - "Community 9"
+Cohesion: 0.13
+Nodes (51): ActionKind, ApprovalPurpose, ArtifactReceipt, ArtifactRequest, AttemptResponse, CaseDefinition, CaseSelection, CheckMethod (+43 more)
+
+### Community 10 - "Community 10"
 Cohesion: 0.08
 Nodes (44): configure_auth(), MAX_APK, AppContext, Config, Environment, Option, PathBuf, Result (+36 more)
 
-### Community 10 - "Community 10"
+### Community 11 - "Community 11"
 Cohesion: 0.05
 Nodes (35): Any, Explicit bounded AI authoring; ordinary device operations never enter this…, check_context(), compact(), configure_agent(), __call__(), direct_tool(), foreground() (+27 more)
 
-### Community 11 - "Community 11"
+### Community 12 - "Community 12"
 Cohesion: 0.11
 Nodes (38): openPhone(), phoneOptionsQuery(), phoneQuery(), stopPhone(), cancelTestGeneration(), generateTests(), runPhoneCommand(), saveAuthoredTests() (+30 more)
 
-### Community 12 - "Community 12"
+### Community 13 - "Community 13"
 Cohesion: 0.12
 Nodes (35): planQuery(), runsQuery(), checked(), forgetSession(), headers(), options, setCsrfToken(), appQuery() (+27 more)
 
-### Community 13 - "Community 13"
+### Community 14 - "Community 14"
 Cohesion: 0.07
 Nodes (32): cost_estimate(), rate(), Exception, QualificationError, Stable, safe reason code; never contains a provider response or credential., Path, safe_path(), validate_result() (+24 more)
-
-### Community 14 - "Community 14"
-Cohesion: 0.15
-Nodes (44): ActionKind, ArtifactReceipt, ArtifactRequest, AttemptResponse, CaseDefinition, CaseSelection, CheckMethod, CheckResult (+36 more)
 
 ### Community 15 - "Community 15"
 Cohesion: 0.06
@@ -299,60 +298,60 @@ Cohesion: 0.11
 Nodes (16): Observation, observe(), Deterministic oracle for the controlled persistence demo, not arbitrary…, validate_png(), verdict(), parametrize, test_full_supervisor_with_injected_device(), boot() (+8 more)
 
 ### Community 29 - "Community 29"
-Cohesion: 0.18
-Nodes (25): create(), manifest(), preview(), ApiResult, AppContext, ConnectionTrait, Uuid, BaselineChoice (+17 more)
+Cohesion: 0.19
+Nodes (24): create(), manifest(), preview(), ApiResult, AppContext, ConnectionTrait, Uuid, BaselineChoice (+16 more)
 
 ### Community 30 - "Community 30"
 Cohesion: 0.10
 Nodes (21): execute(), png(), Path, Synthetic HTTP-worker evidence. It is never advertised as device qualification., controls(), goal_for(), Only bounded non-password controls can become selectable model context., Re-resolve element identity; old screen coordinates never authorize a blind tap. (+13 more)
 
 ### Community 31 - "Community 31"
-Cohesion: 0.20
-Nodes (20): compare(), compares_verified_facts_and_freezes_baseline_identity(), context_matches(), coverage_changes_remain_visible(), eligible(), failed(), manifest_legacy_serialization_is_unchanged(), outcome() (+12 more)
-
-### Community 32 - "Community 32"
 Cohesion: 0.28
 Nodes (21): one(), rows(), ConnectionTrait, QueryResult, Vec, assemble(), attempt(), authorize() (+13 more)
 
-### Community 33 - "Community 33"
+### Community 32 - "Community 32"
 Cohesion: 0.32
 Nodes (20): authorized(), create(), detail(), environment(), list(), ListQuery, membership(), origins() (+12 more)
 
-### Community 34 - "Community 34"
+### Community 33 - "Community 33"
 Cohesion: 0.36
 Nodes (20): admitted(), authorize(), capabilities(), content_issues(), coverage(), default_plan(), draft(), entry() (+12 more)
 
-### Community 35 - "Community 35"
+### Community 34 - "Community 34"
 Cohesion: 0.10
 Nodes (19): name, packageManager, private, type, version, eslint, @eslint/js, globals (+11 more)
 
-### Community 36 - "Community 36"
+### Community 35 - "Community 35"
 Cohesion: 0.10
 Nodes (20): compilerOptions, allowImportingTsExtensions, baseUrl, esModuleInterop, jsx, lib, module, moduleResolution (+12 more)
 
-### Community 37 - "Community 37"
+### Community 36 - "Community 36"
 Cohesion: 0.16
 Nodes (18): ContractProbe, FakeExecutionRequest, FakeExecutionResult, nullable_string_schema(), Outcome, required_nullable(), DateTime, Error (+10 more)
 
-### Community 38 - "Community 38"
+### Community 37 - "Community 37"
 Cohesion: 0.21
 Nodes (16): exec(), finalize_pending(), ApiResult, AppContext, apply(), bump(), link_import(), Mutation (+8 more)
 
-### Community 39 - "Community 39"
+### Community 38 - "Community 38"
 Cohesion: 0.43
 Nodes (19): field(), authorized(), claim(), detail(), lease(), open(), options(), read() (+11 more)
 
-### Community 40 - "Community 40"
+### Community 39 - "Community 39"
 Cohesion: 0.31
 Nodes (19): OpenPhoneRequest, PhoneBuildChoice, PhoneClaimRequest, PhoneClaimResponse, PhoneControl, PhoneFrame, PhoneLease, PhoneOptions (+11 more)
 
-### Community 41 - "Community 41"
+### Community 40 - "Community 40"
 Cohesion: 0.37
 Nodes (17): build(), claim(), detail(), open(), options(), ApiResult, AppContext, HeaderMap (+9 more)
 
-### Community 42 - "Community 42"
+### Community 41 - "Community 41"
 Cohesion: 0.11
 Nodes (18): devDependencies, eslint, @eslint/js, globals, @hey-api/openapi-ts, jsdom, prettier, @testing-library/jest-dom (+10 more)
+
+### Community 42 - "Community 42"
+Cohesion: 0.28
+Nodes (14): compare(), compares_verified_facts_and_freezes_baseline_identity(), context_matches(), coverage_changes_remain_visible(), eligible(), failed(), manifest_legacy_serialization_is_unchanged(), outcome() (+6 more)
 
 ### Community 43 - "Community 43"
 Cohesion: 0.19
@@ -503,12 +502,12 @@ Cohesion: 0.39
 Nodes (5): approved_import_shape_has_separate_actions_and_checks(), case(), invalid_definition_references_and_paths_are_rejected(), manual_methods_are_defined_but_not_implicitly_executable(), unknown_fields_are_not_imported()
 
 ### Community 86 - "Community 86"
-Cohesion: 0.39
-Nodes (5): case(), drafts_round_trip_and_publication_preserves_the_execution_shape(), incomplete_case_is_saveable_but_not_publishable(), oversized_unknown_and_forged_shapes_are_rejected(), snapshot_normalization_preserves_ai_editor_provenance()
+Cohesion: 0.29
+Nodes (5): Migrator, Box, MigrationTrait, Vec, MigratorTrait
 
 ### Community 87 - "Community 87"
 Cohesion: 0.29
-Nodes (5): Migrator, Box, MigrationTrait, Vec, MigratorTrait
+Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
 
 ### Community 88 - "Community 88"
 Cohesion: 0.29
@@ -523,20 +522,20 @@ Cohesion: 0.29
 Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
 
 ### Community 91 - "Community 91"
-Cohesion: 0.29
-Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
-
-### Community 92 - "Community 92"
 Cohesion: 0.43
 Nodes (6): discovery_progress(), ApiResult, Option, T, same(), task_update()
 
-### Community 93 - "Community 93"
+### Community 92 - "Community 92"
 Cohesion: 0.38
 Nodes (6): list(), ApiResult, AppContext, Option, String, Uuid
 
-### Community 95 - "Community 95"
+### Community 94 - "Community 94"
 Cohesion: 0.48
 Nodes (6): fixture(), optional_null_is_accepted_then_omitted(), probe_roundtrips_without_losing_precision(), rejects_invalid_probe_boundaries(), Value, scenario_and_version_are_validated()
+
+### Community 95 - "Community 95"
+Cohesion: 0.33
+Nodes (5): Model, Relation, DateTimeUtc, String, Uuid
 
 ### Community 96 - "Community 96"
 Cohesion: 0.33
@@ -555,54 +554,50 @@ Cohesion: 0.33
 Nodes (5): Model, Relation, DateTimeUtc, String, Uuid
 
 ### Community 100 - "Community 100"
-Cohesion: 0.33
-Nodes (5): Model, Relation, DateTimeUtc, String, Uuid
-
-### Community 101 - "Community 101"
 Cohesion: 0.47
 Nodes (5): create(), ApiResult, AppContext, Uuid, CreateWorkspaceRequest
 
-### Community 103 - "Community 103"
+### Community 102 - "Community 102"
 Cohesion: 0.40
 Nodes (4): request_context(), Response, Next, Request
 
-### Community 104 - "Community 104"
+### Community 103 - "Community 103"
 Cohesion: 0.40
 Nodes (4): Model, Relation, String, Uuid
 
-### Community 105 - "Community 105"
+### Community 104 - "Community 104"
 Cohesion: 0.50
 Nodes (3): Protocol, StructuredCall, StructuredModel
 
-### Community 106 - "Community 106"
+### Community 105 - "Community 105"
 Cohesion: 0.40
 Nodes (4): main(), Box, Error, Result
 
-### Community 108 - "Community 108"
+### Community 107 - "Community 107"
 Cohesion: 0.50
 Nodes (3): rejects_invalid_request_semantics(), request(), Value
 
-### Community 109 - "Community 109"
+### Community 108 - "Community 108"
 Cohesion: 0.70
 Nodes (4): java_environment(), main(), Explicit local SDK setup and demo build; never runs checks or accepts SDK…, setup()
 
-### Community 110 - "Community 110"
+### Community 109 - "Community 109"
 Cohesion: 0.50
 Nodes (3): Model, Relation, Uuid
 
-### Community 111 - "Community 111"
+### Community 110 - "Community 110"
 Cohesion: 0.83
 Nodes (3): gradlew script, die(), warn()
 
-### Community 114 - "Community 114"
+### Community 113 - "Community 113"
 Cohesion: 0.67
 Nodes (3): main(), Explicit repository formatting; generators retain ownership of generated output., run()
 
-### Community 115 - "Community 115"
+### Community 114 - "Community 114"
 Cohesion: 0.67
 Nodes (3): install(), main(), Explicit project-local Android intake tool installation, never run at API…
 
-### Community 117 - "Community 117"
+### Community 116 - "Community 116"
 Cohesion: 0.67
 Nodes (3): migration, mobile-qa, mobile-qa-contracts
 
@@ -614,12 +609,12 @@ Nodes (3): migration, mobile-qa, mobile-qa-contracts
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `DiscoveryReply` connect `Community 18` to `Community 19`, `Community 20`, `Community 37`?**
-  _High betweenness centrality (0.145) - this node is a cross-community bridge._
-- **Why does `QualificationError` connect `Community 13` to `Community 5`, `Community 7`, `Community 8`, `Community 10`, `Community 15`, `Community 19`, `Community 20`, `Community 24`, `Community 28`, `Community 30`?**
-  _High betweenness centrality (0.145) - this node is a cross-community bridge._
-- **Why does `Session` connect `Community 0` to `Community 16`, `Community 41`, `Community 50`, `Community 45`?**
-  _High betweenness centrality (0.098) - this node is a cross-community bridge._
+- **Why does `DiscoveryReply` connect `Community 18` to `Community 19`, `Community 20`, `Community 36`?**
+  _High betweenness centrality (0.158) - this node is a cross-community bridge._
+- **Why does `QualificationError` connect `Community 14` to `Community 5`, `Community 7`, `Community 8`, `Community 11`, `Community 15`, `Community 19`, `Community 20`, `Community 24`, `Community 28`, `Community 30`?**
+  _High betweenness centrality (0.141) - this node is a cross-community bridge._
+- **Why does `Session` connect `Community 0` to `Community 40`, `Community 16`, `Community 50`, `Community 45`?**
+  _High betweenness centrality (0.105) - this node is a cross-community bridge._
 - **Are the 54 inferred relationships involving `QualificationError` (e.g. with `DiscoveryBroker` and `BrokerClient`) actually correct?**
   _`QualificationError` has 54 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 54 inferred relationships involving `field()` (e.g. with `build()` and `create()`) actually correct?**

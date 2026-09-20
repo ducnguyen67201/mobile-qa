@@ -242,29 +242,36 @@ it('adds optional checks inside an action and keeps their binding when reordered
   expect(screen.queryByLabelText('Check 1 description')).not.toBeInTheDocument()
 })
 
-it('picks screen readiness independently and preserves it when repicking the result', async () => {
-  const { opened, tasks } = show()
-  await waitFor(() => expect(opened).toHaveLength(1))
-  await userEvent.click(screen.getByRole('button', { name: 'Pick target for action 1 on phone' }))
-  await userEvent.click(screen.getByRole('button', { name: 'Select Save' }))
-  await userEvent.click(screen.getByRole('button', { name: 'Add check to action 1' }))
-  await userEvent.click(
-    await screen.findByRole('button', { name: 'Pick target for check 1 on phone' }),
-  )
-  await userEvent.click(screen.getByRole('button', { name: 'Select Task input' }))
-  await userEvent.click(screen.getByText('Screen readiness', { exact: true }))
-  await userEvent.click(
-    screen.getByRole('button', { name: 'Pick screen readiness for check 1 on phone' }),
-  )
-  await userEvent.click(screen.getByRole('button', { name: 'Select Save' }))
-  await userEvent.click(
-    await screen.findByRole('button', { name: 'Pick target for check 1 on phone' }),
-  )
-  await userEvent.click(screen.getByRole('button', { name: 'Select Task input' }))
-  await userEvent.click(screen.getByRole('button', { name: 'Run test' }))
-  await waitFor(() => expect(tasks).toHaveLength(1))
-  expect(tasks[0]?.sequence.checks[0]).toMatchObject({
-    resource_id: 'ai.mobileqa.demo:id/task_input',
-    ready_resource_id: 'ai.mobileqa.demo:id/save',
-  })
-})
+it.each([false, true])(
+  'repicks result targets with independent readiness: %s',
+  async (independent) => {
+    const { opened, tasks } = show()
+    await waitFor(() => expect(opened).toHaveLength(1))
+    await userEvent.click(screen.getByRole('button', { name: 'Pick target for action 1 on phone' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Select Save' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add check to action 1' }))
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Pick target for check 1 on phone' }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Select Task input' }))
+    if (independent) {
+      await userEvent.click(screen.getByText('Screen readiness', { exact: true }))
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Pick screen readiness for check 1 on phone' }),
+      )
+      await userEvent.click(screen.getByRole('button', { name: 'Select Save' }))
+    }
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Pick target for check 1 on phone' }),
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: independent ? 'Select Task input' : 'Select Save' }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Run test' }))
+    await waitFor(() => expect(tasks).toHaveLength(1))
+    expect(tasks[0]?.sequence.checks[0]).toMatchObject({
+      resource_id: independent ? 'ai.mobileqa.demo:id/task_input' : 'ai.mobileqa.demo:id/save',
+      ready_resource_id: 'ai.mobileqa.demo:id/save',
+    })
+  },
+)

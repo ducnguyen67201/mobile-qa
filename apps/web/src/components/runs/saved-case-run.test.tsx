@@ -96,3 +96,48 @@ it('does not queue an incomplete save', async () => {
   await screen.findByText('Complete the highlighted test fields before running.')
   expect(mocks.create).not.toHaveBeenCalled()
 })
+
+it.each(['suggested', 'none', 'explicit'] as const)(
+  'pins the displayed %s baseline even when submission discovers a newer run',
+  async (selection) => {
+    const original = {
+      blockers: [],
+      environment_revision: 7,
+      baselines: [
+        {
+          id: 'shown-run',
+          build_label: 'v1.0',
+          created_at: '2026-09-20T12:00:00Z',
+          compatible: true,
+        },
+      ],
+      suggested_baseline_id: selection === 'suggested' ? 'shown-run' : null,
+    }
+    mocks.preview.mockResolvedValue(original)
+    mocks.create.mockRejectedValue(new Error('Response lost'))
+    show(vi.fn().mockResolvedValue({ saved_version_id: 'new-version', issues: [] }))
+    await chooseBuild()
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Compare with' })).toHaveValue(
+        selection !== 'suggested'
+          ? 'None — establish a first result'
+          : `v1.0 · ${new Date('2026-09-20T12:00:00Z').toLocaleString()}`,
+      ),
+    )
+    if (selection === 'explicit') {
+      await userEvent.click(screen.getByRole('combobox', { name: 'Compare with' }))
+      await userEvent.click(screen.getByRole('option', { name: /v1.0/ }))
+    }
+    // Another compatible run completes before the submit-time readiness refresh.
+    mocks.preview.mockResolvedValue({ ...original, suggested_baseline_id: 'newer-run' })
+    await userEvent.click(screen.getByRole('button', { name: 'Save & run' }))
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
+    expect(mocks.create.mock.calls[0]![1].baseline_run_id).toBe(
+      selection === 'none' ? null : 'shown-run',
+    )
+    const firstRequest = mocks.create.mock.calls[0]
+    await userEvent.click(await screen.findByRole('button', { name: 'Retry run' }))
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2))
+    expect(mocks.create.mock.calls[1]).toEqual(firstRequest)
+  },
+)

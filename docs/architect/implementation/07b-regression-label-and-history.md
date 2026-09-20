@@ -36,6 +36,9 @@ builds. Refresh, disconnect and API restart preserve the result and baseline.
    A deliberately pinned baseline is retained until explicitly changed.
 4. Freeze the chosen baseline ID at run creation. Later runs cannot silently
    change an existing comparison. Changing the baseline means creating another run.
+   Submission captures the selector value at click time, including a displayed
+   suggestion or None. Refreshing readiness must not substitute a newer suggestion;
+   lost-response retries retain that same request and baseline.
 5. Saving expectations requires no human approval. Selecting a baseline does not
    introduce an approval workflow or certify a release as bug-free.
 6. Build selection is explicit. Show a compact build selector before Run test;

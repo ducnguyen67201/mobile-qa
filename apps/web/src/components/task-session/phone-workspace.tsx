@@ -248,7 +248,11 @@ export function PhoneWorkspace({
               ? {
                   ...check,
                   resource_id: c.resource_id,
-                  ready_resource_id: check.ready_resource_id || c.resource_id,
+                  // Readiness follows the result until a different marker is chosen.
+                  ready_resource_id:
+                    !check.ready_resource_id || check.ready_resource_id === check.resource_id
+                      ? c.resource_id
+                      : check.ready_resource_id,
                 }
               : check,
         ),

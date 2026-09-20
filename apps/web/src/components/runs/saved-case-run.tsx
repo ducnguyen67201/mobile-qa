@@ -47,7 +47,7 @@ export function SavedCaseRun({
   )?.run
   const result = useQuery(runQuery(workspaceId, runId || latest?.id || ''))
   const submit = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (displayedBaseline: string) => {
       if (!pending.current) {
         setStage('Saving test…')
         const saved = dirty || !versionId ? await save() : null
@@ -61,7 +61,8 @@ export function SavedCaseRun({
           body: {
             ...request,
             environment_revision: p.environment_revision,
-            baseline_run_id: baseline === undefined ? p.suggested_baseline_id : baseline || null,
+            // Refresh readiness, but never replace the selection shown at click time.
+            baseline_run_id: displayedBaseline || null,
           },
           key: crypto.randomUUID(),
         }
@@ -167,7 +168,7 @@ export function SavedCaseRun({
             <Button
               disabled={!build || !body.profile_id || (!dirty && !!preview.data?.blockers.length)}
               loading={submit.isPending}
-              onClick={() => submit.mutate()}
+              onClick={() => submit.mutate(selectedBaseline)}
             >
               {pending.current ? 'Retry run' : dirty ? 'Save & run' : 'Run test'}
             </Button>
@@ -183,7 +184,7 @@ export function SavedCaseRun({
                 {submit.error.message}
               </Alert>
             ) : (
-              <ErrorNotice error={submit.error} retry={() => submit.mutate()} />
+              <ErrorNotice error={submit.error} retry={() => submit.mutate(selectedBaseline)} />
             ))}
         </Stack>
       </Card>

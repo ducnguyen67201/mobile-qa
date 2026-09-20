@@ -1974,6 +1974,68 @@
         "evidence_reference"
       ]
     },
+    "ManifestSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "content_hash": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "release_plan"
+            },
+            "plan_version_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "version": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "version",
+            "plan_version_id",
+            "content_hash"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "case_version_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "content_hash": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "saved_case"
+            },
+            "version": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "version",
+            "case_version_id",
+            "content_hash"
+          ]
+        }
+      ]
+    },
     "ModelUsage": {
       "type": "object",
       "properties": {
@@ -2342,6 +2404,17 @@
             }
           ]
         },
+        "purpose": {
+          "description": "Historical tasks predate explicit purpose and remain legacy session activity.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhoneTaskPurpose"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "sequence": {
           "anyOf": [
             {
@@ -2369,6 +2442,14 @@
         "goal",
         "state",
         "message"
+      ]
+    },
+    "PhoneTaskPurpose": {
+      "type": "string",
+      "enum": [
+        "manual_control",
+        "trial",
+        "exploration"
       ]
     },
     "PhoneTaskState": {
@@ -2962,14 +3043,32 @@
           }
         },
         "plan_hash": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "plan_version_id": {
-          "type": "string",
+          "description": "Legacy release-plan fields remain optional so historical JSON and hashes round-trip.",
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "uuid"
         },
         "profile": {
           "$ref": "#/$defs/ExecutionProfile"
+        },
+        "source": {
+          "description": "Absent only for manifests persisted before source versioning was introduced.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ManifestSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false,
@@ -2978,8 +3077,6 @@
         "build_id",
         "build_sha256",
         "build_bytes",
-        "plan_version_id",
-        "plan_hash",
         "environment_revision",
         "profile",
         "cases",

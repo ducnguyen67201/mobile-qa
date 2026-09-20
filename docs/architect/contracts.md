@@ -159,3 +159,23 @@ Save responses expose saved_version_id only when current content matches a snaps
 The old internal draft DTO names remain; submit/review/fork operations and reviewer
 capabilities are removed. AI authored saves require no expectations_confirmed field.
 See spec 05 for mutation namespace compatibility and migration behavior.
+
+## Durable saved-case runs (07B first delivery)
+
+New `RunManifest` values carry a versioned, tagged `source`: `saved_case` freezes a case
+version/hash and `release_plan` freezes a plan version/hash. The former required plan fields
+remain optional solely so persisted legacy JSON deserializes and reserializes field-for-field
+without acquiring defaults. Versioned manifests require execution worker protocol4; older
+workers continue to claim only legacy manifests.
+
+`CreateRunRequest` names an explicit source and build, freezes the observed environment
+revision and accepts a nullable baseline run ID. Saved-case preview and baseline-candidate
+queries use immutable IDs and generated query types. Comparison responses keep execution
+outcome separate from the delta label and retain nullable observations, verifier reasons
+and evidence artifact IDs. A null observation is Unknown, never inferred absence.
+
+Run history is a tagged read projection with stable source IDs and a timestamp/source/UUID
+cursor. Execution records remain authoritative. Only explicitly purposed editor trials join
+the default projection; manual control and exploration stay out, while phone tasks created
+before purpose tagging are available through the legacy filter. The existing app permission
+applies to execution runs and the original creator/app boundary still applies to phone data.

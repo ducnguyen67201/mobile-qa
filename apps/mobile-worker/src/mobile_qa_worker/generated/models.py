@@ -244,6 +244,30 @@ class LeaseStatusResponse(BaseModel):
     state: JobState
 
 
+class ManifestSource1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    content_hash: str
+    kind: Literal['release_plan']
+    plan_version_id: UUID
+    version: Annotated[int, Field(ge=0, le=255)]
+
+
+class ManifestSource2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    case_version_id: UUID
+    content_hash: str
+    kind: Literal['saved_case']
+    version: Annotated[int, Field(ge=0, le=255)]
+
+
+class ManifestSource(RootModel[ManifestSource1 | ManifestSource2]):
+    root: ManifestSource1 | ManifestSource2
+
+
 class ModelUsage(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -324,6 +348,12 @@ class PhoneState(StrEnum):
     stopping = 'stopping'
     closed = 'closed'
     quarantined = 'quarantined'
+
+
+class PhoneTaskPurpose(StrEnum):
+    manual_control = 'manual_control'
+    trial = 'trial'
+    exploration = 'exploration'
 
 
 class PhoneTaskState(StrEnum):
@@ -977,9 +1007,20 @@ class RunManifest(BaseModel):
     diagnostic_retries: Annotated[int, Field(ge=0, le=255)]
     environment_revision: int
     exclusions: list[str]
-    plan_hash: str
-    plan_version_id: UUID
+    plan_hash: str | None = None
+    plan_version_id: Annotated[
+        UUID | None,
+        Field(
+            description='Legacy release-plan fields remain optional so historical JSON and hashes round-trip.'
+        ),
+    ] = None
     profile: ExecutionProfile
+    source: Annotated[
+        ManifestSource | None,
+        Field(
+            description='Absent only for manifests persisted before source versioning was introduced.'
+        ),
+    ] = None
 
 
 class AttemptResponse(BaseModel):
@@ -1059,6 +1100,12 @@ class PhoneTask(BaseModel):
     id: UUID
     message: str
     progress: GenerationProgress | None = None
+    purpose: Annotated[
+        PhoneTaskPurpose | None,
+        Field(
+            description='Historical tasks predate explicit purpose and remain legacy session activity.'
+        ),
+    ] = None
     sequence: AutomationSequence | None = None
     state: PhoneTaskState
     steps: Annotated[list[StepReceipt], Field(validate_default=True)] = []

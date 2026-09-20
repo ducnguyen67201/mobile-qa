@@ -66,6 +66,13 @@ export const zAuthoringUsage = z.object({
     unknown_calls: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
+export const zBaselineCandidateQuery = z.object({
+    build_id: z.uuid(),
+    case_version_id: z.uuid(),
+    environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    profile_id: z.uuid()
+});
+
 export const zCaseSelection = z.object({
     case_version_id: z.uuid(),
     data_variant: z.string(),
@@ -110,6 +117,17 @@ export const zCleanupRequest = z.object({
     stopped: z.boolean()
 });
 
+export const zComparisonLabel = z.enum([
+    'comparison_pending',
+    'regression',
+    'still_failing',
+    'recovered',
+    'unchanged',
+    'new_failure_same_build',
+    'no_baseline',
+    'not_comparable'
+]);
+
 export const zCoverageKind = z.enum([
     'smoke',
     'happy_path',
@@ -129,12 +147,6 @@ export const zCreateAppRequest = z.object({
 export const zCreateBuildUploadRequest = z.object({
     expected_size: z.int().gte(1).lte(262144000),
     original_filename: z.string()
-});
-
-export const zCreateRunRequest = z.object({
-    build_id: z.uuid(),
-    environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    plan_version_id: z.uuid()
 });
 
 export const zCreateWorkspaceRequest = z.object({
@@ -382,6 +394,21 @@ export const zLogoutResponse = z.object({
     signed_out: z.boolean()
 });
 
+export const zManifestSource = z.union([
+    z.object({
+        content_hash: z.string(),
+        kind: z.enum(['release_plan']),
+        plan_version_id: z.uuid(),
+        version: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    }),
+    z.object({
+        case_version_id: z.uuid(),
+        content_hash: z.string(),
+        kind: z.enum(['saved_case']),
+        version: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    })
+]);
+
 export const zMembershipRole = z.enum(['operator', 'member']);
 
 export const zModelUsage = z.object({
@@ -412,6 +439,32 @@ export const zOutcome = z.enum([
     'skipped',
     'canceled'
 ]);
+
+export const zBaselineCandidate = z.object({
+    build_id: z.uuid(),
+    build_name: z.string(),
+    build_sha256: z.string(),
+    created_at: z.iso.datetime(),
+    outcome: zOutcome,
+    run_id: z.uuid()
+});
+
+export const zBaselineCandidateResponse = z.object({
+    items: z.array(zBaselineCandidate)
+});
+
+export const zCheckComparison = z.object({
+    baseline_artifact_ids: z.array(z.uuid()),
+    baseline_observed: z.string().nullish(),
+    baseline_outcome: zOutcome,
+    baseline_reason: z.string(),
+    check_id: z.string(),
+    current_artifact_ids: z.array(z.uuid()),
+    current_observed: z.string().nullish(),
+    current_outcome: zOutcome,
+    current_reason: z.string(),
+    expected: z.string()
+});
 
 export const zCheckResult = z.object({
     artifact_ids: z.array(z.uuid()),
@@ -475,9 +528,16 @@ export const zPhoneState = z.enum([
     'quarantined'
 ]);
 
+export const zPhoneTaskPurpose = z.enum([
+    'manual_control',
+    'trial',
+    'exploration'
+]);
+
 export const zPhoneTaskRequest = z.object({
     goal: z.string(),
     id: z.uuid(),
+    purpose: zPhoneTaskPurpose,
     selection: zPhoneSelection.nullish()
 });
 
@@ -553,8 +613,54 @@ export const zArtifactReceipt = z.object({
     artifact: zRunArtifact
 });
 
+export const zRunComparisonResponse = z.object({
+    baseline_run_id: z.uuid().nullish(),
+    checks: z.array(zCheckComparison),
+    label: zComparisonLabel,
+    reason: z.string().nullish(),
+    run_id: z.uuid()
+});
+
+export const zRunHistoryFilter = z.enum([
+    'all',
+    'test_runs',
+    'release_runs',
+    'trials',
+    'legacy'
+]);
+
+export const zRunHistoryQuery = z.object({
+    cursor: z.string().nullish(),
+    filter: zRunHistoryFilter.nullish()
+});
+
+export const zRunSourceRequest = z.union([
+    z.object({
+        kind: z.enum(['release_plan']),
+        plan_version_id: z.uuid()
+    }),
+    z.object({
+        case_version_id: z.uuid(),
+        kind: z.enum(['saved_case']),
+        profile_id: z.uuid()
+    })
+]);
+
+export const zCreateRunRequest = z.object({
+    baseline_run_id: z.uuid().nullish(),
+    build_id: z.uuid(),
+    environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    source: zRunSourceRequest
+});
+
 export const zSavedAuthoredTests = z.object({
     entry_ids: z.array(z.uuid())
+});
+
+export const zSavedCasePreviewQuery = z.object({
+    build_id: z.uuid(),
+    case_version_id: z.uuid(),
+    profile_id: z.uuid()
 });
 
 export const zSecretKind = z.enum(['account', 'reset']);
@@ -800,6 +906,7 @@ export const zPhoneCommandRequest = z.object({
     expected_revision: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     frame_id: z.uuid().nullish(),
     id: z.uuid(),
+    purpose: zPhoneTaskPurpose,
     sequence: zAutomationSequence,
     title: z.string()
 });
@@ -808,6 +915,7 @@ export const zPhoneOptions = z.object({
     active_session: z.uuid().nullish(),
     blockers: z.array(z.string()),
     builds: z.array(zPhoneBuildChoice),
+    environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     profiles: z.array(zExecutionProfile)
 });
 
@@ -818,6 +926,7 @@ export const zPhoneTask = z.object({
     id: z.uuid(),
     message: z.string(),
     progress: zGenerationProgress.nullish(),
+    purpose: zPhoneTaskPurpose.nullish(),
     sequence: zAutomationSequence.nullish(),
     state: zPhoneTaskState,
     steps: z.array(zStepReceipt).optional()
@@ -909,9 +1018,10 @@ export const zRunManifest = z.object({
     diagnostic_retries: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     exclusions: z.array(z.string()),
-    plan_hash: z.string(),
-    plan_version_id: z.uuid(),
-    profile: zExecutionProfile
+    plan_hash: z.string().nullish(),
+    plan_version_id: z.uuid().nullish(),
+    profile: zExecutionProfile,
+    source: zManifestSource.nullish()
 });
 
 export const zExecutionLease = z.object({
@@ -931,11 +1041,44 @@ export const zClaimResponse = z.object({
 
 export const zRunResponse = z.object({
     attempts: z.array(zAttemptResponse),
+    baseline_run_id: z.uuid().nullish(),
     created_at: z.iso.datetime(),
     id: z.uuid(),
     manifest: zRunManifest,
     state: zJobState,
     summary: z.string()
+});
+
+export const zRunHistoryItem = z.union([
+    z.object({
+        created_at: z.iso.datetime(),
+        kind: z.enum(['execution']),
+        run: zRunResponse,
+        stable_id: z.string()
+    }),
+    z.object({
+        created_at: z.iso.datetime(),
+        kind: z.enum(['trial']),
+        message: z.string(),
+        stable_id: z.string(),
+        state: z.string(),
+        task_id: z.uuid(),
+        title: z.string()
+    }),
+    z.object({
+        created_at: z.iso.datetime(),
+        kind: z.enum(['legacy_session_activity']),
+        message: z.string(),
+        stable_id: z.string(),
+        state: z.string(),
+        task_id: z.uuid(),
+        title: z.string()
+    })
+]);
+
+export const zRunHistoryResponse = z.object({
+    items: z.array(zRunHistoryItem),
+    next_cursor: z.string().nullish()
 });
 
 export const zRunListResponse = z.object({
@@ -1143,6 +1286,22 @@ export const zGetAppPath = z.object({
  */
 export const zGetAppResponse = zAppResponse;
 
+export const zListBaselineCandidatesPath = z.object({
+    app_id: z.uuid()
+});
+
+export const zListBaselineCandidatesQuery = z.object({
+    build_id: z.uuid(),
+    case_version_id: z.uuid(),
+    profile_id: z.uuid(),
+    environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+/**
+ * Success
+ */
+export const zListBaselineCandidatesResponse = zBaselineCandidateResponse;
+
 export const zCreateBuildUploadBody = zCreateBuildUploadRequest;
 
 export const zCreateBuildUploadHeaders = z.object({
@@ -1295,6 +1454,20 @@ export const zOpenPhonePath = z.object({
  */
 export const zOpenPhoneResponse = zPhoneSession;
 
+export const zListRunHistoryPath = z.object({
+    app_id: z.uuid()
+});
+
+export const zListRunHistoryQuery = z.object({
+    filter: zRunHistoryFilter.optional(),
+    cursor: z.string().optional()
+});
+
+/**
+ * Success
+ */
+export const zListRunHistoryResponse = zRunHistoryResponse;
+
 export const zListRunsPath = z.object({
     app_id: z.uuid()
 });
@@ -1322,6 +1495,21 @@ export const zCreateRunPath = z.object({
  * Idempotent replay
  */
 export const zCreateRunResponse = zRunResponse;
+
+export const zGetSavedCasePreviewPath = z.object({
+    app_id: z.uuid()
+});
+
+export const zGetSavedCasePreviewQuery = z.object({
+    build_id: z.uuid(),
+    case_version_id: z.uuid(),
+    profile_id: z.uuid()
+});
+
+/**
+ * Success
+ */
+export const zGetSavedCasePreviewResponse = zPlanPreviewResponse;
 
 export const zGenerateTestsBody = zGenerateTestsRequest;
 
@@ -1596,6 +1784,15 @@ export const zCancelRunPath = z.object({
  * Success
  */
 export const zCancelRunResponse = zRunResponse;
+
+export const zGetRunComparisonPath = z.object({
+    run_id: z.uuid()
+});
+
+/**
+ * Success
+ */
+export const zGetRunComparisonResponse = zRunComparisonResponse;
 
 /**
  * Success

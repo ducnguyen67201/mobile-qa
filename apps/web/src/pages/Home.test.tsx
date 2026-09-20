@@ -64,7 +64,7 @@ it('keeps operator-managed tests and run history behind authentication', async (
   expect(await screen.findByRole('heading', { name: 'Tests', level: 1 })).toBeInTheDocument()
   await userEvent.click(screen.getByRole('link', { name: /Runs/ }))
   expect(screen.getByRole('heading', { name: 'Runs', level: 1 })).toBeInTheDocument()
-  expect(screen.getByText(/Saved release checks and their evidence/)).toBeInTheDocument()
+  expect(screen.getByText(/Durable test and release runs/)).toBeInTheDocument()
 })
 it.each([
   'https://evil.test',

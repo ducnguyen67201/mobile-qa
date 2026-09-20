@@ -52,8 +52,10 @@ function fixtureFetch(override?: (request: Request) => Promise<Response | undefi
         next_cursor: null,
       })
     if (path === `/api/apps/${appId}`) return Response.json(app)
+    if (path.endsWith('/builds')) return Response.json({ items: [], next_cursor: null })
     if (path.endsWith('/phone-options'))
       return Response.json({
+        environment_revision: 1,
         builds: [],
         profiles: [],
         active_session: null,
@@ -102,7 +104,7 @@ it('creates without a manual key and reuses the same generated identity after a 
   expect(bodies).toHaveLength(2)
   expect(bodies[1]).toEqual(bodies[0])
 })
-it('authors before an APK is uploaded and opens the saved draft from the catalog', async () => {
+it('opens the saved draft and loads explicit run choices without requiring an upload', async () => {
   const fetchMock = fixtureFetch()
   vi.stubGlobal('fetch', fetchMock)
   show('/tests')
@@ -114,9 +116,7 @@ it('authors before an APK is uploaded and opens the saved draft from the catalog
   expect(await screen.findByLabelText('Test name')).toHaveValue(
     libraryDraft.definition.content.title,
   )
-  expect(fetchMock.mock.calls.some(([r]) => new URL(r.url).pathname.endsWith('/builds'))).toBe(
-    false,
-  )
+  expect(fetchMock.mock.calls.some(([r]) => new URL(r.url).pathname.endsWith('/builds'))).toBe(true)
 })
 it('saves explicit typed content, preserving incomplete drafts and without requiring review', async () => {
   let current: LibraryDraftResponse = structuredClone(libraryDraft)
@@ -402,6 +402,7 @@ it('runs the selected saved plan and follows its simulated report', async () => 
   // Generated parser also checks the synthetic fixture rather than asserting an untyped report.
   const run = zRunResponse.parse({
     id: mutationId,
+    baseline_run_id: null,
     state: 'finished',
     created_at: timestamp,
     summary: 'Synthetic release completed',
@@ -411,8 +412,12 @@ it('runs the selected saved plan and follows its simulated report', async () => 
       build_id: buildId,
       build_sha256: build.sha256,
       build_bytes: build.byte_size,
-      plan_version_id: versionId,
-      plan_hash: plan.version.content_hash,
+      source: {
+        version: 1,
+        kind: 'release_plan',
+        plan_version_id: versionId,
+        content_hash: plan.version.content_hash,
+      },
       environment_revision: 1,
       profile: {
         id: mutationId,
@@ -458,6 +463,14 @@ it('runs the selected saved plan and follows its simulated report', async () => 
         return Response.json(run, { status: 201 })
       }
       if (path.endsWith(`/runs/${mutationId}`)) return Response.json(run)
+      if (path.endsWith(`/runs/${mutationId}/comparison`))
+        return Response.json({
+          run_id: mutationId,
+          baseline_run_id: null,
+          label: 'no_baseline',
+          reason: null,
+          checks: [],
+        })
     }),
   )
   const { router } = show(`/tests/${appId}/${entryId}/versions/${versionId}`)
@@ -466,7 +479,116 @@ it('runs the selected saved plan and follows its simulated report', async () => 
   expect(await screen.findByText(/Simulated execution/)).toBeInTheDocument()
   expect(router.state.location.pathname).toBe(`/runs/${mutationId}`)
   expect(submissions).toEqual([
-    { build_id: buildId, plan_version_id: versionId, environment_revision: 1 },
+    {
+      build_id: buildId,
+      source: { kind: 'release_plan', plan_version_id: versionId },
+      environment_revision: 1,
+      baseline_run_id: null,
+    },
+  ])
+})
+it('queues a saved case as a durable run with an explicit build and profile', async () => {
+  const { build, buildId } = await import('@/test/fixtures')
+  const profileId = mutationId
+  const profile = {
+    id: profileId,
+    name: 'Synthetic profile',
+    driver: 'fake' as const,
+    package: libraryCase.package,
+    adapter: libraryCase.adapter,
+    device_identity: 'fixture',
+    image: 'fixture',
+    model: 'none',
+    qualified: true,
+    qualification_reference: 'fixture-only',
+    max_apk_bytes: 1048576,
+  }
+  const manifest = {
+    app_id: appId,
+    build_id: buildId,
+    build_sha256: build.sha256,
+    build_bytes: build.byte_size,
+    source: {
+      version: 1,
+      kind: 'saved_case' as const,
+      case_version_id: versionId,
+      content_hash: libraryVersion.version.content_hash,
+    },
+    environment_revision: 1,
+    profile,
+    cases: [
+      {
+        definition_id: versionId,
+        content_hash: libraryVersion.version.content_hash,
+        data_variant: 'default',
+        required: true,
+        case: libraryCase,
+      },
+    ],
+    budget: libraryCase.budget,
+    diagnostic_retries: 0,
+    exclusions: [],
+  }
+  const run = {
+    id: mutationId,
+    baseline_run_id: null,
+    state: 'queued',
+    created_at: timestamp,
+    summary: 'Incomplete / review required',
+    attempts: [],
+    manifest,
+  }
+  const savedDraft = {
+    ...libraryDraft,
+    entry: {
+      ...libraryDraft.entry,
+      latest_version_id: versionId,
+      draft_version: libraryCase.version,
+    },
+    source_version_id: versionId,
+    saved_version_id: versionId,
+  }
+  const submissions: unknown[] = []
+  vi.stubGlobal(
+    'fetch',
+    fixtureFetch(async (request) => {
+      const path = new URL(request.url).pathname
+      if (path.endsWith(`/test-library/${entryId}`)) return Response.json(savedDraft.entry)
+      if (path.endsWith('/draft')) return Response.json(savedDraft)
+      if (path.endsWith('/builds')) return Response.json({ items: [build], next_cursor: null })
+      if (path.endsWith('/phone-options'))
+        return Response.json({
+          environment_revision: 1,
+          builds: [{ id: buildId, name: build.original_filename }],
+          profiles: [profile],
+          active_session: null,
+          blockers: [],
+        })
+      if (path.endsWith('/saved-case-preview'))
+        return Response.json({ plan: null, manifest, blockers: [] })
+      if (path.endsWith('/baseline-candidates')) return Response.json({ items: [] })
+      if (path.endsWith('/runs') && request.method === 'POST') {
+        submissions.push(await request.json())
+        return Response.json(run, { status: 201 })
+      }
+      if (path.endsWith(`/runs/${mutationId}`)) return Response.json(run)
+    }),
+  )
+  show(`/tests/${appId}/${entryId}`)
+  await userEvent.click(await screen.findByRole('combobox', { name: 'Build' }))
+  await userEvent.click(screen.getByRole('option', { name: build.original_filename }))
+  await userEvent.click(screen.getByRole('combobox', { name: 'Qualified device' }))
+  await userEvent.click(screen.getByRole('option', { name: profile.name }))
+  await screen.findByText(`Pinned build checksum: ${build.sha256}`)
+  await userEvent.click(screen.getByRole('button', { name: 'Run test' }))
+  await screen.findByText('Run started')
+  expect(submissions).toEqual([
+    {
+      build_id: buildId,
+      source: { kind: 'saved_case', case_version_id: versionId, profile_id: profileId },
+      environment_revision: 1,
+      baseline_run_id: null,
+    },
   ])
 })
 it.each(['failed refresh', 'submitted elsewhere'])(

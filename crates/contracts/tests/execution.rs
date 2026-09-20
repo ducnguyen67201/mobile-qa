@@ -68,6 +68,72 @@ fn real_profile_cannot_overstate_demo_installer_capacity() {
 }
 
 #[test]
+fn legacy_and_versioned_manifest_sources_serialize_without_rewriting_history() {
+    let TestDefinition::Case(case) = case() else {
+        panic!("fixture is a case")
+    };
+    let app_id = Uuid::new_v4();
+    let build_id = Uuid::new_v4();
+    let plan_id = Uuid::new_v4();
+    let case_id = Uuid::new_v4();
+    let profile_id = Uuid::new_v4();
+    let legacy = serde_json::json!({
+        "app_id": app_id,
+        "build_id": build_id,
+        "build_sha256": "a".repeat(64),
+        "build_bytes": 4,
+        "plan_version_id": plan_id,
+        "plan_hash": "b".repeat(64),
+        "environment_revision": 1,
+        "profile": {
+            "id": profile_id,
+            "name": "Synthetic",
+            "driver": "fake",
+            "package": "ai.mobileqa.demo",
+            "adapter": "demo_persistence_v1",
+            "device_identity": "fixture",
+            "image": "fixture",
+            "model": "none",
+            "qualified": true,
+            "qualification_reference": "fixture-only",
+            "max_apk_bytes": 1048576
+        },
+        "cases": [{
+            "definition_id": case_id,
+            "content_hash": "c".repeat(64),
+            "data_variant": "default",
+            "required": true,
+            "case": case
+        }],
+        "budget": {"duration_seconds": 600, "max_steps": 30, "artifact_bytes": 16777216},
+        "diagnostic_retries": 0,
+        "exclusions": []
+    });
+    let decoded: RunManifest = serde_json::from_value(legacy.clone()).unwrap();
+    assert!(decoded.source.is_none());
+    assert_eq!(serde_json::to_value(&decoded).unwrap(), legacy);
+
+    let versioned = RunManifest {
+        source: Some(ManifestSource::SavedCase {
+            version: 1,
+            case_version_id: case_id,
+            content_hash: "c".repeat(64),
+        }),
+        plan_version_id: None,
+        plan_hash: None,
+        ..decoded
+    };
+    let raw = serde_json::to_value(&versioned).unwrap();
+    assert_eq!(raw["source"]["kind"], "saved_case");
+    assert!(raw.get("plan_version_id").is_none());
+    assert!(raw.get("plan_hash").is_none());
+    assert_eq!(
+        serde_json::from_value::<RunManifest>(raw).unwrap(),
+        versioned
+    );
+}
+
+#[test]
 fn qualified_context_is_explicit_and_legacy_serialization_stays_absent() {
     use mobile_qa_contracts::execution_lifecycle::*;
     let mut p: ExecutionProfile = serde_json::from_value(serde_json::json!({

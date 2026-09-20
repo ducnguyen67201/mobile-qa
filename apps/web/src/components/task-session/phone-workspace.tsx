@@ -175,6 +175,7 @@ export function PhoneWorkspace({
       frame_id: manual ? (frame?.id ?? null) : null,
       title: manual ? 'Phone interaction' : value?.title || title,
       sequence: next,
+      purpose: manual ? 'manual_control' : 'trial',
     })
   }
   const targetFor = (control: PhoneControl): DirectTarget | undefined =>
@@ -342,7 +343,7 @@ export function PhoneWorkspace({
               loading={submit.isPending}
               onClick={() => run(sequence)}
             >
-              Run test
+              Try actions
             </Button>
             {!value && (
               <Button

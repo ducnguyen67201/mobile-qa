@@ -20,6 +20,7 @@ import { ErrorNotice, LoadingPanel } from '@/components/app/feedback'
 import { PhoneWorkspace } from '@/components/task-session/phone-workspace'
 import { PlanFields, SuiteFields } from './membership-fields'
 import { Coverage, LibraryIssues } from './library-presentation'
+import { SavedCaseRunControls } from './saved-case-run-controls'
 
 /** Compare validated form values as individual fields, never use raw JSON as the editor. */
 export function changedFields(local: LibraryDraftDefinition, remote: LibraryDraftDefinition) {
@@ -85,6 +86,24 @@ export function DraftEditor({
       invalidate()
     },
   })
+  const saveRequest = (): SaveLibraryDraftRequest =>
+    save.isError &&
+    save.variables &&
+    save.variables.expected_revision === saved.entry.revision &&
+    JSON.stringify(save.variables.definition) === JSON.stringify(definition)
+      ? save.variables
+      : {
+          mutation_id: crypto.randomUUID(),
+          expected_revision: saved.entry.revision,
+          definition,
+        }
+  const saveAndGetVersion = async () => {
+    const response = await save.mutateAsync(saveRequest())
+    if (!response.saved_version_id) {
+      throw new Error('Complete the required test fields before running')
+    }
+    return response.saved_version_id
+  }
   const details = libraryErrorDetails(save.error)
   const stale = details?.kind === 'stale_revision'
   const busy = save.isPending || loadingCurrent
@@ -124,20 +143,7 @@ export function DraftEditor({
               variant="default"
               disabled={!canEdit || busy || stale}
               loading={save.isPending}
-              onClick={() =>
-                save.mutate(
-                  save.isError &&
-                    save.variables &&
-                    save.variables.expected_revision === saved.entry.revision &&
-                    JSON.stringify(save.variables.definition) === JSON.stringify(definition)
-                    ? save.variables
-                    : {
-                        mutation_id: crypto.randomUUID(),
-                        expected_revision: saved.entry.revision,
-                        definition,
-                      },
-                )
-              }
+              onClick={() => save.mutate(saveRequest())}
             >
               Save
             </Button>
@@ -155,8 +161,8 @@ export function DraftEditor({
       )}
       {dirty && (
         <Text size="sm" c="dimmed">
-          Unsaved changes. Run test tries your current actions; release coverage uses saved
-          versions.
+          Unsaved changes. Try actions uses the preview session; Save & run creates an immutable
+          version and durable run.
         </Text>
       )}
       {stale ? (
@@ -232,6 +238,15 @@ export function DraftEditor({
           ))
         )}
       </fieldset>
+      {definition.kind === 'case' && (
+        <SavedCaseRunControls
+          appId={appId}
+          savedVersionId={saved.saved_version_id}
+          dirty={dirty}
+          disabled={!canEdit || busy}
+          saveAndGetVersion={saveAndGetVersion}
+        />
+      )}
       {definition.kind !== 'case' && <Coverage value={saved.coverage} saved={!dirty} />}
       {!dirty && renderSaved?.(saved)}
       <Modal

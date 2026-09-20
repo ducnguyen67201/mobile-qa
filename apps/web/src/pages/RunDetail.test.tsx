@@ -12,6 +12,7 @@ const runId = '33333333-3333-4333-8333-333333333333'
 function report(): RunResponse {
   return {
     id: runId,
+    baseline_run_id: null,
     created_at: '2026-09-12T00:00:00Z',
     state: 'running',
     summary: 'Incomplete / review required',
@@ -72,6 +73,14 @@ it('shows simulated run and pending cancellation without claiming physical stop'
         current = { ...current, state: 'cancel_requested' }
         return Response.json(current)
       }
+      if (path.endsWith('/comparison'))
+        return Response.json({
+          run_id: runId,
+          baseline_run_id: null,
+          label: current.state === 'finished' ? 'no_baseline' : 'comparison_pending',
+          reason: null,
+          checks: [],
+        })
       if (path.endsWith(runId)) return Response.json(current)
       throw new Error(`Unexpected fixture route ${path}`)
     }),

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { planQuery, createRun } from './runs'
+import { baselineCandidatesQuery, createRun, planQuery, runHistoryQuery } from './runs'
 import { forgetSession, setCsrfToken } from './session-transport'
 const app = '11111111-1111-4111-8111-111111111111'
 const build = '22222222-2222-4222-8222-222222222222'
@@ -40,7 +40,12 @@ it('shares session CSRF and retains submission identity on transport failure', a
       )
     }),
   )
-  const body = { build_id: build, plan_version_id: app, environment_revision: 1 }
+  const body = {
+    build_id: build,
+    source: { kind: 'release_plan' as const, plan_version_id: app },
+    environment_revision: 1,
+    baseline_run_id: null,
+  }
   await expect(createRun(app, body, 'same-key')).rejects.toThrow('Refresh preview')
   await expect(createRun(app, body, 'same-key')).rejects.toThrow()
   expect(requests).toHaveLength(2)
@@ -64,5 +69,30 @@ it('pins an explicit plan version in the preview request and cache identity', as
   expect(planQuery('workspace', app, build).queryKey).not.toEqual(
     planQuery('workspace', app, build, plan).queryKey,
   )
+  client.clear()
+})
+it('sends complete compatibility inputs and an explicit history filter', async () => {
+  const requests: Request[] = []
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      requests.push(request)
+      return Response.json(
+        new URL(request.url).pathname.endsWith('/baseline-candidates')
+          ? { items: [] }
+          : { items: [], next_cursor: null },
+      )
+    }),
+  )
+  const { QueryClient } = await import('@tanstack/react-query')
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  await client.fetchQuery(baselineCandidatesQuery('workspace', app, build, app, build, 7))
+  await client.fetchQuery(runHistoryQuery('workspace', app, 'legacy'))
+  const candidate = new URL(requests[0]!.url)
+  expect(candidate.searchParams.get('build_id')).toBe(build)
+  expect(candidate.searchParams.get('case_version_id')).toBe(app)
+  expect(candidate.searchParams.get('profile_id')).toBe(build)
+  expect(candidate.searchParams.get('environment_revision')).toBe('7')
+  expect(new URL(requests[1]!.url).searchParams.get('filter')).toBe('legacy')
   client.clear()
 })

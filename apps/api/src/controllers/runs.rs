@@ -1,7 +1,9 @@
 //! Authenticated browser execution routes. Binary evidence remains private.
 use crate::{
     errors::{ApiFailure, ApiResult},
-    services::{apps, auth::Session, execution_store::*, run_artifacts, runs},
+    services::{
+        apps, auth::Session, execution_store::*, run_artifacts, run_comparison, run_history, runs,
+    },
 };
 use axum::{
     body::Body,
@@ -29,6 +31,24 @@ async fn preview(
     Ok(Json(
         runs::preview(&ctx.db, app, q.build_id, q.plan_version_id).await?,
     ))
+}
+async fn preview_saved_case(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path(app): Path<Uuid>,
+    Query(query): Query<SavedCasePreviewQuery>,
+) -> ApiResult<Json<PlanPreviewResponse>> {
+    apps::authorized(&ctx, session.user.id, app).await?;
+    Ok(Json(runs::preview_saved_case(&ctx.db, app, query).await?))
+}
+async fn baseline_candidates(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path(app): Path<Uuid>,
+    Query(query): Query<BaselineCandidateQuery>,
+) -> ApiResult<Json<BaselineCandidateResponse>> {
+    apps::authorized(&ctx, session.user.id, app).await?;
+    Ok(Json(run_comparison::candidates(&ctx.db, app, query).await?))
 }
 async fn create(
     State(ctx): State<AppContext>,
@@ -68,6 +88,25 @@ async fn list(
     Ok(Json(
         runs::list(&ctx, session.user.id, app, q.cursor).await?,
     ))
+}
+async fn history(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path(app): Path<Uuid>,
+    Query(query): Query<RunHistoryQuery>,
+) -> ApiResult<Json<RunHistoryResponse>> {
+    apps::authorized(&ctx, session.user.id, app).await?;
+    Ok(Json(
+        run_history::list(&ctx.db, session.user.id, app, query).await?,
+    ))
+}
+async fn comparison(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<RunComparisonResponse>> {
+    runs::authorize(&ctx, session.user.id, id).await?;
+    Ok(Json(run_comparison::comparison(&ctx.db, id).await?))
 }
 async fn cancel(
     State(ctx): State<AppContext>,
@@ -116,8 +155,18 @@ pub fn routes() -> Routes {
     use axum::routing::{get, post};
     Routes::new()
         .add("/api/apps/{app_id}/execution-plan", get(preview))
+        .add(
+            "/api/apps/{app_id}/saved-case-preview",
+            get(preview_saved_case),
+        )
+        .add(
+            "/api/apps/{app_id}/baseline-candidates",
+            get(baseline_candidates),
+        )
         .add("/api/apps/{app_id}/runs", get(list).post(create))
+        .add("/api/apps/{app_id}/run-history", get(history))
         .add("/api/runs/{run_id}", get(detail))
+        .add("/api/runs/{run_id}/comparison", get(comparison))
         .add("/api/runs/{run_id}/cancel", post(cancel))
         .add(
             "/api/runs/{run_id}/artifacts/{artifact_id}/content",

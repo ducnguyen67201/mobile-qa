@@ -4,6 +4,7 @@ use mobile_qa::services::{
     execution_store::*, runs, scheduler, test_definitions as defs, verification, worker_auth,
 };
 use mobile_qa_contracts::execution::*;
+use mobile_qa_contracts::task_sessions::{PhoneTask, PhoneTaskPurpose, PhoneTaskState};
 use sea_orm::TransactionTrait;
 use support::*;
 
@@ -116,6 +117,34 @@ async fn prepared(
         .unwrap();
     (app.id, build.id, plan.id, worker, token)
 }
+async fn finish_run(ctx: &AppContext, run_id: Uuid, outcome: Outcome, observed: &str) {
+    let run = runs::detail(&ctx.db, run_id).await.unwrap();
+    let checks = run.manifest.cases[0]
+        .case
+        .checks
+        .iter()
+        .map(|expected| CheckResult {
+            check_id: expected.id.clone(),
+            expected: expected.expected.clone(),
+            observed: Some(if outcome == Outcome::Passed {
+                expected.expected.clone()
+            } else {
+                observed.into()
+            }),
+            outcome,
+            reason: "synthetic_assertion".into(),
+            artifact_ids: Vec::new(),
+        })
+        .collect::<Vec<_>>();
+    exec(
+        &ctx.db,
+        "UPDATE execution_attempts SET state='finished',outcome=$2,cleanup='verified_clean',checks=$3
+         WHERE run_id=$1",
+        vec![run_id.into(), word(&outcome).into(), json(&checks).unwrap().into()],
+    )
+    .await
+    .unwrap();
+}
 #[tokio::test]
 async fn route_manifest_idempotency_and_worker_fencing() {
     let _guard = DATABASE_BOOT.lock().await;
@@ -125,8 +154,11 @@ async fn route_manifest_idempotency_and_worker_fencing() {
         let (app, build, plan, w, token) = prepared(&server, &ctx, &owner).await;
         let input = CreateRunRequest {
             build_id: build,
-            plan_version_id: plan,
+            source: RunSourceRequest::ReleasePlan {
+                plan_version_id: plan,
+            },
             environment_revision: 1,
+            baseline_run_id: None,
         };
         let url = format!("/api/apps/{app}/runs");
         let submit = || {
@@ -203,7 +235,7 @@ async fn route_manifest_idempotency_and_worker_fencing() {
             .post("/api/worker/claims")
             .add_header("authorization", format!("Bearer {token}"))
             .json(&ClaimRequest {
-                version: 1,
+                version: 4,
                 claim_id: cid,
                 profile_id: w.profile_id,
             })
@@ -215,7 +247,7 @@ async fn route_manifest_idempotency_and_worker_fencing() {
             &ctx,
             &w,
             ClaimRequest {
-                version: 1,
+                version: 4,
                 claim_id: Uuid::new_v4(),
                 profile_id: w.profile_id,
             },
@@ -227,7 +259,7 @@ async fn route_manifest_idempotency_and_worker_fencing() {
             &ctx,
             &w,
             ClaimRequest {
-                version: 1,
+                version: 4,
                 claim_id: cid,
                 profile_id: w.profile_id,
             },
@@ -370,8 +402,11 @@ async fn real_database_competing_claims_and_immutable_definition_boundaries() {
                 k,
                 CreateRunRequest {
                     build_id: build,
-                    plan_version_id: plan,
+                    source: RunSourceRequest::ReleasePlan {
+                        plan_version_id: plan,
+                    },
                     environment_revision: 1,
+                    baseline_run_id: None,
                 },
             )
             .await
@@ -382,7 +417,7 @@ async fn real_database_competing_claims_and_immutable_definition_boundaries() {
                 &ctx,
                 &w,
                 ClaimRequest {
-                    version: 1,
+                    version: 4,
                     claim_id: Uuid::new_v4(),
                     profile_id: w.profile_id
                 }
@@ -391,7 +426,7 @@ async fn real_database_competing_claims_and_immutable_definition_boundaries() {
                 &ctx,
                 &w,
                 ClaimRequest {
-                    version: 1,
+                    version: 4,
                     claim_id: Uuid::new_v4(),
                     profile_id: w.profile_id
                 }
@@ -475,8 +510,8 @@ async fn evidence_http_roundtrip_pass_failure_and_blocked() {
     request::<App,_,_>(|server,ctx|async move{
  let owner=login(&server,&ctx).await;let(app,build,plan,w,token)=prepared(&server,&ctx,&owner).await;
  for (scenario,expected) in [("pass",Outcome::Passed),("fail",Outcome::Failed),("blocked",Outcome::Blocked)]{
- let(run,_)=runs::create(&ctx,owner.user,app,scenario,CreateRunRequest{build_id:build,plan_version_id:plan,environment_revision:1}).await.unwrap();
- let lease=scheduler::claim(&ctx,&w,ClaimRequest{version:1,claim_id:Uuid::new_v4(),profile_id:w.profile_id}).await.unwrap().lease.unwrap();
+ let(run,_)=runs::create(&ctx,owner.user,app,scenario,CreateRunRequest{build_id:build,source:RunSourceRequest::ReleasePlan{plan_version_id:plan},environment_revision:1,baseline_run_id:None}).await.unwrap();
+ let lease=scheduler::claim(&ctx,&w,ClaimRequest{version:4,claim_id:Uuid::new_v4(),profile_id:w.profile_id}).await.unwrap().lease.unwrap();
  let prefix=format!("/api/worker/attempts/{}",lease.attempt_id);let mut artifact_id=Uuid::nil();
  for cp in ["created","reopened"]{
  let task=format!("qa-{}",lease.attempt_id);let marker=if scenario=="blocked"{"prerequisite_unavailable"}else{"ready_marker"};
@@ -503,6 +538,181 @@ async fn evidence_http_roundtrip_pass_failure_and_blocked() {
 }
 
 #[tokio::test]
+async fn saved_case_runs_freeze_baselines_compare_and_project_history() {
+    let _guard = DATABASE_BOOT.lock().await;
+    request::<App, _, _>(|server, ctx| async move {
+        let owner = login(&server, &ctx).await;
+        let foreign = login(&server, &ctx).await;
+        let (app, build, plan, worker, _) = prepared(&server, &ctx, &owner).await;
+        let plan = defs::get(&ctx.db, app, plan).await.unwrap();
+        let TestDefinition::Plan(plan) = plan.definition else {
+            panic!("prepared definition is a plan")
+        };
+        let case_version_id = plan.cases[0].case_version_id;
+        let preview = owner
+            .read(server.get(&format!(
+                "/api/apps/{app}/saved-case-preview?build_id={build}&case_version_id={case_version_id}&profile_id={}",
+                worker.profile_id
+            )))
+            .await;
+        preview.assert_status_ok();
+        assert!(preview.json::<PlanPreviewResponse>().blockers.is_empty());
+
+        let submit = |key: &'static str, baseline_run_id: Option<Uuid>| {
+            owner
+                .write(server.post(&format!("/api/apps/{app}/runs")))
+                .add_header("idempotency-key", key)
+                .json(&CreateRunRequest {
+                    build_id: build,
+                    source: RunSourceRequest::SavedCase {
+                        case_version_id,
+                        profile_id: worker.profile_id,
+                    },
+                    environment_revision: 1,
+                    baseline_run_id,
+                })
+        };
+        let baseline_response = submit("saved-baseline", None).await;
+        baseline_response.assert_status(axum::http::StatusCode::CREATED);
+        let baseline = baseline_response.json::<RunResponse>();
+        assert!(baseline.manifest.plan_version_id.is_none());
+        finish_run(&ctx, baseline.id, Outcome::Passed, "expected").await;
+
+        let known_failure_response = submit("saved-known-failure", None).await;
+        known_failure_response.assert_status(axum::http::StatusCode::CREATED);
+        let known_failure = known_failure_response.json::<RunResponse>();
+        finish_run(&ctx, known_failure.id, Outcome::Failed, "missing").await;
+        exec(
+            &ctx.db,
+            "UPDATE execution_runs SET created_at=(SELECT created_at FROM execution_runs WHERE id=$2)+interval '1 second' WHERE id=$1",
+            vec![known_failure.id.into(), baseline.id.into()],
+        )
+        .await
+        .unwrap();
+
+        let candidates = owner
+            .read(server.get(&format!(
+                "/api/apps/{app}/baseline-candidates?build_id={build}&case_version_id={case_version_id}&profile_id={}&environment_revision=1",
+                worker.profile_id
+            )))
+            .await;
+        candidates.assert_status_ok();
+        let candidates = candidates.json::<BaselineCandidateResponse>();
+        assert_eq!(candidates.items[0].run_id, known_failure.id);
+        assert_eq!(candidates.items[0].outcome, Outcome::Failed);
+        assert!(candidates.items.iter().any(|item| item.run_id == baseline.id));
+
+        let current_response = submit("saved-current", Some(baseline.id)).await;
+        current_response.assert_status(axum::http::StatusCode::CREATED);
+        let current = current_response.json::<RunResponse>();
+        assert_eq!(current.baseline_run_id, Some(baseline.id));
+        finish_run(&ctx, current.id, Outcome::Failed, "missing").await;
+        let same_build = owner
+            .read(server.get(&format!("/api/runs/{}/comparison", current.id)))
+            .await;
+        same_build.assert_status_ok();
+        assert_eq!(
+            same_build.json::<RunComparisonResponse>().label,
+            ComparisonLabel::NewFailureSameBuild
+        );
+        exec(
+            &ctx.db,
+            "UPDATE execution_runs SET manifest=jsonb_set(manifest,'{build_sha256}',$2) WHERE id=$1",
+            vec![current.id.into(), serde_json::json!("d".repeat(64)).into()],
+        )
+        .await
+        .unwrap();
+        let comparison = owner
+            .read(server.get(&format!("/api/runs/{}/comparison", current.id)))
+            .await;
+        comparison.assert_status_ok();
+        let comparison = comparison.json::<RunComparisonResponse>();
+        assert_eq!(comparison.label, ComparisonLabel::Regression);
+        assert_eq!(comparison.baseline_run_id, Some(baseline.id));
+        assert!(!comparison.checks.is_empty());
+        assert_eq!(comparison.checks[0].current_reason, "synthetic_assertion");
+
+        let session_id = Uuid::new_v4();
+        exec(
+            &ctx.db,
+            "INSERT INTO phone_sessions(id,app_id,creator_id,build_id,profile_id,payload,fingerprint,
+             build_sha256,build_bytes) VALUES($1,$2,$3,$4,$5,'{}','history',$6,1)",
+            vec![
+                session_id.into(),
+                app.into(),
+                owner.user.into(),
+                build.into(),
+                worker.profile_id.into(),
+                "a".repeat(64).into(),
+            ],
+        )
+        .await
+        .unwrap();
+        let trial = PhoneTask {
+            purpose: Some(PhoneTaskPurpose::Trial),
+            sequence: None,
+            steps: Vec::new(),
+            generation: None,
+            progress: None,
+            id: Uuid::new_v4(),
+            goal: "Editor trial".into(),
+            control: None,
+            state: PhoneTaskState::Completed,
+            message: "Trial completed".into(),
+        };
+        exec(
+            &ctx.db,
+            "INSERT INTO phone_tasks(id,session_id,fingerprint,payload) VALUES($1,$2,'trial',$3)",
+            vec![trial.id.into(), session_id.into(), json(&trial).unwrap().into()],
+        )
+        .await
+        .unwrap();
+        let legacy = PhoneTask {
+            purpose: None,
+            id: Uuid::new_v4(),
+            goal: "Historical preview action".into(),
+            ..trial.clone()
+        };
+        exec(
+            &ctx.db,
+            "INSERT INTO phone_tasks(id,session_id,fingerprint,payload) VALUES($1,$2,'legacy',$3)",
+            vec![legacy.id.into(), session_id.into(), json(&legacy).unwrap().into()],
+        )
+        .await
+        .unwrap();
+        let history = owner
+            .read(server.get(&format!("/api/apps/{app}/run-history?filter=all")))
+            .await;
+        history.assert_status_ok();
+        let history = history.json::<RunHistoryResponse>();
+        assert!(history.items.iter().any(
+            |item| matches!(item, RunHistoryItem::Trial { task_id, .. } if *task_id == trial.id)
+        ));
+        assert!(history.items.iter().any(
+            |item| matches!(item, RunHistoryItem::Execution { run, .. } if run.id == current.id)
+        ));
+        assert!(!history.items.iter().any(|item| {
+            matches!(item, RunHistoryItem::LegacySessionActivity { .. })
+        }));
+        let legacy_history = owner
+            .read(server.get(&format!("/api/apps/{app}/run-history?filter=legacy")))
+            .await;
+        legacy_history.assert_status_ok();
+        assert!(legacy_history
+            .json::<RunHistoryResponse>()
+            .items
+            .iter()
+            .any(|item| matches!(item, RunHistoryItem::LegacySessionActivity { task_id, .. } if *task_id == legacy.id)));
+
+        let denied = foreign
+            .read(server.get(&format!("/api/apps/{app}/run-history?filter=all")))
+            .await;
+        error(&denied, 404);
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn long_poll_wakes_on_committed_run_and_times_out_without_reserving() {
     use std::time::Duration;
     let _guard = DATABASE_BOOT.lock().await;
@@ -510,7 +720,7 @@ async fn long_poll_wakes_on_committed_run_and_times_out_without_reserving() {
         let owner = login(&server, &ctx).await;
         let (app, build, plan, worker, token) = prepared(&server, &ctx, &owner).await;
         let request = ClaimRequest {
-            version: 1,
+            version: 4,
             claim_id: Uuid::new_v4(),
             profile_id: worker.profile_id,
         };
@@ -548,8 +758,11 @@ async fn long_poll_wakes_on_committed_run_and_times_out_without_reserving() {
                 "wake-test",
                 CreateRunRequest {
                     build_id: build,
-                    plan_version_id: plan,
+                    source: RunSourceRequest::ReleasePlan {
+                        plan_version_id: plan,
+                    },
                     environment_revision: 1,
+                    baseline_run_id: None,
                 },
             )
             .await
@@ -624,9 +837,9 @@ async fn clean_start_route_is_fenced_and_recovery_keeps_original_evidence() {
         let plan=saved_definition(&ctx,&owner,app,TestDefinition::Plan(PlanDefinition{key:"direct-clean-plan".into(),version:1,title:"Clean replay".into(),suite_version_ids:vec![],cases:vec![CaseSelection{case_version_id:case.id,data_variant:"default".into(),required:true}],profile_id:p.id,budget:ExecutionBudget{duration_seconds:1800,max_steps:80,artifact_bytes:16777216},diagnostic_retries:0,exclusions:vec![]})).await;
         let w=worker_auth::Worker{id:Uuid::new_v4(),app_id:app,profile_id:p.id};let token=loco_rs::hash::random_string(64);
         worker_auth::register(&ctx,owner.user,app,w.id,p.id,&token).await.unwrap();
-        let(run,_)=runs::create(&ctx,owner.user,app,"clean",CreateRunRequest{build_id:build,plan_version_id:plan.id,environment_revision:1}).await.unwrap();
-        for version in [1,2] {assert!(scheduler::claim(&ctx,&w,ClaimRequest{version,claim_id:Uuid::new_v4(),profile_id:p.id}).await.unwrap().lease.is_none());}
-        let lease=scheduler::claim(&ctx,&w,ClaimRequest{version:3,claim_id:Uuid::new_v4(),profile_id:p.id}).await.unwrap().lease.unwrap();
+        let(run,_)=runs::create(&ctx,owner.user,app,"clean",CreateRunRequest{build_id:build,source:RunSourceRequest::ReleasePlan{plan_version_id:plan.id},environment_revision:1,baseline_run_id:None}).await.unwrap();
+        for version in [1,2,3] {assert!(scheduler::claim(&ctx,&w,ClaimRequest{version,claim_id:Uuid::new_v4(),profile_id:p.id}).await.unwrap().lease.is_none());}
+        let lease=scheduler::claim(&ctx,&w,ClaimRequest{version:4,claim_id:Uuid::new_v4(),profile_id:p.id}).await.unwrap().lease.unwrap();
         let prefix=format!("/api/worker/attempts/{}",lease.attempt_id);
         let event=EventRequest{generation:lease.generation,events:vec![ExecutionEvent{id:Uuid::new_v4(),sequence:1,action_id:"create".into(),phase:"started".into(),message:"Starting".into()}]};
         error(&server.post(&format!("{prefix}/events")).add_header("authorization",format!("Bearer {token}")).add_header("x-lease-token",&lease.lease_token).json(&event).await,409);

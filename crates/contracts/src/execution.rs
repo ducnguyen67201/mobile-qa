@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -252,14 +252,45 @@ pub struct ResolvedCase {
     pub case: CaseDefinition,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ManifestSource {
+    ReleasePlan {
+        version: u8,
+        plan_version_id: Uuid,
+        content_hash: String,
+    },
+    SavedCase {
+        version: u8,
+        case_version_id: Uuid,
+        content_hash: String,
+    },
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum RunSourceRequest {
+    ReleasePlan {
+        plan_version_id: Uuid,
+    },
+    SavedCase {
+        case_version_id: Uuid,
+        profile_id: Uuid,
+    },
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RunManifest {
     pub app_id: Uuid,
     pub build_id: Uuid,
     pub build_sha256: String,
     pub build_bytes: u32,
-    pub plan_version_id: Uuid,
-    pub plan_hash: String,
+    /// Absent only for manifests persisted before source versioning was introduced.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<ManifestSource>,
+    /// Legacy release-plan fields remain optional so historical JSON and hashes round-trip.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan_version_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan_hash: Option<String>,
     pub environment_revision: i32,
     pub profile: ExecutionProfile,
     pub cases: Vec<ResolvedCase>,
@@ -278,8 +309,76 @@ pub struct PlanPreviewResponse {
 #[serde(deny_unknown_fields)]
 pub struct CreateRunRequest {
     pub build_id: Uuid,
-    pub plan_version_id: Uuid,
+    pub source: RunSourceRequest,
     pub environment_revision: i32,
+    pub baseline_run_id: Option<Uuid>,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+#[serde(deny_unknown_fields)]
+pub struct SavedCasePreviewQuery {
+    pub build_id: Uuid,
+    pub case_version_id: Uuid,
+    pub profile_id: Uuid,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+#[serde(deny_unknown_fields)]
+pub struct BaselineCandidateQuery {
+    pub build_id: Uuid,
+    pub case_version_id: Uuid,
+    pub profile_id: Uuid,
+    pub environment_revision: i32,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ComparisonLabel {
+    ComparisonPending,
+    Regression,
+    StillFailing,
+    Recovered,
+    Unchanged,
+    NewFailureSameBuild,
+    NoBaseline,
+    NotComparable,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CheckComparison {
+    pub check_id: String,
+    pub expected: String,
+    pub baseline_observed: Option<String>,
+    pub current_observed: Option<String>,
+    pub baseline_reason: String,
+    pub current_reason: String,
+    pub baseline_artifact_ids: Vec<Uuid>,
+    pub current_artifact_ids: Vec<Uuid>,
+    pub baseline_outcome: Outcome,
+    pub current_outcome: Outcome,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RunComparisonResponse {
+    pub run_id: Uuid,
+    pub baseline_run_id: Option<Uuid>,
+    pub label: ComparisonLabel,
+    pub reason: Option<String>,
+    pub checks: Vec<CheckComparison>,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BaselineCandidate {
+    pub run_id: Uuid,
+    pub build_id: Uuid,
+    pub build_name: String,
+    pub build_sha256: String,
+    pub created_at: DateTime<Utc>,
+    pub outcome: Outcome,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BaselineCandidateResponse {
+    pub items: Vec<BaselineCandidate>,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -331,6 +430,7 @@ pub struct AttemptResponse {
 pub struct RunResponse {
     pub id: Uuid,
     pub manifest: RunManifest,
+    pub baseline_run_id: Option<Uuid>,
     pub state: JobState,
     pub summary: String,
     pub created_at: DateTime<Utc>,
@@ -340,6 +440,53 @@ pub struct RunResponse {
 #[serde(deny_unknown_fields)]
 pub struct RunListResponse {
     pub items: Vec<RunResponse>,
+    pub next_cursor: Option<String>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RunHistoryFilter {
+    All,
+    TestRuns,
+    ReleaseRuns,
+    Trials,
+    Legacy,
+}
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+#[serde(deny_unknown_fields)]
+pub struct RunHistoryQuery {
+    pub filter: Option<RunHistoryFilter>,
+    pub cursor: Option<String>,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum RunHistoryItem {
+    Execution {
+        stable_id: String,
+        created_at: DateTime<Utc>,
+        run: Box<RunResponse>,
+    },
+    Trial {
+        stable_id: String,
+        created_at: DateTime<Utc>,
+        task_id: Uuid,
+        title: String,
+        state: String,
+        message: String,
+    },
+    LegacySessionActivity {
+        stable_id: String,
+        created_at: DateTime<Utc>,
+        task_id: Uuid,
+        title: String,
+        state: String,
+        message: String,
+    },
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RunHistoryResponse {
+    pub items: Vec<RunHistoryItem>,
     pub next_cursor: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]

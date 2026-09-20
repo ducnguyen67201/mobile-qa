@@ -137,6 +137,7 @@ pub struct PhoneCommandRequest {
     pub frame_id: Option<Uuid>,
     pub title: String,
     pub sequence: AutomationSequence,
+    pub purpose: crate::task_sessions::PhoneTaskPurpose,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(rename_all = "snake_case")]

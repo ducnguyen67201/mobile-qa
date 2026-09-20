@@ -12,6 +12,8 @@ pub mod execution_store;
 
 pub mod test_definitions;
 
+pub mod run_comparison;
+pub mod run_history;
 pub mod runs;
 
 pub mod scheduler;

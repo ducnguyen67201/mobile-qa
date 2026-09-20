@@ -34,6 +34,7 @@ pub async fn command(
         input.frame_id,
         fingerprint,
         PhoneTask {
+            purpose: Some(input.purpose),
             id: input.id,
             goal: input.title,
             control: None,
@@ -218,6 +219,7 @@ pub async fn generate(
         None,
         fingerprint,
         PhoneTask {
+            purpose: Some(PhoneTaskPurpose::Exploration),
             id: input.id,
             goal: format!("Generate {:?} tests", input.category),
             control: None,

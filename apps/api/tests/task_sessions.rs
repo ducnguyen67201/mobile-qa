@@ -123,7 +123,7 @@ async fn assert_session_protocol(protocol_version: u32) {
                 .add_header("x-lease-token", lease.lease_token.clone())
         };
         publish().json(&status).await.assert_status_ok();
-        let unsupported = serde_json::json!({"id":Uuid::new_v4(),"expected_revision":0,"frame_id":null,"title":"Back","sequence":{"actions":[{"id":"b","checkpoint_id":"b","kind":"direct","instruction":"","command":{"operation":"back"}}],"checks":[]}});
+        let unsupported = serde_json::json!({"id":Uuid::new_v4(),"expected_revision":0,"frame_id":null,"title":"Back","purpose":"trial","sequence":{"actions":[{"id":"b","checkpoint_id":"b","kind":"direct","instruction":"","command":{"operation":"back"}}],"checks":[]}});
         assert_eq!(
             owner
                 .write(server.post(&format!("{path}/commands")))
@@ -146,6 +146,7 @@ async fn assert_session_protocol(protocol_version: u32) {
         let stale = PhoneTaskRequest {
             id: Uuid::new_v4(),
             goal: "Tap Save".into(),
+            purpose: PhoneTaskPurpose::Exploration,
             selection: Some(PhoneSelection {
                 frame_id: Uuid::new_v4(),
                 control_id: "missing".into(),
@@ -164,6 +165,7 @@ async fn assert_session_protocol(protocol_version: u32) {
             id: Uuid::new_v4(),
             goal: "Type Buy milk".into(),
             selection: None,
+            purpose: PhoneTaskPurpose::Exploration,
         };
         let tasks = format!("{path}/tasks");
         let r = owner.write(server.post(&tasks)).json(&task).await;
@@ -330,6 +332,7 @@ async fn assert_session_protocol(protocol_version: u32) {
             frame_id: status.frame.as_ref().map(|f| f.id),
             title: "Go back without AI".into(),
             sequence: sequence.clone(),
+            purpose: PhoneTaskPurpose::Trial,
         };
         let commands = format!("/api/phones/{}/commands", next.id);
         assert!(!other

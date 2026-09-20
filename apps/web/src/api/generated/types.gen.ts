@@ -104,6 +104,26 @@ export type AutomationSequence = {
     checks: Array<ExpectedCheck>;
 };
 
+export type BaselineCandidate = {
+    build_id: string;
+    build_name: string;
+    build_sha256: string;
+    created_at: string;
+    outcome: Outcome;
+    run_id: string;
+};
+
+export type BaselineCandidateQuery = {
+    build_id: string;
+    case_version_id: string;
+    environment_revision: number;
+    profile_id: string;
+};
+
+export type BaselineCandidateResponse = {
+    items: Array<BaselineCandidate>;
+};
+
 export type BuildListResponse = {
     items: Array<BuildResponse>;
     next_cursor?: string | null;
@@ -153,6 +173,19 @@ export type CaseSelection = {
     required: boolean;
 };
 
+export type CheckComparison = {
+    baseline_artifact_ids: Array<string>;
+    baseline_observed?: string | null;
+    baseline_outcome: Outcome;
+    baseline_reason: string;
+    check_id: string;
+    current_artifact_ids: Array<string>;
+    current_observed?: string | null;
+    current_outcome: Outcome;
+    current_reason: string;
+    expected: string;
+};
+
 export type CheckKind = 'backend' | 'account' | 'reset';
 
 export type CheckMethod = 'ui_property_equals_v1' | 'ui_element_presence_v1' | 'manual';
@@ -189,6 +222,8 @@ export type CleanupRequest = {
 
 export type CleanupState = 'pending' | 'verified_clean' | 'quarantined';
 
+export type ComparisonLabel = 'comparison_pending' | 'regression' | 'still_failing' | 'recovered' | 'unchanged' | 'new_failure_same_build' | 'no_baseline' | 'not_comparable';
+
 export type CompleteRequest = {
     execution_outcome: Outcome;
     generation: number;
@@ -221,9 +256,10 @@ export type CreateLibraryEntryRequest = {
 };
 
 export type CreateRunRequest = {
+    baseline_run_id?: string | null;
     build_id: string;
     environment_revision: number;
-    plan_version_id: string;
+    source: RunSourceRequest;
 };
 
 export type CreateWorkspaceRequest = {
@@ -613,6 +649,18 @@ export type LogoutResponse = {
     signed_out: boolean;
 };
 
+export type ManifestSource = {
+    content_hash: string;
+    kind: 'release_plan';
+    plan_version_id: string;
+    version: number;
+} | {
+    case_version_id: string;
+    content_hash: string;
+    kind: 'saved_case';
+    version: number;
+};
+
 export type MembershipRole = 'operator' | 'member';
 
 export type ModelUsage = {
@@ -646,6 +694,7 @@ export type PhoneCommandRequest = {
     expected_revision: number;
     frame_id?: string | null;
     id: string;
+    purpose: PhoneTaskPurpose;
     sequence: AutomationSequence;
     title: string;
 };
@@ -674,6 +723,7 @@ export type PhoneOptions = {
     active_session?: string | null;
     blockers: Array<string>;
     builds: Array<PhoneBuildChoice>;
+    environment_revision: number;
     profiles: Array<ExecutionProfile>;
 };
 
@@ -705,14 +755,18 @@ export type PhoneTask = {
     id: string;
     message: string;
     progress?: null | GenerationProgress;
+    purpose?: null | PhoneTaskPurpose;
     sequence?: null | AutomationSequence;
     state: PhoneTaskState;
     steps?: Array<StepReceipt>;
 };
 
+export type PhoneTaskPurpose = 'manual_control' | 'trial' | 'exploration';
+
 export type PhoneTaskRequest = {
     goal: string;
     id: string;
+    purpose: PhoneTaskPurpose;
     selection?: null | PhoneSelection;
 };
 
@@ -808,6 +862,49 @@ export type RunArtifact = {
     state: EvidenceState;
 };
 
+export type RunComparisonResponse = {
+    baseline_run_id?: string | null;
+    checks: Array<CheckComparison>;
+    label: ComparisonLabel;
+    reason?: string | null;
+    run_id: string;
+};
+
+export type RunHistoryFilter = 'all' | 'test_runs' | 'release_runs' | 'trials' | 'legacy';
+
+export type RunHistoryItem = {
+    created_at: string;
+    kind: 'execution';
+    run: RunResponse;
+    stable_id: string;
+} | {
+    created_at: string;
+    kind: 'trial';
+    message: string;
+    stable_id: string;
+    state: string;
+    task_id: string;
+    title: string;
+} | {
+    created_at: string;
+    kind: 'legacy_session_activity';
+    message: string;
+    stable_id: string;
+    state: string;
+    task_id: string;
+    title: string;
+};
+
+export type RunHistoryQuery = {
+    cursor?: string | null;
+    filter?: null | RunHistoryFilter;
+};
+
+export type RunHistoryResponse = {
+    items: Array<RunHistoryItem>;
+    next_cursor?: string | null;
+};
+
 export type RunListResponse = {
     items: Array<RunResponse>;
     next_cursor?: string | null;
@@ -823,18 +920,32 @@ export type RunManifest = {
     diagnostic_retries: number;
     environment_revision: number;
     exclusions: Array<string>;
-    plan_hash: string;
-    plan_version_id: string;
+    plan_hash?: string | null;
+    /**
+     * Legacy release-plan fields remain optional so historical JSON and hashes round-trip.
+     */
+    plan_version_id?: string | null;
     profile: ExecutionProfile;
+    source?: null | ManifestSource;
 };
 
 export type RunResponse = {
     attempts: Array<AttemptResponse>;
+    baseline_run_id?: string | null;
     created_at: string;
     id: string;
     manifest: RunManifest;
     state: JobState;
     summary: string;
+};
+
+export type RunSourceRequest = {
+    kind: 'release_plan';
+    plan_version_id: string;
+} | {
+    case_version_id: string;
+    kind: 'saved_case';
+    profile_id: string;
 };
 
 export type SaveAuthoredTest = {
@@ -859,6 +970,12 @@ export type SaveLibraryDraftRequest = {
 
 export type SavedAuthoredTests = {
     entry_ids: Array<string>;
+};
+
+export type SavedCasePreviewQuery = {
+    build_id: string;
+    case_version_id: string;
+    profile_id: string;
 };
 
 export type SecretKind = 'account' | 'reset';
@@ -1225,6 +1342,58 @@ export type GetAppResponses = {
 };
 
 export type GetAppResponse = GetAppResponses[keyof GetAppResponses];
+
+export type ListBaselineCandidatesData = {
+    body?: never;
+    path: {
+        app_id: string;
+    };
+    query: {
+        build_id: string;
+        case_version_id: string;
+        profile_id: string;
+        environment_revision: number;
+    };
+    url: '/api/apps/{app_id}/baseline-candidates';
+};
+
+export type ListBaselineCandidatesErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+};
+
+export type ListBaselineCandidatesError = ListBaselineCandidatesErrors[keyof ListBaselineCandidatesErrors];
+
+export type ListBaselineCandidatesResponses = {
+    /**
+     * Success
+     */
+    200: BaselineCandidateResponse;
+};
+
+export type ListBaselineCandidatesResponse = ListBaselineCandidatesResponses[keyof ListBaselineCandidatesResponses];
 
 export type CreateBuildUploadData = {
     body: CreateBuildUploadRequest;
@@ -2143,6 +2312,52 @@ export type OpenPhoneResponses = {
 
 export type OpenPhoneResponse = OpenPhoneResponses[keyof OpenPhoneResponses];
 
+export type ListRunHistoryData = {
+    body?: never;
+    path: {
+        app_id: string;
+    };
+    query?: {
+        filter?: RunHistoryFilter;
+        cursor?: string;
+    };
+    url: '/api/apps/{app_id}/run-history';
+};
+
+export type ListRunHistoryErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+};
+
+export type ListRunHistoryError = ListRunHistoryErrors[keyof ListRunHistoryErrors];
+
+export type ListRunHistoryResponses = {
+    /**
+     * Success
+     */
+    200: RunHistoryResponse;
+};
+
+export type ListRunHistoryResponse = ListRunHistoryResponses[keyof ListRunHistoryResponses];
+
 export type ListRunsData = {
     body?: never;
     path: {
@@ -2285,6 +2500,61 @@ export type CreateRunResponses = {
 };
 
 export type CreateRunResponse = CreateRunResponses[keyof CreateRunResponses];
+
+export type GetSavedCasePreviewData = {
+    body?: never;
+    path: {
+        app_id: string;
+    };
+    query: {
+        build_id: string;
+        case_version_id: string;
+        profile_id: string;
+    };
+    url: '/api/apps/{app_id}/saved-case-preview';
+};
+
+export type GetSavedCasePreviewErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+};
+
+export type GetSavedCasePreviewError = GetSavedCasePreviewErrors[keyof GetSavedCasePreviewErrors];
+
+export type GetSavedCasePreviewResponses = {
+    /**
+     * Success
+     */
+    200: PlanPreviewResponse;
+};
+
+export type GetSavedCasePreviewResponse = GetSavedCasePreviewResponses[keyof GetSavedCasePreviewResponses];
 
 export type GenerateTestsData = {
     body: GenerateTestsRequest;
@@ -4091,6 +4361,49 @@ export type CancelRunResponses = {
 };
 
 export type CancelRunResponse = CancelRunResponses[keyof CancelRunResponses];
+
+export type GetRunComparisonData = {
+    body?: never;
+    path: {
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}/comparison';
+};
+
+export type GetRunComparisonErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+};
+
+export type GetRunComparisonError = GetRunComparisonErrors[keyof GetRunComparisonErrors];
+
+export type GetRunComparisonResponses = {
+    /**
+     * Success
+     */
+    200: RunComparisonResponse;
+};
+
+export type GetRunComparisonResponse = GetRunComparisonResponses[keyof GetRunComparisonResponses];
 
 export type GetSettingsData = {
     body?: never;

@@ -1,5 +1,39 @@
 # Implementation status and evidence
 
+## Phase 07B first delivery — durable saved-test runs (2026-09-20)
+
+The editor now admits a complete saved case directly into the existing execution
+scheduler using an explicit build, qualified profile, environment revision and optional
+frozen baseline run. Unsaved content uses Save & run and submits only the immutable version
+returned by that save. Try actions remains a phone-session Trial and AI/manual activity is
+not relabeled as a durable test execution.
+
+New manifests carry a versioned saved-case or release-plan source. Historical manifests
+continue to decode and serialize with their original plan fields. Execution protocol4 is
+required before a worker can claim the new shape. Migration000009 records the source and
+baseline without adding a shadow run table.
+
+Runs is a cursor-paginated read projection over durable execution runs and creator-scoped
+phone trials. Legacy phone activity is available only through its explicit filter and has
+no invented baseline. Comparison freezes the selected baseline and requires the exact case
+version/hash, data variant, environment and execution profile plus terminal, consistent
+attempts with clean lifecycle evidence. It reports Regression, Still failing, Recovered,
+Unchanged, New failure on same build, No baseline, Comparison pending or Not comparable.
+Null observations remain Unknown with their retained reason.
+
+Validation passed for generated-contract drift, formatting, Clippy, TypeScript/ESLint,
+Ruff/Pyright, production API/web builds, 54 Rust tests, 122 browser tests and 175 worker
+tests across the consolidated run plus the isolated retry of the existing intermittent
+loopback HTTP test. Test-library, execution and direct-authoring HTTP smokes passed with
+simulated workers and API restart persistence. The shared test database contained another
+branch's migration, so API validation used and removed a disposable PostgreSQL container;
+the shared database and original checkout were untouched. Vite retains its existing large
+bundle advisory.
+
+Audited triage, multi-case coverage deltas and the operational 07C–D work remain pending.
+No real device/model run, rendered browser acceptance or customer APK qualification is
+claimed. See the [implementation report](../../.claude/PRPs/reports/07b-regression-labels-durable-test-history-report.md).
+
 ## Save without human reviews (2026-09-20)
 
 Implemented Edit → Save → Run for cases, suites and release plans, including selected
@@ -81,7 +115,7 @@ These checks use no emulator or model calls and do not prove real-device qualifi
 Implementation report and remaining gates are in the owning
 [phase 07 specification](implementation/07-pilot-readiness-and-scale.md#07a-implementation-notes--2026-09-15).
 Temporary GAN specifications and evaluation files were removed after applying the review.
-The Phase07 plan remains active because 07B–D have not been implemented.
+The Phase07 plan remains active because the remainder of 07B and 07C–D have not been implemented.
 
 ## Full local development supervisor (2026-09-15)
 

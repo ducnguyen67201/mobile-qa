@@ -7,7 +7,14 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, expect, it, vi } from 'vitest'
 import { routes } from '@/routes'
 import { app, appId, build, buildId, session, settings, upload, uploadId } from '@/test/fixtures'
-import type { BuildResponse, UploadResponse } from '@/api/generated/types.gen'
+import type {
+  BuildResponse,
+  CreateRunRequest,
+  RunManifest,
+  RunResponse,
+  UploadResponse,
+} from '@/api/generated/types.gen'
+import { zCreateRunRequest } from '@/api/generated/zod.gen'
 function show(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   render(
@@ -50,6 +57,70 @@ it('shows persisted metadata while device readiness remains not checked', async 
   expect(screen.getByText(/Device checks are not available yet/)).toBeInTheDocument()
   expect(screen.getAllByText('Not checked')).toHaveLength(4)
   expect(screen.queryByText('Ready to run')).not.toBeInTheDocument()
+})
+it('queues the default release plan resolved by the preview', async () => {
+  const planVersionId = '11111111-1111-4111-8111-111111111111'
+  const runId = '22222222-2222-4222-8222-222222222222'
+  const manifest: RunManifest = {
+    app_id: appId,
+    build_id: buildId,
+    build_sha256: build.sha256,
+    build_bytes: build.byte_size,
+    plan_version_id: planVersionId,
+    plan_hash: 'b'.repeat(64),
+    environment_revision: app.environment.revision,
+    profile: {
+      id: runId,
+      name: 'Synthetic profile',
+      driver: 'fake',
+      package: app.android_package,
+      adapter: 'fixture',
+      device_identity: 'fixture',
+      image: 'fixture',
+      model: 'none',
+      qualified: true,
+      qualification_reference: 'fixture',
+      max_apk_bytes: 1048576,
+    },
+    cases: [],
+    budget: { duration_seconds: 600, max_steps: 30, artifact_bytes: 16777216 },
+    diagnostic_retries: 0,
+    exclusions: [],
+  }
+  const run: RunResponse = {
+    id: runId,
+    state: 'queued',
+    created_at: '2026-09-20T00:00:00Z',
+    summary: 'Queued',
+    attempts: [],
+    manifest,
+  }
+  const submissions: CreateRunRequest[] = []
+  const base = fixtureFetch()
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      const url = new URL(request.url)
+      if (url.pathname.endsWith('/execution-plan')) {
+        expect(url.searchParams.has('plan_version_id')).toBe(false)
+        return Response.json({ plan: null, manifest, blockers: [] })
+      }
+      if (url.pathname.endsWith('/runs') && request.method === 'POST') {
+        submissions.push(zCreateRunRequest.parse(await request.json()))
+        return Response.json(run, { status: 201 })
+      }
+      if (url.pathname.endsWith(`/runs/${runId}`)) return Response.json(run)
+      return base(request)
+    }),
+  )
+  show(`/apps/${appId}?build=${buildId}`)
+  await userEvent.click(await screen.findByRole('button', { name: 'Run release check' }))
+  await waitFor(() => expect(submissions).toHaveLength(1))
+  expect(submissions[0]).toEqual({
+    build_id: buildId,
+    plan_version_id: planVersionId,
+    environment_revision: app.environment.revision,
+  })
 })
 it('distinguishes infrastructure failure from an invalid APK', async () => {
   vi.stubGlobal(

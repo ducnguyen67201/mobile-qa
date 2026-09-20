@@ -818,19 +818,32 @@ async fn comparison_finalization_is_durable_idempotent_and_baseline_is_pinned() 
     let _guard = DATABASE_BOOT.lock().await;
     request::<App,_,_>(|server,ctx|async move {
         let owner=login(&server,&ctx).await;
-        let(app,build,plan,w,_)=prepared(&server,&ctx,&owner).await;
-        let original=runs::preview(&ctx.db,app,build,Some(plan)).await.unwrap().manifest.unwrap();
-        let input=CaseRunRequest{case_version_id:original.cases[0].definition_id,build_id:build,profile_id:w.profile_id,environment_revision:1,baseline_run_id:None};
+        let(app,build,_,_,_)=prepared(&server,&ctx,&owner).await;
+        let TestDefinition::Case(mut case)=definition() else {panic!()};
+        case.key="comparison-direct".into();case.adapter="android_direct_v1".into();
+        for action in &mut case.actions {if action.kind==ActionKind::Navigate {action.kind=ActionKind::Checkpoint;action.instruction.clear();}}
+        case.checks.truncate(1);case.checks[0].required=true;
+        let case=saved_definition(&ctx,&owner,app,TestDefinition::Case(case)).await;
+        let fixture:RunResponse=serde_json::from_str(include_str!("fixtures/execution/comparison.json")).unwrap();
+        let mut profile=fixture.manifest.profile;
+        profile.id=Uuid::new_v4();
+        let context=profile.execution_context.as_mut().unwrap();
+        context.qualified_profile_id=profile.id;
+        let starting_check=&mut context.starting_checks[0];
+        starting_check.id="ready".into();starting_check.checkpoint_id="preflight".into();
+        starting_check.text_filter.clear();starting_check.expected="true".into();
+        starting_check.prerequisite_check_ids.clear();starting_check.required=true;
+        defs::register_profile(&ctx,owner.user,app,profile.clone()).await.unwrap();
+        let input=CaseRunRequest{case_version_id:case.id,build_id:build,profile_id:profile.id,environment_revision:1,baseline_run_id:None};
         let (base,_)=case_runs::create(&ctx,owner.user,app,"baseline",input.clone()).await.unwrap();
         // Seed retained synthetic facts to isolate persistence/finalization from worker transport.
         // Device/check publication and fencing are exercised by the route tests above.
         async fn finish(ctx:&AppContext,run:&RunResponse,failed:bool) {
             let mut fixture:RunResponse=serde_json::from_str(include_str!("fixtures/execution/comparison.json")).unwrap();
-            fixture.manifest.app_id=run.manifest.app_id;fixture.manifest.build_id=run.manifest.build_id;
-            fixture.manifest.cases[0].definition_id=run.manifest.cases[0].definition_id;
+            fixture.manifest=run.manifest.clone();
             if failed {fixture.manifest.build_sha256="f".repeat(64);}
-            let attempt=&mut fixture.attempts[0];attempt.id=run.attempts[0].id;
-            let receipt=attempt.preflight.as_mut().unwrap();receipt.attempt_id=attempt.id;receipt.build_sha256=fixture.manifest.build_sha256.clone();
+            let attempt=&mut fixture.attempts[0];attempt.id=run.attempts[0].id;attempt.case_version_id=run.manifest.cases[0].definition_id;
+            let receipt=attempt.preflight.as_mut().unwrap();receipt.attempt_id=attempt.id;receipt.build_sha256=fixture.manifest.build_sha256.clone();receipt.context=fixture.manifest.profile.execution_context.clone().unwrap();
             let artifact=Uuid::new_v4();attempt.checks[0].artifact_ids=vec![artifact];
             if failed {attempt.checks[0].outcome=Outcome::Failed;attempt.checks[0].observed=Some("".into());}
             exec(&ctx.db,"UPDATE execution_runs SET manifest=$2 WHERE id=$1",vec![run.id.into(),json(&fixture.manifest).unwrap().into()]).await.unwrap();
@@ -839,6 +852,39 @@ async fn comparison_finalization_is_durable_idempotent_and_baseline_is_pinned() 
             exec(&ctx.db,"INSERT INTO execution_artifacts(id,attempt_id,checkpoint_id,name,mime,byte_size,sha256,state,storage_key,storage_backend) VALUES($1,$2,'created','created.xml','application/xml',1,'fixture','sealed',$3,'local')",vec![artifact.into(),attempt.id.into(),artifact.to_string().into()]).await.unwrap();
         }
         finish(&ctx,&base,false).await;
+        // More than one page of newer, completed but incompatible runs must not hide the
+        // latest eligible baseline. This guards the keyset scan in case-run previews.
+        let noise_namespace = Uuid::new_v4().to_string();
+        exec(
+            &ctx.db,
+            "INSERT INTO execution_runs(id,app_id,creator_id,build_id,plan_id,idempotency_key,fingerprint,manifest,cancel_requested,created_at)
+             SELECT md5($2 || ':run:' || generated.position::text)::uuid,
+                 app_id,creator_id,build_id,plan_id,$2 || ':key:' || generated.position::text,
+                 fingerprint,jsonb_set(manifest,'{environment_revision}',to_jsonb(2::integer)),
+                 cancel_requested,created_at + generated.position * interval '1 second'
+             FROM execution_runs
+             CROSS JOIN generate_series(1,101) AS generated(position)
+             WHERE id=$1",
+            vec![base.id.into(), noise_namespace.clone().into()],
+        )
+        .await
+        .unwrap();
+        exec(
+            &ctx.db,
+            "INSERT INTO execution_attempts(id,run_id,case_index,number,generation,state,outcome,cleanup,reason,checks,usage,completion_hash,cleanup_hash,cleanup_receipt)
+             SELECT md5($2 || ':attempt:' || generated.position::text)::uuid,
+                 md5($2 || ':run:' || generated.position::text)::uuid,
+                 case_index,number,generation,state,outcome,cleanup,reason,checks,usage,
+                 completion_hash,cleanup_hash,cleanup_receipt
+             FROM execution_attempts
+             CROSS JOIN generate_series(1,101) AS generated(position)
+             WHERE run_id=$1",
+            vec![base.id.into(), noise_namespace.into()],
+        )
+        .await
+        .unwrap();
+        let preview=case_runs::preview(&ctx,owner.user,app,input.clone()).await.unwrap();
+        assert_eq!(preview.suggested_baseline_id,Some(base.id));
         let (current,_)=case_runs::create(&ctx,owner.user,app,"current",CaseRunRequest{baseline_run_id:Some(base.id),..input}).await.unwrap();
         finish(&ctx,&current,true).await;
         assert!(runs::detail(&ctx.db,current.id).await.unwrap().comparison.is_none());

@@ -114,14 +114,14 @@ evidence. Blocked, canceled, skipped, inconclusive, missing proof and mixed retr
 outcomes cannot establish a clean transition. Retain every attempt. Until both
 runs finish, show **Comparison pending**, not a final regression badge.
 
-| Baseline → current | Comparison label |
-| --- | --- |
-| Passed → assertion failed, different build checksum | Regression |
-| Failed → failed | Still failing |
-| Failed → passed, clean attempts and lifecycle proof | Recovered |
-| Passed → passed | Unchanged |
-| Passed → failed, same build checksum | New failure on same build |
-| No selected eligible baseline | No baseline |
+| Baseline → current                                                | Comparison label            |
+| ----------------------------------------------------------------- | --------------------------- |
+| Passed → assertion failed, different build checksum               | Regression                  |
+| Failed → failed                                                   | Still failing               |
+| Failed → passed, clean attempts and lifecycle proof               | Recovered                   |
+| Passed → passed                                                   | Unchanged                   |
+| Passed → failed, same build checksum                              | New failure on same build   |
+| No selected eligible baseline                                     | No baseline                 |
 | Changed test/data/context, incomplete proof or uncertain attempts | Not comparable, with reason |
 
 Added and removed cases remain separate visible coverage changes in multi-case
@@ -146,15 +146,15 @@ React: choose build / baseline → Rust admission → existing execution queue
                         pure comparison policy → persisted comparison → UI
 ```
 
-| Owner | Responsibility |
-| --- | --- |
-| `crates/contracts` | Rust-owned request/response and versioned manifest shapes; comparison categories and reason codes; no DB or framework logic |
-| `apps/api/src/domain/regression.rs` (new) | Pure compatibility, case/check matching and transition functions; no DB/network/clock/AI |
-| `apps/api/src/services/runs.rs` and focused admission helper | Authorize, resolve immutable input, pin build/baseline, idempotently queue through existing execution machinery |
-| `apps/api/src/services/run_comparisons.rs` (new) | Authorize both sides, load complete facts, invoke policy and finalize the comparison exactly once |
-| Focused comparison/history stores + SeaORM migration | Baseline reference, policy version, case deltas/reasons/evidence references, deterministic pagination and uniqueness constraints |
-| Existing worker + server verifier | Execute, capture observations and establish outcomes; never decide whether a result is a regression |
-| React run components | Render generated DTOs; selection/disclosure/filter state only; shared compact result card for editor, Runs and report |
+| Owner                                                        | Responsibility                                                                                                                   |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `crates/contracts`                                           | Rust-owned request/response and versioned manifest shapes; comparison categories and reason codes; no DB or framework logic      |
+| `apps/api/src/domain/regression.rs` (new)                    | Pure compatibility, case/check matching and transition functions; no DB/network/clock/AI                                         |
+| `apps/api/src/services/runs.rs` and focused admission helper | Authorize, resolve immutable input, pin build/baseline, idempotently queue through existing execution machinery                  |
+| `apps/api/src/services/run_comparisons.rs` (new)             | Authorize both sides, load complete facts, invoke policy and finalize the comparison exactly once                                |
+| Focused comparison/history stores + SeaORM migration         | Baseline reference, policy version, case deltas/reasons/evidence references, deterministic pagination and uniqueness constraints |
+| Existing worker + server verifier                            | Execute, capture observations and establish outcomes; never decide whether a result is a regression                              |
+| React run components                                         | Render generated DTOs; selection/disclosure/filter state only; shared compact result card for editor, Runs and report            |
 
 Freeze baseline selection atomically with run admission. Finalize comparison
 idempotently after lifecycle verification, storing the comparison policy version
@@ -224,7 +224,6 @@ match, or whichever passing run happens to be newest does not meet this boundary
 Audited human triage, accepted-release baseline management, exports, retention and
 fleet scaling remain subsequent work; none is required to add another save approval.
 
-
 ## Implementation report — 2026-09-20
 
 Implemented the first delivery across contracts, pure policy, admission, persistence,
@@ -293,7 +292,6 @@ copies. This first delivery does not include audited triage, accepted-release ba
 management, exports, retention or fleet scaling. Legacy demo profiles lacking start
 proof can still execute, but cannot become comparable baselines by inference.
 
-
 ### Observed real-device result
 
 Acceptance directory (ignored/private):
@@ -301,11 +299,11 @@ Acceptance directory (ignored/private):
 The test-only workspace and records use the isolated test database, not the user's
 existing demonstration workspace.
 
-| Durable run | Result | Comparison |
-| --- | --- | --- |
-| `4256cc75-835d-4d51-b996-1d9e8ccb42bc` · sample | All three checks passed | No baseline |
-| `94ca7116-dba8-4ada-996f-edc784e4a1c5` · sampleBroken | Enter/save passed; restart persistence failed | Regression against the first run |
-| `b7fdba04-4e70-4cc5-a1fb-faf8f70b6397` · sampleBroken | Same restart failure | Still failing against the second run |
+| Durable run                                           | Result                                        | Comparison                           |
+| ----------------------------------------------------- | --------------------------------------------- | ------------------------------------ |
+| `4256cc75-835d-4d51-b996-1d9e8ccb42bc` · sample       | All three checks passed                       | No baseline                          |
+| `94ca7116-dba8-4ada-996f-edc784e4a1c5` · sampleBroken | Enter/save passed; restart persistence failed | Regression against the first run     |
+| `b7fdba04-4e70-4cc5-a1fb-faf8f70b6397` · sampleBroken | Same restart failure                          | Still failing against the second run |
 
 The failing check retained expected `Buy milk`, structured `absent`, and
 `target_absent_on_ready_screen`, with PNG/XML evidence. All runs had verified

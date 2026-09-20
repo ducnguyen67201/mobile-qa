@@ -217,7 +217,7 @@ hosted token permissions or repeat the unrelated application suites.
 | Spec 04 worker HTTP leases/runs/evidence reports                           | Planned; local fake protocol is not a scheduler                                                      |
 | Spec 05 versioned case/suite/plan editor and approvals                     | Planned                                                                                              |
 | Spec 06 requirements-to-tests generation                                   | Planned                                                                                              |
-| Spec 07 regression, retention, production deployment and pilot reliability | First regression/history delivery implemented locally; later operational phases planned                                                                                              |
+| Spec 07 regression, retention, production deployment and pilot reliability | First regression/history delivery implemented locally; later operational phases planned              |
 | Paid pilot/customer validation                                             | No accepted customer app, signed pilot or demonstrated willingness to pay recorded                   |
 
 Doppler project creation does not provision database/model credentials, deploy a service,

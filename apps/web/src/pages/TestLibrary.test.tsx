@@ -513,6 +513,7 @@ it.each(['failed refresh', 'submitted elsewhere'])(
 )
 
 it('locates saved setup errors in collapsed checks and focuses the exact field', async () => {
+  const user = userEvent.setup()
   const draft: LibraryDraftResponse = {
     ...libraryDraft,
     definition: {
@@ -577,7 +578,9 @@ it('locates saved setup errors in collapsed checks and focuses the exact field',
   await userEvent.click(screen.getByRole('button', { name: 'Edit action 2' }))
   await userEvent.click(jump)
   await waitFor(() => expect(screen.getByLabelText('Check 2 control')).toHaveFocus())
-  await userEvent.type(screen.getByLabelText('Check 2 description'), 'Saved task is visible')
+  // One edit is enough to verify issue clearing; avoid rerendering the full editor per key.
+  await user.click(screen.getByLabelText('Check 2 description'))
+  await user.paste('Saved task is visible')
   expect(screen.queryByRole('button', { name: /Check 2 → Description/ })).not.toBeInTheDocument()
   expect(jump).toBeInTheDocument()
   expect(screen.getByText('Save to recheck the fields you changed.')).toBeInTheDocument()

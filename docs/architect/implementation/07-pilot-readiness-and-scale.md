@@ -259,7 +259,6 @@ belongs to 07B. Reports remain in this canonical document, rather than adding co
 plan/report files. The full plan remains pending for 07B–D. Real non-demo APK qualification,
 the reliability campaign and hosted acceptance are not claimed by this delivery.
 
-
 ### 07B first delivery — 2026-09-20
 
 Saved-case admission, durable history and conservative persisted regression comparisons

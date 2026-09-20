@@ -78,10 +78,7 @@
           "provenance": "operator_authored",
           "package": "ai.mobileqa.demo",
           "adapter": "demo_persistence_v1",
-          "preconditions": [
-            "Clean demo device",
-            "Controlled demo backend available"
-          ],
+          "preconditions": ["Clean demo device", "Controlled demo backend available"],
           "actions": [
             {
               "id": "create",
@@ -149,9 +146,7 @@
           "observed": "Buy milk",
           "outcome": "passed",
           "reason": "expected_value_observed",
-          "artifact_ids": [
-            "0db52229-6528-4783-a62f-68035633c8c7"
-          ]
+          "artifact_ids": ["0db52229-6528-4783-a62f-68035633c8c7"]
         }
       ],
       "artifacts": [
@@ -217,9 +212,7 @@
         "started_at": "2026-09-20T12:00:00Z",
         "ready_at": "2026-09-20T12:00:00Z",
         "duration_ms": 1,
-        "artifact_ids": [
-          "0db52229-6528-4783-a62f-68035633c8c7"
-        ]
+        "artifact_ids": ["0db52229-6528-4783-a62f-68035633c8c7"]
       },
       "original_cleanup": {
         "generation": 1,

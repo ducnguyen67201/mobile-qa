@@ -87,3 +87,14 @@ Preserve legacy payload hashes and approval rules. Generated expectations requir
 review; app observations cannot establish intended behavior. See the
 [owning spec](implementation/06-test-generation.md).
 The source now follows this decision. Validation and live acceptance are tracked separately in status.md. Existing session payloads and receipt transactions own the additive state; a second queue and migration would duplicate those mechanisms. Invalid model output fails closed rather than buying automatic repair calls.
+
+## 2026-09-20 — Save replaces human test approvals
+
+Test authors requested one persistence action for cases, suites, release plans, templates
+and selected AI proposals. Remove submit/fork/reviewer gates; complete Save creates or
+reuses an immutable snapshot. Incomplete work remains durable and editable. Save never
+means passed. Keep technical admission, exact version pins, operator permissions and
+history. Migration 000008 preserves old decisions as legacy audit without fabricating
+approvals for new saves. Retain internal draft storage/routes to limit wire churn;
+namespace new mutation fingerprints so old retries fail closed rather than deserialize
+obsolete receipts. Spec 05 owns the detailed upgrade and execution invariants.

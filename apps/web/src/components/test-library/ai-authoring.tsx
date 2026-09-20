@@ -1,4 +1,4 @@
-/** AI proposals are editable drafts. Accepting them never approves or runs a regression plan. */
+/** AI proposals are editable drafts. Saving them never runs a regression plan. */
 import { useState } from 'react'
 import {
   Alert,
@@ -223,7 +223,7 @@ export function ProposalReview({ task, appId }: { task: PhoneTask; appId: string
           <Group justify="space-between" gap="xs">
             <Text size="sm" fw={600}>
               {save.isSuccess
-                ? 'Saved as drafts'
+                ? 'Saved'
                 : `${selected.length} ${selected.length === 1 ? 'test' : 'tests'} selected`}
             </Text>
             <Button
@@ -234,7 +234,6 @@ export function ProposalReview({ task, appId }: { task: PhoneTask; appId: string
                 save.mutate({
                   mutation_id: crypto.randomUUID(),
                   source_task_id: task.id,
-                  expectations_confirmed: true,
                   tests: proposals
                     .filter((p) => selected.includes(p.id))
                     .map((p) => ({
@@ -249,11 +248,11 @@ export function ProposalReview({ task, appId }: { task: PhoneTask; appId: string
             >
               {save.isSuccess
                 ? 'Saved'
-                : `Confirm & save ${selected.length === 1 ? 'test' : `${selected.length} tests`}`}
+                : `Save ${selected.length === 1 ? 'test' : `${selected.length} tests`}`}
             </Button>
           </Group>
           <Text size="xs" c="dimmed" mt={4}>
-            Saving confirms the actions and expected results below and creates editable drafts.
+            Save the selected tests. You can edit them later.
           </Text>
         </div>
       )}

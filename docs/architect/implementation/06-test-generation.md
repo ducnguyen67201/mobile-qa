@@ -28,7 +28,7 @@ existing resizer and compact navigation.
   above the target/value inputs, with accessible labels and multiline text support.
   Add action appends another. Checks expand only when added or explicitly opened. Optional checks appear inside their owning action;
   no check form is created until requested. Actions can be tried without checks.
-  Reviewed release tests still require evidence under the existing approval rules.
+  Saved release tests still require technically valid evidence checks.
   Removed-action checks remain recoverable for reassignment rather than being silently deleted.
   Run the typed sequence directly; show per-step progress, evidence and checks.
 - **Control and record:** distinguish Pick target from Control phone. Picking only
@@ -42,8 +42,7 @@ existing resizer and compact navigation.
   when available; ask for a choice only when needed. Show visited screens and gaps,
   then editable proposals such as “Smoke — app opens” and “Saved task survives restart.”
 - **Save and rerun:** save selected proposals or recorded steps atomically as drafts.
-  A tester can trial drafts without first assembling a release plan. Existing review
-  and immutable-definition rules still govern approved regression runs.
+  A tester can trial drafts without first assembling a release plan. Immutable-definition and technical admission rules still govern saved regression runs.
 
 Templates, manual authoring and direct execution remain usable without model credentials.
 AI is never invoked by uploading a build, visiting a page, or failing to find a selector.
@@ -63,7 +62,7 @@ resource IDs and require unique matches. Frame-local control IDs and old coordin
 not reusable selectors. Literal text goes through a device RPC, not shell interpolation.
 Missing/ambiguous controls stop with a useful error; they do not trigger hidden AI recovery.
 
-Both interactive sessions and approved regression runs use this executor. Per-step capture
+Both interactive sessions and saved regression runs use this executor. Per-step capture
 feeds the existing independent Rust evidence checks. Agent completion and successful taps
 alone are never a test pass. Keep supported assertion methods and require explicit expected
 behavior; unsupported checks remain needs-input rather than being silently approximated.
@@ -107,11 +106,11 @@ app and compatible scope; changed builds/environments invalidate old discovery c
 AI proposals contain suggested title/category, structured steps, source references, expected
 checks or explicit unanswered questions, and potential duplicates. Screens show what occurred;
 requirements or the author's explicit decision establish what should occur. Suggested expected
-behavior needs confirmation before review. Do not redefine a seeded defect as correct behavior.
-Generated output never automatically approves a test or updates the default plan.
+behavior needs a visible question before the user chooses Save. Do not redefine a seeded defect as correct behavior.
+Generated output never automatically saves a test or updates the default plan.
 
 Generation state and selected-proposal acceptance are durable/idempotent. Canceling stops
-future model calls/actions, retains completed proposals, and leaves approved cases unchanged.
+future model calls/actions, retains completed proposals, and leaves saved cases unchanged.
 A worker crash with uncertain side effects quarantines the session rather than resuming it.
 Source images are bounded private session payloads read through authorized routes. Separate
 artifact retention/garbage collection remains part of phase 07; referenced source tasks must
@@ -120,10 +119,10 @@ not be removed while saved drafts depend on them.
 ## Delivery order and acceptance
 
 1. **Direct execution and recording:** prove picked tap/type/restart/check steps on the
-   qualified sample through both the phone API and approved run pipeline, with no model
+   qualified sample through both the phone API and saved-version run pipeline, with no model
    credentials/calls. Verify Unicode, ambiguity, failures, cancellation and cleanup.
 2. **Templates and reusable tests:** bind template slots, save complete typed drafts
-   atomically, review them through existing semantics and rerun the frozen definitions.
+   atomically, save them without approvals and rerun the frozen definitions.
 3. **AI discovery and proposals:** run bounded discovery, generate named grounded scenarios,
    resolve missing expectations, save selected proposals and execute their direct steps.
 
@@ -195,13 +194,13 @@ actions, three minutes and five proposals. Read-only discovery permits wait/back
 form submissions need the explicit test-data switch and a described journey. Missing usage stops
 further calls. Invalid output fails closed without repair calls. Password fields are masked before
 provider requests. Proposals retain source IDs and versioned template/generation provenance;
-accepting them creates drafts and never grants approvals. Existing-name hints cover the loaded
+saving them creates editable content and eligible immutable versions. Existing-name hints cover the loaded
 catalog page, not semantic deduplication across the whole library. Same-session captures can be
 reused explicitly, while changed environment/build/session scope requires discovery again.
 
 ### Verification scope
 
-`just smoke-direct-authoring` exercises real HTTP draft/review/run persistence with synthetic
+`just smoke-direct-authoring` exercises real HTTP save/run persistence with synthetic
 worker evidence; it is not real-emulator acceptance. Worker unit tests exercise the same direct
 RPC seam, literal Unicode input, ambiguity, uncertainty, explicit AI dispatch and generation
 source rejection. The direct executor passed local sample input/save/restart with plain text and Vietnamese text

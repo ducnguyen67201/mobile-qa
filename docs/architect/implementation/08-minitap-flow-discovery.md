@@ -15,7 +15,7 @@ test. Subsequent runs execute its recorded direct actions without AI calls.
 
 This implementation replaces the custom structured-model discovery loop with the pinned
 Minitap agent graph. Direct execution, explicit Ask AI, manual editing, templates and the
-existing approval/reporting flow remain available. Real-device qualification gates are
+existing save/reporting flow remain available. Real-device qualification gates are
 reported separately from source implementation in status.md.
 
 ## Tester flow
@@ -35,8 +35,8 @@ reported separately from source implementation in status.md.
    “Smoke — task screen opens” and “Saved task remains after restart”, only when supported
    by the actual observations. Never promise to find every flow or every screen.
 5. Select proposals and **Save tests**. Generate internal stable keys automatically. Reuse
-   existing atomic save receipts. Saving does not approve or execute a test. A saved draft
-   can be tried through the existing direct runner; release runs still use reviewed versions.
+   existing atomic save receipts. Saving does not execute a test. Saved content can be tried through the direct runner;
+   complete saved versions are available for release selection without human approvals.
 
 Use “AI” in tester-facing buttons, descriptions and status messages; Minitap remains the
 internal integration name. While the phone opens, allow editing the exploration instructions
@@ -62,7 +62,7 @@ derives this from stored proposal provenance, including older saved proposals an
 manual recordings and templates do not receive the badge.
 
 Suggestions start selected, with selection controls only for multiple proposals. One sticky
-**Confirm & save** action explicitly confirms expected behavior and saves the selected drafts;
+**Save** action saves the selected tests;
 there is no separate confirmation checkbox. Save failures preserve edits, and successful saves
 disable repeat submission and show links to the saved drafts. Screenshots stay in one horizontal
 strip inside the collapsed evidence section. Proposal cards put action/check counts beside the
@@ -191,7 +191,7 @@ somewhere. Start from the recorded initial state; a non-initial segment needs it
 setup prefix. Missing reset/setup prerequisites remain explicit.
 
 Observed text is not automatically the intended result. Require the tester to confirm proposed
-expectations using the existing review rules. Action-only trials remain legal; a generated
+expectations by choosing Save. No separate approval workflow is required. Action-only trials remain legal; a generated
 test with no checks does not claim behavioral correctness. Editing actions or bindings makes
 the draft user-modified; preserve source provenance without presenting the edited sequence as
 an unchanged observed path. Never stamp a proposal “passed” because the agent finished.
@@ -228,7 +228,7 @@ Rust remains the single source for browser and worker transport types. Extend ex
 generation contracts with engine identity, versioned journal/observation references and
 proposal provenance. Keep all fields on historical records backward-readable; absent engine
 means legacy custom discovery for old stored jobs. Do not rewrite existing definition hashes,
-approvals, templates or frozen manifests.
+saved versions, templates or frozen manifests.
 
 Use phone protocol 3 to advertise Minitap discovery support. Protocols 2 and 3 both support
 direct actions; only 3 accepts a new Minitap discovery request. Update exact `== 2` comparisons

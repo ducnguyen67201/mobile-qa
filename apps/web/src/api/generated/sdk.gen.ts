@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AcknowledgeExecutionStartData, AcknowledgeExecutionStartErrors, AcknowledgeExecutionStartResponses, ArchiveTestLibraryEntryData, ArchiveTestLibraryEntryErrors, ArchiveTestLibraryEntryResponses, CancelRunData, CancelRunErrors, CancelRunResponses, CancelTestGenerationData, CancelTestGenerationErrors, CancelTestGenerationResponses, CompleteBuildUploadData, CompleteBuildUploadErrors, CompleteBuildUploadResponses, CreateAppData, CreateAppErrors, CreateAppResponses, CreateBuildUploadData, CreateBuildUploadErrors, CreateBuildUploadResponses, CreateRunData, CreateRunErrors, CreateRunResponses, CreateTestLibraryEntryData, CreateTestLibraryEntryErrors, CreateTestLibraryEntryResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, ForkTestLibraryDraftData, ForkTestLibraryDraftErrors, ForkTestLibraryDraftResponses, GenerateTestsData, GenerateTestsErrors, GenerateTestsResponses, GetAppData, GetAppErrors, GetAppResponses, GetBuildData, GetBuildErrors, GetBuildResponses, GetBuildUploadData, GetBuildUploadErrors, GetBuildUploadResponses, GetDefaultTestPlanData, GetDefaultTestPlanErrors, GetDefaultTestPlanResponses, GetExecutionPlanData, GetExecutionPlanErrors, GetExecutionPlanResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPhoneData, GetPhoneErrors, GetPhoneOptionsData, GetPhoneOptionsErrors, GetPhoneOptionsResponses, GetPhoneResponses, GetRunArtifactData, GetRunArtifactErrors, GetRunArtifactResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, GetTestGenerationData, GetTestGenerationErrors, GetTestGenerationResponses, GetTestLibraryDraftData, GetTestLibraryDraftErrors, GetTestLibraryDraftResponses, GetTestLibraryEntryData, GetTestLibraryEntryErrors, GetTestLibraryEntryResponses, GetTestLibraryOptionsData, GetTestLibraryOptionsErrors, GetTestLibraryOptionsResponses, GetTestLibraryVersionData, GetTestLibraryVersionErrors, GetTestLibraryVersionResponses, GetTestTemplatesData, GetTestTemplatesErrors, GetTestTemplatesResponses, ListAppsData, ListAppsErrors, ListAppsResponses, ListBuildsData, ListBuildsErrors, ListBuildsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListTestLibraryData, ListTestLibraryErrors, ListTestLibraryResponses, ListTestLibraryVersionsData, ListTestLibraryVersionsErrors, ListTestLibraryVersionsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, OpenPhoneData, OpenPhoneErrors, OpenPhoneResponses, ReviewTestLibraryVersionData, ReviewTestLibraryVersionErrors, ReviewTestLibraryVersionResponses, RunPhoneCommandData, RunPhoneCommandErrors, RunPhoneCommandResponses, RunPhoneTaskData, RunPhoneTaskErrors, RunPhoneTaskResponses, SaveAuthoredTestsData, SaveAuthoredTestsErrors, SaveAuthoredTestsResponses, SaveTestLibraryDraftData, SaveTestLibraryDraftErrors, SaveTestLibraryDraftResponses, SetDefaultTestPlanData, SetDefaultTestPlanErrors, SetDefaultTestPlanResponses, StartGoogleSignInData, StartGoogleSignInErrors, StartGoogleSignInResponses, StopPhoneData, StopPhoneErrors, StopPhoneResponses, SubmitTestLibraryDraftData, SubmitTestLibraryDraftErrors, SubmitTestLibraryDraftResponses, UpdateEnvironmentData, UpdateEnvironmentErrors, UpdateEnvironmentResponses, UploadBuildContentData, UploadBuildContentErrors, UploadBuildContentResponses } from './types.gen';
-import { zAcknowledgeExecutionStartBody, zAcknowledgeExecutionStartHeaders, zAcknowledgeExecutionStartPath, zArchiveTestLibraryEntryBody, zArchiveTestLibraryEntryHeaders, zArchiveTestLibraryEntryPath, zCancelRunPath, zCancelTestGenerationPath, zCompleteBuildUploadHeaders, zCompleteBuildUploadPath, zCreateAppBody, zCreateAppHeaders, zCreateBuildUploadBody, zCreateBuildUploadHeaders, zCreateBuildUploadPath, zCreateRunBody, zCreateRunHeaders, zCreateRunPath, zCreateTestLibraryEntryBody, zCreateTestLibraryEntryHeaders, zCreateTestLibraryEntryPath, zCreateWorkspaceBody, zCreateWorkspaceHeaders, zForkTestLibraryDraftBody, zForkTestLibraryDraftHeaders, zForkTestLibraryDraftPath, zGenerateTestsBody, zGenerateTestsPath, zGetAppPath, zGetBuildPath, zGetBuildUploadPath, zGetDefaultTestPlanPath, zGetExecutionPlanPath, zGetExecutionPlanQuery, zGetPhoneOptionsPath, zGetPhonePath, zGetRunArtifactPath, zGetRunPath, zGetTestGenerationPath, zGetTestLibraryDraftPath, zGetTestLibraryEntryPath, zGetTestLibraryOptionsPath, zGetTestLibraryVersionPath, zGetTestTemplatesPath, zListAppsQuery, zListBuildsPath, zListBuildsQuery, zListRunsPath, zListRunsQuery, zListTestLibraryPath, zListTestLibraryQuery, zListTestLibraryVersionsPath, zListTestLibraryVersionsQuery, zLoginBody, zLoginHeaders, zLogoutHeaders, zOpenPhoneBody, zOpenPhonePath, zReviewTestLibraryVersionBody, zReviewTestLibraryVersionHeaders, zReviewTestLibraryVersionPath, zRunPhoneCommandBody, zRunPhoneCommandPath, zRunPhoneTaskBody, zRunPhoneTaskPath, zSaveAuthoredTestsBody, zSaveAuthoredTestsPath, zSaveTestLibraryDraftBody, zSaveTestLibraryDraftHeaders, zSaveTestLibraryDraftPath, zSetDefaultTestPlanBody, zSetDefaultTestPlanHeaders, zSetDefaultTestPlanPath, zStartGoogleSignInHeaders, zStopPhonePath, zSubmitTestLibraryDraftBody, zSubmitTestLibraryDraftHeaders, zSubmitTestLibraryDraftPath, zUpdateEnvironmentBody, zUpdateEnvironmentHeaders, zUpdateEnvironmentPath, zUploadBuildContentBody, zUploadBuildContentHeaders, zUploadBuildContentPath } from './zod.gen';
+import type { AcknowledgeExecutionStartData, AcknowledgeExecutionStartErrors, AcknowledgeExecutionStartResponses, ArchiveTestLibraryEntryData, ArchiveTestLibraryEntryErrors, ArchiveTestLibraryEntryResponses, CancelRunData, CancelRunErrors, CancelRunResponses, CancelTestGenerationData, CancelTestGenerationErrors, CancelTestGenerationResponses, CompleteBuildUploadData, CompleteBuildUploadErrors, CompleteBuildUploadResponses, CreateAppData, CreateAppErrors, CreateAppResponses, CreateBuildUploadData, CreateBuildUploadErrors, CreateBuildUploadResponses, CreateRunData, CreateRunErrors, CreateRunResponses, CreateTestLibraryEntryData, CreateTestLibraryEntryErrors, CreateTestLibraryEntryResponses, CreateWorkspaceData, CreateWorkspaceErrors, CreateWorkspaceResponses, GenerateTestsData, GenerateTestsErrors, GenerateTestsResponses, GetAppData, GetAppErrors, GetAppResponses, GetBuildData, GetBuildErrors, GetBuildResponses, GetBuildUploadData, GetBuildUploadErrors, GetBuildUploadResponses, GetDefaultTestPlanData, GetDefaultTestPlanErrors, GetDefaultTestPlanResponses, GetExecutionPlanData, GetExecutionPlanErrors, GetExecutionPlanResponses, GetHealthData, GetHealthErrors, GetHealthResponses, GetPhoneData, GetPhoneErrors, GetPhoneOptionsData, GetPhoneOptionsErrors, GetPhoneOptionsResponses, GetPhoneResponses, GetRunArtifactData, GetRunArtifactErrors, GetRunArtifactResponses, GetRunData, GetRunErrors, GetRunResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetSettingsData, GetSettingsErrors, GetSettingsResponses, GetTestGenerationData, GetTestGenerationErrors, GetTestGenerationResponses, GetTestLibraryDraftData, GetTestLibraryDraftErrors, GetTestLibraryDraftResponses, GetTestLibraryEntryData, GetTestLibraryEntryErrors, GetTestLibraryEntryResponses, GetTestLibraryOptionsData, GetTestLibraryOptionsErrors, GetTestLibraryOptionsResponses, GetTestLibraryVersionData, GetTestLibraryVersionErrors, GetTestLibraryVersionResponses, GetTestTemplatesData, GetTestTemplatesErrors, GetTestTemplatesResponses, ListAppsData, ListAppsErrors, ListAppsResponses, ListBuildsData, ListBuildsErrors, ListBuildsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListTestLibraryData, ListTestLibraryErrors, ListTestLibraryResponses, ListTestLibraryVersionsData, ListTestLibraryVersionsErrors, ListTestLibraryVersionsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, OpenPhoneData, OpenPhoneErrors, OpenPhoneResponses, RunPhoneCommandData, RunPhoneCommandErrors, RunPhoneCommandResponses, RunPhoneTaskData, RunPhoneTaskErrors, RunPhoneTaskResponses, SaveAuthoredTestsData, SaveAuthoredTestsErrors, SaveAuthoredTestsResponses, SaveTestLibraryDraftData, SaveTestLibraryDraftErrors, SaveTestLibraryDraftResponses, SetDefaultTestPlanData, SetDefaultTestPlanErrors, SetDefaultTestPlanResponses, StartGoogleSignInData, StartGoogleSignInErrors, StartGoogleSignInResponses, StopPhoneData, StopPhoneErrors, StopPhoneResponses, UpdateEnvironmentData, UpdateEnvironmentErrors, UpdateEnvironmentResponses, UploadBuildContentData, UploadBuildContentErrors, UploadBuildContentResponses } from './types.gen';
+import { zAcknowledgeExecutionStartBody, zAcknowledgeExecutionStartHeaders, zAcknowledgeExecutionStartPath, zArchiveTestLibraryEntryBody, zArchiveTestLibraryEntryHeaders, zArchiveTestLibraryEntryPath, zCancelRunPath, zCancelTestGenerationPath, zCompleteBuildUploadHeaders, zCompleteBuildUploadPath, zCreateAppBody, zCreateAppHeaders, zCreateBuildUploadBody, zCreateBuildUploadHeaders, zCreateBuildUploadPath, zCreateRunBody, zCreateRunHeaders, zCreateRunPath, zCreateTestLibraryEntryBody, zCreateTestLibraryEntryHeaders, zCreateTestLibraryEntryPath, zCreateWorkspaceBody, zCreateWorkspaceHeaders, zGenerateTestsBody, zGenerateTestsPath, zGetAppPath, zGetBuildPath, zGetBuildUploadPath, zGetDefaultTestPlanPath, zGetExecutionPlanPath, zGetExecutionPlanQuery, zGetPhoneOptionsPath, zGetPhonePath, zGetRunArtifactPath, zGetRunPath, zGetTestGenerationPath, zGetTestLibraryDraftPath, zGetTestLibraryEntryPath, zGetTestLibraryOptionsPath, zGetTestLibraryVersionPath, zGetTestTemplatesPath, zListAppsQuery, zListBuildsPath, zListBuildsQuery, zListRunsPath, zListRunsQuery, zListTestLibraryPath, zListTestLibraryQuery, zListTestLibraryVersionsPath, zListTestLibraryVersionsQuery, zLoginBody, zLoginHeaders, zLogoutHeaders, zOpenPhoneBody, zOpenPhonePath, zRunPhoneCommandBody, zRunPhoneCommandPath, zRunPhoneTaskBody, zRunPhoneTaskPath, zSaveAuthoredTestsBody, zSaveAuthoredTestsPath, zSaveTestLibraryDraftBody, zSaveTestLibraryDraftHeaders, zSaveTestLibraryDraftPath, zSetDefaultTestPlanBody, zSetDefaultTestPlanHeaders, zSetDefaultTestPlanPath, zStartGoogleSignInHeaders, zStopPhonePath, zUpdateEnvironmentBody, zUpdateEnvironmentHeaders, zUpdateEnvironmentPath, zUploadBuildContentBody, zUploadBuildContentHeaders, zUploadBuildContentPath } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -480,26 +480,6 @@ export const getTestLibraryDraft = <ThrowOnError extends boolean = false>(option
     ...options
 });
 
-export const forkTestLibraryDraft = <ThrowOnError extends boolean = false>(options: Options<ForkTestLibraryDraftData, ThrowOnError>): RequestResult<ForkTestLibraryDraftResponses, ForkTestLibraryDraftErrors, ThrowOnError> => (options.client ?? client).post<ForkTestLibraryDraftResponses, ForkTestLibraryDraftErrors, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zForkTestLibraryDraftBody,
-        headers: zForkTestLibraryDraftHeaders,
-        path: zForkTestLibraryDraftPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    security: [{
-            in: 'cookie',
-            name: 'mobile_qa_session',
-            type: 'apiKey'
-        }],
-    url: '/api/apps/{app_id}/test-library/{entry_id}/draft',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
 export const saveTestLibraryDraft = <ThrowOnError extends boolean = false>(options: Options<SaveTestLibraryDraftData, ThrowOnError>): RequestResult<SaveTestLibraryDraftResponses, SaveTestLibraryDraftErrors, ThrowOnError> => (options.client ?? client).put<SaveTestLibraryDraftResponses, SaveTestLibraryDraftErrors, ThrowOnError>({
     requestValidator: async (data) => await z.object({
         body: zSaveTestLibraryDraftBody,
@@ -513,26 +493,6 @@ export const saveTestLibraryDraft = <ThrowOnError extends boolean = false>(optio
             type: 'apiKey'
         }],
     url: '/api/apps/{app_id}/test-library/{entry_id}/draft',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-export const submitTestLibraryDraft = <ThrowOnError extends boolean = false>(options: Options<SubmitTestLibraryDraftData, ThrowOnError>): RequestResult<SubmitTestLibraryDraftResponses, SubmitTestLibraryDraftErrors, ThrowOnError> => (options.client ?? client).post<SubmitTestLibraryDraftResponses, SubmitTestLibraryDraftErrors, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zSubmitTestLibraryDraftBody,
-        headers: zSubmitTestLibraryDraftHeaders,
-        path: zSubmitTestLibraryDraftPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    security: [{
-            in: 'cookie',
-            name: 'mobile_qa_session',
-            type: 'apiKey'
-        }],
-    url: '/api/apps/{app_id}/test-library/{entry_id}/submit',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -568,26 +528,6 @@ export const getTestLibraryVersion = <ThrowOnError extends boolean = false>(opti
         }],
     url: '/api/apps/{app_id}/test-library/{entry_id}/versions/{version_id}',
     ...options
-});
-
-export const reviewTestLibraryVersion = <ThrowOnError extends boolean = false>(options: Options<ReviewTestLibraryVersionData, ThrowOnError>): RequestResult<ReviewTestLibraryVersionResponses, ReviewTestLibraryVersionErrors, ThrowOnError> => (options.client ?? client).post<ReviewTestLibraryVersionResponses, ReviewTestLibraryVersionErrors, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zReviewTestLibraryVersionBody,
-        headers: zReviewTestLibraryVersionHeaders,
-        path: zReviewTestLibraryVersionPath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    security: [{
-            in: 'cookie',
-            name: 'mobile_qa_session',
-            type: 'apiKey'
-        }],
-    url: '/api/apps/{app_id}/test-library/{entry_id}/versions/{version_id}/review',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
 });
 
 export const getTestTemplates = <ThrowOnError extends boolean = false>(options: Options<GetTestTemplatesData, ThrowOnError>): RequestResult<GetTestTemplatesResponses, GetTestTemplatesErrors, ThrowOnError> => (options.client ?? client).get<GetTestTemplatesResponses, GetTestTemplatesErrors, ThrowOnError>({

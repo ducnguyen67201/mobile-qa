@@ -1,4 +1,4 @@
-//! Freeze approved coverage before queuing. Reports are projections of durable facts.
+//! Freeze saved coverage before queuing. Reports are projections of durable facts.
 use super::{apps, execution_store::*, test_definitions as definitions};
 use crate::errors::{ApiFailure, ApiResult};
 use loco_rs::app::AppContext;
@@ -33,7 +33,7 @@ pub async fn preview(
             id
         } else {
             out.blockers
-                .push("Choose an approved default release plan in Tests".into());
+                .push("Choose a saved default release plan in Tests".into());
             return Ok(out);
         }
     };
@@ -44,10 +44,6 @@ pub async fn preview(
             return Err(error);
         }
         out.blockers.push(error.message);
-        return Ok(out);
-    }
-    if !definitions::approved(&d) {
-        out.blockers.push("Release check is not approved".into());
         return Ok(out);
     }
     let TestDefinition::Plan(p) = &d.definition else {

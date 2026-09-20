@@ -1,26 +1,11 @@
 //! Browser authoring workspace. Drafts deliberately permit missing semantic content;
-//! only publication converts them into immutable execution definitions.
+//! a complete save also records an immutable execution definition.
 use crate::execution::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum LibraryReviewState {
-    InReview,
-    NeedsInput,
-    Rejected,
-    Approved,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum LibraryReviewDecision {
-    Approve,
-    NeedsInput,
-    Reject,
-}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LibraryIssueCode {
@@ -82,8 +67,6 @@ pub enum LibraryDraftDefinition {
 #[serde(deny_unknown_fields)]
 pub struct LibraryCapabilities {
     pub can_edit: bool,
-    pub can_review_business: bool,
-    pub can_review_executability: bool,
     pub can_archive: bool,
     pub can_set_default: bool,
 }
@@ -98,11 +81,12 @@ pub struct LibraryEntryResponse {
     /// Derived from saved proposal provenance; remains true after editing the draft.
     #[serde(default)]
     pub ai_generated: bool,
+    /// Current saved editor content still has semantic or reference setup issues.
+    pub needs_setup: bool,
     pub revision: i32,
     pub archived_at: Option<DateTime<Utc>>,
     pub draft_version: Option<u32>,
     pub latest_version_id: Option<Uuid>,
-    pub latest_review_state: Option<LibraryReviewState>,
     pub updated_at: DateTime<Utc>,
     pub capabilities: LibraryCapabilities,
 }
@@ -120,28 +104,16 @@ pub struct LibraryDraftResponse {
     pub entry: LibraryEntryResponse,
     pub definition: LibraryDraftDefinition,
     pub source_version_id: Option<Uuid>,
+    /// Snapshot matching this exact saved editor content, never a previous runnable edit.
+    pub saved_version_id: Option<Uuid>,
     pub issues: Vec<LibraryIssue>,
     pub coverage: LibraryCoveragePreview,
-}
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct LibraryReviewEvent {
-    pub id: Uuid,
-    pub actor_id: Uuid,
-    pub actor_name: String,
-    pub purpose: ApprovalPurpose,
-    pub decision: LibraryReviewDecision,
-    pub content_hash: String,
-    pub reason: Option<String>,
-    pub created_at: DateTime<Utc>,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LibraryVersionResponse {
     pub entry: LibraryEntryResponse,
     pub version: DefinitionResponse,
-    pub review_state: LibraryReviewState,
-    pub review_events: Vec<LibraryReviewEvent>,
     pub coverage: LibraryCoveragePreview,
     pub issues: Vec<LibraryIssue>,
 }
@@ -171,7 +143,7 @@ pub struct LibraryProfileChoice {
 #[serde(deny_unknown_fields)]
 pub struct LibraryOptionsResponse {
     pub profiles: Vec<LibraryProfileChoice>,
-    pub approved_versions: Vec<LibraryVersionResponse>,
+    pub saved_versions: Vec<LibraryVersionResponse>,
     pub capabilities: LibraryCapabilities,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -192,33 +164,10 @@ pub struct CreateLibraryEntryRequest {
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
-pub struct ForkLibraryDraftRequest {
-    pub mutation_id: Uuid,
-    pub expected_revision: i32,
-    pub source_version_id: Uuid,
-}
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
 pub struct SaveLibraryDraftRequest {
     pub mutation_id: Uuid,
     pub expected_revision: i32,
     pub definition: LibraryDraftDefinition,
-}
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct SubmitLibraryDraftRequest {
-    pub mutation_id: Uuid,
-    pub expected_revision: i32,
-}
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct ReviewLibraryVersionRequest {
-    pub mutation_id: Uuid,
-    pub expected_revision: i32,
-    pub content_hash: String,
-    pub purpose: ApprovalPurpose,
-    pub decision: LibraryReviewDecision,
-    pub reason: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -239,7 +188,6 @@ pub struct SetDefaultPlanRequest {
 #[serde(deny_unknown_fields)]
 pub struct LibraryListQuery {
     pub kind: Option<DefinitionKind>,
-    pub status: Option<LibraryReviewState>,
     pub archived: Option<bool>,
     pub cursor: Option<Uuid>,
 }
@@ -262,8 +210,7 @@ pub struct ExecutionPlanQuery {
 #[serde(tag = "kind", content = "response", rename_all = "snake_case")]
 pub enum LibraryMutationReceipt {
     Authored(crate::automation::SavedAuthoredTests),
-    Draft(LibraryDraftResponse),
-    Version(LibraryVersionResponse),
+    Draft(Box<LibraryDraftResponse>),
     Entry(LibraryEntryResponse),
     Default(DefaultPlanResponse),
 }
@@ -296,7 +243,6 @@ impl LibraryDraftDefinition {
         match self {
             Self::Case(c) => {
                 c.version = version;
-                c.provenance = "user_authored".into();
             }
             Self::Suite(s) => s.version = version,
             Self::Plan(p) => p.version = version,
@@ -304,7 +250,12 @@ impl LibraryDraftDefinition {
     }
     pub fn published(&self) -> Result<TestDefinition, LibraryIssue> {
         Ok(match self {
-            Self::Case(c) => TestDefinition::Case(c.clone()),
+            Self::Case(c) => {
+                let mut executable = c.clone();
+                // Detailed source provenance belongs to the editor; execution has a closed origin vocabulary.
+                executable.provenance = "user_authored".into();
+                TestDefinition::Case(executable)
+            }
             Self::Suite(s) => TestDefinition::Suite(s.clone()),
             Self::Plan(p) => TestDefinition::Plan(PlanDefinition {
                 key: p.key.clone(),
@@ -402,15 +353,13 @@ impl LibraryDraftDefinition {
                     required("checks", "Add at least one required expected check");
                 }
             }
-            Self::Suite(s) if s.cases.is_empty() => {
-                required("cases", "Choose approved case versions")
-            }
+            Self::Suite(s) if s.cases.is_empty() => required("cases", "Choose saved case versions"),
             Self::Plan(p) => {
                 if p.profile_id.is_none() {
                     required("profile_id", "Choose an execution profile");
                 }
                 if p.cases.is_empty() && p.suite_version_ids.is_empty() {
-                    required("cases", "Choose approved coverage");
+                    required("cases", "Choose saved coverage");
                 }
             }
             _ => {}

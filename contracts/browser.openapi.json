@@ -3440,14 +3440,6 @@
             }
           },
           {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/LibraryReviewState"
-            }
-          },
-          {
             "name": "archived",
             "in": "query",
             "required": false,
@@ -4696,366 +4688,6 @@
             "session_cookie": []
           }
         ]
-      },
-      "post": {
-        "tags": [],
-        "operationId": "forkTestLibraryDraft",
-        "parameters": [
-          {
-            "name": "app_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "entry_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "X-CSRF-Token",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ForkLibraryDraftRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Mutation replay",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryDraftResponse"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryDraftResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session_cookie": []
-          }
-        ]
-      }
-    },
-    "/api/apps/{app_id}/test-library/{entry_id}/submit": {
-      "post": {
-        "tags": [],
-        "operationId": "submitTestLibraryDraft",
-        "parameters": [
-          {
-            "name": "app_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "entry_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "X-CSRF-Token",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubmitLibraryDraftRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Mutation replay",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryVersionResponse"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryVersionResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session_cookie": []
-          }
-        ]
       }
     },
     "/api/apps/{app_id}/test-library/{entry_id}/versions": {
@@ -5253,186 +4885,6 @@
             }
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryVersionResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "API error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session_cookie": []
-          }
-        ]
-      }
-    },
-    "/api/apps/{app_id}/test-library/{entry_id}/versions/{version_id}/review": {
-      "post": {
-        "tags": [],
-        "operationId": "reviewTestLibraryVersion",
-        "parameters": [
-          {
-            "name": "app_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "entry_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "version_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "X-CSRF-Token",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReviewLibraryVersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -9808,29 +9260,6 @@
         },
         "additionalProperties": false
       },
-      "ForkLibraryDraftRequest": {
-        "type": "object",
-        "required": [
-          "mutation_id",
-          "expected_revision",
-          "source_version_id"
-        ],
-        "properties": {
-          "expected_revision": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "mutation_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "source_version_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "additionalProperties": false
-      },
       "GenerateTestsRequest": {
         "type": "object",
         "required": [
@@ -10111,8 +9540,6 @@
         "type": "object",
         "required": [
           "can_edit",
-          "can_review_business",
-          "can_review_executability",
           "can_archive",
           "can_set_default"
         ],
@@ -10121,12 +9548,6 @@
             "type": "boolean"
           },
           "can_edit": {
-            "type": "boolean"
-          },
-          "can_review_business": {
-            "type": "boolean"
-          },
-          "can_review_executability": {
             "type": "boolean"
           },
           "can_set_default": {
@@ -10252,6 +9673,14 @@
               "$ref": "#/components/schemas/LibraryIssue"
             }
           },
+          "saved_version_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Snapshot matching this exact saved editor content, never a previous runnable edit."
+          },
           "source_version_id": {
             "type": [
               "string",
@@ -10270,6 +9699,7 @@
           "kind",
           "key",
           "title",
+          "needs_setup",
           "revision",
           "updated_at",
           "capabilities"
@@ -10311,22 +9741,16 @@
           "kind": {
             "$ref": "#/components/schemas/DefinitionKind"
           },
-          "latest_review_state": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/LibraryReviewState"
-              }
-            ]
-          },
           "latest_version_id": {
             "type": [
               "string",
               "null"
             ],
             "format": "uuid"
+          },
+          "needs_setup": {
+            "type": "boolean",
+            "description": "Current saved editor content still has semantic or reference setup issues."
           },
           "revision": {
             "type": "integer",
@@ -10474,16 +9898,6 @@
                 "$ref": "#/components/schemas/DefinitionKind"
               }
             ]
-          },
-          "status": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/LibraryReviewState"
-              }
-            ]
           }
         },
         "additionalProperties": false
@@ -10514,16 +9928,10 @@
         "type": "object",
         "required": [
           "profiles",
-          "approved_versions",
+          "saved_versions",
           "capabilities"
         ],
         "properties": {
-          "approved_versions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LibraryVersionResponse"
-            }
-          },
           "capabilities": {
             "$ref": "#/components/schemas/LibraryCapabilities"
           },
@@ -10531,6 +9939,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/LibraryProfileChoice"
+            }
+          },
+          "saved_versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LibraryVersionResponse"
             }
           }
         },
@@ -10568,68 +9982,6 @@
           }
         },
         "additionalProperties": false
-      },
-      "LibraryReviewDecision": {
-        "type": "string",
-        "enum": [
-          "approve",
-          "needs_input",
-          "reject"
-        ]
-      },
-      "LibraryReviewEvent": {
-        "type": "object",
-        "required": [
-          "id",
-          "actor_id",
-          "actor_name",
-          "purpose",
-          "decision",
-          "content_hash",
-          "created_at"
-        ],
-        "properties": {
-          "actor_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "actor_name": {
-            "type": "string"
-          },
-          "content_hash": {
-            "type": "string"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "decision": {
-            "$ref": "#/components/schemas/LibraryReviewDecision"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "purpose": {
-            "$ref": "#/components/schemas/ApprovalPurpose"
-          },
-          "reason": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "additionalProperties": false
-      },
-      "LibraryReviewState": {
-        "type": "string",
-        "enum": [
-          "in_review",
-          "needs_input",
-          "rejected",
-          "approved"
-        ]
       },
       "LibraryVersionListResponse": {
         "type": "object",
@@ -10671,8 +10023,6 @@
         "required": [
           "entry",
           "version",
-          "review_state",
-          "review_events",
           "coverage",
           "issues"
         ],
@@ -10688,15 +10038,6 @@
             "items": {
               "$ref": "#/components/schemas/LibraryIssue"
             }
-          },
-          "review_events": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LibraryReviewEvent"
-            }
-          },
-          "review_state": {
-            "$ref": "#/components/schemas/LibraryReviewState"
           },
           "version": {
             "$ref": "#/components/schemas/DefinitionResponse"
@@ -11559,42 +10900,6 @@
         },
         "additionalProperties": false
       },
-      "ReviewLibraryVersionRequest": {
-        "type": "object",
-        "required": [
-          "mutation_id",
-          "expected_revision",
-          "content_hash",
-          "purpose",
-          "decision"
-        ],
-        "properties": {
-          "content_hash": {
-            "type": "string"
-          },
-          "decision": {
-            "$ref": "#/components/schemas/LibraryReviewDecision"
-          },
-          "expected_revision": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "mutation_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "purpose": {
-            "$ref": "#/components/schemas/ApprovalPurpose"
-          },
-          "reason": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "additionalProperties": false
-      },
       "RunArtifact": {
         "type": "object",
         "required": [
@@ -11810,13 +11115,9 @@
         "type": "object",
         "required": [
           "mutation_id",
-          "tests",
-          "expectations_confirmed"
+          "tests"
         ],
         "properties": {
-          "expectations_confirmed": {
-            "type": "boolean"
-          },
           "mutation_id": {
             "type": "string",
             "format": "uuid"
@@ -12063,24 +11364,6 @@
           "blocked",
           "inconclusive"
         ]
-      },
-      "SubmitLibraryDraftRequest": {
-        "type": "object",
-        "required": [
-          "mutation_id",
-          "expected_revision"
-        ],
-        "properties": {
-          "expected_revision": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "mutation_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "additionalProperties": false
       },
       "SuiteDefinition": {
         "type": "object",

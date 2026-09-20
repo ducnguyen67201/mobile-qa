@@ -27,20 +27,8 @@ pub async fn capabilities(
         "SELECT EXISTS(SELECT 1 FROM memberships m JOIN apps a ON a.organization_id=m.organization_id
          WHERE a.id=$1 AND m.user_id=$2 AND m.active AND m.role='operator') AS allowed",
         vec![app.into(),actor.into()]).await?, "allowed")?;
-    let grants = rows(
-        db,
-        "SELECT purpose FROM execution_reviewer_grants WHERE app_id=$1 AND user_id=$2",
-        vec![app.into(), actor.into()],
-    )
-    .await?;
-    let purposes = grants
-        .iter()
-        .map(|r| field::<String>(r, "purpose"))
-        .collect::<ApiResult<Vec<_>>>()?;
     Ok(LibraryCapabilities {
         can_edit: true,
-        can_review_business: purposes.iter().any(|p| p == "business"),
-        can_review_executability: purposes.iter().any(|p| p == "executability"),
         can_archive: operator,
         can_set_default: operator,
     })
@@ -51,24 +39,35 @@ pub async fn entry(
     app: Uuid,
     id: Uuid,
 ) -> ApiResult<LibraryEntryResponse> {
-    let row=one(db,"SELECT e.*, d.version AS draft_version,
+    let row = one(
+        db,
+        "SELECT e.*, d.version AS draft_version, d.payload AS draft_payload,
         COALESCE(d.payload->'content'->>'title',v.title,e.logical_key) AS title,
         COALESCE(d.payload->'content'->>'provenance',v.provenance,'') AS provenance,
-        v.definition_id AS latest_version_id,v.review_state AS latest_review_state
+        v.definition_id AS latest_version_id
         FROM test_library_entries e LEFT JOIN test_library_drafts d ON d.entry_id=e.id
-        LEFT JOIN LATERAL (SELECT lv.definition_id,lv.review_state,ed.payload->'content'->>'title' AS title,
+        LEFT JOIN LATERAL (SELECT lv.definition_id,ed.payload->'content'->>'title' AS title,
           ed.payload->'content'->>'provenance' AS provenance
           FROM test_library_versions lv JOIN execution_definitions ed ON ed.id=lv.definition_id
           WHERE lv.entry_id=e.id ORDER BY ed.version DESC LIMIT 1) v ON true
-        WHERE e.id=$1 AND e.app_id=$2",vec![id.into(),app.into()]).await?;
+        WHERE e.id=$1 AND e.app_id=$2",
+        vec![id.into(), app.into()],
+    )
+    .await?;
     let archived_at: Option<chrono::DateTime<chrono::Utc>> = field(&row, "archived_at")?;
     let mut capabilities = capabilities(db, actor, app).await?;
     if archived_at.is_some() {
         capabilities.can_edit = false;
-        capabilities.can_review_business = false;
-        capabilities.can_review_executability = false;
         capabilities.can_set_default = false;
     }
+    let current: Option<serde_json::Value> = field(&row, "draft_payload")?;
+    let needs_setup = match current {
+        Some(payload) => !content_issues(db, app, &decode(payload)?)
+            .await?
+            .0
+            .is_empty(),
+        None => false,
+    };
     Ok(LibraryEntryResponse {
         id,
         app_id: app,
@@ -81,13 +80,11 @@ pub async fn entry(
             provenance.starts_with("authored-task:")
                 && (provenance.contains(":p:") || provenance.contains(":proposal:"))
         },
+        needs_setup,
         revision: field(&row, "revision")?,
         archived_at,
         draft_version: field::<Option<i32>>(&row, "draft_version")?.map(|v| v as u32),
         latest_version_id: field(&row, "latest_version_id")?,
-        latest_review_state: field::<Option<String>>(&row, "latest_review_state")?
-            .map(|s| decode(json(&s)?))
-            .transpose()?,
         updated_at: field(&row, "updated_at")?,
         capabilities,
     })
@@ -105,16 +102,12 @@ pub async fn list(
         db,
         "SELECT e.id FROM test_library_entries e
         WHERE e.app_id=$1 AND ($2::text IS NULL OR e.kind=$2) AND (e.archived_at IS NOT NULL)=$3
-        AND ($4::uuid IS NULL OR e.id>$4)
-        AND ($5::text IS NULL OR (SELECT v.review_state FROM test_library_versions v
-          JOIN execution_definitions d ON d.id=v.definition_id WHERE v.entry_id=e.id
-          ORDER BY d.version DESC LIMIT 1)=$5) ORDER BY e.id LIMIT 51",
+        AND ($4::uuid IS NULL OR e.id>$4) ORDER BY e.id LIMIT 51",
         vec![
             app.into(),
             q.kind.map(|k| word(&k)).into(),
             q.archived.unwrap_or(false).into(),
             q.cursor.into(),
-            q.status.map(|s| word(&s)).into(),
         ],
     )
     .await?;
@@ -132,7 +125,7 @@ pub async fn list(
 pub async fn admitted(db: &impl ConnectionTrait, app: Uuid, id: Uuid) -> ApiResult<()> {
     let r = one(
         db,
-        "SELECT e.archived_at,v.review_state FROM test_library_versions v
+        "SELECT e.archived_at FROM test_library_versions v
         JOIN test_library_entries e ON e.id=v.entry_id WHERE v.definition_id=$1 AND e.app_id=$2",
         vec![id.into(), app.into()],
     )
@@ -140,12 +133,14 @@ pub async fn admitted(db: &impl ConnectionTrait, app: Uuid, id: Uuid) -> ApiResu
     if field::<Option<chrono::DateTime<chrono::Utc>>>(&r, "archived_at")?.is_some() {
         return Err(conflict("Referenced test is archived"));
     }
-    if field::<String>(&r, "review_state")? != "approved" {
-        return Err(conflict("Referenced version needs both approvals"));
-    }
+    definitions::get(db, app, id)
+        .await?
+        .definition
+        .validate()
+        .map_err(ApiFailure::invalid)?;
     Ok(())
 }
-/// Draft coverage does not require a build or profile. It resolves only approved,
+/// Draft coverage does not require a build or profile. It resolves saved,
 /// active references and reports conflicts instead of silently picking precedence.
 pub async fn coverage(
     db: &impl ConnectionTrait,
@@ -170,9 +165,6 @@ pub async fn coverage(
         let result = async {
             admitted(db, app, id).await?;
             let d = definitions::get(db, app, id).await?;
-            if !definitions::approved(&d) {
-                return Err(conflict("Suite needs both approvals"));
-            }
             match d.definition {
                 TestDefinition::Suite(s) => Ok(s.cases),
                 _ => Err(ApiFailure::invalid("Choose a suite version")),
@@ -189,7 +181,7 @@ pub async fn coverage(
                     code: LibraryIssueCode::InvalidReference,
                     field: "suite_version_ids".into(),
                     item_id: Some(id.to_string()),
-                    message: "Suite version is unavailable, archived or awaiting review".into(),
+                    message: "Suite version is unavailable, archived or invalid".into(),
                 });
             }
         }
@@ -198,9 +190,6 @@ pub async fn coverage(
         let result = async {
             admitted(db, app, selection.case_version_id).await?;
             let d = definitions::get(db, app, selection.case_version_id).await?;
-            if !definitions::approved(&d) {
-                return Err(conflict("Case needs both approvals"));
-            }
             let TestDefinition::Case(case) = d.definition else {
                 return Err(ApiFailure::invalid("Choose a case version"));
             };
@@ -240,7 +229,7 @@ pub async fn coverage(
                     code: LibraryIssueCode::InvalidReference,
                     field: "cases".into(),
                     item_id: Some(selection.case_version_id.to_string()),
-                    message: "Case version is unavailable, archived or awaiting review".into(),
+                    message: "Case version is unavailable, archived or invalid".into(),
                 });
             }
         }
@@ -267,15 +256,7 @@ pub async fn content_issues(
     if let LibraryDraftDefinition::Plan(p) = definition {
         if let Some(id) = p.profile_id {
             match definitions::profile(db, app, id).await {
-                Ok(profile) => {
-                    if !profile.qualified {
-                        issues.push(LibraryIssue::new(
-                            LibraryIssueCode::UnsupportedCapability,
-                            "profile_id",
-                            "Profile is not qualified",
-                        ));
-                    }
-                }
+                Ok(_) => {}
                 Err(e) => {
                     if e.status.is_server_error() {
                         return Err(e);
@@ -299,18 +280,45 @@ pub async fn draft(
     id: Uuid,
 ) -> ApiResult<LibraryDraftResponse> {
     let entry = entry(db, actor, app, id).await?;
-    let row = one(
+    let stored = rows(
         db,
         "SELECT payload,source_version_id FROM test_library_drafts WHERE entry_id=$1",
         vec![id.into()],
     )
     .await?;
-    let definition = decode(field(&row, "payload")?)?;
+    let (definition, source_version_id): (LibraryDraftDefinition, Option<Uuid>) =
+        if let Some(row) = stored.first() {
+            (
+                decode(field(row, "payload")?)?,
+                field(row, "source_version_id")?,
+            )
+        } else {
+            let version_id = entry.latest_version_id.ok_or_else(ApiFailure::missing)?;
+            (
+                definitions::get(db, app, version_id)
+                    .await?
+                    .definition
+                    .into(),
+                Some(version_id),
+            )
+        };
+    let saved_version_id = if let Some(version_id) = source_version_id {
+        let saved = definitions::get(db, app, version_id).await?;
+        (definition.published().ok().as_ref()
+            == LibraryDraftDefinition::from(saved.definition)
+                .published()
+                .ok()
+                .as_ref())
+        .then_some(version_id)
+    } else {
+        None
+    };
     let (issues, coverage) = content_issues(db, app, &definition).await?;
     Ok(LibraryDraftResponse {
         entry,
         definition,
-        source_version_id: field(&row, "source_version_id")?,
+        source_version_id,
+        saved_version_id,
         issues,
         coverage,
     })
@@ -323,35 +331,13 @@ pub async fn version(
     version_id: Uuid,
 ) -> ApiResult<LibraryVersionResponse> {
     let entry = entry(db, actor, app, id).await?;
-    let r = one(
+    one(
         db,
-        "SELECT review_state FROM test_library_versions WHERE entry_id=$1 AND definition_id=$2",
+        "SELECT definition_id FROM test_library_versions WHERE entry_id=$1 AND definition_id=$2",
         vec![id.into(), version_id.into()],
     )
     .await?;
     let version = definitions::get(db, app, version_id).await?;
-    let events = rows(
-        db,
-        "SELECT e.*, u.display_name AS actor_name FROM test_library_review_events e JOIN users u ON
-        u.id=e.actor_id WHERE e.definition_id=$1 ORDER BY e.created_at, e.id",
-        vec![version_id.into()],
-    )
-    .await?;
-    let review_events = events
-        .iter()
-        .map(|r| {
-            Ok(LibraryReviewEvent {
-                id: field(r, "id")?,
-                actor_id: field(r, "actor_id")?,
-                actor_name: field(r, "actor_name")?,
-                purpose: decode(json(&field::<String>(r, "purpose")?)?)?,
-                decision: decode(json(&field::<String>(r, "decision")?)?)?,
-                content_hash: field(r, "content_hash")?,
-                reason: field(r, "reason")?,
-                created_at: field(r, "created_at")?,
-            })
-        })
-        .collect::<ApiResult<Vec<_>>>()?;
     let (mut issues, coverage) =
         content_issues(db, app, &version.definition.clone().into()).await?;
     if let Err(e) = executable(db, app, &version.definition).await {
@@ -368,8 +354,6 @@ pub async fn version(
     Ok(LibraryVersionResponse {
         entry,
         version,
-        review_state: decode(json(&field::<String>(&r, "review_state")?)?)?,
-        review_events,
         coverage,
         issues,
     })
@@ -428,11 +412,11 @@ pub async fn options(
         });
     }
     let ids=rows(db,"SELECT v.entry_id, v.definition_id FROM test_library_versions v JOIN test_library_entries e
-        ON e.id=v.entry_id WHERE e.app_id=$1 AND e.archived_at IS NULL AND v.review_state='approved'
+        ON e.id=v.entry_id WHERE e.app_id=$1 AND e.archived_at IS NULL
         ORDER BY e.logical_key, v.created_at DESC, v.definition_id",vec![app.into()]).await?;
-    let mut approved_versions = Vec::new();
+    let mut saved_versions = Vec::new();
     for r in ids {
-        approved_versions.push(
+        saved_versions.push(
             version(
                 db,
                 actor,
@@ -445,7 +429,7 @@ pub async fn options(
     }
     Ok(LibraryOptionsResponse {
         profiles,
-        approved_versions,
+        saved_versions,
         capabilities: capabilities(db, actor, app).await?,
     })
 }
@@ -544,7 +528,7 @@ pub fn validation(issues: Vec<LibraryIssue>) -> ApiFailure {
     ApiFailure::new(
         status,
         "library_validation",
-        "Resolve the listed issues before requesting review",
+        "Resolve the listed issues before running",
     )
     .with_library_details(LibraryErrorDetails::Validation { issues })
 }

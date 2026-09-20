@@ -405,11 +405,6 @@ pub async fn save(
     let source = if let Some(task) = input.source_task_id {
         let row=one(db,"SELECT t.payload FROM phone_tasks t JOIN phone_sessions s ON s.id=t.session_id WHERE t.id=$1 AND s.app_id=$2 AND s.creator_id=$3",vec![task.into(),app.into(),user.into()]).await?;
         let t: PhoneTask = decode(field(&row, "payload")?)?;
-        if t.generation.is_some() && !input.expectations_confirmed {
-            return Err(ApiFailure::invalid(
-                "Confirm the proposed expected behavior before saving generated tests",
-            ));
-        }
         if t.generation.is_some() {
             if t.state != PhoneTaskState::Completed {
                 return Err(conflict("Generation is not ready"));
@@ -498,6 +493,7 @@ pub async fn save(
         definition.check_bounds().map_err(ApiFailure::invalid)?;
         exec(db,"INSERT INTO test_library_entries(id,app_id,kind,logical_key,next_version,actor_id) VALUES($1,$2,'case',$3,2,$4)",vec![id.into(),app.into(),key.into(),user.into()]).await?;
         exec(db,"INSERT INTO test_library_drafts(entry_id,version,payload,editor_id) VALUES($1,1,$2,$3)",vec![id.into(),json(&definition)?.into(),user.into()]).await?;
+        super::test_library_save::save(db, user, app, id, definition).await?;
         ids.push(id);
     }
     Ok(SavedAuthoredTests { entry_ids: ids })

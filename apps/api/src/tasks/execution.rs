@@ -20,15 +20,6 @@ fn id(v: &Vars, name: &str) -> ApiResult<Uuid> {
         .parse()
         .map_err(|_| ApiFailure::invalid(format!("Invalid {name} UUID")))
 }
-fn purpose(v: &Vars) -> ApiResult<ApprovalPurpose> {
-    match arg(v, "purpose")? {
-        "business" => Ok(ApprovalPurpose::Business),
-        "executability" => Ok(ApprovalPurpose::Executability),
-        _ => Err(ApiFailure::invalid(
-            "Purpose must be business or executability",
-        )),
-    }
-}
 fn read<T: serde::de::DeserializeOwned>(path: &str) -> ApiResult<T> {
     let metadata = std::fs::metadata(path)?;
     if metadata.len() > 1048576 {
@@ -59,18 +50,6 @@ pub async fn execute(ctx: &AppContext, v: &Vars) -> ApiResult<()> {
             .await?;
             println!("definition_id={} content_hash={}", d.id, d.content_hash);
         }
-        "grant-reviewer" => defs::grant(ctx, actor, app, id(v, "user")?, purpose(v)?).await?,
-        "approve" => {
-            defs::approve(
-                ctx,
-                actor,
-                app,
-                id(v, "definition")?,
-                arg(v, "hash")?,
-                purpose(v)?,
-            )
-            .await?;
-        }
         "register-profile" => {
             defs::register_profile(ctx, actor, app, read(arg(v, "file")?)?).await?
         }
@@ -93,7 +72,7 @@ impl Task for Execution {
     fn task(&self) -> TaskInfo {
         TaskInfo {
             name: "execution".into(),
-            detail: "Import and review tests; register workers/profiles; reconcile leases".into(),
+            detail: "Import saved tests; register workers/profiles; reconcile leases".into(),
         }
     }
     async fn run(&self, ctx: &AppContext, vars: &Vars) -> loco_rs::Result<()> {

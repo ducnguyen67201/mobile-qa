@@ -45,10 +45,10 @@ Start here before planning or changing the application.
 
 ## Current direction
 
-An operated Android regression-testing service: app setup → reviewed tests → run →
+An operated Android regression-testing service: app setup → saved tests → run →
 evidence report, with small Settings. Rust/Loco/SeaORM owns the application; React/Vite
 owns the UI; Python/Minitap owns device interaction. Main's Mantine dashboard, Google
 sign-in, workspace onboarding and app/APK setup are preserved in this branch. The local
-Android runner and one live Minitap demo are verified independently. Execution/report source (04) and authoring/review (05) are locally implemented
+Android runner and one live Minitap demo are verified independently. Execution/report source (04) and save/versioning (05) are locally implemented
 with simulated HTTP acceptance. Rendered UI-to-device acceptance, full device
 qualification and hosted acceptance remain open. See the status page before treating any milestone as complete.

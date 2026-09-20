@@ -11,21 +11,21 @@ The customer test editor belongs to spec 05.
 
 ## Deliverable
 
-From the browser, run one manually authored approved case on an uploaded build. Show queued/running progress and a persisted report. The same path supports a real worker and a clearly identified development fake worker.
+From the browser, run one manually authored saved case on an uploaded build. Show queued/running progress and a persisted report. The same path supports a real worker and a clearly identified development fake worker.
 
 ## Smallest durable domain
 
-Introduce minimal case-version, suite-version and default-plan-version records now, even though the full editor arrives in spec 05. An operator fixture/import command creates these through normal validation. Do not create a separate throwaway free-text job model that bypasses approvals.
+Introduce minimal case-version, suite-version and default-plan-version records now, even though the full editor arrives in spec 05. An operator fixture/import command creates these through normal validation. Do not create a separate throwaway free-text job model that bypasses validation.
 
-Persist a run manifest binding project, build checksum, approved plan/case versions, requiredness, data variants, qualified device/image configuration, reset policy and execution/model settings. Include attempts, checks, jobs, device/account leases, events and artifacts. Store identifiers/references for secrets; never snapshot secret values into the manifest.
+Persist a run manifest binding project, build checksum, saved plan/case versions, requiredness, data variants, qualified device/image configuration, reset policy and execution/model settings. Include attempts, checks, jobs, device/account leases, events and artifacts. Store identifiers/references for secrets; never snapshot secret values into the manifest.
 
 ## APIs and flow
 
-Customer routes: `POST /api/apps/:app_id/runs`, `GET /api/runs/:run_id`, `POST /api/runs/:run_id/cancel`, and authorized artifact access. Submission takes a build and approved plan; the server resolves the manifest. Use an idempotency key to prevent a double-click producing two runs.
+Customer routes: `POST /api/apps/:app_id/runs`, `GET /api/runs/:run_id`, `POST /api/runs/:run_id/cancel`, and authorized artifact access. Submission takes a build and saved plan; the server resolves the manifest. Use an idempotency key to prevent a double-click producing two runs.
 
 Worker operations: claim, heartbeat, publish events, request artifact upload, complete attempt, acknowledge cancellation. These are our HTTP endpoints. The Python process needs no database credentials or public HTTP listener.
 
-1. Validate build/readiness, membership, approvals and budgets.
+1. Validate build/readiness, membership, definition validity and budgets.
 2. Atomically persist manifest and queued jobs.
 3. Claim an eligible job in a short PostgreSQL transaction using row locking/`SKIP LOCKED`; reserve device and test account and issue a scoped lease token.
 4. Worker downloads the checked APK, verifies reset/install/preconditions and starts the qualified adapter.
@@ -63,8 +63,8 @@ Repeat the three qualified device scenarios through the browser. Restart the Rus
 ## Local implementation scope
 
 The phase 04 implementation uses one typed version store (`execution_definitions`)
-for cases, suites and plans, with distinct Rust variants and separate review grants
-and immutable approvals. Attempts serve as durable queue records; the manifest pins
+for cases, suites and plans, with distinct Rust variants and immutable saved versions
+and technical admission. Attempts serve as durable queue records; the manifest pins
 resolved case selections. This reduces parallel table/entity scaffolding while keeping
 case/suite/plan meaning and version identity separate. All SQL goes through SeaORM
 with bound parameters; the migration owns constraints.

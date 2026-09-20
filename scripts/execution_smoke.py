@@ -48,23 +48,13 @@ def task(env, actor, app, action, **args):
     return result.stdout
 
 
-def approve_file(env, actor, app, directory, content):
+def import_file(env, actor, app, directory, content):
     path = directory / f"{uuid.uuid4()}.json"
     path.write_text(json.dumps(content))
     output = task(env, actor, app, "import", file=path)
     match = re.search(r"definition_id=([0-9a-f-]+) content_hash=([0-9a-f]+)", output)
     if not match:
         raise RuntimeError("Import did not return definition identity")
-    for purpose in ["business", "executability"]:
-        task(
-            env,
-            actor,
-            app,
-            "approve",
-            definition=match[1],
-            hash=match[2],
-            purpose=purpose,
-        )
     return match[1]
 
 
@@ -169,12 +159,10 @@ def main(author=None, edit_after_queue=None):
                 )
             )
             task(env, actor, app, "register-profile", file=profile_file)
-            for purpose in ["business", "executability"]:
-                task(env, actor, app, "grant-reviewer", user=actor, purpose=purpose)
             if author is not None:
                 plan = author(owner, csrf, app, profile)
             else:
-                case = approve_file(
+                case = import_file(
                     env,
                     actor,
                     app,
@@ -185,7 +173,7 @@ def main(author=None, edit_after_queue=None):
                         ).read_text()
                     ),
                 )
-                plan = approve_file(
+                plan = import_file(
                     env,
                     actor,
                     app,

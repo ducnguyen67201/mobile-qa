@@ -77,7 +77,7 @@ export function RunPreview({
         >
           Open test library & release plans
         </Button>
-        {query.isPending && <LoadingPanel label="Loading approved tests…" />}
+        {query.isPending && <LoadingPanel label="Loading saved tests…" />}
         {query.isError && <ErrorNotice error={query.error} retry={() => void query.refetch()} />}
         {query.data?.blockers.length ? (
           <Alert title="Before this build can run">

@@ -99,12 +99,11 @@ it('shows actions and checks with collapsed evidence and saves one test on expli
   expect(screen.getByText('Edit test').closest('details')).not.toHaveAttribute('open')
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   expect(saveAuthoredTests).not.toHaveBeenCalled()
-  await userEvent.click(screen.getByRole('button', { name: 'Confirm & save test' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Save test' }))
   await waitFor(() =>
     expect(saveAuthoredTests).toHaveBeenCalledWith(
       'app',
       expect.objectContaining({
-        expectations_confirmed: true,
         source_task_id: 'task',
         tests: [expect.objectContaining({ proposal_id: proposal.id, sequence: proposal.sequence })],
       }),
@@ -120,9 +119,9 @@ it('lets the tester deselect suggestions and sends only the selected test', asyn
   show([proposal, { ...proposal, id: 'proposal-2', title: 'Another test' }])
   await userEvent.click(screen.getByRole('checkbox', { name: 'Include Another test' }))
   await userEvent.click(screen.getByRole('checkbox', { name: 'Include Save a task' }))
-  expect(screen.getByRole('button', { name: 'Confirm & save 0 tests' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Save 0 tests' })).toBeDisabled()
   await userEvent.click(screen.getByRole('checkbox', { name: 'Include Save a task' }))
-  await userEvent.click(screen.getByRole('button', { name: 'Confirm & save test' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Save test' }))
   await waitFor(() => expect(saveAuthoredTests).toHaveBeenCalledTimes(1))
   expect(
     vi.mocked(saveAuthoredTests).mock.calls[0]?.[1].tests.map((test) => test.proposal_id),
@@ -135,12 +134,10 @@ it('saves an edited name and preserves the draft when saving fails', async () =>
   const input = screen.getByRole('textbox', { name: 'Test name' })
   await userEvent.clear(input)
   await userEvent.type(input, 'My smoke test')
-  await userEvent.click(screen.getByRole('button', { name: 'Confirm & save test' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Save test' }))
   await waitFor(() => expect(saveAuthoredTests).toHaveBeenCalledTimes(1))
   expect(vi.mocked(saveAuthoredTests).mock.calls[0]?.[1].tests[0]?.title).toBe('My smoke test')
-  await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Confirm & save test' })).toBeEnabled(),
-  )
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save test' })).toBeEnabled())
   expect(input).toHaveValue('My smoke test')
   expect(screen.queryByRole('link', { name: 'Open saved test' })).not.toBeInTheDocument()
 })
@@ -165,5 +162,5 @@ it('keeps duplicate notice and checks visible while grouping every question into
   await userEvent.click(notes)
   expect(disclosure).toHaveAttribute('open')
   for (const question of questions) expect(screen.getByText(question)).toBeVisible()
-  expect(screen.getByRole('button', { name: 'Confirm & save test' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Save test' })).toBeEnabled()
 })

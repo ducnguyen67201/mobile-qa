@@ -240,12 +240,6 @@ export const zExecutionPlanQuery = z.object({
     plan_version_id: z.uuid().nullish()
 });
 
-export const zForkLibraryDraftRequest = z.object({
-    expected_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    mutation_id: z.uuid(),
-    source_version_id: z.uuid()
-});
-
 export const zGenerateTestsRequest = z.object({
     allow_writes: z.boolean(),
     category: zCoverageKind,
@@ -304,9 +298,23 @@ export const zLeaseStatusResponse = z.object({
 export const zLibraryCapabilities = z.object({
     can_archive: z.boolean(),
     can_edit: z.boolean(),
-    can_review_business: z.boolean(),
-    can_review_executability: z.boolean(),
     can_set_default: z.boolean()
+});
+
+export const zLibraryEntryResponse = z.object({
+    ai_generated: z.boolean().optional(),
+    app_id: z.uuid(),
+    archived_at: z.iso.datetime().nullish(),
+    capabilities: zLibraryCapabilities,
+    draft_version: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish(),
+    id: z.uuid(),
+    key: z.string(),
+    kind: zDefinitionKind,
+    latest_version_id: z.uuid().nullish(),
+    needs_setup: z.boolean(),
+    revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    title: z.string(),
+    updated_at: z.iso.datetime()
 });
 
 export const zLibraryIssueCode = z.enum([
@@ -341,6 +349,17 @@ export const zLibraryErrorDetails = z.union([
     })
 ]);
 
+export const zLibraryListQuery = z.object({
+    archived: z.boolean().nullish(),
+    cursor: z.uuid().nullish(),
+    kind: zDefinitionKind.nullish()
+});
+
+export const zLibraryListResponse = z.object({
+    items: z.array(zLibraryEntryResponse),
+    next_cursor: z.uuid().nullish()
+});
+
 export const zLibraryProfileChoice = z.object({
     adapter: z.string(),
     driver: zDriver,
@@ -348,58 +367,6 @@ export const zLibraryProfileChoice = z.object({
     name: z.string(),
     package: z.string(),
     qualified: z.boolean()
-});
-
-export const zLibraryReviewDecision = z.enum([
-    'approve',
-    'needs_input',
-    'reject'
-]);
-
-export const zLibraryReviewEvent = z.object({
-    actor_id: z.uuid(),
-    actor_name: z.string(),
-    content_hash: z.string(),
-    created_at: z.iso.datetime(),
-    decision: zLibraryReviewDecision,
-    id: z.uuid(),
-    purpose: zApprovalPurpose,
-    reason: z.string().nullish()
-});
-
-export const zLibraryReviewState = z.enum([
-    'in_review',
-    'needs_input',
-    'rejected',
-    'approved'
-]);
-
-export const zLibraryEntryResponse = z.object({
-    ai_generated: z.boolean().optional(),
-    app_id: z.uuid(),
-    archived_at: z.iso.datetime().nullish(),
-    capabilities: zLibraryCapabilities,
-    draft_version: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish(),
-    id: z.uuid(),
-    key: z.string(),
-    kind: zDefinitionKind,
-    latest_review_state: zLibraryReviewState.nullish(),
-    latest_version_id: z.uuid().nullish(),
-    revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    title: z.string(),
-    updated_at: z.iso.datetime()
-});
-
-export const zLibraryListQuery = z.object({
-    archived: z.boolean().nullish(),
-    cursor: z.uuid().nullish(),
-    kind: zDefinitionKind.nullish(),
-    status: zLibraryReviewState.nullish()
-});
-
-export const zLibraryListResponse = z.object({
-    items: z.array(zLibraryEntryResponse),
-    next_cursor: z.uuid().nullish()
 });
 
 export const zLibraryVersionQuery = z.object({
@@ -570,15 +537,6 @@ export const zRecoveryEvent = z.object({
     evidence_reference: z.string()
 });
 
-export const zReviewLibraryVersionRequest = z.object({
-    content_hash: z.string(),
-    decision: zLibraryReviewDecision,
-    expected_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    mutation_id: z.uuid(),
-    purpose: zApprovalPurpose,
-    reason: z.string().nullish()
-});
-
 export const zRunArtifact = z.object({
     attempt_id: z.uuid(),
     byte_size: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
@@ -664,11 +622,6 @@ export const zStepReceipt = z.object({
     action_id: z.string(),
     message: z.string(),
     state: zStepState
-});
-
-export const zSubmitLibraryDraftRequest = z.object({
-    expected_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    mutation_id: z.uuid()
 });
 
 export const zSuiteDefinition = z.object({
@@ -942,6 +895,7 @@ export const zLibraryDraftResponse = z.object({
     definition: zLibraryDraftDefinition,
     entry: zLibraryEntryResponse,
     issues: z.array(zLibraryIssue),
+    saved_version_id: z.uuid().nullish(),
     source_version_id: z.uuid().nullish()
 });
 
@@ -998,7 +952,6 @@ export const zSaveAuthoredTest = z.object({
 });
 
 export const zSaveAuthoredTestsRequest = z.object({
-    expectations_confirmed: z.boolean(),
     mutation_id: z.uuid(),
     source_task_id: z.uuid().nullish(),
     tests: z.array(zSaveAuthoredTest)
@@ -1042,15 +995,13 @@ export const zLibraryVersionResponse = z.object({
     coverage: zLibraryCoveragePreview,
     entry: zLibraryEntryResponse,
     issues: z.array(zLibraryIssue),
-    review_events: z.array(zLibraryReviewEvent),
-    review_state: zLibraryReviewState,
     version: zDefinitionResponse
 });
 
 export const zLibraryOptionsResponse = z.object({
-    approved_versions: z.array(zLibraryVersionResponse),
     capabilities: zLibraryCapabilities,
-    profiles: z.array(zLibraryProfileChoice)
+    profiles: z.array(zLibraryProfileChoice),
+    saved_versions: z.array(zLibraryVersionResponse)
 });
 
 export const zLibraryVersionListResponse = z.object({
@@ -1409,7 +1360,6 @@ export const zListTestLibraryPath = z.object({
 
 export const zListTestLibraryQuery = z.object({
     kind: zDefinitionKind.optional(),
-    status: zLibraryReviewState.optional(),
     archived: z.boolean().optional(),
     cursor: z.uuid().optional()
 });
@@ -1490,22 +1440,6 @@ export const zGetTestLibraryDraftPath = z.object({
  */
 export const zGetTestLibraryDraftResponse = zLibraryDraftResponse;
 
-export const zForkTestLibraryDraftBody = zForkLibraryDraftRequest;
-
-export const zForkTestLibraryDraftHeaders = z.object({
-    'X-CSRF-Token': z.string()
-});
-
-export const zForkTestLibraryDraftPath = z.object({
-    app_id: z.uuid(),
-    entry_id: z.uuid()
-});
-
-/**
- * Mutation replay
- */
-export const zForkTestLibraryDraftResponse = zLibraryDraftResponse;
-
 export const zSaveTestLibraryDraftBody = zSaveLibraryDraftRequest;
 
 export const zSaveTestLibraryDraftHeaders = z.object({
@@ -1521,22 +1455,6 @@ export const zSaveTestLibraryDraftPath = z.object({
  * Success
  */
 export const zSaveTestLibraryDraftResponse = zLibraryDraftResponse;
-
-export const zSubmitTestLibraryDraftBody = zSubmitLibraryDraftRequest;
-
-export const zSubmitTestLibraryDraftHeaders = z.object({
-    'X-CSRF-Token': z.string()
-});
-
-export const zSubmitTestLibraryDraftPath = z.object({
-    app_id: z.uuid(),
-    entry_id: z.uuid()
-});
-
-/**
- * Mutation replay
- */
-export const zSubmitTestLibraryDraftResponse = zLibraryVersionResponse;
 
 export const zListTestLibraryVersionsPath = z.object({
     app_id: z.uuid(),
@@ -1562,23 +1480,6 @@ export const zGetTestLibraryVersionPath = z.object({
  * Success
  */
 export const zGetTestLibraryVersionResponse = zLibraryVersionResponse;
-
-export const zReviewTestLibraryVersionBody = zReviewLibraryVersionRequest;
-
-export const zReviewTestLibraryVersionHeaders = z.object({
-    'X-CSRF-Token': z.string()
-});
-
-export const zReviewTestLibraryVersionPath = z.object({
-    app_id: z.uuid(),
-    entry_id: z.uuid(),
-    version_id: z.uuid()
-});
-
-/**
- * Success
- */
-export const zReviewTestLibraryVersionResponse = zLibraryVersionResponse;
 
 export const zGetTestTemplatesPath = z.object({
     app_id: z.uuid()

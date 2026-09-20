@@ -6,35 +6,11 @@ import type {
   LibraryCoveragePreview,
   LibraryDraftDefinition,
   LibraryIssue,
-  LibraryReviewState,
   LibraryOptionsResponse,
 } from '@/api/generated/types.gen'
-export const reviewLabels: Record<LibraryReviewState, string> = {
-  in_review: 'In review',
-  needs_input: 'Changes requested',
-  rejected: 'Rejected',
-  approved: 'Approved',
-}
-export function ReviewBadge({ state }: { state?: LibraryReviewState | null }) {
-  return (
-    <Badge
-      color={
-        state === 'approved'
-          ? 'green'
-          : state === 'rejected'
-            ? 'red'
-            : state === 'needs_input'
-              ? 'orange'
-              : 'gray'
-      }
-    >
-      {state ? reviewLabels[state] : 'Draft'}
-    </Badge>
-  )
-}
 export function LibraryIssues({
   issues,
-  title = 'Before requesting review',
+  title = 'Saved content needs setup',
 }: {
   issues: LibraryIssue[]
   title?: string
@@ -120,7 +96,7 @@ export function DefinitionSummary({
   const { href } = useWorkspace()
   const content = definition.content
   const reference = (id: string) => {
-    const version = options?.approved_versions.find((v) => v.version.id === id)
+    const version = options?.saved_versions.find((v) => v.version.id === id)
     return version ? (
       <Text
         component={Link}
@@ -233,7 +209,7 @@ export function DefinitionSummary({
         </>
       ) : (
         <Text size="sm" c="dimmed">
-          Membership below is pinned to reviewed versions. New case edits do not change this{' '}
+          Membership below is pinned to saved versions. New case edits do not change this{' '}
           {definition.kind === 'suite' ? 'suite' : 'release plan'}.
         </Text>
       )}

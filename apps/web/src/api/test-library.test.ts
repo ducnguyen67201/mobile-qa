@@ -14,7 +14,6 @@ import {
   archiveLibraryEntry,
   createLibraryEntry,
   defaultPlanQuery,
-  forkLibraryDraft,
   libraryDraftQuery,
   libraryEntryQuery,
   libraryErrorDetails,
@@ -22,10 +21,8 @@ import {
   libraryOptionsQuery,
   libraryQuery,
   libraryVersionQuery,
-  reviewLibraryVersion,
   saveLibraryDraft,
   setDefaultPlan,
-  submitLibraryDraft,
 } from './test-library'
 import { ApiClientError } from './runtime'
 import { forgetSession, setCsrfToken } from './session-transport'
@@ -77,10 +74,7 @@ it('uses documented methods and shares CSRF while validating all mutations', asy
   const calls: Request[] = []
   const replies = [
     Response.json(libraryDraft, { status: 201 }),
-    Response.json(libraryDraft, { status: 201 }),
     Response.json(libraryDraft),
-    Response.json(libraryVersion, { status: 201 }),
-    Response.json(libraryVersion),
     Response.json(libraryEntry),
     Response.json({ app_id: appId, revision: 1, plan_version_id: versionId }),
   ]
@@ -98,24 +92,10 @@ it('uses documented methods and shares CSRF while validating all mutations', asy
     key: 'example',
     template_profile_id: null,
   })
-  await forkLibraryDraft(appId, entryId, {
-    mutation_id: mutationId,
-    expected_revision: 1,
-    source_version_id: versionId,
-  })
   await saveLibraryDraft(appId, entryId, {
     mutation_id: mutationId,
     expected_revision: 1,
     definition: libraryDraft.definition,
-  })
-  await submitLibraryDraft(appId, entryId, { mutation_id: mutationId, expected_revision: 1 })
-  await reviewLibraryVersion(appId, entryId, versionId, {
-    mutation_id: mutationId,
-    expected_revision: 2,
-    content_hash: libraryVersion.version.content_hash,
-    purpose: 'business',
-    decision: 'approve',
-    reason: null,
   })
   await archiveLibraryEntry(appId, entryId, {
     mutation_id: mutationId,
@@ -127,11 +107,9 @@ it('uses documented methods and shares CSRF while validating all mutations', asy
     expected_revision: 0,
     plan_version_id: versionId,
   })
-  expect(calls.map((r) => r.method)).toEqual(['POST', 'POST', 'PUT', 'POST', 'POST', 'POST', 'PUT'])
+  expect(calls.map((r) => r.method)).toEqual(['POST', 'PUT', 'POST', 'PUT'])
   expect(calls.every((r) => r.headers.get('X-CSRF-Token') === 'library-csrf')).toBe(true)
-  expect(new URL(calls[4]!.url).pathname).toBe(
-    `/api/apps/${appId}/test-library/${entryId}/versions/${versionId}/review`,
-  )
+  expect(new URL(calls[1]!.url).pathname).toBe(`/api/apps/${appId}/test-library/${entryId}/draft`)
 })
 it.each([201, 202, 204])('rejects undeclared draft-save success status %d', async (status) => {
   vi.stubGlobal(

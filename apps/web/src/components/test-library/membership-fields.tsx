@@ -35,14 +35,14 @@ export function CaseMembership({
   onChange: (selections: CaseSelection[]) => void
 }) {
   const [selected, setSelected] = useState<string | null>(null)
-  const cases = options.approved_versions.filter((v) => v.version.definition.kind === 'case')
+  const cases = options.saved_versions.filter((v) => v.version.definition.kind === 'case')
   return (
     <Stack gap="sm">
       <Title order={3} size="h4">
         Pinned case versions
       </Title>
       <Text size="sm" c="dimmed">
-        Choose approved cases. “Required” means the release cannot pass without that case passing.
+        Choose saved cases. “Required” means the release cannot pass without that case passing.
       </Text>
       {selections.map((selection, i) => {
         const current = cases.find((v) => v.version.id === selection.case_version_id)
@@ -77,8 +77,8 @@ export function CaseMembership({
               </Group>
               {!current && (
                 <Text size="xs" c="orange">
-                  This version may be archived or no longer eligible. Choose a reviewed replacement
-                  or remove it.
+                  This version may be archived or no longer eligible. Choose a saved replacement or
+                  remove it.
                 </Text>
               )}
               <Checkbox
@@ -105,7 +105,7 @@ export function CaseMembership({
                     )
                   }
                 >
-                  Use newer approved v{newer.version.definition.content.version}
+                  Use newer saved v{newer.version.definition.content.version}
                 </Button>
               )}
             </Stack>
@@ -118,7 +118,7 @@ export function CaseMembership({
           miw={180}
           label="Approved case"
           searchable
-          placeholder={cases.length ? 'Choose a reviewed version' : 'Approve a case first'}
+          placeholder={cases.length ? 'Choose a saved version' : 'Save a case first'}
           data={cases
             .filter((v) => !selections.some((s) => s.case_version_id === v.version.id))
             .map((v) => ({ value: v.version.id, label: choiceLabel(v) }))}
@@ -183,7 +183,7 @@ export function PlanFields({
   onChange: (value: PlanDraftContent) => void
 }) {
   const [suite, setSuite] = useState<string | null>(null)
-  const suites = options.approved_versions.filter((v) => v.version.definition.kind === 'suite')
+  const suites = options.saved_versions.filter((v) => v.version.definition.kind === 'suite')
   const profile = options.profiles.find((p) => p.id === value.profile_id)
   return (
     <Stack gap="lg">
@@ -265,7 +265,7 @@ export function PlanFields({
                       })
                     }
                   >
-                    Use newer approved suite v{newer.version.definition.content.version}
+                    Use newer saved suite v{newer.version.definition.content.version}
                   </Button>
                 )}
               </Stack>
@@ -276,7 +276,7 @@ export function PlanFields({
               flex={1}
               miw={180}
               label="Approved suite"
-              placeholder="Choose a reviewed suite"
+              placeholder="Choose a saved suite"
               searchable
               data={suites
                 .filter((v) => !value.suite_version_ids.includes(v.version.id))

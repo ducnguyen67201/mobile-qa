@@ -1,6 +1,6 @@
-"""Author/review/pin coverage using real browser HTTP routes, then run the existing
+"""Save/pin coverage using real browser HTTP routes, then run the existing
 fake Python worker across API restarts. This proves protocol persistence, not UI
-rendering or real Android execution. Operator setup is confined to fixture grants,
+rendering or real Android execution. Operator setup is confined to fixture
 profiles and worker identity in execution_smoke.
 """
 
@@ -37,33 +37,17 @@ def main(direct=False):
                 },
             )
 
-        def publish(draft):
-            path = base + "/" + draft["entry"]["id"]
-            candidate = mutate(
+        def saved_version(draft):
+            assert draft["saved_version_id"], draft["issues"]
+            return request(
                 owner,
-                csrf,
-                "POST",
-                path + "/submit",
-                {
-                    "expected_revision": draft["entry"]["revision"],
-                },
+                "GET",
+                base
+                + "/"
+                + draft["entry"]["id"]
+                + "/versions/"
+                + draft["saved_version_id"],
             )
-            for purpose in ["business", "executability"]:
-                candidate = mutate(
-                    owner,
-                    csrf,
-                    "POST",
-                    path + "/versions/" + candidate["version"]["id"] + "/review",
-                    {
-                        "expected_revision": candidate["entry"]["revision"],
-                        "content_hash": candidate["version"]["content_hash"],
-                        "purpose": purpose,
-                        "decision": "approve",
-                        "reason": None,
-                    },
-                )
-            assert candidate["review_state"] == "approved"
-            return candidate
 
         case = create("case")
         if direct:
@@ -111,7 +95,7 @@ def main(direct=False):
                 "definition": case["definition"],
             },
         )
-        case = publish(case)
+        case = saved_version(case)
         saved["case"] = case
         selection = {
             "case_version_id": case["version"]["id"],
@@ -132,7 +116,7 @@ def main(direct=False):
                 "definition": suite["definition"],
             },
         )
-        suite = publish(suite)
+        suite = saved_version(suite)
         plan = create("plan")
         plan["definition"]["content"].update(
             title="Reviewed release checks",
@@ -158,22 +142,13 @@ def main(direct=False):
             "Direct + suite reference must resolve once"
         )
         assert plan["coverage"]["required_count"] == 1
-        plan = publish(plan)
+        plan = saved_version(plan)
         return plan["version"]["id"]
 
     def edit(owner, csrf, app):
         case = saved["case"]
         base = f"/api/apps/{app}/test-library/{case['entry']['id']}"
-        draft = mutate(
-            owner,
-            csrf,
-            "POST",
-            base + "/draft",
-            {
-                "expected_revision": case["entry"]["revision"],
-                "source_version_id": case["version"]["id"],
-            },
-        )
+        draft = request(owner, "GET", base + "/draft")
         draft["definition"]["content"]["title"] = (
             "Later work must not alter the queued run"
         )
@@ -193,7 +168,7 @@ def main(direct=False):
 
     execution_main(author=author, edit_after_queue=edit)
     print(
-        "Test library HTTP acceptance passed: draft/save/replay, case + suite + plan review, explicit default, unique coverage, frozen queued manifest after editing and API restart; simulated worker only"
+        "Test library HTTP acceptance passed: save/replay, case + suite + plan snapshots, explicit default, unique coverage, frozen queued manifest after editing and API restart; simulated worker only"
     )
 
 

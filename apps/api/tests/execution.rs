@@ -13,7 +13,7 @@ fn definition() -> TestDefinition {
     ))
     .unwrap()
 }
-async fn approved(
+async fn saved_definition(
     ctx: &AppContext,
     owner: &Login,
     app: Uuid,
@@ -29,14 +29,6 @@ async fn approved(
     )
     .await
     .unwrap();
-    for purpose in [ApprovalPurpose::Business, ApprovalPurpose::Executability] {
-        defs::grant(ctx, owner.user, app, owner.user, purpose)
-            .await
-            .unwrap();
-        defs::approve(ctx, owner.user, app, row.id, &row.content_hash, purpose)
-            .await
-            .unwrap();
-    }
     defs::get(&ctx.db, app, row.id).await.unwrap()
 }
 async fn prepared(
@@ -78,7 +70,7 @@ async fn prepared(
     defs::register_profile(ctx, owner.user, app.id, profile.clone())
         .await
         .unwrap();
-    let case = approved(ctx, owner, app.id, definition()).await;
+    let case = saved_definition(ctx, owner, app.id, definition()).await;
     let plan = TestDefinition::Plan(PlanDefinition {
         key: "release".into(),
         version: 1,
@@ -98,7 +90,7 @@ async fn prepared(
         diagnostic_retries: 0,
         exclusions: vec![],
     });
-    let plan = approved(ctx, owner, app.id, plan).await;
+    let plan = saved_definition(ctx, owner, app.id, plan).await;
     mobile_qa::services::test_library_mutations::apply(
         ctx,
         owner.user,
@@ -349,27 +341,17 @@ async fn route_manifest_idempotency_and_worker_fencing() {
     .await;
 }
 #[tokio::test]
-async fn real_database_competing_claims_and_approval_boundaries() {
+async fn real_database_competing_claims_and_immutable_definition_boundaries() {
     let _guard = DATABASE_BOOT.lock().await;
     request::<App, _, _>(|server, ctx| async move {
         let owner = login(&server, &ctx).await;
         let (app, build, plan, w, _) = prepared(&server, &ctx, &owner).await;
         let d = defs::get(&ctx.db, app, plan).await.unwrap();
-        assert!(defs::approve(
-            &ctx,
-            owner.user,
-            app,
-            plan,
-            "stale",
-            ApprovalPurpose::Business
-        )
-        .await
-        .is_err());
         let mut altered = d.definition;
         let TestDefinition::Plan(ref mut p) = altered else {
             panic!()
         };
-        p.title = "Changed after approval".into();
+        p.title = "Changed after saving".into();
         assert!(defs::import(
             &ctx,
             owner.user,
@@ -638,8 +620,8 @@ async fn clean_start_route_is_fenced_and_recovery_keeps_original_evidence() {
         let TestDefinition::Case(mut c)=definition() else {panic!()};
         c.key="direct-clean".into();c.adapter=p.adapter.clone();
         for a in &mut c.actions {if a.kind==ActionKind::Navigate {a.kind=ActionKind::Checkpoint;a.instruction.clear();}}
-        let case=approved(&ctx,&owner,app,TestDefinition::Case(c)).await;
-        let plan=approved(&ctx,&owner,app,TestDefinition::Plan(PlanDefinition{key:"direct-clean-plan".into(),version:1,title:"Clean replay".into(),suite_version_ids:vec![],cases:vec![CaseSelection{case_version_id:case.id,data_variant:"default".into(),required:true}],profile_id:p.id,budget:ExecutionBudget{duration_seconds:1800,max_steps:80,artifact_bytes:16777216},diagnostic_retries:0,exclusions:vec![]})).await;
+        let case=saved_definition(&ctx,&owner,app,TestDefinition::Case(c)).await;
+        let plan=saved_definition(&ctx,&owner,app,TestDefinition::Plan(PlanDefinition{key:"direct-clean-plan".into(),version:1,title:"Clean replay".into(),suite_version_ids:vec![],cases:vec![CaseSelection{case_version_id:case.id,data_variant:"default".into(),required:true}],profile_id:p.id,budget:ExecutionBudget{duration_seconds:1800,max_steps:80,artifact_bytes:16777216},diagnostic_retries:0,exclusions:vec![]})).await;
         let w=worker_auth::Worker{id:Uuid::new_v4(),app_id:app,profile_id:p.id};let token=loco_rs::hash::random_string(64);
         worker_auth::register(&ctx,owner.user,app,w.id,p.id,&token).await.unwrap();
         let(run,_)=runs::create(&ctx,owner.user,app,"clean",CreateRunRequest{build_id:build,plan_version_id:plan.id,environment_revision:1}).await.unwrap();

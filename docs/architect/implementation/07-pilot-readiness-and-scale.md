@@ -56,7 +56,7 @@ No per-customer database or service is needed by default. Preserve tenant scope 
 
 ## Pilot handoff acceptance
 
-One customer app completes onboarding, an approved run, a new-build rerun and a reviewed comparison report. Record at least one actionable finding or explicit coverage limitation, actual turnaround/cost and customer feedback. Provide operator instructions for install failure, stuck worker, leaked lease, missing evidence, secret rotation and deletion. This is the point to sell a repeatable supported service with measured scope.
+One customer app completes onboarding, a validated run, a new-build rerun and a reviewed comparison report. Record at least one actionable finding or explicit coverage limitation, actual turnaround/cost and customer feedback. Provide operator instructions for install failure, stuck worker, leaked lease, missing evidence, secret rotation and deletion. This is the point to sell a repeatable supported service with measured scope.
 
 ## Implementation increments agreed on 2026-09-15
 
@@ -194,7 +194,7 @@ and measured queue/cost/reliability signals before adding capacity.
 The first increment now separates generic Android operations (`device/android.py`) from
 controlled demo qualification (`qualification/device.py`). `execution/adapters.py`
 selects the two explicit policies; `execution/lifecycle.py` owns the new direct flow.
-`execution_readiness.rs` admits reviewed cases against immutable qualification context.
+`execution_readiness.rs` admits saved cases against immutable qualification context.
 `execution_preflight.rs` verifies sealed start artifacts under lease fencing before
 accepting action events/evidence. The supervisor is the only process with worker
 credentials; the child waits for an instance-bound private acknowledgement file.

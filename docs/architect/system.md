@@ -46,7 +46,7 @@ Hosted S3-compatible storage is configured in code but has no authorized round-t
 The explicit Python runner controls a local emulator, runs Minitap and independently
 verifies the controlled demo before reset. It does not claim API jobs or execute uploaded
 customer APKs. Tests/Runs remain main's placeholders; upload validation readiness must
-not be presented as execution readiness. Rust will own job approvals and outcome aggregation.
+not be presented as execution readiness. Rust will own job admission and outcome aggregation.
 Agent completion alone cannot prove
 a customer expectation passed. Planned results and immutable manifests follow
 [product rules](product.md) and [execution spec](implementation/04-execution-and-reports.md).
@@ -90,7 +90,7 @@ jobs and the narrow transactional claim/lease behavior.
 
 ## Execution ownership
 
-Rust owns immutable test definitions/approvals, manifests, queue attempts, worker
+Rust owns immutable saved test definitions, manifests, queue attempts, worker
 identity, physical-resource reservations, event deduplication and evidence verdicts.
 The Python polling supervisor owns execution/cleanup on its host. A database lease
 expiry invalidates completion authority while keeping reservations quarantined until

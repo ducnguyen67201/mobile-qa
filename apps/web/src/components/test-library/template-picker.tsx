@@ -46,7 +46,6 @@ export function TemplatePicker({
                   save.mutate({
                     mutation_id: crypto.randomUUID(),
                     source_task_id: null,
-                    expectations_confirmed: false,
                     tests: [
                       {
                         template_id: t.id,

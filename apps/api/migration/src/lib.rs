@@ -9,6 +9,7 @@ mod m20260912_000004_execution;
 pub mod m20260912_000005_test_library;
 mod m20260913_000006_task_sessions;
 mod m20260915_000007_execution_lifecycle;
+pub mod m20260920_000008_save_without_reviews;
 pub struct Migrator;
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260912_000005_test_library::Migration),
             Box::new(m20260913_000006_task_sessions::Migration),
             Box::new(m20260915_000007_execution_lifecycle::Migration),
+            Box::new(m20260920_000008_save_without_reviews::Migration),
             // inject-above (do not remove this comment)
         ]
     }

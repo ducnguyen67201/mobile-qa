@@ -116,3 +116,22 @@ fn suite_and_typed_error_details_round_trip() {
         error
     );
 }
+
+#[test]
+fn snapshot_normalization_preserves_ai_editor_provenance() {
+    let LibraryDraftDefinition::Case(mut c) = case() else {
+        panic!()
+    };
+    c.provenance = "ai_discovery:source-job".into();
+    let mut draft = LibraryDraftDefinition::Case(c);
+    draft.allocate(3);
+    let LibraryDraftDefinition::Case(editor) = &draft else {
+        panic!()
+    };
+    assert_eq!(editor.provenance, "ai_discovery:source-job");
+    let TestDefinition::Case(snapshot) = draft.published().unwrap() else {
+        panic!()
+    };
+    assert_eq!(snapshot.provenance, "user_authored");
+    assert_eq!(snapshot.version, 3);
+}

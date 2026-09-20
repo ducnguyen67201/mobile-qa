@@ -1,5 +1,5 @@
 //! Cookie-session authoring routes. Session applies CSRF/origin checks to mutations;
-//! services reauthorize app membership, review purpose and optimistic revisions.
+//! services reauthorize app membership and optimistic revisions.
 use crate::{
     errors::{ApiFailure, ApiResult},
     services::{
@@ -99,27 +99,7 @@ async fn create(
         } else {
             StatusCode::OK
         },
-        Json(response),
-    ))
-}
-async fn fork(
-    State(ctx): State<AppContext>,
-    session: Session,
-    Path((app, id)): Path<(Uuid, Uuid)>,
-    Json(r): Json<ForkLibraryDraftRequest>,
-) -> ApiResult<(StatusCode, Json<LibraryDraftResponse>)> {
-    let (LibraryMutationReceipt::Draft(response), new) =
-        test_library_mutations::apply(&ctx, session.user.id, app, Mutation::Fork(id, r)).await?
-    else {
-        return Err(ApiFailure::internal());
-    };
-    Ok((
-        if new {
-            StatusCode::CREATED
-        } else {
-            StatusCode::OK
-        },
-        Json(response),
+        Json(*response),
     ))
 }
 async fn save(
@@ -133,41 +113,7 @@ async fn save(
     else {
         return Err(ApiFailure::internal());
     };
-    Ok(Json(response))
-}
-async fn submit(
-    State(ctx): State<AppContext>,
-    session: Session,
-    Path((app, id)): Path<(Uuid, Uuid)>,
-    Json(r): Json<SubmitLibraryDraftRequest>,
-) -> ApiResult<(StatusCode, Json<LibraryVersionResponse>)> {
-    let (LibraryMutationReceipt::Version(response), new) =
-        test_library_mutations::apply(&ctx, session.user.id, app, Mutation::Submit(id, r)).await?
-    else {
-        return Err(ApiFailure::internal());
-    };
-    Ok((
-        if new {
-            StatusCode::CREATED
-        } else {
-            StatusCode::OK
-        },
-        Json(response),
-    ))
-}
-async fn review(
-    State(ctx): State<AppContext>,
-    session: Session,
-    Path((app, id, v)): Path<(Uuid, Uuid, Uuid)>,
-    Json(r): Json<ReviewLibraryVersionRequest>,
-) -> ApiResult<Json<LibraryVersionResponse>> {
-    let (LibraryMutationReceipt::Version(response), _) =
-        test_library_mutations::apply(&ctx, session.user.id, app, Mutation::Review(id, v, r))
-            .await?
-    else {
-        return Err(ApiFailure::internal());
-    };
-    Ok(Json(response))
+    Ok(Json(*response))
 }
 async fn archive(
     State(ctx): State<AppContext>,
@@ -203,11 +149,7 @@ pub fn routes() -> Routes {
         .add("/api/apps/{app_id}/test-library/{entry_id}", get(entry))
         .add(
             "/api/apps/{app_id}/test-library/{entry_id}/draft",
-            get(draft).put(save).post(fork),
-        )
-        .add(
-            "/api/apps/{app_id}/test-library/{entry_id}/submit",
-            post(submit),
+            get(draft).put(save),
         )
         .add(
             "/api/apps/{app_id}/test-library/{entry_id}/versions",
@@ -216,10 +158,6 @@ pub fn routes() -> Routes {
         .add(
             "/api/apps/{app_id}/test-library/{entry_id}/versions/{version_id}",
             get(version),
-        )
-        .add(
-            "/api/apps/{app_id}/test-library/{entry_id}/versions/{version_id}/review",
-            post(review),
         )
         .add(
             "/api/apps/{app_id}/test-library/{entry_id}/archive",

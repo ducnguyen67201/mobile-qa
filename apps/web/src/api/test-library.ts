@@ -5,11 +5,8 @@ import * as z from './generated/zod.gen'
 import type {
   ArchiveLibraryEntryRequest,
   CreateLibraryEntryRequest,
-  ForkLibraryDraftRequest,
-  ReviewLibraryVersionRequest,
   SaveLibraryDraftRequest,
   SetDefaultPlanRequest,
-  SubmitLibraryDraftRequest,
   ListTestLibraryData,
 } from './generated/types.gen'
 import { ApiClientError } from './runtime'
@@ -119,18 +116,6 @@ export function createLibraryEntry(appId: string, body: CreateLibraryEntryReques
     [200, 201],
   )
 }
-export function forkLibraryDraft(appId: string, entryId: string, body: ForkLibraryDraftRequest) {
-  return checked(
-    sdk.forkTestLibraryDraft({
-      ...options,
-      path: { app_id: appId, entry_id: entryId },
-      headers: headers(),
-      body: z.zForkLibraryDraftRequest.parse(body),
-    }),
-    z.zLibraryDraftResponse,
-    [200, 201],
-  )
-}
 export function saveLibraryDraft(appId: string, entryId: string, body: SaveLibraryDraftRequest) {
   return checked(
     sdk.saveTestLibraryDraft({
@@ -140,38 +125,6 @@ export function saveLibraryDraft(appId: string, entryId: string, body: SaveLibra
       body: z.zSaveLibraryDraftRequest.parse(body),
     }),
     z.zLibraryDraftResponse,
-  )
-}
-export function submitLibraryDraft(
-  appId: string,
-  entryId: string,
-  body: SubmitLibraryDraftRequest,
-) {
-  return checked(
-    sdk.submitTestLibraryDraft({
-      ...options,
-      path: { app_id: appId, entry_id: entryId },
-      headers: headers(),
-      body: z.zSubmitLibraryDraftRequest.parse(body),
-    }),
-    z.zLibraryVersionResponse,
-    [200, 201],
-  )
-}
-export function reviewLibraryVersion(
-  appId: string,
-  entryId: string,
-  versionId: string,
-  body: ReviewLibraryVersionRequest,
-) {
-  return checked(
-    sdk.reviewTestLibraryVersion({
-      ...options,
-      path: { app_id: appId, entry_id: entryId, version_id: versionId },
-      headers: headers(),
-      body: z.zReviewLibraryVersionRequest.parse(body),
-    }),
-    z.zLibraryVersionResponse,
   )
 }
 export function archiveLibraryEntry(

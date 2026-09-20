@@ -71,7 +71,6 @@ def scenario(owner, csrf, app, path, wait_for, directory):
         {
             "mutation_id": str(uuid.uuid4()),
             "source_task_id": job,
-            "expectations_confirmed": True,
             "tests": [
                 {
                     "template_id": None,

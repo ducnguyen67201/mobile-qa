@@ -420,7 +420,6 @@ async fn assert_session_protocol(protocol_version: u32) {
         let save = SaveAuthoredTestsRequest {
             mutation_id: Uuid::new_v4(),
             source_task_id: None,
-            expectations_confirmed: false,
             tests: vec![SaveAuthoredTest {
                 template_id: Some(catalog.items[0].id.clone()),
                 proposal_id: None,
@@ -620,7 +619,6 @@ async fn assert_session_protocol(protocol_version: u32) {
         let generated_save = SaveAuthoredTestsRequest {
             mutation_id: Uuid::new_v4(),
             source_task_id: Some(generation.id),
-            expectations_confirmed: true,
             tests: vec![SaveAuthoredTest {
                 template_id: None,
                 proposal_id: Some(proposal.id),

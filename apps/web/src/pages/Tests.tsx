@@ -24,34 +24,29 @@ import {
   libraryOptionsQuery,
   libraryQuery,
 } from '@/api/test-library'
-import type {
-  CreateLibraryEntryRequest,
-  DefinitionKind,
-  LibraryReviewState,
-} from '@/api/generated/types.gen'
+import type { CreateLibraryEntryRequest, DefinitionKind } from '@/api/generated/types.gen'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { useMounted } from '@/hooks/use-mounted'
 import { ErrorNotice, LoadingPanel, PageHeading } from '@/components/app/feedback'
 import { TemplatePicker } from '@/components/test-library/template-picker'
-import { ReviewBadge } from '@/components/test-library/library-presentation'
 const kinds: Record<DefinitionKind, { label: string; single: string; description: string }> = {
   case: {
     label: 'Cases',
     single: 'case',
     description:
-      'Describe what a person does and what should happen. Save a draft before you have a build.',
+      'Describe what a person does and what should happen. Save your test before you have a build.',
   },
   suite: {
     label: 'Suites',
     single: 'suite',
     description:
-      'Group reviewed case versions into reusable coverage. Each member stays pinned until you change it.',
+      'Group saved case versions into reusable coverage. Each member stays pinned until you change it.',
   },
   plan: {
     label: 'Release plan',
     single: 'release plan',
     description:
-      'Choose reviewed coverage and an execution profile. Set one approved version as the default for this app.',
+      'Choose saved coverage and an execution profile. Set one saved version as the default for this app.',
   },
 }
 export function Tests() {
@@ -66,7 +61,6 @@ function WorkspaceTests() {
   const selectedTab = params.get('kind')
   const kind: DefinitionKind =
     selectedTab === 'suite' || selectedTab === 'plan' ? selectedTab : 'case'
-  const [status, setStatus] = useState<LibraryReviewState | null>(null)
   const [archived, setArchived] = useState(false)
   const [cursor, setCursor] = useState<string | undefined>()
   const [creating, setCreating] = useState(false)
@@ -77,9 +71,7 @@ function WorkspaceTests() {
     setParams(next)
     setCursor(undefined)
   }
-  const library = useQuery(
-    libraryQuery(workspaceId, appId, { kind, status: status ?? undefined, archived, cursor }),
-  )
+  const library = useQuery(libraryQuery(workspaceId, appId, { kind, archived, cursor }))
   const options = useQuery(libraryOptionsQuery(workspaceId, appId))
   const defaultPlan = useQuery(defaultPlanQuery(workspaceId, appId))
   return (
@@ -87,7 +79,7 @@ function WorkspaceTests() {
       <PageHeading
         eyebrow="Build confidence, one behavior at a time"
         title="Tests"
-        description="Write the expectation. Review the version. Run it on your next build."
+        description="Write your test. Save it. Run it on your next build."
       />
       {apps.isError && <ErrorNotice error={apps.error} retry={() => void apps.refetch()} />}
       {apps.isPending ? (
@@ -200,35 +192,11 @@ function WorkspaceTests() {
               }
             >
               {defaultPlan.data.plan_version_id
-                ? 'Approving another version will not change the default. Open an approved plan to change it explicitly.'
-                : 'Create and review a release plan, then set it as the default. Each build can also preview a specific reviewed plan.'}
+                ? 'Saving another version will not change the default. Open an saved plan to change it explicitly.'
+                : 'Create and save a release plan, then set it as the default. Each build can also preview a specific saved plan.'}
             </Alert>
           )}
           <Group align="flex-end">
-            <Select
-              label="Review status"
-              clearable
-              placeholder="All review states"
-              value={status}
-              data={[
-                { value: 'in_review', label: 'In review' },
-                { value: 'needs_input', label: 'Changes requested' },
-                { value: 'rejected', label: 'Rejected' },
-                { value: 'approved', label: 'Approved' },
-              ]}
-              onChange={(v) => {
-                if (
-                  v === 'in_review' ||
-                  v === 'needs_input' ||
-                  v === 'rejected' ||
-                  v === 'approved' ||
-                  v === null
-                ) {
-                  setStatus(v)
-                  setCursor(undefined)
-                }
-              }}
-            />
             <Checkbox
               label="Archived only"
               checked={archived}
@@ -257,10 +225,10 @@ function WorkspaceTests() {
                       {status || archived
                         ? 'Change the filters to see other test entries.'
                         : kind === 'case'
-                          ? 'Start with one important behavior. Incomplete drafts stay editable until you request review.'
+                          ? 'Start with one important behavior. Saved tests stay editable.'
                           : kind === 'suite'
                             ? 'Approve a case first, then group the exact versions you want to reuse.'
-                            : 'Choose approved cases or suites and a qualified profile. No build is needed to prepare coverage.'}
+                            : 'Choose saved cases or suites and a qualified profile. No build is needed to prepare coverage.'}
                     </Text>
                   </Stack>
                 </Card>
@@ -275,14 +243,16 @@ function WorkspaceTests() {
                     <Group justify="space-between" wrap="nowrap">
                       <Stack gap={6} miw={0}>
                         <Group gap="xs">
-                          <ReviewBadge state={entry.latest_review_state} />
+                          <Badge color={entry.needs_setup ? 'orange' : 'gray'}>
+                            {entry.needs_setup ? 'Needs setup' : 'Saved'}
+                          </Badge>
                           {entry.ai_generated && (
                             <Badge color="grape" variant="light">
                               AI generated
                             </Badge>
                           )}
                           {entry.draft_version != null && (
-                            <Badge color="gray">Draft v{entry.draft_version}</Badge>
+                            <Badge color="gray">v{entry.draft_version}</Badge>
                           )}
                           {entry.archived_at && <Badge color="orange">Archived</Badge>}
                           {entry.kind === 'plan' &&
@@ -361,8 +331,7 @@ function CreateEntry({
     <Drawer opened={opened} onClose={close} title={`New ${kinds[kind].single}`}>
       <Stack>
         <Text size="sm" c="dimmed">
-          Start a draft, then give it a title and describe its content. You can save your progress
-          before it is ready for review.
+          Give your test a title and add actions. You can save incomplete work and finish it later.
         </Text>
         {create.isError && (
           <ErrorNotice
@@ -385,10 +354,10 @@ function CreateEntry({
             )
           }
         >
-          Create draft
+          Create test
         </Button>
         <Text size="xs" c="dimmed">
-          Creating a draft does not publish or approve it.
+          Save when you are ready. You can keep editing afterward.
         </Text>
       </Stack>
     </Drawer>

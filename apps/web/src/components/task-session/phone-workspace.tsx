@@ -353,7 +353,6 @@ export function PhoneWorkspace({
                   save.mutate({
                     mutation_id: crypto.randomUUID(),
                     source_task_id: null,
-                    expectations_confirmed: true,
                     tests: [{ template_id: null, proposal_id: null, title, requirement, sequence }],
                   })
                 }
@@ -376,7 +375,7 @@ export function PhoneWorkspace({
           )}
           {save.data?.entry_ids.map((key) => (
             <Button variant="light" component={Link} to={href(`/tests/${appId}/${key}`)} key={key}>
-              Open saved test draft
+              Open saved test
             </Button>
           ))}
           {s?.tasks

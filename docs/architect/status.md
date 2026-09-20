@@ -1,5 +1,34 @@
 # Implementation status and evidence
 
+## Save without human reviews (2026-09-20)
+
+Implemented Edit → Save → Run for cases, suites and release plans, including selected
+AI proposals and templates. The current entry stays editable. Complete Save creates
+or reuses an immutable snapshot; incomplete content persists with Needs setup. Review
+buttons, capabilities, routes and operator approval commands are removed. Membership,
+CSRF, revisions, technical admission, archive permissions, exact pins and defaults remain.
+
+Migration 000008 retains prior review states and events as legacy audit, without
+inventing approvals. Historical content hashes, report payloads and run manifests stay
+unchanged. Old mutation IDs fail closed under the new save namespace; refresh clients
+after upgrade. This supersedes the historical phase 05 review workflow documented below.
+
+Validation: 50 Rust, 119 browser and 175 worker tests pass across the consolidated run
+and targeted retries. Formatting, Clippy, TypeScript/ESLint, Ruff/Pyright, generated
+contract drift and API/web builds pass. All three simulated HTTP smokes pass:
+test-library, direct-authoring and execution (operator imports). They preserve exact
+retry results, pinned manifests, pass/fail/blocked reports and API restart persistence.
+
+The shared Compose test database contained another branch's migration. Validation
+used a disposable PostgreSQL container, the same fixed test database name and an
+external temporary test configuration; no development data was reset. JDK 17 was
+explicitly selected for APK intake checks. Tests that ran before container readiness
+passed after it was ready; one existing worker loopback HTTP test passed on retry.
+Vite still reports the existing large-bundle advisory. No real device/model calls or
+rendered browser acceptance were performed for this change.
+
+See [spec 05](implementation/05-test-library-and-plans.md) for the active behavior.
+
 ## Phase 07A — qualified clean-start replay (2026-09-15)
 
 07A source and synthetic validation are complete. The new `android_direct_v1`

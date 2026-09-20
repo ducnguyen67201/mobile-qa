@@ -1,4 +1,4 @@
-//! Operator-authored immutable versions. Import never implicitly approves expectations.
+//! Immutable saved versions and technical execution resolution.
 use super::{apps, execution_store::*};
 use crate::{
     errors::{ApiFailure, ApiResult},
@@ -62,16 +62,6 @@ pub async fn get(db: &impl ConnectionTrait, app: Uuid, id: Uuid) -> ApiResult<De
     })
 }
 
-pub fn approved(d: &DefinitionResponse) -> bool {
-    [ApprovalPurpose::Business, ApprovalPurpose::Executability]
-        .iter()
-        .all(|purpose| {
-            d.approvals
-                .iter()
-                .any(|a| &a.purpose == purpose && a.content_hash == d.content_hash)
-        })
-}
-
 pub async fn import(
     ctx: &AppContext,
     actor: Uuid,
@@ -90,7 +80,7 @@ pub async fn import(
         return Err(ApiFailure::invalid("Version exceeds supported range"));
     }
     let tx = ctx.db.begin().await?;
-    // Parent app lock serializes imports/approvals against run resolution.
+    // Parent app lock serializes imports/saves against run resolution.
     one(
         &tx,
         "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
@@ -160,81 +150,18 @@ pub async fn import(
     Ok(result)
 }
 
-pub async fn grant(
-    ctx: &AppContext,
-    actor: Uuid,
-    app: Uuid,
-    user: Uuid,
-    purpose: ApprovalPurpose,
-) -> ApiResult<()> {
-    operator(ctx, actor, app).await?;
-    apps::authorized(ctx, user, app).await?;
-    exec(
-        &ctx.db,
-        "INSERT INTO execution_reviewer_grants(app_id,user_id,purpose) VALUES($1,$2,$3) ON \
-            CONFLICT DO NOTHING",
-        vec![app.into(), user.into(), word(&purpose).into()],
-    )
-    .await?;
-    Ok(())
-}
-
-pub async fn approve(
-    ctx: &AppContext,
-    actor: Uuid,
-    app: Uuid,
-    id: Uuid,
-    digest: &str,
-    purpose: ApprovalPurpose,
-) -> ApiResult<DefinitionResponse> {
-    super::test_library::authorize(ctx, actor, app).await?;
-    let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![app.into()],
-    )
-    .await?;
-    let row = one(
-        &tx,
-        "SELECT e.id, e.revision FROM test_library_versions v JOIN test_library_entries e ON
-        e.id=v.entry_id WHERE v.definition_id=$1 AND e.app_id=$2",
-        vec![id.into(), app.into()],
-    )
-    .await?;
-    super::test_library_mutations::review(
-        &tx,
-        actor,
-        app,
-        field(&row, "id")?,
-        id,
-        &mobile_qa_contracts::test_library::ReviewLibraryVersionRequest {
-            mutation_id: Uuid::new_v4(),
-            expected_revision: field(&row, "revision")?,
-            content_hash: digest.into(),
-            purpose,
-            decision: mobile_qa_contracts::test_library::LibraryReviewDecision::Approve,
-            reason: None,
-        },
-    )
-    .await?;
-    let result = get(&tx, app, id).await?;
-    tx.commit().await?;
-    Ok(result)
-}
-
 async fn require_case(
     db: &impl ConnectionTrait,
     app: Uuid,
     id: Uuid,
-    approval: bool,
+    admission: bool,
 ) -> ApiResult<DefinitionResponse> {
     let d = get(db, app, id).await?;
-    if approval {
+    if admission {
         super::test_library::admitted(db, app, id).await?;
     }
-    if !matches!(d.definition, TestDefinition::Case(_)) || (approval && !approved(&d)) {
-        return Err(ApiFailure::invalid("An approved case version is required"));
+    if !matches!(d.definition, TestDefinition::Case(_)) {
+        return Err(ApiFailure::invalid("A saved case version is required"));
     }
     Ok(d)
 }
@@ -297,9 +224,6 @@ pub async fn resolve(
     for id in &p.suite_version_ids {
         let d = get(db, app, *id).await?;
         super::test_library::admitted(db, app, *id).await?;
-        if !approved(&d) {
-            return Err(ApiFailure::invalid("Suite is not approved"));
-        }
         let TestDefinition::Suite(s) = d.definition else {
             return Err(ApiFailure::invalid("Suite reference expected"));
         };

@@ -421,12 +421,6 @@ export type ExpectedCheck = {
     text_filter: string;
 };
 
-export type ForkLibraryDraftRequest = {
-    expected_revision: number;
-    mutation_id: string;
-    source_version_id: string;
-};
-
 export type GenerateTestsRequest = {
     allow_writes: boolean;
     category: CoverageKind;
@@ -492,8 +486,6 @@ export type LeaseStatusResponse = {
 export type LibraryCapabilities = {
     can_archive: boolean;
     can_edit: boolean;
-    can_review_business: boolean;
-    can_review_executability: boolean;
     can_set_default: boolean;
 };
 
@@ -520,6 +512,10 @@ export type LibraryDraftResponse = {
     definition: LibraryDraftDefinition;
     entry: LibraryEntryResponse;
     issues: Array<LibraryIssue>;
+    /**
+     * Snapshot matching this exact saved editor content, never a previous runnable edit.
+     */
+    saved_version_id?: string | null;
     source_version_id?: string | null;
 };
 
@@ -535,8 +531,11 @@ export type LibraryEntryResponse = {
     id: string;
     key: string;
     kind: DefinitionKind;
-    latest_review_state?: null | LibraryReviewState;
     latest_version_id?: string | null;
+    /**
+     * Current saved editor content still has semantic or reference setup issues.
+     */
+    needs_setup: boolean;
     revision: number;
     title: string;
     updated_at: string;
@@ -567,7 +566,6 @@ export type LibraryListQuery = {
     archived?: boolean | null;
     cursor?: string | null;
     kind?: null | DefinitionKind;
-    status?: null | LibraryReviewState;
 };
 
 export type LibraryListResponse = {
@@ -576,9 +574,9 @@ export type LibraryListResponse = {
 };
 
 export type LibraryOptionsResponse = {
-    approved_versions: Array<LibraryVersionResponse>;
     capabilities: LibraryCapabilities;
     profiles: Array<LibraryProfileChoice>;
+    saved_versions: Array<LibraryVersionResponse>;
 };
 
 export type LibraryProfileChoice = {
@@ -589,21 +587,6 @@ export type LibraryProfileChoice = {
     package: string;
     qualified: boolean;
 };
-
-export type LibraryReviewDecision = 'approve' | 'needs_input' | 'reject';
-
-export type LibraryReviewEvent = {
-    actor_id: string;
-    actor_name: string;
-    content_hash: string;
-    created_at: string;
-    decision: LibraryReviewDecision;
-    id: string;
-    purpose: ApprovalPurpose;
-    reason?: string | null;
-};
-
-export type LibraryReviewState = 'in_review' | 'needs_input' | 'rejected' | 'approved';
 
 export type LibraryVersionListResponse = {
     items: Array<LibraryVersionResponse>;
@@ -618,8 +601,6 @@ export type LibraryVersionResponse = {
     coverage: LibraryCoveragePreview;
     entry: LibraryEntryResponse;
     issues: Array<LibraryIssue>;
-    review_events: Array<LibraryReviewEvent>;
-    review_state: LibraryReviewState;
     version: DefinitionResponse;
 };
 
@@ -815,15 +796,6 @@ export type ResolvedCase = {
     required: boolean;
 };
 
-export type ReviewLibraryVersionRequest = {
-    content_hash: string;
-    decision: LibraryReviewDecision;
-    expected_revision: number;
-    mutation_id: string;
-    purpose: ApprovalPurpose;
-    reason?: string | null;
-};
-
 export type RunArtifact = {
     attempt_id: string;
     byte_size: number;
@@ -874,7 +846,6 @@ export type SaveAuthoredTest = {
 };
 
 export type SaveAuthoredTestsRequest = {
-    expectations_confirmed: boolean;
     mutation_id: string;
     source_task_id?: string | null;
     tests: Array<SaveAuthoredTest>;
@@ -935,11 +906,6 @@ export type StepReceipt = {
 };
 
 export type StepState = 'started' | 'completed' | 'failed' | 'blocked' | 'inconclusive';
-
-export type SubmitLibraryDraftRequest = {
-    expected_revision: number;
-    mutation_id: string;
-};
 
 export type SuiteDefinition = {
     cases: Array<CaseSelection>;
@@ -2518,7 +2484,6 @@ export type ListTestLibraryData = {
     };
     query?: {
         kind?: DefinitionKind;
-        status?: LibraryReviewState;
         archived?: boolean;
         cursor?: string;
     };
@@ -2994,81 +2959,6 @@ export type GetTestLibraryDraftResponses = {
 
 export type GetTestLibraryDraftResponse = GetTestLibraryDraftResponses[keyof GetTestLibraryDraftResponses];
 
-export type ForkTestLibraryDraftData = {
-    body: ForkLibraryDraftRequest;
-    headers: {
-        'X-CSRF-Token': string;
-    };
-    path: {
-        app_id: string;
-        entry_id: string;
-    };
-    query?: never;
-    url: '/api/apps/{app_id}/test-library/{entry_id}/draft';
-};
-
-export type ForkTestLibraryDraftErrors = {
-    /**
-     * API error
-     */
-    400: ApiError;
-    /**
-     * API error
-     */
-    401: ApiError;
-    /**
-     * API error
-     */
-    403: ApiError;
-    /**
-     * API error
-     */
-    404: ApiError;
-    /**
-     * API error
-     */
-    409: ApiError;
-    /**
-     * API error
-     */
-    413: ApiError;
-    /**
-     * API error
-     */
-    422: ApiError;
-    /**
-     * API error
-     */
-    429: ApiError;
-    /**
-     * API error
-     */
-    500: ApiError;
-    /**
-     * API error
-     */
-    503: ApiError;
-    /**
-     * API error
-     */
-    default: ApiError;
-};
-
-export type ForkTestLibraryDraftError = ForkTestLibraryDraftErrors[keyof ForkTestLibraryDraftErrors];
-
-export type ForkTestLibraryDraftResponses = {
-    /**
-     * Mutation replay
-     */
-    200: LibraryDraftResponse;
-    /**
-     * Success
-     */
-    201: LibraryDraftResponse;
-};
-
-export type ForkTestLibraryDraftResponse = ForkTestLibraryDraftResponses[keyof ForkTestLibraryDraftResponses];
-
 export type SaveTestLibraryDraftData = {
     body: SaveLibraryDraftRequest;
     headers: {
@@ -3139,81 +3029,6 @@ export type SaveTestLibraryDraftResponses = {
 };
 
 export type SaveTestLibraryDraftResponse = SaveTestLibraryDraftResponses[keyof SaveTestLibraryDraftResponses];
-
-export type SubmitTestLibraryDraftData = {
-    body: SubmitLibraryDraftRequest;
-    headers: {
-        'X-CSRF-Token': string;
-    };
-    path: {
-        app_id: string;
-        entry_id: string;
-    };
-    query?: never;
-    url: '/api/apps/{app_id}/test-library/{entry_id}/submit';
-};
-
-export type SubmitTestLibraryDraftErrors = {
-    /**
-     * API error
-     */
-    400: ApiError;
-    /**
-     * API error
-     */
-    401: ApiError;
-    /**
-     * API error
-     */
-    403: ApiError;
-    /**
-     * API error
-     */
-    404: ApiError;
-    /**
-     * API error
-     */
-    409: ApiError;
-    /**
-     * API error
-     */
-    413: ApiError;
-    /**
-     * API error
-     */
-    422: ApiError;
-    /**
-     * API error
-     */
-    429: ApiError;
-    /**
-     * API error
-     */
-    500: ApiError;
-    /**
-     * API error
-     */
-    503: ApiError;
-    /**
-     * API error
-     */
-    default: ApiError;
-};
-
-export type SubmitTestLibraryDraftError = SubmitTestLibraryDraftErrors[keyof SubmitTestLibraryDraftErrors];
-
-export type SubmitTestLibraryDraftResponses = {
-    /**
-     * Mutation replay
-     */
-    200: LibraryVersionResponse;
-    /**
-     * Success
-     */
-    201: LibraryVersionResponse;
-};
-
-export type SubmitTestLibraryDraftResponse = SubmitTestLibraryDraftResponses[keyof SubmitTestLibraryDraftResponses];
 
 export type ListTestLibraryVersionsData = {
     body?: never;
@@ -3353,78 +3168,6 @@ export type GetTestLibraryVersionResponses = {
 };
 
 export type GetTestLibraryVersionResponse = GetTestLibraryVersionResponses[keyof GetTestLibraryVersionResponses];
-
-export type ReviewTestLibraryVersionData = {
-    body: ReviewLibraryVersionRequest;
-    headers: {
-        'X-CSRF-Token': string;
-    };
-    path: {
-        app_id: string;
-        entry_id: string;
-        version_id: string;
-    };
-    query?: never;
-    url: '/api/apps/{app_id}/test-library/{entry_id}/versions/{version_id}/review';
-};
-
-export type ReviewTestLibraryVersionErrors = {
-    /**
-     * API error
-     */
-    400: ApiError;
-    /**
-     * API error
-     */
-    401: ApiError;
-    /**
-     * API error
-     */
-    403: ApiError;
-    /**
-     * API error
-     */
-    404: ApiError;
-    /**
-     * API error
-     */
-    409: ApiError;
-    /**
-     * API error
-     */
-    413: ApiError;
-    /**
-     * API error
-     */
-    422: ApiError;
-    /**
-     * API error
-     */
-    429: ApiError;
-    /**
-     * API error
-     */
-    500: ApiError;
-    /**
-     * API error
-     */
-    503: ApiError;
-    /**
-     * API error
-     */
-    default: ApiError;
-};
-
-export type ReviewTestLibraryVersionError = ReviewTestLibraryVersionErrors[keyof ReviewTestLibraryVersionErrors];
-
-export type ReviewTestLibraryVersionResponses = {
-    /**
-     * Success
-     */
-    200: LibraryVersionResponse;
-};
-
-export type ReviewTestLibraryVersionResponse = ReviewTestLibraryVersionResponses[keyof ReviewTestLibraryVersionResponses];
 
 export type GetTestTemplatesData = {
     body?: never;

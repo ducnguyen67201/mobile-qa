@@ -7,9 +7,8 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, expect, it, vi } from 'vitest'
 import { routes } from '@/routes'
 import { theme } from '@/theme'
-import { app, appId, orgId, session, settings, timestamp, userId } from '@/test/fixtures'
+import { app, appId, orgId, session, settings, timestamp } from '@/test/fixtures'
 import {
-  capabilities,
   emptyCoverage,
   entryId,
   libraryCase,
@@ -25,11 +24,7 @@ import type {
   LibraryDraftResponse,
   LibraryVersionResponse,
 } from '@/api/generated/types.gen'
-import {
-  zCreateLibraryEntryRequest,
-  zReviewLibraryVersionRequest,
-  zSaveLibraryDraftRequest,
-} from '@/api/generated/zod.gen'
+import { zCreateLibraryEntryRequest, zSaveLibraryDraftRequest } from '@/api/generated/zod.gen'
 function show(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   const router = createMemoryRouter(routes, {
@@ -93,7 +88,7 @@ it('creates without a manual key and reuses the same generated identity after a 
   show('/tests')
   await userEvent.click(await screen.findByRole('button', { name: 'New case' }))
   expect(screen.queryByLabelText('Stable key')).not.toBeInTheDocument()
-  const create = screen.getByRole('button', { name: 'Create draft' })
+  const create = screen.getByRole('button', { name: 'Create test' })
   expect(create).toBeEnabled()
   await userEvent.click(create)
   await screen.findByRole('button', { name: 'Retry' })
@@ -123,7 +118,7 @@ it('authors before an APK is uploaded and opens the saved draft from the catalog
     false,
   )
 })
-it('saves explicit typed content, preserving incomplete drafts and disabling review until saved', async () => {
+it('saves explicit typed content, preserving incomplete drafts and without requiring review', async () => {
   let current: LibraryDraftResponse = structuredClone(libraryDraft)
   const savedBodies: unknown[] = []
   vi.stubGlobal(
@@ -154,17 +149,17 @@ it('saves explicit typed content, preserving incomplete drafts and disabling rev
   show(`/tests/${appId}/${entryId}`)
   await userEvent.clear(await screen.findByLabelText('Test name'))
   expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Request review' })).toBeDisabled()
+  expect(screen.queryByRole('button', { name: 'Request review' })).not.toBeInTheDocument()
   expect(savedBodies).toHaveLength(0)
-  await userEvent.click(screen.getByRole('button', { name: 'Save draft' }))
-  expect(await screen.findByText('Draft saved')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+  expect(await screen.findByText('Saved')).toBeInTheDocument()
   expect(screen.getByText('Give this test a descriptive title')).toBeInTheDocument()
   expect(savedBodies).toHaveLength(1)
   expect(savedBodies[0]).toMatchObject({
     expected_revision: 1,
     definition: { kind: 'case', content: { title: '' } },
   })
-  expect(screen.getByRole('button', { name: 'Request review' })).toBeDisabled()
+  expect(screen.queryByRole('button', { name: 'Request review' })).not.toBeInTheDocument()
 })
 it('preserves a stale editor, compares saved fields and requires an explicit revision choice', async () => {
   let reads = 0
@@ -202,10 +197,10 @@ it('preserves a stale editor, compares saved fields and requires an explicit rev
   const title = await screen.findByLabelText('Test name')
   await userEvent.clear(title)
   await userEvent.type(title, 'My carefully edited title')
-  await userEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }))
   expect(await screen.findByText('A newer revision was saved')).toBeInTheDocument()
   expect(title).toHaveValue('My carefully edited title')
-  expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   await userEvent.click(screen.getByRole('button', { name: 'Compare with saved draft' }))
   const dialog = await screen.findByRole('dialog', { name: 'Your changes and the saved draft' })
   expect(within(dialog).getByText('My carefully edited title')).toBeInTheDocument()
@@ -215,8 +210,8 @@ it('preserves a stale editor, compares saved fields and requires an explicit rev
   )
   expect(savedRequests).toHaveLength(1)
   expect(title).toHaveValue('My carefully edited title')
-  await userEvent.click(screen.getByRole('button', { name: 'Save draft' }))
-  expect(await screen.findByText('Draft saved')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+  expect(await screen.findByText('Saved')).toBeInTheDocument()
   expect(savedRequests[1]).toMatchObject({
     expected_revision: 2,
     definition: { content: { title: 'My carefully edited title' } },
@@ -238,102 +233,25 @@ it('keeps expected results when an action is removed and warns before leaving an
   await userEvent.click(await screen.findByRole('button', { name: 'Discard changes and leave' }))
   expect(await screen.findByRole('heading', { name: 'Tests', level: 1 })).toBeInTheDocument()
 })
-it('binds two independent review decisions to the displayed exact hash and revision', async () => {
-  let current: LibraryVersionResponse = structuredClone(libraryVersion)
-  const decisions: unknown[] = []
+it('opens previously frozen content in the current editor without review controls', async () => {
   vi.stubGlobal(
     'fetch',
     fixtureFetch(async (request) => {
       const path = new URL(request.url).pathname
-      if (path.endsWith(`/test-library/${entryId}`)) return Response.json(current.entry)
-      if (path.endsWith(`/versions/${versionId}`)) return Response.json(current)
-      if (path.endsWith('/review')) {
-        const body = zReviewLibraryVersionRequest.parse(await request.json())
-        decisions.push(body)
-        const state = body.purpose === 'executability' ? 'approved' : 'in_review'
-        current = {
-          ...current,
-          entry: {
-            ...current.entry,
-            revision: current.entry.revision + 1,
-            latest_review_state: state,
-          },
-          review_state: state,
-          version: {
-            ...current.version,
-            approvals: [
-              ...current.version.approvals,
-              {
-                purpose: body.purpose,
-                actor_id: userId,
-                content_hash: body.content_hash,
-                approved_at: timestamp,
-              },
-            ],
-          },
-          review_events: [
-            ...current.review_events,
-            {
-              id: crypto.randomUUID(),
-              actor_id: userId,
-              actor_name: 'Synthetic Reviewer',
-              purpose: body.purpose,
-              decision: body.decision,
-              content_hash: body.content_hash,
-              reason: null,
-              created_at: timestamp,
-            },
-          ],
-        }
-        return Response.json(current)
-      }
+      if (path.endsWith(`/test-library/${entryId}`)) return Response.json(libraryVersion.entry)
+      if (path.endsWith('/draft'))
+        return Response.json({
+          ...libraryDraft,
+          entry: libraryVersion.entry,
+          saved_version_id: versionId,
+        })
     }),
   )
-  show(`/tests/${appId}/${entryId}/versions/${versionId}`)
-  await userEvent.click(await screen.findByRole('button', { name: 'Approve business' }))
-  await waitFor(() =>
-    expect(screen.queryByRole('button', { name: 'Approve business' })).not.toBeInTheDocument(),
-  )
-  await userEvent.click(await screen.findByRole('button', { name: 'Approve executability' }))
-  await waitFor(() =>
-    expect(screen.queryByRole('button', { name: 'Approve executability' })).not.toBeInTheDocument(),
-  )
-  expect(decisions).toHaveLength(2)
-  expect(decisions[0]).toMatchObject({
-    expected_revision: 2,
-    purpose: 'business',
-    content_hash: libraryVersion.version.content_hash,
-  })
-  expect(decisions[1]).toMatchObject({
-    expected_revision: 3,
-    purpose: 'executability',
-    content_hash: libraryVersion.version.content_hash,
-  })
-  expect(screen.queryByLabelText('Test name')).not.toBeInTheDocument()
-})
-it('explains missing review authority instead of presenting approval buttons', async () => {
-  const version: LibraryVersionResponse = {
-    ...libraryVersion,
-    entry: {
-      ...libraryVersion.entry,
-      capabilities: {
-        ...capabilities,
-        can_review_business: false,
-        can_review_executability: false,
-      },
-    },
-  }
-  vi.stubGlobal(
-    'fetch',
-    fixtureFetch(async (request) => {
-      if (new URL(request.url).pathname.endsWith(`/versions/${versionId}`))
-        return Response.json(version)
-    }),
-  )
-  show(`/tests/${appId}/${entryId}/versions/${versionId}`)
-  expect(await screen.findByText(/An explicitly authorized business reviewer/)).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Approve business' })).not.toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Approve executability' })).not.toBeInTheDocument()
+  show(`/tests/${appId}/${entryId}`)
+  expect(await screen.findByLabelText('Test name')).toHaveValue(libraryCase.title)
+  expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  expect(screen.queryByText('Two reviews, one exact version')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Request review' })).not.toBeInTheDocument()
 })
 it('restores an archived draft-only entry without requiring a frozen version', async () => {
   let current: LibraryDraftResponse = {
@@ -356,7 +274,7 @@ it('restores an archived draft-only entry without requiring a frozen version', a
   await userEvent.click(await screen.findByRole('button', { name: 'Restore entry' }))
   const dialog = await screen.findByRole('dialog', { name: 'Restore this entry?' })
   await userEvent.click(within(dialog).getByRole('button', { name: 'Restore entry' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled())
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
 })
 it('keeps plan authoring available with no profile and no uploaded build', async () => {
   const draft: LibraryDraftResponse = {
@@ -395,12 +313,12 @@ it('keeps plan authoring available with no profile and no uploaded build', async
   show(`/tests/${appId}/${entryId}`)
   expect(await screen.findByLabelText('Release plan title')).toHaveValue('Release check')
   expect(screen.getByRole('combobox', { name: 'Execution profile' })).toHaveValue('')
-  expect(screen.getByRole('button', { name: 'Request review' })).toBeDisabled()
-  expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled()
+  expect(screen.queryByRole('button', { name: 'Request review' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   expect(requests.mock.calls.some(([r]) => new URL(r.url).pathname.endsWith('/builds'))).toBe(false)
 })
-it('changes a pinned case version only when the author explicitly chooses the newer approval', async () => {
-  const old: LibraryVersionResponse = { ...libraryVersion, review_state: 'approved' }
+it('changes a pinned case version only when the author explicitly chooses the newer saved version', async () => {
+  const old: LibraryVersionResponse = { ...libraryVersion }
   const newer: LibraryVersionResponse = {
     ...old,
     version: {
@@ -428,7 +346,7 @@ it('changes a pinned case version only when the author explicitly chooses the ne
     fixtureFetch(async (request) => {
       const path = new URL(request.url).pathname
       if (path.endsWith('/options'))
-        return Response.json({ ...libraryOptions, approved_versions: [old, newer] })
+        return Response.json({ ...libraryOptions, saved_versions: [old, newer] })
       if (path.endsWith(`/test-library/${entryId}`)) return Response.json(draft.entry)
       if (path.endsWith('/draft')) {
         if (request.method === 'PUT') {
@@ -443,9 +361,9 @@ it('changes a pinned case version only when the author explicitly chooses the ne
   show(`/tests/${appId}/${entryId}`)
   expect(await screen.findByText(`${libraryCase.title} · v1`)).toBeInTheDocument()
   expect(requests).toHaveLength(0)
-  await userEvent.click(screen.getByRole('button', { name: 'Use newer approved v2' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Use newer saved v2' }))
   expect(screen.getByText(`${libraryCase.title} · v2`)).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }))
   await waitFor(() => expect(requests).toHaveLength(1))
   expect(requests[0]).toMatchObject({
     definition: {
@@ -456,14 +374,13 @@ it('changes a pinned case version only when the author explicitly chooses the ne
     },
   })
 })
-it('runs the selected reviewed plan and follows its simulated report', async () => {
+it('runs the selected saved plan and follows its simulated report', async () => {
   const { build, buildId } = await import('@/test/fixtures')
   const { zCreateRunRequest } = await import('@/api/generated/zod.gen')
   const { zRunResponse } = await import('@/api/generated/zod.gen')
   const plan: LibraryVersionResponse = {
     ...libraryVersion,
-    review_state: 'approved',
-    entry: { ...libraryVersion.entry, kind: 'plan', latest_review_state: 'approved' },
+    entry: { ...libraryVersion.entry, kind: 'plan' },
     version: {
       ...libraryVersion.version,
       definition: {
@@ -588,8 +505,6 @@ it.each(['failed refresh', 'submitted elsewhere'])(
       await screen.findByText('Saved status could not be refreshed. Your editor is preserved.'),
     ).toBeInTheDocument()
     expect(screen.getByLabelText('Test name')).toHaveValue('Local work must survive')
-    if (scenario === 'submitted elsewhere')
-      expect(screen.getByText('This draft was submitted elsewhere')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('link', { name: 'Back to test library' }))
     expect(
       await screen.findByRole('dialog', { name: 'Leave unsaved changes?' }),

@@ -263,7 +263,7 @@ organization differs from the selected workspace before loading builds/uploads.
 
 This branch retains main's Mantine dashboard, sign-in, workspace and APK intake flows.
 Use `just dev` for that application and `just device-local-agent MODEL` for the
-standalone demo runner. Phase 04 Tests/Runs now dispatch approved API jobs to a registered execution worker. An accepted uploaded
+standalone demo runner. Phase 04 Tests/Runs now dispatch saved, validated API jobs to a registered execution worker. An accepted uploaded
 build is not an automatically executable test and device readiness remains separate.
 
 `just setup-android` supplies intake Build Tools 36.0.0; `just device-local-setup`
@@ -282,9 +282,8 @@ it is never claimed as a runnable Android application.
 
 Operator commands use the existing Loco task entry from apps/api:
 `cargo loco task execution action:import actor:<uuid> app:<uuid> file:<absolute-json>`.
-The JSON contains the case/suite/plan tagged definition only. Use `grant-reviewer`
-with `user` and `purpose:business|executability`; then `approve` with `definition`,
-`hash` and `purpose`. `register-profile` reads a nonsecret profile JSON; `register-worker`
+The JSON contains the case/suite/plan tagged definition only. Imports create saved
+versions directly; reviewer grants and approval commands have been removed. `register-profile` reads a nonsecret profile JSON; `register-worker`
 takes `worker`/`profile` UUIDs and an injected token. `action:reconcile` marks expired
 leases for recovery; `action:recover` requires actor/app/attempt and a physical-reset
 evidence reference. Recovery is an operator assertion after stopping the old process
@@ -330,8 +329,8 @@ does not provision that host or start a worker daemon for you.
    `driver: minitap`, `adapter: demo_persistence_v1`, `package: ai.mobileqa.demo`,
    the exact same model/image and at most 104857600 APK bytes. Qualification must
    reference real evidence; do not label an unqualified host qualified just to run.
-3. Use the execution maintenance commands above to import/review
-   `contracts/fixtures/execution/persistence-case.json`, import/review a plan
+3. Use the execution maintenance commands above to import/save
+   `contracts/fixtures/execution/persistence-case.json`, import/save a plan
    selecting that case and real profile, and register a worker for that app/profile.
    Inject the same `MOBILE_QA_WORKER_TOKEN` into registration and worker processes
    through Doppler. Backend origins belong to the demo fixture; customer account
@@ -344,7 +343,7 @@ does not provision that host or start a worker daemon for you.
      /absolute/private/execution-state /absolute/path/profile.toml
    ```
 
-5. Submit the approved plan/build using the dashboard Run button, or the normal
+5. Submit the saved plan/build using the dashboard Run button, or the normal
    authenticated `POST /api/apps/{app_id}/runs` endpoint with an Idempotency-Key
    and body `{"build_id":"BUILD_UUID","plan_version_id":"PLAN_UUID",
 "environment_revision":1}`. Browser session, CSRF and app membership checks
@@ -374,12 +373,13 @@ and worker fixtures on the owned test API port. It performs customer mutations
 through HTTP, checks exact retries and restarts, and never consumes Doppler secrets
 or starts an emulator. Preserve existing local development processes.
 
-For an allowed browser acceptance: Tests → app → new case or controlled demo template
-→ Save → Request review → both explicitly granted reviews → suite/release plan →
-review → Set as default → choose a build → Run → report. An operator must already
-register a compatible qualified profile and grant the reviewer purposes. Customer
-apps without a qualified adapter can be authored and receive business review;
-automatic execution remains blocked with a visible readiness explanation.
+For an allowed browser acceptance: Tests → app → new case or template → Save →
+suite/release plan → Save → Set as default → choose a build → Run → report. An operator
+must register a compatible qualified profile. Apps without a qualified adapter can
+be saved; automatic execution remains blocked with a visible readiness explanation.
+Existing In review entries open editable; historical links remain read-only.
+Upgrade with normal forward migrations and refresh the browser. No database reset
+or reviewer provisioning is needed. Spec 05 documents legacy mutation retry behavior.
 
 The existing browser admin-policy restriction is binding. Source design review,
 DOM tests and HTTP acceptance must be reported separately from rendered/device proof.

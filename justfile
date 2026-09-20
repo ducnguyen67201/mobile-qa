@@ -117,7 +117,7 @@ smoke-execution:
 dev-execution-real origin profile_id state profile:
     uv run --no-sync --project apps/mobile-worker --frozen mobile-qa-worker execution-worker --origin {{quote(origin)}} --profile-id {{quote(profile_id)}} --state {{quote(state)}} --profile {{quote(profile)}}
 
-# Full author/review/default/run HTTP flow; fake Python evidence, no phone or secrets.
+# Full save/default/run HTTP flow; fake Python evidence, no phone or secrets.
 smoke-test-library:
     python3 scripts/test_library_smoke.py
 

@@ -1,4 +1,4 @@
-"""Real HTTP author/review/run persistence with synthetic device evidence.
+"""Real HTTP save/run persistence with synthetic device evidence.
 
 Use worker device acceptance separately: this fixture cannot prove emulator behavior.
 """

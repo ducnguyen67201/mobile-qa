@@ -12,13 +12,13 @@ product draft, not every later technical change. [System architecture](system.md
 
 ## 1. Product decision
 
-Build a web application backed by an operated mobile QA service. Customers provide a test build, test account, and important user journeys. We help them turn that input into an approved test suite, run it on subsequent builds, and deliver evidence that explains which checks passed, failed, or could not be completed.
+Build a web application backed by an operated mobile QA service. Customers provide a test build, test account, and important user journeys. We help them turn that input into a saved test suite, run it on subsequent builds, and deliver evidence that explains which checks passed, failed, or could not be completed.
 
 Working architecture: reuse Minitap mobile-use for device interaction; use OpenAI models for structured drafting and evidence interpretation; use ordinary application code for scheduling, state transitions, permissions, and result aggregation. OpenAI Agents SDK is optional, not required for the first version.
 
 The customer buys a repeatable release check with someone responsible for reviewing findings. The interface supports that service. It should not require the customer to become a test automation engineer.
 
-Initial target: a small mobile team releasing frequently without a dedicated automation specialist. Buyer hypothesis: founder or engineering lead; daily user: developer; initial operator and report reviewer: our team. The customer owns approval of business expectations. This is a proposed segment, not a validated customer profile.
+Initial target: a small mobile team releasing frequently without a dedicated automation specialist. Buyer hypothesis: founder or engineering lead; daily user: developer; initial operator and report reviewer: our team. The customer owns business expectations and chooses which tests to save. This is a proposed segment, not a validated customer profile.
 
 Initial delivery boundary: Android APKs, one approved emulator configuration, a test backend, and about 5–10 critical journeys per pilot app. Physical Android is a separately qualified configuration. iOS is a follow-on decision unless the first paying pilot requires it. Emulator results must be labeled as such.
 
@@ -31,7 +31,7 @@ No named customer, measured current testing cost, signed pilot, or willingness-t
 | Pain                           | Likely current workaround, to verify            | Product response                                         | Pilot measurement                      |
 | ------------------------------ | ----------------------------------------------- | -------------------------------------------------------- | -------------------------------------- |
 | Setup takes effort             | Developer installs builds and maintains devices | Guided build intake and managed execution                | Operator/customer setup minutes        |
-| Regression work repeats        | Someone taps through a checklist each release   | Save approved cases and rerun them                       | Human minutes per release before/after |
+| Regression work repeats        | Someone taps through a checklist each release   | Save cases and rerun them                                | Human minutes per release before/after |
 | Nobody knows what was covered  | Ad hoc checks and messages                      | Plan manifest with explicit included and excluded checks | Missing critical journeys identified   |
 | Failures are hard to reproduce | Screenshot or vague bug message                 | Evidence linked to build, case, device, and attempt      | Time from report to reproduced bug     |
 | Tests get stale                | Fix scripts or skip checks                      | Propose versioned changes for review                     | Review effort and stale-case count     |
@@ -46,12 +46,12 @@ Premises for this draft: repeatable regression is the first product; test genera
 | US-01 | As a developer, I want to register my app and upload a build so testing can start without installing a framework. | Identify app/package and build checksum; reject unsupported/corrupt files; report install/preflight errors separately from test failures.                                                |
 | US-02 | As a product owner, I want to explain what must work so tests reflect intended behavior.                          | Accept pasted stories and acceptance criteria; preserve source versions; highlight missing prerequisites and unclear expectations.                                                       |
 | US-03 | As a QA operator, I want AI to draft tests so I can review instead of starting from a blank page.                 | Each draft has a source, expected outcome, prerequisites, test data needs, and verification method; unsupported claims are marked as assumptions.                                        |
-| US-04 | As a reviewer, I want to edit and approve cases so the AI cannot define correctness by itself.                    | Drafts cannot enter normal regression runs; approvals record actor/time/version; edits to approved content create a new draft version.                                                   |
+| US-04 | As a tester, I want to edit and save cases without a separate approval workflow.                                  | Complete saves create immutable usable versions; incomplete edits remain saved; old runs retain exact pinned content.                                                                    |
 | US-05 | As a developer, I want suites for onboarding, login, and other features so tests are reusable.                    | Add/remove/reorder case references; allow one case in several suites; prevent duplicate execution of the same case variant in one plan.                                                  |
 | US-06 | As a release owner, I want a test plan so I know exactly what this release check includes.                        | Save coverage, environment policy, suites/cases, device configuration, required checks, budgets, and retry policy; bind a build when starting a run and preview resolved cases and gaps. |
 | US-07 | As a developer, I want visible run progress so I know whether to wait or intervene.                               | Show queued/running/finished states, current case, elapsed time, cancellation, and setup blockers; disconnecting the browser does not lose the job.                                      |
 | US-08 | As a developer, I want an evidence-based failure report so I can reproduce and fix the issue.                     | Show expected/actual, failed check, exact attempt, screenshots/video where available, logs, build/device identifiers, and replayable instructions.                                       |
-| US-09 | As a release owner, I want to rerun the suite on a new build so I can detect regressions.                         | Pin approved versions; preserve old results; distinguish comparable changes from new/changed tests and environment differences.                                                          |
+| US-09 | As a release owner, I want to rerun the suite on a new build so I can detect regressions.                         | Pin saved versions; preserve old results; distinguish comparable changes from new/changed tests and environment differences.                                                             |
 | US-10 | As a reviewer, I want to triage findings without erasing evidence.                                                | Confirm bug, expected behavior, duplicate, or needs investigation; keep machine outcome and original artifacts immutable.                                                                |
 | US-11 | As a customer, I want my app and credentials accessible only to authorized people.                                | Project-scoped access controls cover metadata, builds, run controls, and artifacts; secrets are references, never embedded in cases or exported reports.                                 |
 | US-12 | As an operator, I want bounded jobs so one broken app cannot consume unlimited time or money.                     | Enforce time/step/token budgets outside model prompts; preserve partial evidence; use an explicit inconclusive result when limits are reached.                                           |
@@ -93,7 +93,7 @@ flowchart TD
     K --> F[Findings and human triage]
 ```
 
-Plans reference approved suite and case versions. At run creation, bind the chosen build and actual environment revision, then resolve all memberships into explicit case-version IDs, data-variant IDs, and device configurations. Later edits cannot alter that manifest. In this MVP, "test plan" and "release check template" name the same reusable object; a run manifest is its build-bound snapshot. Updating the build alone needs no case reapproval; changing required coverage or environment policy creates a new plan version for review. Selecting newer approved cases also creates a new plan version, avoiding silent scope changes.
+Plans reference saved suite and case versions. At run creation, bind the chosen build and actual environment revision, then resolve all memberships into explicit case-version IDs, data-variant IDs, and device configurations. Later edits cannot alter that manifest. In this MVP, "test plan" and "release check template" name the same reusable object; a run manifest is its build-bound snapshot. Updating the build alone needs no new test version. Saving changed coverage or environment policy creates a new immutable plan version. Selecting newer saved cases is explicit, avoiding silent scope changes.
 
 The deduplication key is `(case_version_id, data_variant_id, device_configuration_id)`. If two selected suites contain the same case variant, run it once. If versions of the same logical case conflict, require selection rather than silently running or dropping one. Case ordering is for readability and cost planning; cases must not depend on an earlier case having passed.
 
@@ -107,7 +107,7 @@ Each expected check specifies its verification method: exact UI/property compari
 
 Keep semantic actions such as “enter the invalid password and submit” in the case. Runtime coordinates and selectors belong in the execution trace. They can be execution hints; changing them must not relax the approved expected behavior.
 
-Lifecycle: Draft → Needs clarification or Ready for review → Approved → Deprecated. Only immutable Approved versions can be used for release regression. A superseding version does not delete the earlier one. Reviewed exploratory draft trials are explicitly marked discovery and cannot produce a release-passing summary.
+Lifecycle: Edit → Save → Run. Incomplete content stays editable and shows setup issues; complete saves create immutable versions usable for release regression. A superseding version never deletes earlier history. Exploratory trials remain separate from release summaries.
 
 ### Test suite
 
@@ -119,9 +119,9 @@ Suite generation proposes memberships and an explanation. Creating 50 cases does
 
 Required fields: ID/version, objective, compatible app/package and build-selection rules, environment policy, suite/case selections, device matrix, required check list, exclusions with rationale, preflight requirements, execution budget, retry policy, reviewer/owner, baseline-selection rule if supplied, and result aggregation policy. The build ID, actual environment revision, and chosen baseline-run ID are bound in each run manifest.
 
-Plan lifecycle: Draft → Ready for review → Approved → Deprecated. Only approved versions launch release runs. Baseline selection is explicit; the system may propose the latest comparable run but never silently replace a customer-accepted baseline. Suite membership changes likewise create a new version; approval resolves all member cases and required-check mappings.
+Plan lifecycle: Edit → Save → Run. Technically valid saved versions launch release runs. Baseline selection is explicit; the system may propose the latest comparable run but never silently replace a customer-accepted baseline. Suite membership changes likewise create a new version; save validation resolves member cases and required-check mappings.
 
-The MVP UI should offer a default “Release check” template. The operator should not have to create all these objects manually for each run. The app proposes the plan, displays the selected cases and gaps, and asks the authorized reviewer to confirm its scope.
+The MVP UI should offer a default “Release check” template. The operator should not have to create all these objects manually for each run. The app proposes the plan, displays the selected cases and gaps, and lets an authorized user save its scope.
 
 ## 6. Worked example: intended behavior to repeatable tests
 
@@ -191,19 +191,19 @@ Code checks required fields, references, capability compatibility, budgets, secr
 
 Generate suite suggestions by feature and a small smoke selection by customer-designated critical criteria. Generate a draft plan using approved capabilities and explicit exclusions. Draft plans stay non-executable until their required cases and prerequisites are approved and ready.
 
-### Stage 6: Human review and baseline trial
+### Stage 6: Save and baseline trial
 
-Show original source, generated case, assumptions, and expected evidence side by side. Reviewer edits, accepts, rejects, or requests clarification. Record case version and approval. A technical baseline trial checks executability and evidence collection; it does not prove the app's behavior is correct.
+Show original source, generated case, assumptions, and expected evidence side by side. The tester edits and saves selected tests. Record immutable case versions without a separate approval step. A technical baseline trial checks executability and evidence collection; it does not prove the app's behavior is correct.
 
-Approving a case defines an expectation. Approving a clean baseline establishes that those checks passed on a specified build/environment. These are separate actions. Failed or inconclusive trials remain visible and are never silently used as a passing baseline.
+Saving a case defines an expectation. Accepting a clean baseline establishes that those checks passed on a specified build/environment. These are separate actions. Failed or inconclusive trials remain visible and are never silently used as a passing baseline.
 
 ### Stage 7: Persist and maintain
 
-Persist approved cases/suites/plan versions and an explicit coverage map. On new requirements or navigation failures, propose a diff: added scenario, changed prerequisite, changed navigation hint, or changed expected outcome. Expected-outcome changes always require review. Existing runs and findings keep their historical context.
+Persist saved case/suite/plan versions and an explicit coverage map. On new requirements or navigation failures, propose a diff: added scenario, changed prerequisite, changed navigation hint, or changed expected outcome. Expected-outcome changes create a new saved version. Existing runs and findings keep their historical context.
 
 ## 8. Execution and result rules
 
-1. Resolve and freeze the approved plan. Check project access and idempotency; repeated submission of the same request does not create duplicate jobs.
+1. Resolve and freeze the saved plan. Check project access and idempotency; repeated submission of the same request does not create duplicate jobs.
 2. Reserve one healthy worker/device using a lease. Install the exact build and apply fixtures. One device runs one case at a time.
 3. Execute a bounded case request through the mobile-use adapter. The adapter returns observations and artifacts; its success statement is not the final test verdict.
 4. Evaluate each required check against recorded evidence. Prefer deterministic UI/property or customer-configured read-only backend checks. Visual checks may use an OpenAI model but must be labeled visual judgment. If evidence is ambiguous, require review.
@@ -313,7 +313,7 @@ Record runtime, device minutes, model token usage where available, retries, stor
 | B. Agents SDK coordinator + mobile-use                    | Medium / medium   | Better fit for later cross-system workflows; reusable orchestration/tracing | Two orchestration layers; more integration/state boundaries            | Existing executor plus SDK                  |
 | C. Custom mobile agent on device tools                    | Largest / high    | Full control; potential long-term specialized verifier                      | Must develop navigation/recovery and evaluate reliability ourselves    | Device drivers and SDK tools                |
 
-Approach A is the engineering baseline. Customer-specific expectations and pilot scope still require the approval rules in Section 19. No timetable is promised before the device feasibility check.
+Approach A is the engineering baseline. Customer-specific expectations and pilot scope remain owned by the customer; Section 19 describes saving and technical admission. No timetable is promised before the device feasibility check.
 
 ## 14. MVP boundary
 
@@ -329,8 +329,8 @@ These deferrals restrict initial coverage. They must be visible in pilot proposa
 | -------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | M0: Pre-build agreement    | This specification, sample suite, default plan, named pilot owner, scope and acceptance criteria             | Stakeholders understand the promise and unsupported features                                                                                          |
 | M1: Feasibility            | Pin mobile-use revision; execute/reset/record one real journey on intended worker and pilot-compatible build | At least one clean pass, deliberate app failure, and unavailable-prerequisite result correctly distinguished; actual event formats and costs recorded |
-| M2: One vertical workflow  | Upload build → run one manually authored approved case → evidence report                                     | Durable job, cancellation, failure handling, and authorization work end to end                                                                        |
-| M3: Test library and plans | Cases/suites/plan versions, approvals, manifests, fixture/data references                                    | Historical runs unchanged by edits; duplicates resolved; unresolved cases block normal runs                                                           |
+| M2: One vertical workflow  | Upload build → run one manually authored saved case → evidence report                                        | Durable job, cancellation, failure handling, and authorization work end to end                                                                        |
+| M3: Test library and plans | Cases/suites/plan versions, saves, manifests, fixture/data references                                        | Historical runs unchanged by edits; duplicates resolved; unresolved cases block normal runs                                                           |
 | M4: Generation             | Requirements → draft cases/suites/plan → review                                                              | Source links, assumptions, validation, partial-error handling, and duplicate suggestions work                                                         |
 | M5: Regression and triage  | New build comparison, retries, findings, coverage gaps                                                       | Correct comparison categories and no false green from mixed/incomplete results                                                                        |
 | M6: Operated pilot         | One customer app, scoped report, repeat release, cost log                                                    | Customer can act on findings; review effort and cost measured; renewal decision requested                                                             |
@@ -363,34 +363,31 @@ Dependencies: one authorized test app/build; test backend and seed/reset approac
 
 ## 18. Open questions and proposed defaults
 
-| Question                                    | Working default                                                                                  | Resolution point                  |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------- |
-| Who is the first customer and app?          | Small mobile team; not yet named                                                                 | Before pilot scope is sold        |
-| Android or iOS required first?              | Android                                                                                          | Before M1 device selection        |
-| What is the test-data/reset contract?       | Customer staging account plus explicit reset/seed procedure                                      | Before approving executable cases |
-| Must results prove backend state?           | Only where a read-only verification interface is supplied; otherwise disclose UI-only scope      | Per-case approval                 |
-| Which model and mobile-use revision?        | Evaluate a compatible pinned combination                                                         | M1                                |
-| What price and service commitment?          | Fixed-scope paid pilot with usage limits; US$500 hypothesis in Section 20, not a validated price | After measured pilot workload     |
-| What does the customer permit us to record? | Synthetic data and restricted artifacts                                                          | Before customer testing           |
-| When is iOS added?                          | After Android pilot, unless an actual buyer requires it                                          | Sales and feasibility evidence    |
+| Question                                    | Working default                                                                                  | Resolution point               |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------ |
+| Who is the first customer and app?          | Small mobile team; not yet named                                                                 | Before pilot scope is sold     |
+| Android or iOS required first?              | Android                                                                                          | Before M1 device selection     |
+| What is the test-data/reset contract?       | Customer staging account plus explicit reset/seed procedure                                      | Before running release cases   |
+| Must results prove backend state?           | Only where a read-only verification interface is supplied; otherwise disclose UI-only scope      | Per-case setup                 |
+| Which model and mobile-use revision?        | Evaluate a compatible pinned combination                                                         | M1                             |
+| What price and service commitment?          | Fixed-scope paid pilot with usage limits; US$500 hypothesis in Section 20, not a validated price | After measured pilot workload  |
+| What does the customer permit us to record? | Synthetic data and restricted artifacts                                                          | Before customer testing        |
+| When is iOS added?                          | After Android pilot, unless an actual buyer requires it                                          | Sales and feasibility evidence |
 
 Physical-iPhone support is unverified: the inspected upstream README says unsupported while current code includes WebDriverAgent integration. Do not promise production readiness from either source alone.
 
-## 19. Approval ownership
+## 19. Test ownership and saving
 
-The customer appoints a business owner and may explicitly delegate approval to a named person. Our operator cannot infer that delegation from access to a build. Administrative control over our infrastructure does not confer authority to change the customer's requirements.
+App members choose the business expectations they save. The application does not require
+business or executability reviewers, grants or approvals. Saving complete content creates
+an immutable version; editing it creates a newer version while plans and reports retain
+their explicit pins. Incomplete content remains saved with setup issues.
 
-| Decision                                | Customer business/release owner  | Our QA operator                                    | Application                                       |
-| --------------------------------------- | -------------------------------- | -------------------------------------------------- | ------------------------------------------------- |
-| Intended behavior and criterion changes | Accountable approver             | Drafts and flags gaps                              | Records actor, source, version                    |
-| Case business expectations              | Approves or explicitly delegates | Proposes evidence/check mapping                    | Prevents unapproved release execution             |
-| Case execution readiness                | Consulted on required fixtures   | Approves setup, capabilities, evidence feasibility | Enforces both expectation and readiness approvals |
-| Plan scope and exclusions               | Approves                         | Proposes selection/budget                          | Freezes approved versions                         |
-| Baseline acceptance                     | Accepts scoped baseline          | Reviews evidence and prerequisites                 | Preserves machine outcomes                        |
-| Report evidence quality                 | Receives and questions findings  | Reviews and signs delivery                         | Aggregates stored facts                           |
-| Release despite a failure / waiver      | Sole release decision owner      | Advises and records rationale                      | Never converts failure into pass                  |
-
-A case becomes Approved only after both expectation approval and technical-readiness approval; one designated person may legitimately perform both, with both acts recorded. Customer-delegated approval and its scope are audited.
+Technical validation still checks references, required evidence, compatibility and budgets.
+Operators control device qualification, archive/restore and default-plan selection.
+A successful Save is neither a passing result nor customer release approval. Customer
+release decisions and report triage remain separate from test persistence. Historical
+approval records are retained as audit evidence, not consulted for current admission.
 
 ## 20. Proposed pilot package
 
@@ -410,7 +407,7 @@ Candidate reference profile to qualify in M1: Android 15 / API 35 emulator; 1080
 
 Pilot apps must install on that exact profile and operate against the approved test backend. A Google APIs image does not establish support for Play Store billing or production attestation. Exclude hardware-dependent flows, SIM/SMS MFA, biometrics, Bluetooth/NFC/camera requirements, real payments, device-integrity/anti-automation requirements, and unsupported external authentication until separately qualified. Cases needing those features remain visible as unsupported, not passed. Permissions are declared per case and restored before each attempt; local app reset alone is not a backend reset.
 
-Hard intake gate before executable-case approval:
+Hard intake gate before release execution:
 
 - Known app/package, compatible APK, reachable allowlisted test backend, and designated customer recovery owner.
 - Credential references and account inventory, documented MFA behavior, rate limits, lockout policy, and permitted test mutations.
@@ -424,7 +421,7 @@ Hard intake gate before executable-case approval:
 | ------------------------------------------------------------- | ------------------------------------- | ------------------------------------- |
 | Operator-provisioned project and access; APK intake           | Self-service onboarding               | Broad connectors and repo analysis    |
 | Pasted requirements; generated case drafts; source references | Richer requirement import and review  | Autonomous large-scale discovery      |
-| Minimal versioned case/suite/plan forms and approvals         | Bulk editing and suite management     | Multiple runner backends              |
+| Minimal versioned case/suite/plan forms and Save              | Bulk editing and suite management     | Multiple runner backends              |
 | One reusable plan; fixed qualified device; manifest per run   | More templates and qualified profiles | iOS/physical device fleet             |
 | Manually authored cases before generation rollout             | Optional bounded discovery UI         | Fully autonomous suite maintenance    |
 | Basic previous-run comparison table and findings              | Trends, advanced comparison dashboard | Automatic defect fixing               |

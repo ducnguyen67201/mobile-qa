@@ -4,7 +4,7 @@ Status: canonical implementation roadmap. Spec 01 foundation and spec 03 local a
 are implemented. Spec 02 has verified local ADB and one live Minitap demo; the full
 reliability campaign and cloud qualification remain open. Spec 04 is locally implemented
 with simulated HTTP and one real API-to-emulator good-path run verified; browser,
-live fault/reliability and hosted acceptance remain open. Spec 05 authoring/review/default-plan source and simulated HTTP acceptance are locally
+live fault/reliability and hosted acceptance remain open. Spec 05 save/versioning/default-plan source and simulated HTTP acceptance are locally
 implemented; rendered UI and UI-triggered real-device acceptance remain open. See its
 [current status](../status.md).
 Spec 06 task-session source is locally implemented; its direct-execution, template and
@@ -17,7 +17,7 @@ This roadmap owns sequencing; [system architecture](../system.md), [contracts](.
 
 ## Outcome
 
-A customer uploads an Android test APK, supplies important journeys and a test account, reviews proposed tests, and runs an approved regression plan. The report shows expected versus observed behavior, evidence, and everything that could not be checked. Our team operates onboarding and reviews findings during the pilot.
+A customer uploads an Android test APK, supplies important journeys and a test account, reviews proposed tests, and runs a saved regression plan. The report shows expected versus observed behavior, evidence, and everything that could not be checked. Our team operates onboarding and reviews findings during the pilot.
 
 The first engineering milestone is smaller: **one manually authored test, one cloud Android emulator, and an evidence report that distinguishes a pass, a real defect, and an unavailable prerequisite.** AI test generation comes after this works.
 
@@ -48,7 +48,7 @@ Runnable applications live under `apps/api`, `apps/web` and `apps/mobile-worker`
 | 2     | [Cloud phone and execution feasibility](02-cloud-phone-and-feasibility.md) | Real emulator runs a fixed case and captures trustworthy evidence                  |
 | 3     | [App setup and first UI/backend slice](03-app-setup-and-ui-backend.md)     | Sign in, create app, upload APK, see real readiness status                         |
 | 4     | [Run one test and report](04-execution-and-reports.md)                     | Browser → durable job → Python → phone → persisted report                          |
-| 5     | [Test cases, suites and plans](05-test-library-and-plans.md)               | Edit, review, version and rerun approved definitions                               |
+| 5     | [Test cases, suites and plans](05-test-library-and-plans.md)               | Edit, save, version and rerun validated definitions                                |
 | 6     | [Direct execution and AI test authoring](06-test-generation.md)            | Direct steps and templates run; AI proposes named, reviewable tests                |
 | 7     | [Regression, pilot readiness and scaling](07-pilot-readiness-and-scale.md) | New-build comparison, recovery, measured reliability and costs                     |
 | 8     | [Minitap flow discovery](08-minitap-flow-discovery.md)                     | Minitap explores; observed flows become editable tests with zero-AI direct replays |
@@ -69,7 +69,7 @@ Complete spec 01 and its post-implementation verification first. It establishes 
 | B    | Spec 02 cloud/device adapter + spec 03 app setup                                           | Device qualification and persisted app/build setup both complete                         |
 | C    | Spec 04 divided into Rust scheduling/report APIs, Python protocol integration, and Runs UI | Agree on the protocol first; integrate all three and verify the real end-to-end workflow |
 | D    | Spec 05 test library + the independent operational subset of spec 07                       | Approved/versioned cases and plans work; operational work cannot claim pilot readiness   |
-| E    | Spec 06 generation + remaining independent deployment/retention work from spec 07          | Generated drafts execute through the same approved workflow                              |
+| E    | Spec 06 generation + remaining independent deployment/retention work from spec 07          | Generated drafts execute through the same save/run workflow                              |
 | F    | Remaining spec 07 regression integration and pilot qualification                           | Completed system passes the full pilot acceptance gate                                   |
 
 For a small team, use two workstreams after setup: **device/worker** and **product UI/backend**. Split into three for spec 04 only if coordination is useful. These are scheduling recommendations, not instructions to launch agents or paid cloud resources now.
@@ -83,7 +83,7 @@ For a small team, use two workstreams after setup: **device/worker** and **produ
 - Spec 07's early operational subset means deployment configuration, retention machinery using established artifact records, backup/restore instructions and metrics already defined by execution. Defer comparison against final case versions, generated-case evaluation and complete pilot sign-off until their inputs exist. Coordinate any shared services or migrations with the owning feature stream.
 - Each workstream finishes its complete agreed implementation before running checks. In a shared checkout, coordinate an explicit verification window so checks do not run against another contributor's unfinished edits. Isolated worktrees may verify their completed scope independently. Generate shared outputs once at integration; batch fixes and rerun affected checks only. No check watchers or per-edit verification.
 
-Do not start all seven specs together. Spec 04 depends on actual device behavior and build records; spec 06 depends on the approved case/plan model. Starting those complete implementations prematurely would require assumptions and rework.
+Do not start all seven specs together. Spec 04 depends on actual device behavior and build records; spec 06 depends on the saved case/plan model. Starting those complete implementations prematurely would require assumptions and rework.
 
 ## What to build first
 
@@ -116,7 +116,7 @@ flowchart LR
     W --> LLM[Configured model provider]
 ```
 
-Rust owns authorization, expectations, approvals, job state and result aggregation. The worker reports observations; agent completion alone does not prove correctness. Any model-assisted verification is labeled and retains its evidence.
+Rust owns authorization, expectations, technical admission, job state and result aggregation. The worker reports observations; agent completion alone does not prove correctness. Any model-assisted verification is labeled and retains its evidence.
 
 Runs bind immutable build checksums, case versions, plan version, device configuration, reset policy and model/adapter configuration. A missing required execution cannot become green. A retry preserves every attempt. Device/account lease expiry never authorizes blind replay of a potentially completed side effect.
 

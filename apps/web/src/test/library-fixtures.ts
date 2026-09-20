@@ -14,8 +14,6 @@ export const versionId = '22222222-2222-4222-8222-222222222222'
 export const mutationId = '33333333-3333-4333-8333-333333333333'
 export const capabilities: LibraryCapabilities = {
   can_edit: true,
-  can_review_business: true,
-  can_review_executability: true,
   can_archive: true,
   can_set_default: true,
 }
@@ -62,11 +60,11 @@ export const libraryEntry: LibraryEntryResponse = {
   key: libraryCase.key,
   title: libraryCase.title,
   ai_generated: false,
+  needs_setup: false,
   revision: 1,
   archived_at: null,
   draft_version: 1,
   latest_version_id: null,
-  latest_review_state: null,
   updated_at: timestamp,
   capabilities,
 }
@@ -80,6 +78,7 @@ export const libraryDraft: LibraryDraftResponse = {
   entry: libraryEntry,
   definition: { kind: 'case', content: libraryCase },
   source_version_id: null,
+  saved_version_id: null,
   issues: [],
   coverage: emptyCoverage,
 }
@@ -88,7 +87,6 @@ export const libraryVersion: LibraryVersionResponse = {
     ...libraryEntry,
     draft_version: null,
     latest_version_id: versionId,
-    latest_review_state: 'in_review',
     revision: 2,
   },
   version: {
@@ -98,13 +96,11 @@ export const libraryVersion: LibraryVersionResponse = {
     definition: { kind: 'case', content: libraryCase },
     approvals: [],
   },
-  review_state: 'in_review',
-  review_events: [],
   coverage: emptyCoverage,
   issues: [],
 }
 export const libraryOptions: LibraryOptionsResponse = {
   profiles: [],
-  approved_versions: [],
+  saved_versions: [],
   capabilities,
 }

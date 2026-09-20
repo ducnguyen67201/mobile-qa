@@ -301,7 +301,6 @@ pub struct SaveAuthoredTestsRequest {
     pub mutation_id: Uuid,
     pub tests: Vec<SaveAuthoredTest>,
     pub source_task_id: Option<Uuid>,
-    pub expectations_confirmed: bool,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]

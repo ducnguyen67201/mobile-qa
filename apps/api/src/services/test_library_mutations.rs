@@ -1,5 +1,5 @@
 //! One app lock serializes authoring with run admission. Receipts commit alongside
-//! changes, so a lost response never creates another version or review event.
+//! changes, so a lost response never creates another version.
 use super::{execution_store::*, test_definitions as definitions, test_library as library};
 use crate::errors::{ApiFailure, ApiResult};
 use loco_rs::app::AppContext;
@@ -13,10 +13,7 @@ use uuid::Uuid;
 pub enum Mutation {
     Authored(mobile_qa_contracts::automation::SaveAuthoredTestsRequest),
     Create(CreateLibraryEntryRequest),
-    Fork(Uuid, ForkLibraryDraftRequest),
     Save(Uuid, SaveLibraryDraftRequest),
-    Submit(Uuid, SubmitLibraryDraftRequest),
-    Review(Uuid, Uuid, ReviewLibraryVersionRequest),
     Archive(Uuid, ArchiveLibraryEntryRequest),
     Default(SetDefaultPlanRequest),
 }
@@ -25,20 +22,14 @@ impl Mutation {
         match self {
             Self::Authored(r) => r.mutation_id,
             Self::Create(r) => r.mutation_id,
-            Self::Fork(_, r) => r.mutation_id,
             Self::Save(_, r) => r.mutation_id,
-            Self::Submit(_, r) => r.mutation_id,
-            Self::Review(_, _, r) => r.mutation_id,
             Self::Archive(_, r) => r.mutation_id,
             Self::Default(r) => r.mutation_id,
         }
     }
     fn entry_revision(&self) -> Option<(Uuid, i32)> {
         match self {
-            Self::Fork(id, r) => Some((*id, r.expected_revision)),
             Self::Save(id, r) => Some((*id, r.expected_revision)),
-            Self::Submit(id, r) => Some((*id, r.expected_revision)),
-            Self::Review(id, _, r) => Some((*id, r.expected_revision)),
             Self::Archive(id, r) => Some((*id, r.expected_revision)),
             _ => None,
         }
@@ -92,22 +83,13 @@ pub async fn apply(
                 "An active operator is required",
             ))
         }
-        Mutation::Review(_, _, r)
-            if !match r.purpose {
-                ApprovalPurpose::Business => caps.can_review_business,
-                ApprovalPurpose::Executability => caps.can_review_executability,
-            } =>
-        {
-            return Err(ApiFailure::new(
-                403,
-                "reviewer_required",
-                "This review permission is required",
-            ))
-        }
         _ => {}
     }
     let mutation_id = mutation.id();
-    let fingerprint = hash(serde_json::to_vec(&mutation).map_err(|_| ApiFailure::internal())?);
+    let fingerprint = hash(
+        serde_json::to_vec(&("save_lifecycle_v2", &mutation))
+            .map_err(|_| ApiFailure::internal())?,
+    );
     let previous=rows(&tx,"SELECT fingerprint, response FROM test_library_mutations WHERE app_id=$1 AND actor_id=$2 AND
         mutation_id=$3",vec![app.into(),actor.into(),mutation_id.into()]).await?;
     if let Some(row) = previous.first() {
@@ -222,102 +204,14 @@ pub async fn apply(
             exec(&tx,"INSERT INTO test_library_entries(id, app_id, kind, logical_key, next_version, actor_id)
         VALUES($1, $2, $3, $4,2, $5)",vec![r.entry_id.into(),app.into(),word(&r.kind).into(),r.key.into(),actor.into()]).await?;
             exec(&tx,"INSERT INTO test_library_drafts(entry_id,version,payload,editor_id) VALUES($1,1,$2,$3)",vec![r.entry_id.into(),json(&definition)?.into(),actor.into()]).await?;
-            LibraryMutationReceipt::Draft(library::draft(&tx, actor, app, r.entry_id).await?)
+            LibraryMutationReceipt::Draft(Box::new(
+                library::draft(&tx, actor, app, r.entry_id).await?,
+            ))
         }
-        Mutation::Fork(id, r) => {
-            let source = library::version(&tx, actor, app, id, r.source_version_id).await?;
-            if source.entry.draft_version.is_some() {
-                return Err(conflict("An editable draft already exists"));
-            }
-            let next: i32 = field(
-                &one(
-                    &tx,
-                    "SELECT next_version FROM test_library_entries WHERE id=$1",
-                    vec![id.into()],
-                )
-                .await?,
-                "next_version",
-            )?;
-            if next == i32::MAX {
-                return Err(conflict("Version limit reached"));
-            }
-            let mut definition: LibraryDraftDefinition = source.version.definition.into();
-            definition.allocate(next as u32);
-            exec(&tx,"INSERT INTO test_library_drafts(entry_id, version, source_version_id, payload, editor_id)
-        VALUES($1, $2, $3, $4, $5)",vec![id.into(),next.into(),r.source_version_id.into(),json(&definition)?.into(),actor.into()]).await?;
-            exec(
-                &tx,
-                "UPDATE test_library_entries SET next_version=next_version+1 WHERE id=$1",
-                vec![id.into()],
-            )
-            .await?;
+        Mutation::Save(id, r) => {
+            super::test_library_save::save(&tx, actor, app, id, r.definition).await?;
             bump(&tx, id, actor).await?;
-            LibraryMutationReceipt::Draft(library::draft(&tx, actor, app, id).await?)
-        }
-        Mutation::Save(id, mut r) => {
-            let original = library::draft(&tx, actor, app, id).await?;
-            if original.definition.identity() != r.definition.identity() {
-                return Err(conflict("Draft kind, key and version cannot change"));
-            }
-            if let LibraryDraftDefinition::Case(ref mut c) = r.definition {
-                let LibraryDraftDefinition::Case(previous) = &original.definition else {
-                    return Err(ApiFailure::internal());
-                };
-                if c.package != previous.package {
-                    return Err(ApiFailure::invalid("The draft package belongs to its app"));
-                }
-                c.provenance = previous.provenance.clone();
-            }
-            r.definition.check_bounds().map_err(ApiFailure::invalid)?;
-            let payload = json(&r.definition)?;
-            if serde_json::to_vec(&payload)
-                .map_err(|_| ApiFailure::internal())?
-                .len()
-                > 1048576
-            {
-                return Err(ApiFailure::new(
-                    413,
-                    "draft_too_large",
-                    "Draft exceeds 1 MiB",
-                ));
-            }
-            exec(&tx,"UPDATE test_library_drafts SET payload=$2,editor_id=$3,updated_at=now() WHERE entry_id=$1",vec![id.into(),payload.into(),actor.into()]).await?;
-            bump(&tx, id, actor).await?;
-            LibraryMutationReceipt::Draft(library::draft(&tx, actor, app, id).await?)
-        }
-        Mutation::Submit(id, _) => {
-            let draft = library::draft(&tx, actor, app, id).await?;
-            if !draft.issues.is_empty() {
-                return Err(library::validation(draft.issues));
-            }
-            let definition = draft
-                .definition
-                .published()
-                .map_err(|issue| library::validation(vec![issue]))?;
-            definition.validate().map_err(ApiFailure::invalid)?;
-            let payload = json(&definition)?;
-            let digest = hash(serde_json::to_vec(&payload).map_err(|_| ApiFailure::internal())?);
-            let version_id = Uuid::new_v4();
-            let (kind, key, version) = definition.identity();
-            exec(&tx,"INSERT INTO execution_definitions(id, app_id, kind, logical_key, version, content_hash,
-        payload, author_id) VALUES($1, $2, $3, $4, $5, $6, $7, $8)",vec![version_id.into(),app.into(),word(&kind).into(),key.into(),(version as i32).into(),digest.into(),payload.into(),actor.into()]).await?;
-            exec(&tx,"INSERT INTO test_library_versions(definition_id,entry_id,review_state) VALUES($1,$2,'in_review')",vec![version_id.into(),id.into()]).await?;
-            exec(
-                &tx,
-                "DELETE FROM test_library_drafts WHERE entry_id=$1",
-                vec![id.into()],
-            )
-            .await?;
-            bump(&tx, id, actor).await?;
-            LibraryMutationReceipt::Version(
-                library::version(&tx, actor, app, id, version_id).await?,
-            )
-        }
-        Mutation::Review(id, version_id, r) => {
-            review(&tx, actor, app, id, version_id, &r).await?;
-            LibraryMutationReceipt::Version(
-                library::version(&tx, actor, app, id, version_id).await?,
-            )
+            LibraryMutationReceipt::Draft(Box::new(library::draft(&tx, actor, app, id).await?))
         }
         Mutation::Archive(id, r) => {
             exec(&tx,"UPDATE test_library_entries SET archived_at=CASE WHEN $2 THEN COALESCE(archived_at, now())
@@ -332,10 +226,8 @@ pub async fn apply(
             }
             library::admitted(&tx, app, r.plan_version_id).await?;
             let definition = definitions::get(&tx, app, r.plan_version_id).await?;
-            if !matches!(definition.definition, TestDefinition::Plan(_))
-                || !definitions::approved(&definition)
-            {
-                return Err(ApiFailure::invalid("Choose an approved plan version"));
+            if !matches!(definition.definition, TestDefinition::Plan(_)) {
+                return Err(ApiFailure::invalid("Choose a saved plan version"));
             }
             library::executable(&tx, app, &definition.definition).await?;
             let next = current
@@ -363,102 +255,6 @@ pub async fn apply(
     .await?;
     tx.commit().await?;
     Ok((response, true))
-}
-
-/// Shared with the operator CLI. Caller holds the app lock; no legacy path may
-/// approve a rejected/archived candidate or bypass purpose-specific grants.
-pub async fn review(
-    db: &impl ConnectionTrait,
-    actor: Uuid,
-    app: Uuid,
-    entry_id: Uuid,
-    version_id: Uuid,
-    r: &ReviewLibraryVersionRequest,
-) -> ApiResult<()> {
-    let candidate = library::version(db, actor, app, entry_id, version_id).await?;
-    if candidate.entry.revision != r.expected_revision {
-        return Err(stale(Some(entry_id), candidate.entry.revision));
-    }
-    if candidate.entry.archived_at.is_some()
-        || candidate.review_state != LibraryReviewState::InReview
-    {
-        return Err(conflict(
-            "Only an active version awaiting review can receive a decision",
-        ));
-    }
-    let caps = &candidate.entry.capabilities;
-    if !match r.purpose {
-        ApprovalPurpose::Business => caps.can_review_business,
-        ApprovalPurpose::Executability => caps.can_review_executability,
-    } {
-        return Err(ApiFailure::new(
-            403,
-            "reviewer_required",
-            "This review permission is required",
-        ));
-    }
-    if candidate.version.content_hash != r.content_hash {
-        return Err(conflict("Reviewed content hash changed"));
-    }
-    if candidate
-        .review_events
-        .iter()
-        .any(|e| e.purpose == r.purpose)
-    {
-        return Err(conflict("This review purpose already has a decision"));
-    }
-    if r.reason.as_ref().is_some_and(|s| !bounded(s, 2000))
-        || (r.decision != LibraryReviewDecision::Approve && r.reason.is_none())
-    {
-        return Err(ApiFailure::invalid(
-            "Changes requested or rejection needs a reason of 1–2000 printable bytes",
-        ));
-    }
-    if r.decision == LibraryReviewDecision::Approve {
-        let coverage =
-            library::coverage(db, app, &candidate.version.definition.clone().into()).await?;
-        if !coverage.issues.is_empty() {
-            return Err(library::validation(coverage.issues));
-        }
-    }
-    if r.decision == LibraryReviewDecision::Approve && r.purpose == ApprovalPurpose::Executability {
-        library::executable(db, app, &candidate.version.definition).await?;
-    }
-    exec(
-        db,
-        "INSERT INTO test_library_review_events(id, entry_id, definition_id, actor_id, purpose,
-        decision, content_hash, reason) VALUES($1, $2, $3, $4, $5, $6, $7, $8)",
-        vec![
-            Uuid::new_v4().into(),
-            entry_id.into(),
-            version_id.into(),
-            actor.into(),
-            word(&r.purpose).into(),
-            word(&r.decision).into(),
-            r.content_hash.clone().into(),
-            r.reason.clone().into(),
-        ],
-    )
-    .await?;
-    let state = match r.decision {
-        LibraryReviewDecision::Approve => {
-            exec(db,"INSERT INTO execution_approvals(definition_id,purpose,actor_id,content_hash) VALUES($1,$2,$3,$4)",vec![version_id.into(),word(&r.purpose).into(),actor.into(),r.content_hash.clone().into()]).await?;
-            if definitions::approved(&definitions::get(db, app, version_id).await?) {
-                LibraryReviewState::Approved
-            } else {
-                LibraryReviewState::InReview
-            }
-        }
-        LibraryReviewDecision::NeedsInput => LibraryReviewState::NeedsInput,
-        LibraryReviewDecision::Reject => LibraryReviewState::Rejected,
-    };
-    exec(
-        db,
-        "UPDATE test_library_versions SET review_state=$2,updated_at=now() WHERE definition_id=$1",
-        vec![version_id.into(), word(&state).into()],
-    )
-    .await?;
-    bump(db, entry_id, actor).await
 }
 
 /// Register operator imports in the same catalog, respecting versions reserved by
@@ -513,7 +309,12 @@ pub async fn link_import(
     {
         return Err(conflict("Version is reserved by an editable draft"));
     }
-    exec(db,"INSERT INTO test_library_versions(definition_id,entry_id,review_state) VALUES($1,$2,'in_review')",vec![definition.id.into(),id.into()]).await?;
+    exec(
+        db,
+        "INSERT INTO test_library_versions(definition_id,entry_id) VALUES($1,$2)",
+        vec![definition.id.into(), id.into()],
+    )
+    .await?;
     exec(
         db,
         "UPDATE test_library_entries SET next_version=GREATEST(next_version,$2) WHERE id=$1",

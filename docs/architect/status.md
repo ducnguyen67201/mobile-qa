@@ -1,5 +1,9 @@
 # Implementation status and evidence
 
+## Execution stall recovery hardening — local changes (2026-09-21)
+
+The real execution worker now checks the Android command-line tools before claiming a job and passes the configured JDK to its supervised child. An AVD setup failure before an emulator has ever launched may finish with verified clean cleanup after the owned directory and free ports are checked. Once an emulator has launched, uncertain cleanup remains quarantined and requires operator recovery. The previously held local attempt was explicitly recovered after confirming no active process, dirty marker or current AVD; a later queued attempt exposed a Java 8 selection and left a new dirty AVD state. A fresh host boot and operator recovery are still required for that new attempt. Source and offline tests do not establish a successful live suite run.
+
 ## Model catalog capacity — locally validated (2026-09-21)
 
 An additive model assignment revision and audit store, protocol-6 qualified worker

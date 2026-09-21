@@ -398,6 +398,26 @@ it('derives a complete dynamic legend from real attempts', () => {
   expect(screen.queryByText('Failed')).not.toBeInTheDocument()
 })
 
+it('marks finished case cards with their result while later cases remain queued', () => {
+  const run = runFixture()
+  run.attempts[1] = attempt('attempt-2', invalidPassword.version.id, 'finished', 'failed')
+  const cases = buildRunCoverageFlow(run).nodes.filter((node) => node.type === 'case')
+  expect(cases.map((node) => [node.data.status, node.data.finished])).toEqual([
+    ['passed', true],
+    ['failed', true],
+    ['queued', false],
+  ])
+})
+
+it('waits for cleanup before showing a final result on the run map', () => {
+  const run = runFixture()
+  run.attempts[0] = attempt('attempt-1', signIn.version.id, 'finalizing', 'passed')
+  run.attempts[1] = attempt('attempt-2', invalidPassword.version.id, 'recovery_required', 'failed')
+  const cases = buildRunCoverageFlow(run).nodes.filter((node) => node.type === 'case')
+  expect(cases.map((node) => node.data.status)).toEqual(['running', 'recovery', 'queued'])
+  expect(cases.map((node) => node.data.finished)).toEqual([false, false, false])
+})
+
 it('activates an attempt from a complete keyboard-action name and focuses evidence', () => {
   const activate = vi.fn()
   const model = buildRunCoverageFlow(runFixture(), activate)

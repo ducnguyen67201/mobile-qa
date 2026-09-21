@@ -61,6 +61,7 @@ type CoverageNodeData = {
   order?: number
   required?: boolean
   status?: CoverageFlowStatus
+  finished?: boolean
   detail?: string
   band?: boolean
   onActivate?: () => void
@@ -108,20 +109,37 @@ const STATUS_ORDER: CoverageFlowStatus[] = [
 function caseCount(count: number) {
   return `${count} ${count === 1 ? 'case' : 'cases'}`
 }
-function StatusMark({ status }: { status: CoverageFlowStatus }) {
+function StatusMark({
+  status,
+  prominent = false,
+}: {
+  status: CoverageFlowStatus
+  prominent?: boolean
+}) {
   const Icon =
     status === 'passed'
       ? Check
       : status === 'running'
         ? LoaderCircle
-        : status === 'failed' || status === 'missing' || status === 'recovery'
+        : status === 'failed' ||
+            status === 'blocked' ||
+            status === 'inconclusive' ||
+            status === 'missing' ||
+            status === 'recovery'
           ? AlertTriangle
           : status === 'ready'
             ? Play
             : Circle
   return (
-    <span className={styles.status} data-status={status}>
-      <Icon size={12} aria-hidden className={status === 'running' ? styles.spin : undefined} />
+    <span
+      className={`${styles.status} ${prominent ? styles.resultBadge : ''}`}
+      data-status={status}
+    >
+      <Icon
+        size={prominent ? 15 : 12}
+        aria-hidden
+        className={status === 'running' ? styles.spin : undefined}
+      />
       {STATUS_LABEL[status]}
     </span>
   )
@@ -133,6 +151,7 @@ function handlePositions(orientation: FlowOrientation) {
 }
 function NodeShell({ data, className = '' }: { data: CoverageNodeData; className?: string }) {
   const handles = handlePositions(data.orientation)
+  const nodeClassName = `${styles.node} ${className} ${data.orientation === 'vertical' ? styles.verticalNode : ''} ${data.finished ? styles.finishedNode : ''}`
   const body = (
     <>
       <Handle type="target" position={handles.target} isConnectable={false} />
@@ -150,23 +169,25 @@ function NodeShell({ data, className = '' }: { data: CoverageNodeData; className
           </span>
         )}
         {data.detail && <span>{data.detail}</span>}
-        {data.status && <StatusMark status={data.status} />}
+        {data.status && <StatusMark status={data.status} prominent={data.finished} />}
       </div>
       <Handle type="source" position={handles.source} isConnectable={false} />
     </>
   )
-  const orientationClass = data.orientation === 'vertical' ? styles.verticalNode : ''
   return data.onActivate ? (
     <button
       type="button"
-      className={`${styles.node} ${className} ${orientationClass} ${styles.actionNode}`}
+      className={`${nodeClassName} ${styles.actionNode}`}
+      data-result={data.finished ? data.status : undefined}
       onClick={data.onActivate}
       aria-label={`${data.order ? `Case ${data.order}, ` : ''}${data.title}${data.version != null ? `, version ${data.version}` : ''}${data.required != null ? `, ${data.required ? 'required' : 'optional'}` : ''}${data.status ? `, ${STATUS_LABEL[data.status]}` : ''}. View attempt details`}
     >
       {body}
     </button>
   ) : (
-    <div className={`${styles.node} ${className} ${orientationClass}`}>{body}</div>
+    <div className={nodeClassName} data-result={data.finished ? data.status : undefined}>
+      {body}
+    </div>
   )
 }
 function RootNode({ data }: NodeProps<CoverageNode>) {
@@ -548,7 +569,8 @@ function attemptStatus(
   attempt: AttemptResponse | undefined,
   runState: JobState,
 ): CoverageFlowStatus {
-  if (attempt?.outcome) return attempt.outcome
+  // An outcome can arrive before cleanup; only the finished state is a final result.
+  if (attempt?.state === 'finished') return attempt.outcome ?? 'inconclusive'
   if (
     attempt?.state === 'leased' ||
     attempt?.state === 'running' ||
@@ -651,6 +673,7 @@ export function buildRunCoverageFlow(
         order: index + 1,
         required: resolved.required,
         status,
+        finished: attempt?.state === 'finished',
         detail: resolved.data_variant === 'default' ? undefined : resolved.data_variant,
         onActivate: attempt && activate ? () => activate(attempt.id) : undefined,
       },

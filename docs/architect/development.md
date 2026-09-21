@@ -232,6 +232,9 @@ set `MOBILE_QA_DEV_ORIGIN=http://localhost:5173`, and open that origin. Producti
 the configured HTTPS `HOST`. This GIS credential flow needs no client secret or
 OAuth redirect callback. The client ID is public; the API returns it with a one-use
 nonce/challenge and sets a separate HttpOnly browser-binding cookie.
+The local Vite server redirects HTML visits to `127.0.0.1:5173` to the configured
+`localhost:5173` origin before the sign-in challenge; API requests still require
+the exact configured origin.
 
 Any verified Google account can register and sign in. New users have
 `users.approval_status='pending'` and can view their approval status without a
@@ -313,6 +316,7 @@ long-polls the protocol for up to 30 seconds. `--once` exits after one claim, in
 is an explicit synthetic/demo fixture control, not customer run input. Do not use
 `dev-execution-fake` with a registered real profile: the profile controls the driver.
 A dirty execution journal requires operator recovery; restarting never replays actions.
+The managed dev stack supplies its configured JDK 17 `JAVA_HOME` to the execution worker and its Android child. A manually started real worker must supply a working JDK 17 or later through `JAVA_HOME`; the worker now runs the read-only `avdmanager list device` before claiming, so a broken Java selection leaves the job queued without reserving the phone. After the emulator has launched, an interrupted or unverified reset still needs physical recovery evidence before reservations are released.
 
 ## Source formatting
 

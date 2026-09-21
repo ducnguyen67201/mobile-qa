@@ -102,6 +102,7 @@ class AndroidDevice:
         self.env = host_environment(profile)
         self.current = profile.state_root / "current"
         self.owns_current = False
+        self.ever_launched = False
         self.inventory: dict[str, str] = {}
         self.video_pid: str | None = None
         self.direct_automation = False
@@ -183,6 +184,7 @@ class AndroidDevice:
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
             )
+            self.ever_launched = True
         finally:
             log.close()
         deadline = time.monotonic() + (timeout or self.profile.boot_seconds)

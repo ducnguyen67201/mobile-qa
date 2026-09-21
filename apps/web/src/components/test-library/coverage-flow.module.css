@@ -250,9 +250,30 @@
   color: var(--flow-status-danger);
 }
 .status[data-status='blocked'],
+.status[data-status='inconclusive'],
 .status[data-status='needs_setup'],
 .status[data-status='recovery'] {
   color: var(--flow-status-warning);
+}
+.resultBadge {
+  gap: 0.35rem;
+  padding: 0.28rem 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 9%, white);
+  font-size: 0.76rem;
+  font-weight: 750;
+  line-height: 1;
+}
+.finishedNode[data-result='passed'] {
+  border-color: var(--flow-status-success);
+}
+.finishedNode[data-result='failed'] {
+  border-color: var(--flow-status-danger);
+}
+.finishedNode[data-result='blocked'],
+.finishedNode[data-result='inconclusive'] {
+  border-color: var(--flow-status-warning);
 }
 .actionNode {
   cursor: pointer;

@@ -138,6 +138,9 @@ pub struct LibraryProfileChoice {
     pub package: String,
     pub adapter: String,
     pub qualified: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_model: Option<crate::model_registry::ResolvedModel>,
+    pub model_available: bool,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]

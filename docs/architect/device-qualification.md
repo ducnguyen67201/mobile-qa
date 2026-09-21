@@ -59,13 +59,16 @@ our demo controls. It fetches no secrets and makes no model calls. Reports expli
 name the navigation driver; this smoke result does not qualify Minitap. Model mode is:
 
 ```sh
-just device-local-agent YOUR_MODEL_ID
-just device-local-agent YOUR_MODEL_ID broken
+just device-local-agent /absolute/private/path/resolved-model.json
+just device-local-agent /absolute/private/path/resolved-model.json broken
 ```
 
 Model mode uses the same supervisor with Minitap navigation and Doppler process injection;
-configure OPENAI_API_KEY in the profile's selected Doppler project/config. Explicit model
-choice is required and calls are billed. No environment file is created. Each run gets an
+configure OPENAI_API_KEY in the profile's selected Doppler project/config. Register the approved
+nonsecret definition with the trusted `execution` task, run `show-model key:<key> revision:<n>`,
+and save its `ResolvedModel` JSON to the private path passed above. The host profile's
+`[model_ref]` must match the JSON reference. This path is a file, not a provider model ID;
+explicit model execution is billed. No environment file is created. Each run gets an
 immutable private profile/request/evidence directory; latest.json points to its report.
 The local command exits 0 only when the expected scenario outcome AND reset match,
 1 for a mismatch or quarantine, and 2 for input/preflight errors.

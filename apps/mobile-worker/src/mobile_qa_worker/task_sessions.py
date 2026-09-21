@@ -19,6 +19,7 @@ from mobile_qa_worker.execution.adapters import device_for
 from mobile_qa_worker.execution.client import Client
 from mobile_qa_worker.execution.journal import write
 from mobile_qa_worker.generated.models import (
+    ModelCapability,
     NavigationRequest,
     PhoneClaimResponse,
     PhoneControl,
@@ -29,6 +30,11 @@ from mobile_qa_worker.generated.models import (
     PhoneTask,
     PhoneTaskState,
     PhoneUpdate,
+)
+from mobile_qa_worker.model_runtime import (
+    require_capability,
+    require_host_assignment,
+    worker_capabilities,
 )
 from mobile_qa_worker.qualification.config import Profile, QualificationError
 from mobile_qa_worker.qualification.evidence import Evidence, sha256
@@ -171,6 +177,7 @@ def act(
             "package": connection.session.profile.package,
             "instruction": goal,
             "max_steps": min(30, profile.max_steps),
+            "resolved_model": connection.session.resolved_model,
         }
     )
     request_path = directory / "request.json"
@@ -239,12 +246,11 @@ def run_session(
 ) -> None:
     profile = Profile.load(profile_path)
     assignment = lease.session.profile
-    # The SDK reads the host profile; bind its model to the qualified session before side effects.
-    uses_model = assignment.driver.value == "minitap" or bool(assignment.model)
-    if assignment.image != profile.system_image or (
-        uses_model and assignment.model != profile.model
-    ):
+    if assignment.image != profile.system_image:
         raise QualificationError("worker_profile_mismatch")
+    if lease.session.resolved_model is not None:
+        require_capability(lease.session.resolved_model, ModelCapability.minitap_navigation)
+        require_host_assignment(lease.session.resolved_model, profile.model_ref)
     with host_lock(profile.state_root) as dirty:
         if dirty.exists():
             raise QualificationError("device_recovery_required")
@@ -346,6 +352,8 @@ def serve(origin: str, state: Path, profile_path: Path, once: bool = False) -> N
     state = state.resolve()
     state.mkdir(parents=True, mode=0o700, exist_ok=True)
     client = Client(origin, os.environ.get("MOBILE_QA_WORKER_TOKEN", ""))
+    profile = Profile.load(profile_path.resolve())
+    capabilities = worker_capabilities(profile).model_dump(mode="json")
     with host_lock(state) as pending:
         if pending.exists():
             raise QualificationError("worker_claim_recovery_required")
@@ -355,11 +363,15 @@ def serve(origin: str, state: Path, profile_path: Path, once: bool = False) -> N
             write(pending, {"claim_id": str(claim_id)})
             response = client.send(
                 "/api/worker/phone-claims",
-                {"claim_id": str(claim_id), "protocol_version": 4},
+                {
+                    "claim_id": str(claim_id),
+                    "protocol_version": 5,
+                    "model_capabilities": capabilities,
+                },
                 PhoneClaimResponse,
             )
             if not connected:
-                print("Worker connected: phone sessions, protocol 3", flush=True)
+                print("Worker connected: phone sessions, protocol 5", flush=True)
                 connected = True
             if response.lease:
                 if shutdown.is_set():

@@ -48,7 +48,7 @@ def run(
                 device.launch()
             elif action.kind.value == "navigate":
                 # Minitap remains an explicit step; it cannot publish a whole-sequence completion.
-                if not profile.model:
+                if connection.session.resolved_model is None:
                     raise QualificationError("model_profile_required")
                 ai_task = task.model_copy(deep=True)
                 ai_task.goal = action.instruction

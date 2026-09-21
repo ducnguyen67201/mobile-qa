@@ -3473,6 +3473,332 @@
         ]
       }
     },
+    "/api/apps/{app_id}/suite-runs": {
+      "post": {
+        "tags": [],
+        "operationId": "createSuiteRun",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuiteRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
+    "/api/apps/{app_id}/suite-runs/preview": {
+      "post": {
+        "tags": [],
+        "operationId": "previewSuiteRun",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuiteRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteRunPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
     "/api/apps/{app_id}/test-generations": {
       "post": {
         "tags": [],
@@ -8869,6 +9195,16 @@
             "type": "string",
             "format": "uuid"
           },
+          "model_capabilities": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/WorkerModelCapabilities"
+              }
+            ]
+          },
           "profile_id": {
             "type": "string",
             "format": "uuid"
@@ -9838,7 +10174,6 @@
           "adapter",
           "device_identity",
           "image",
-          "model",
           "qualified",
           "qualification_reference",
           "max_apk_bytes"
@@ -9876,7 +10211,14 @@
             "minimum": 0
           },
           "model": {
-            "type": "string"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ModelBinding"
+              }
+            ]
           },
           "name": {
             "type": "string"
@@ -10652,7 +10994,8 @@
           "driver",
           "package",
           "adapter",
-          "qualified"
+          "qualified",
+          "model_available"
         ],
         "properties": {
           "adapter": {
@@ -10665,6 +11008,9 @@
             "type": "string",
             "format": "uuid"
           },
+          "model_available": {
+            "type": "boolean"
+          },
           "name": {
             "type": "string"
           },
@@ -10673,6 +11019,16 @@
           },
           "qualified": {
             "type": "boolean"
+          },
+          "resolved_model": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResolvedModel"
+              }
+            ]
           }
         },
         "additionalProperties": false
@@ -10777,6 +11133,79 @@
           "member"
         ]
       },
+      "ModelBinding": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ModelReference"
+          },
+          {
+            "type": "string"
+          }
+        ],
+        "description": "Historical profiles used a raw provider-model string. Consumers may read that\nshape, but API registration rejects it for every new profile."
+      },
+      "ModelCapability": {
+        "type": "string",
+        "enum": [
+          "minitap_navigation",
+          "structured_authoring"
+        ]
+      },
+      "ModelDefinition": {
+        "type": "object",
+        "required": [
+          "reference",
+          "display_name",
+          "provider",
+          "provider_model",
+          "capabilities"
+        ],
+        "properties": {
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelCapability"
+            }
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/ModelProvider"
+          },
+          "provider_model": {
+            "type": "string"
+          },
+          "reference": {
+            "$ref": "#/components/schemas/ModelReference"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ModelProvider": {
+        "type": "string",
+        "enum": [
+          "open_ai"
+        ]
+      },
+      "ModelReference": {
+        "type": "object",
+        "required": [
+          "key",
+          "revision"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
       "ModelUsage": {
         "type": "object",
         "required": [
@@ -10800,6 +11229,16 @@
           },
           "model": {
             "type": "string"
+          },
+          "model_reference": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ModelReference"
+              }
+            ]
           },
           "output_tokens": {
             "type": [
@@ -11132,6 +11571,16 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
+          },
+          "resolved_model": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResolvedModel"
+              }
+            ]
           },
           "revision": {
             "type": "integer",
@@ -11611,6 +12060,37 @@
         },
         "additionalProperties": false
       },
+      "ResolvedModel": {
+        "type": "object",
+        "required": [
+          "reference",
+          "display_name",
+          "provider",
+          "provider_model",
+          "capabilities"
+        ],
+        "properties": {
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelCapability"
+            }
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/ModelProvider"
+          },
+          "provider_model": {
+            "type": "string"
+          },
+          "reference": {
+            "$ref": "#/components/schemas/ModelReference"
+          }
+        },
+        "additionalProperties": false
+      },
       "RunArtifact": {
         "type": "object",
         "required": [
@@ -11851,6 +12331,16 @@
           "profile": {
             "$ref": "#/components/schemas/ExecutionProfile"
           },
+          "resolved_model": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResolvedModel"
+              }
+            ]
+          },
           "source": {
             "oneOf": [
               {
@@ -11942,6 +12432,25 @@
                 "enum": [
                   "saved_case_v1"
                 ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "suite_version_id",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "saved_suite_v1"
+                ]
+              },
+              "suite_version_id": {
+                "type": "string",
+                "format": "uuid"
               }
             }
           },
@@ -12282,6 +12791,53 @@
         },
         "additionalProperties": false
       },
+      "SuiteRunPreview": {
+        "type": "object",
+        "required": [
+          "blockers",
+          "environment_revision"
+        ],
+        "properties": {
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "environment_revision": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "SuiteRunRequest": {
+        "type": "object",
+        "required": [
+          "suite_version_id",
+          "build_id",
+          "profile_id",
+          "environment_revision"
+        ],
+        "properties": {
+          "build_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environment_revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "profile_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "suite_version_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
       "SwipeDirection": {
         "type": "string",
         "enum": [
@@ -12604,6 +13160,28 @@
           "unsupported",
           "error"
         ]
+      },
+      "WorkerModelCapabilities": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ModelReference"
+              }
+            ]
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelProvider"
+            }
+          }
+        },
+        "additionalProperties": false
       }
     },
     "securitySchemes": {

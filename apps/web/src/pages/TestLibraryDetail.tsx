@@ -26,12 +26,14 @@ import { useWorkspace } from '@/hooks/use-workspace'
 import { useMounted } from '@/hooks/use-mounted'
 import { ErrorNotice, LoadingPanel, PageHeading } from '@/components/app/feedback'
 import { RunPreview } from '@/components/app/run-preview'
+import { SavedSuiteRun } from '@/components/runs/saved-suite-run'
 import { DraftEditor } from '@/components/test-library/draft-editor'
 import {
   Coverage,
   DefinitionSummary,
   LibraryIssues,
 } from '@/components/test-library/library-presentation'
+import { LibraryCoverageFlow } from '@/components/test-library/coverage-flow'
 
 export function TestLibraryDetail() {
   const { workspaceId = '' } = useWorkspace()
@@ -352,6 +354,23 @@ function FrozenVersion({ value }: { value: LibraryVersionResponse }) {
           </Text>
         </Stack>
       </Card>
+      {frozen.definition.kind !== 'case' && options.data && (
+        <LibraryCoverageFlow
+          definition={frozen.definition}
+          options={options.data}
+          frozen
+          runControl={
+            frozen.definition.kind === 'suite' ? (
+              <SavedSuiteRun
+                appId={value.entry.app_id}
+                versionId={frozen.id}
+                dirty={false}
+                profiles={options.data.profiles}
+              />
+            ) : undefined
+          }
+        />
+      )}
       <DefinitionSummary definition={frozen.definition} options={options.data} />
       {frozen.definition.kind !== 'case' && <Coverage value={value.coverage} />}
       <LibraryIssues issues={value.issues} title="Setup needs attention" />

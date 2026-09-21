@@ -20,7 +20,7 @@ async fn setup(server: &TestServer, ctx: &AppContext) -> (Login, Uuid, Uuid) {
         adapter: "demo_persistence_v1".into(),
         device_identity: Uuid::new_v4().to_string(),
         image: "synthetic".into(),
-        model: "none".into(),
+        model: None,
         qualified: true,
         qualification_reference: "synthetic".into(),
         max_apk_bytes: 262144000,

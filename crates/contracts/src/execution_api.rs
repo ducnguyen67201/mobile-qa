@@ -1,6 +1,6 @@
 //! Browser execution OpenAPI merged into the canonical local export.
 use crate::execution_lifecycle::*;
-use crate::{browser::ApiError, execution::*};
+use crate::{browser::ApiError, execution::*, model_registry::*};
 use utoipa::OpenApi;
 #[utoipa::path(get,path="/api/apps/{app_id}/execution-plan",operation_id="getExecutionPlan",security(("session_cookie"=[])),
 params(("app_id" = Uuid, Path),crate::test_library::ExecutionPlanQuery),
@@ -67,6 +67,13 @@ fn preflight_endpoint() {}
         ActionKind,
         EvidenceState,
         Driver,
+        ModelReference,
+        ModelProvider,
+        ModelCapability,
+        ModelDefinition,
+        ResolvedModel,
+        ModelBinding,
+        WorkerModelCapabilities,
         TestDefinition,
         ExecutionBudget,
         TestAction,

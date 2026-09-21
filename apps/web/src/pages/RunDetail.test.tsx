@@ -96,3 +96,43 @@ it('does not present malformed persisted results as a report', async () => {
   expect(await screen.findByRole('button', { name: /Retry/i })).toBeInTheDocument()
   expect(screen.queryByText('Everything passed')).not.toBeInTheDocument()
 })
+it('shows the exact frozen model assignment used by the run', async () => {
+  const current = report()
+  current.manifest.resolved_model = {
+    reference: { key: 'approved.navigation', revision: 3 },
+    display_name: 'Approved navigation',
+    provider: 'open_ai',
+    provider_model: 'provider-model',
+    capabilities: ['minitap_navigation'],
+  }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      const path = new URL(request.url).pathname
+      if (path.endsWith('/session')) return Response.json(session)
+      if (path.endsWith('/settings')) return Response.json(settings)
+      if (path === `/apps/${appId}` || path === `/api/apps/${appId}`) return Response.json(app)
+      if (path.endsWith(runId)) return Response.json(current)
+      throw new Error(`Unexpected fixture route ${path}`)
+    }),
+  )
+  show()
+  expect(await screen.findByText('Approved navigation')).toBeInTheDocument()
+  expect(screen.getByText(/approved\.navigation@3.*provider-model/)).toBeInTheDocument()
+})
+it('labels historical raw-model runs without guessing their registry identity', async () => {
+  const current = report()
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      const path = new URL(request.url).pathname
+      if (path.endsWith('/session')) return Response.json(session)
+      if (path.endsWith('/settings')) return Response.json(settings)
+      if (path === `/apps/${appId}` || path === `/api/apps/${appId}`) return Response.json(app)
+      if (path.endsWith(runId)) return Response.json(current)
+      throw new Error(`Unexpected fixture route ${path}`)
+    }),
+  )
+  show()
+  expect(await screen.findByText('Legacy model context unavailable')).toBeInTheDocument()
+})

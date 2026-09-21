@@ -42,7 +42,9 @@ impl Setup {
             ctx.config.server.host.clone()
         } else if matches!(ctx.environment, Environment::Development) {
             std::env::var("MOBILE_QA_DEV_ORIGIN")
-                .unwrap_or_else(|_| "http://127.0.0.1:5173".to_owned())
+                // `localhost` and `127.0.0.1` are distinct browser security origins.
+                // Match the documented Vite URL when no explicit local override is supplied.
+                .unwrap_or_else(|_| "http://localhost:5173".to_owned())
         } else {
             "http://127.0.0.1:5173".to_owned()
         };

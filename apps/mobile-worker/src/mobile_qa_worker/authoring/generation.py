@@ -13,6 +13,7 @@ from xml.etree import ElementTree
 from mobile_qa_worker.device.android import AndroidDevice as Device
 from mobile_qa_worker.execution.journal import write
 from mobile_qa_worker.generated.models import (
+    AuthoringModelEnvelope,
     AuthoringModelRequest,
     AuthoringModelResponse,
     AuthoringUsage,
@@ -54,7 +55,7 @@ def redact(frame: PhoneFrame, xml: bytes) -> PhoneFrame:
 
 
 def invoke(
-    request: AuthoringModelRequest,
+    request: AuthoringModelEnvelope,
     profile: Profile,
     profile_path: Path,
     root: Path,
@@ -148,9 +149,15 @@ def run(
             raise QualificationError("generation_budget_exhausted")
         progress.usage.calls += 1
         publish("AI is preparing test suggestions")
+        resolved_model = connection.session.resolved_model
+        if resolved_model is None:
+            raise QualificationError("model_capability_unavailable")
         try:
             response = invoke(
-                AuthoringModelRequest.model_validate(payload),
+                AuthoringModelEnvelope(
+                    model=resolved_model,
+                    request=AuthoringModelRequest.model_validate(payload),
+                ),
                 profile,
                 profile_path,
                 directory / str(progress.usage.calls),

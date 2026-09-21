@@ -3,15 +3,33 @@ import json
 import subprocess
 import sys
 from types import SimpleNamespace
+from typing import cast
 
+import pytest
 from test_qualification import request_data
 
+from mobile_qa_worker.generated.models import ModelCapability
 from mobile_qa_worker.qualification import sdk_adapter
+from mobile_qa_worker.qualification.config import Profile, QualificationError
 from mobile_qa_worker.qualification.sdk_adapter import UsageRecorder
 
 
+def model():
+    from mobile_qa_worker.generated.models import ResolvedModel
+
+    return ResolvedModel.model_validate(
+        {
+            "reference": {"key": "demo", "revision": 1},
+            "display_name": "Demo",
+            "provider": "open_ai",
+            "provider_model": "demo",
+            "capabilities": ["minitap_navigation"],
+        }
+    )
+
+
 def test_usage_deduplicates_and_keeps_unknown():
-    recorder = UsageRecorder("demo")
+    recorder = UsageRecorder(model())
     recorder.start("one")
     recorder.end("one", {"input_tokens": 10, "output_tokens": 2})
     recorder.end("one", {"input_tokens": 10, "output_tokens": 2})
@@ -19,12 +37,13 @@ def test_usage_deduplicates_and_keeps_unknown():
     recorder.end("two", {"input_tokens": True, "output_tokens": 2})
     assert recorder.result() == {
         "model": "demo",
+        "model_reference": {"key": "demo", "revision": 1},
         "calls": 2,
         "unknown_calls": 1,
         "input_tokens": 10,
         "output_tokens": 2,
     }
-    empty = UsageRecorder("demo")
+    empty = UsageRecorder(model())
     empty.start("x")
     assert empty.result()["input_tokens"] is None
 
@@ -33,11 +52,13 @@ def test_sdk_environment_in_subprocess(tmp_path):
     code = """
 import os,sys
 from pathlib import Path
+from mobile_qa_worker.generated.models import ResolvedModel
 from mobile_qa_worker.qualification.sdk_adapter import prepare_environment
 os.environ['OPENAI_API_KEY']='dummy'
 os.environ['DATABASE_URL']='must-not-propagate'
 os.environ['DOPPLER_TOKEN']='must-not-propagate'
-prepare_environment(Path(sys.argv[1]))
+model=ResolvedModel.model_validate({'reference':{'key':'demo','revision':1},'display_name':'Demo','provider':'open_ai','provider_model':'demo','capabilities':['minitap_navigation']})
+prepare_environment(model,Path(sys.argv[1]))
 assert os.environ['OPENAI_API_KEY']=='dummy'
 assert 'DATABASE_URL' not in os.environ and 'DOPPLER_TOKEN' not in os.environ
 assert os.environ['PYTHON_DOTENV_DISABLED']=='1'
@@ -47,16 +68,38 @@ assert not any(name.startswith('minitap') for name in sys.modules)
     subprocess.run([sys.executable, "-c", code, str(tmp_path)], check=True)
 
 
+def test_qualification_rejects_non_navigation_model_before_provider_setup(tmp_path, monkeypatch):
+    restricted = model().model_copy(update={"capabilities": [ModelCapability.structured_authoring]})
+    monkeypatch.setattr(
+        sdk_adapter,
+        "prepare_provider_environment",
+        lambda *_: pytest.fail("provider setup must not run"),
+    )
+    with pytest.raises(QualificationError, match="model_capability_unavailable"):
+        asyncio.run(
+            sdk_adapter.navigate(
+                cast(Profile, SimpleNamespace()),
+                restricted,
+                "emulator-5554",
+                "ai.mobileqa.demo",
+                "synthetic-attempt",
+                tmp_path / "result.json",
+                "Navigate",
+            )
+        )
+
+
 def test_sdk_exact_public_seam(tmp_path, monkeypatch):
     data = request_data(tmp_path)
+    data["resolved_model"] = model().model_dump(mode="json")
     request = tmp_path / "request.json"
     request.write_text(json.dumps(data))
     profile = tmp_path / "profile.toml"
     profile.write_text(
-        f'sdk_root="{tmp_path}/sdk"\nstate_root="{tmp_path}/state"\ntoolchain="{tmp_path}/lock.json"\nmodel="demo"\n'
+        f'sdk_root="{tmp_path}/sdk"\nstate_root="{tmp_path}/state"\ntoolchain="{tmp_path}/lock.json"\n[model_ref]\nkey="demo"\nrevision=1\n'
     )
     seen = []
-    usage = UsageRecorder("demo")
+    usage = UsageRecorder(model())
     monkeypatch.setattr(sdk_adapter, "UsageRecorder", lambda model: usage)
 
     class Builder:
@@ -114,7 +157,8 @@ def test_sdk_exact_public_seam(tmp_path, monkeypatch):
     for name, module in modules.items():
         monkeypatch.setitem(sys.modules, name, module)
     monkeypatch.setattr(sdk_adapter.importlib.metadata, "version", lambda name: "4.0.0")
-    monkeypatch.setattr(sdk_adapter, "prepare_environment", lambda p: None)
+    monkeypatch.setattr(sdk_adapter, "prepare_provider_environment", lambda m, p: None)
+    monkeypatch.setattr(sdk_adapter, "minitap_model", lambda m: {})
     monkeypatch.setattr(sdk_adapter, "install_tool_runtime_compat", lambda: None)
     asyncio.run(sdk_adapter.execute(request, tmp_path / "child-result.json"))
     assert seen[0] == {"platform": "android", "device_id": "emulator-5554"}
@@ -167,6 +211,7 @@ def test_sdk_exact_public_seam(tmp_path, monkeypatch):
     asyncio.run(callback.on_llm_end(LLMResult(generations=[[]]), run_id=uuid4()))
     assert usage.result() == {
         "model": "demo",
+        "model_reference": {"key": "demo", "revision": 1},
         "calls": 3,
         "unknown_calls": 1,
         "input_tokens": 13,

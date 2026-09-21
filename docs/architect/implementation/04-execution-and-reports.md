@@ -9,6 +9,15 @@ evidence checks, HTTP leases and the Runs interface. Validation and remaining de
 hosted-storage acceptance gates are tracked in [current status](../status.md).
 The customer test editor belongs to spec 05.
 
+## Model assignment
+
+New model-enabled manifests freeze one validated `ResolvedModel` before queue insertion. The
+registry may later be retired without changing that historical snapshot. Protocol-5 workers must
+advertise the same reference and provider support before device reservation; mismatches remain
+queued. Comparison context includes the resolved reference/revision, so different model revisions
+are not comparable even when the test and device profile otherwise match. Historical manifests
+without a snapshot remain readable and are reported as unavailable model context, never guessed.
+
 ## Deliverable
 
 From the browser, run one manually authored saved case on an uploaded build. Show queued/running progress and a persisted report. The same path supports a real worker and a clearly identified development fake worker.
@@ -21,7 +30,13 @@ Persist a run manifest binding project, build checksum, saved plan/case versions
 
 ## APIs and flow
 
-Customer routes: `POST /api/apps/:app_id/runs`, `GET /api/runs/:run_id`, `POST /api/runs/:run_id/cancel`, and authorized artifact access. Submission takes a build and saved plan; the server resolves the manifest. Use an idempotency key to prevent a double-click producing two runs.
+Customer routes: `POST /api/apps/:app_id/runs`, `POST /api/apps/:app_id/suite-runs`,
+`GET /api/runs/:run_id`, `POST /api/runs/:run_id/cancel`, and authorized artifact access.
+Release submission takes a build and saved plan. Direct suite submission takes a build,
+qualified profile and exact saved suite version, then derives a bounded transient execution policy;
+it never creates a hidden library plan. The server resolves either source into the same immutable
+manifest and ordered attempt queue. Use an idempotency key to prevent a double-click producing
+two runs.
 
 Worker operations: claim, heartbeat, publish events, request artifact upload, complete attempt, acknowledge cancellation. These are our HTTP endpoints. The Python process needs no database credentials or public HTTP listener.
 

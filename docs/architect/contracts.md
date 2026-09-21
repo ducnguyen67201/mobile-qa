@@ -50,6 +50,15 @@ reports deterministic passed/failed/blocked observations and never imports Minit
 The explicit SDK smoke imports4.0.0 with telemetry disabled and connections blocked;
 it never constructs Agent and proves no device execution or model capability.
 
+## Shared model vocabulary
+
+`model_registry.rs` owns model references, providers, capabilities, definitions, resolved
+snapshots and worker advertisements. `ExecutionProfile.model` is optional: new writes use a
+`ModelReference`, while the untagged string variant exists only to read historical payloads.
+Model-enabled manifests and phone sessions carry `resolved_model`; child model requests use that
+snapshot rather than re-resolving host configuration. Protocol-5 claim advertisements are
+additive, but protocol 5 is mandatory whenever a frozen model assignment exists.
+
 ## Future work
 
 Keep Loco source registries and injection markers inside apps/api. Generated domain

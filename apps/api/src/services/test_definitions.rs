@@ -6,6 +6,7 @@ use crate::{
 };
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::execution::*;
+use mobile_qa_contracts::model_registry::{ModelBinding, ModelCapability};
 use sea_orm::{ConnectionTrait, EntityTrait, TransactionTrait};
 use uuid::Uuid;
 
@@ -190,6 +191,26 @@ pub async fn register_profile(
 ) -> ApiResult<()> {
     operator(ctx, actor, app).await?;
     p.validate().map_err(ApiFailure::invalid)?;
+    match p.model.as_ref() {
+        Some(ModelBinding::Legacy(_)) => {
+            return Err(ApiFailure::invalid(
+                "New profiles must use a registered model reference",
+            ))
+        }
+        Some(ModelBinding::Registered(_)) if matches!(p.driver, Driver::Direct | Driver::Fake) => {
+            return Err(ApiFailure::invalid(
+                "Direct and fake profiles must be model-free",
+            ))
+        }
+        binding => {
+            let required = if p.driver == Driver::Minitap {
+                vec![ModelCapability::MinitapNavigation]
+            } else {
+                vec![]
+            };
+            super::model_registry::resolve_for_new_work(&ctx.db, binding, &required).await?;
+        }
+    }
     let value = json(&p)?;
     let r = rows(
         &ctx.db,

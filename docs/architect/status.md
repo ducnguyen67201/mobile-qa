@@ -498,6 +498,33 @@ after a later draft edit. See the [phase 05 specification](implementation/05-tes
 The GAN review is source-only; rendered layout and the new UI-to-emulator flow
 remain unverified under the existing browser restriction.
 
+### Phase 05 coverage-flow follow-up — locally validated (2026-09-20)
+
+The Tests editor, frozen versions and run detail now project their existing ordered
+suite/plan/manifest data through a non-connectable React Flow control surface. The
+browser never persists layout or creates case dependencies. Authors add saved cases and
+suites directly from the canvas; each selection appends the next numbered step, while
+arrowed case rails make sequential execution order visible. Explicit move/remove/required
+controls and one Save action remain. The run view derives labels only from manifest and
+attempt state, and the authoring view matches the API's logical-case conflict rules.
+Ready saved suites now expose one Run sequence action in the canvas. It refreshes
+readiness, queues the exact suite version through the durable manifest/attempt pipeline and
+opens the polling run map; unsaved content uses Save & run and pins the returned version.
+Suite submission derives a transient bounded policy and does not create a hidden plan.
+
+The two-iteration GAN design evaluation improved from 6.79 to 8.39/10. Web typecheck,
+ESLint, all 147 browser tests, contract drift checks and the production build pass. Rust
+compilation and all 11 library tests pass. The new database-backed route test compiles but
+cannot execute against the retained local test database because its migration ledger names a
+removed historical migration; the database was not reset. Signed-in in-app browser
+inspection passed at desktop and 390×844: the narrow flow uses readable vertical layout,
+ordinary document scrolling works over the canvas and the saved-suite page has no redundant
+Add button. The API-only development origin now defaults to the documented
+`http://localhost:5173`; a fresh browser challenge returned 200 and the Google Continue button
+rendered after restart. The new Run sequence control and a real live run remain source/test
+verified because this acceptance pass did not sign back in or execute a device.
+This follow-up did not execute a device or model.
+
 ### Phase 06 task sessions — in progress
 
 Task-first source is being implemented on `codex/06-task-sessions`; see
@@ -536,3 +563,25 @@ and fixed competing Android hierarchy dump mechanisms. This device check does no
 whole new UI/API route on a real device. Real-model proposal quality, rendered browser acceptance,
 broader app qualification and hosted gates remain open. See the
 [phase 06 specification](implementation/06-test-generation.md).
+
+## Shared model registry and resolver — locally validated (2026-09-21)
+
+The API now owns an immutable, nonsecret model registry and resolves exact model references into
+frozen run and phone-session assignments. Model-enabled protocol-5 claims are fenced against the
+worker's recent qualified reference before resource reservation, while direct profiles remain
+model-free. Python provider construction and credential allowlisting are centralized in one runtime
+module; generated browser and worker contracts carry the same reference, capability and audit
+shapes. Browser controls use explicit capabilities without adding a customer model-selection step.
+
+Observed validation: eight targeted contract tests, all 149 browser tests and 11 API library tests
+pass; API integration binaries compile; contract drift, browser typecheck/lint, worker Ruff/Pyright,
+formatting, the production build and `git diff --check` pass. The full worker run collected 179
+tests; its two reported failures both passed on their exact targeted reruns (one is the previously
+documented local HTTP boundary test, and one was a corrected protocol-5 fixture). PostgreSQL-backed
+API tests and the three model-free HTTP smokes could not start against the retained local test
+database because its migration ledger contains `m20260918_000008_regression`, which is absent from
+this worktree. The database was not reset or altered for validation.
+
+No real device, provider/model, Doppler, or rendered-browser acceptance ran for this change. Registry
+registration does not itself requalify a host; rollout still requires an approved definition, an
+exact private host `model_ref`, worker restart and a matching protocol-5 heartbeat.

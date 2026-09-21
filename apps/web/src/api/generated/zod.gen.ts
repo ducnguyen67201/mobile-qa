@@ -114,12 +114,6 @@ export const zCheckState = z.enum([
     'operator_reported_blocked'
 ]);
 
-export const zClaimRequest = z.object({
-    claim_id: z.uuid(),
-    profile_id: z.uuid(),
-    version: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
-});
-
 export const zCleanupState = z.enum([
     'pending',
     'verified_clean',
@@ -398,15 +392,6 @@ export const zLibraryListResponse = z.object({
     next_cursor: z.uuid().nullish()
 });
 
-export const zLibraryProfileChoice = z.object({
-    adapter: z.string(),
-    driver: zDriver,
-    id: z.uuid(),
-    name: z.string(),
-    package: z.string(),
-    qualified: z.boolean()
-});
-
 export const zLibraryVersionQuery = z.object({
     cursor: z.uuid().nullish()
 });
@@ -422,10 +407,37 @@ export const zLogoutResponse = z.object({
 
 export const zMembershipRole = z.enum(['operator', 'member']);
 
+export const zModelCapability = z.enum(['minitap_navigation', 'structured_authoring']);
+
+export const zModelProvider = z.enum(['open_ai']);
+
+export const zModelReference = z.object({
+    key: z.string(),
+    revision: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+/**
+ * Historical profiles used a raw provider-model string. Consumers may read that
+ * shape, but API registration rejects it for every new profile.
+ */
+export const zModelBinding = z.union([
+    zModelReference,
+    z.string()
+]);
+
+export const zModelDefinition = z.object({
+    capabilities: z.array(zModelCapability),
+    display_name: z.string(),
+    provider: zModelProvider,
+    provider_model: z.string(),
+    reference: zModelReference
+});
+
 export const zModelUsage = z.object({
     calls: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     input_tokens: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish(),
     model: z.string(),
+    model_reference: zModelReference.nullish(),
     output_tokens: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish(),
     unknown_calls: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
@@ -592,6 +604,25 @@ export const zRecoveryEvent = z.object({
     evidence_reference: z.string()
 });
 
+export const zResolvedModel = z.object({
+    capabilities: z.array(zModelCapability),
+    display_name: z.string(),
+    provider: zModelProvider,
+    provider_model: z.string(),
+    reference: zModelReference
+});
+
+export const zLibraryProfileChoice = z.object({
+    adapter: z.string(),
+    driver: zDriver,
+    id: z.uuid(),
+    model_available: z.boolean(),
+    name: z.string(),
+    package: z.string(),
+    qualified: z.boolean(),
+    resolved_model: zResolvedModel.nullish()
+});
+
 export const zRunArtifact = z.object({
     attempt_id: z.uuid(),
     byte_size: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
@@ -618,6 +649,10 @@ export const zRunSource = z.union([
     z.object({
         case_version_id: z.uuid(),
         kind: z.enum(['saved_case_v1'])
+    }),
+    z.object({
+        kind: z.enum(['saved_suite_v1']),
+        suite_version_id: z.uuid()
     }),
     z.object({
         kind: z.enum(['release_plan_v1']),
@@ -701,6 +736,18 @@ export const zSuiteDefinition = z.object({
     key: z.string(),
     title: z.string(),
     version: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+export const zSuiteRunPreview = z.object({
+    blockers: z.array(z.string()),
+    environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+export const zSuiteRunRequest = z.object({
+    build_id: z.uuid(),
+    environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    profile_id: z.uuid(),
+    suite_version_id: z.uuid()
 });
 
 export const zSwipeDirection = z.enum([
@@ -823,7 +870,7 @@ export const zExecutionProfile = z.object({
     id: z.uuid(),
     image: z.string(),
     max_apk_bytes: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
-    model: z.string(),
+    model: zModelBinding.nullish(),
     name: z.string(),
     package: z.string(),
     qualification_reference: z.string(),
@@ -905,6 +952,7 @@ export const zPhoneSession = z.object({
     message: z.string(),
     profile: zExecutionProfile,
     protocol_version: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).optional(),
+    resolved_model: zResolvedModel.nullish(),
     revision: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).optional(),
     state: zPhoneState,
     tasks: z.array(zPhoneTask)
@@ -985,6 +1033,7 @@ export const zRunManifest = z.object({
     plan_hash: z.string().nullish(),
     plan_version_id: z.uuid().nullish(),
     profile: zExecutionProfile,
+    resolved_model: zResolvedModel.nullish(),
     source: zRunSource.nullish()
 });
 
@@ -1202,6 +1251,18 @@ export const zBuildResponse = z.object({
 export const zBuildListResponse = z.object({
     items: z.array(zBuildResponse),
     next_cursor: z.string().nullish()
+});
+
+export const zWorkerModelCapabilities = z.object({
+    model: zModelReference.nullish(),
+    providers: z.array(zModelProvider).optional()
+});
+
+export const zClaimRequest = z.object({
+    claim_id: z.uuid(),
+    model_capabilities: zWorkerModelCapabilities.nullish(),
+    profile_id: z.uuid(),
+    version: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
 export const zListAppsQuery = z.object({
@@ -1454,6 +1515,32 @@ export const zCreateRunPath = z.object({
  * Idempotent replay
  */
 export const zCreateRunResponse = zRunResponse;
+
+export const zCreateSuiteRunBody = zSuiteRunRequest;
+
+export const zCreateSuiteRunHeaders = z.object({
+    'Idempotency-Key': z.string()
+});
+
+export const zCreateSuiteRunPath = z.object({
+    app_id: z.uuid()
+});
+
+/**
+ * Idempotent replay
+ */
+export const zCreateSuiteRunResponse = zRunResponse;
+
+export const zPreviewSuiteRunBody = zSuiteRunRequest;
+
+export const zPreviewSuiteRunPath = z.object({
+    app_id: z.uuid()
+});
+
+/**
+ * Success
+ */
+export const zPreviewSuiteRunResponse = zSuiteRunPreview;
 
 export const zGenerateTestsBody = zGenerateTestsRequest;
 

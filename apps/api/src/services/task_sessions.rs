@@ -1,10 +1,11 @@
 //! Durable interactive sessions. A lost lease quarantines the phone instead of replaying effects.
-use super::{apps, execution_store::*, test_definitions, worker_auth::Worker};
+use super::{apps, execution_store::*, model_registry, test_definitions, worker_auth::Worker};
 use crate::errors::{ApiFailure, ApiResult};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::{
     execution::{Driver, ExecutionProfile},
+    model_registry::ModelCapability,
     task_sessions::*,
 };
 use sea_orm::{ConnectionTrait, QueryResult, TransactionTrait};
@@ -69,7 +70,39 @@ pub async fn options(ctx: &AppContext, user: Uuid, app: Uuid) -> ApiResult<Phone
     let a = apps::authorized(ctx, user, app).await?;
     reconcile(ctx).await?;
     let builds=rows(&ctx.db,"SELECT id,original_filename FROM builds WHERE app_id=$1 AND validation_state='validated' ORDER BY created_at DESC,id DESC LIMIT 50",vec![app.into()]).await?.iter().map(|r|Ok(PhoneBuildChoice{id:field(r,"id")?,name:field(r,"original_filename")?})).collect::<ApiResult<Vec<_>>>()?;
-    let profiles=rows(&ctx.db,"SELECT p.payload FROM execution_profiles p WHERE p.app_id=$1 AND EXISTS(SELECT 1 FROM execution_workers w WHERE w.profile_id=p.id AND w.revoked=false)",vec![app.into()]).await?.iter().map(|r|decode::<ExecutionProfile>(field(r,"payload")?)).collect::<ApiResult<Vec<_>>>()?.into_iter().filter(|p|p.qualified&&p.validate().is_ok()&&matches!(p.driver,Driver::Minitap|Driver::Direct)&&p.package==a.android_package).collect::<Vec<_>>();
+    let candidates=rows(&ctx.db,"SELECT p.payload FROM execution_profiles p WHERE p.app_id=$1 AND EXISTS(SELECT 1 FROM execution_workers w WHERE w.profile_id=p.id AND w.revoked=false)",vec![app.into()]).await?.iter().map(|r|decode::<ExecutionProfile>(field(r,"payload")?)).collect::<ApiResult<Vec<_>>>()?;
+    let mut profiles = Vec::new();
+    for profile in candidates.into_iter().filter(|profile| {
+        profile.qualified
+            && profile.validate().is_ok()
+            && matches!(profile.driver, Driver::Minitap | Driver::Direct)
+            && profile.package == a.android_package
+    }) {
+        if profile.is_model_free() {
+            profiles.push(profile);
+            continue;
+        }
+        let Ok(Some(resolved)) = model_registry::resolve_for_new_work(
+            &ctx.db,
+            profile.model.as_ref(),
+            &[ModelCapability::MinitapNavigation],
+        )
+        .await
+        else {
+            continue;
+        };
+        let advertised=rows(&ctx.db,"SELECT model_capabilities FROM execution_workers WHERE profile_id=$1 AND revoked=false AND model_last_seen_at>now()-interval '90 seconds' AND model_capabilities IS NOT NULL",vec![profile.id.into()]).await?;
+        let compatible = advertised.iter().any(|row| {
+            field(row, "model_capabilities")
+                .and_then(decode)
+                .is_ok_and(|capabilities| {
+                    model_registry::worker_matches(&resolved, Some(&capabilities))
+                })
+        });
+        if compatible {
+            profiles.push(profile);
+        }
+    }
     let active_session=rows(&ctx.db,"SELECT id FROM phone_sessions WHERE app_id=$1 AND creator_id=$2 AND payload->>'state' NOT IN ('closed','quarantined') ORDER BY created_at DESC LIMIT 1",vec![app.into(),user.into()]).await?.first().map(|r|field(r,"id")).transpose()?;
     let mut blockers = vec![];
     let env = one(&ctx.db,"SELECT account_secret_reference_id,reset_secret_reference_id FROM environments WHERE app_id=$1",vec![app.into()]).await?;
@@ -161,6 +194,16 @@ pub async fn open(
         .await?,
         "revision",
     )?;
+    let resolved_model = model_registry::resolve_for_new_work(
+        &tx,
+        profile.model.as_ref(),
+        if profile.driver == Driver::Minitap {
+            &[ModelCapability::MinitapNavigation]
+        } else {
+            &[]
+        },
+    )
+    .await?;
     let s = PhoneSession {
         environment_revision: environment_revision as u32,
         revision: 0,
@@ -169,6 +212,7 @@ pub async fn open(
         app_id: app,
         build_id: build,
         profile: profile.clone(),
+        resolved_model,
         state: PhoneState::Queued,
         message: "Waiting for a device".into(),
         frame: None,
@@ -209,7 +253,10 @@ pub async fn task(
         }
         return detail(&tx, id).await;
     }
-    if s.profile.model.is_empty() {
+    if s.resolved_model
+        .as_ref()
+        .is_none_or(|model| !model.has(ModelCapability::MinitapNavigation))
+    {
         return Err(ApiFailure::invalid(
             "Legacy tasks require a model; use structured commands for direct execution",
         ));
@@ -292,7 +339,7 @@ pub async fn claim(
     w: &Worker,
     input: PhoneClaimRequest,
 ) -> ApiResult<PhoneClaimResponse> {
-    if ![0, 2, 3, 4].contains(&input.protocol_version) {
+    if ![0, 2, 3, 4, 5].contains(&input.protocol_version) {
         return Err(conflict("Unsupported phone protocol"));
     }
     reconcile(ctx).await?;
@@ -305,18 +352,13 @@ pub async fn claim(
     .await?;
     let p = test_definitions::profile(&tx, w.app_id, w.profile_id).await?;
     p.validate().map_err(ApiFailure::invalid)?;
+    model_registry::advertise(&ctx.db, w.id, input.model_capabilities.as_ref()).await?;
     if p.execution_context.is_some() && input.protocol_version < 4 {
         return Ok(PhoneClaimResponse { lease: None });
     }
     if !p.qualified || !matches!(p.driver, Driver::Minitap | Driver::Direct) {
         return Err(conflict("A qualified real device profile is required"));
     }
-    rows(
-        &tx,
-        "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
-        vec![p.device_identity.clone().into()],
-    )
-    .await?;
     if !rows(
         &tx,
         "SELECT id FROM phone_sessions WHERE worker_id=$1 AND claim_id=$2",
@@ -347,8 +389,22 @@ pub async fn claim(
         return Ok(PhoneClaimResponse { lease: None });
     };
     let mut s: PhoneSession = decode(field(r, "payload")?)?;
+    if let Some(resolved) = s.resolved_model.as_ref() {
+        if input.protocol_version < 5
+            || !model_registry::worker_matches(resolved, input.model_capabilities.as_ref())
+        {
+            tracing::warn!(reason_code = "worker_model_reference_mismatch", worker_id=%w.id, "phone claim left queued");
+            return Ok(PhoneClaimResponse { lease: None });
+        }
+    }
+    rows(
+        &tx,
+        "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+        vec![p.device_identity.clone().into()],
+    )
+    .await?;
     s.protocol_version = input.protocol_version;
-    if p.driver == Driver::Direct && ![2, 3, 4].contains(&input.protocol_version) {
+    if p.driver == Driver::Direct && ![2, 3, 4, 5].contains(&input.protocol_version) {
         return Err(conflict("Update this worker for direct execution"));
     }
     s.state = PhoneState::Preparing;

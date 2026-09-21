@@ -1,4 +1,5 @@
 use mobile_qa_contracts::execution::*;
+use mobile_qa_contracts::model_registry::{ModelBinding, ModelReference};
 use uuid::Uuid;
 fn case() -> TestDefinition {
     serde_json::from_str(include_str!(
@@ -57,7 +58,10 @@ fn real_profile_cannot_overstate_demo_installer_capacity() {
         adapter: "demo_persistence_v1".into(),
         device_identity: "local".into(),
         image: "pinned".into(),
-        model: "pinned".into(),
+        model: Some(ModelBinding::Registered(ModelReference {
+            key: "pinned".into(),
+            revision: 1,
+        })),
         qualified: false,
         qualification_reference: String::new(),
         max_apk_bytes: 104857600,

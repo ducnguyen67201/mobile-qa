@@ -147,6 +147,22 @@ existing automated check, not a claim of rendered browser acceptance.
 
 ## Explicit qualification commands
 
+### Model registry rollout and recovery
+
+Use the trusted `execution` task to `register-model file:<safe-json>`, `show-model key:<key>
+revision:<n>`, or `retire-model key:<key> revision:<n>`. Registry documents contain no secret,
+Doppler scope, timeout or token policy. Before rollout, count and drain or explicitly cancel
+active legacy runs/sessions; apply migration 000010; register the approved definition; manually
+change private host TOML to `[model_ref]`; then restart API and workers. Confirm a protocol-5
+heartbeat before starting model work. A mismatched worker must leave work queued and must not
+place a phone in recovery. Roll back by retiring the new definition and restoring old binaries
+only after active protocol-5 work is terminal; never replay a possibly completed device action.
+
+`worker_model_reference_mismatch` means the host's qualified `key@revision` differs from the
+frozen assignment. It is not an APK mismatch and not an OpenAI credential/model-name lookup
+failure. Update the private host reference or execution profile through the operator workflow;
+do not edit private files automatically and do not change Doppler configuration as a repair.
+
 `just device-doctor profile`, `just device-smoke request`, and `just device-qualify config`
 are opt-in operator commands, never dependencies of setup/check/build/smoke. The Android
 fixture has its own pinned Gradle wrapper under apps/qa-demo-android. Worker checks install
@@ -262,8 +278,10 @@ organization differs from the selected workspace before loading builds/uploads.
 ### Combined app setup and phone runner
 
 This branch retains main's Mantine dashboard, sign-in, workspace and APK intake flows.
-Use `just dev` for that application and `just device-local-agent MODEL` for the
-standalone demo runner. Phase 04 Tests/Runs now dispatch saved, validated API jobs to a registered execution worker. An accepted uploaded
+Use `just dev` for that application and `just device-local-agent
+/absolute/private/path/resolved-model.json` for the standalone demo runner. The argument is a
+private `ResolvedModel` JSON file obtained with the trusted `execution` task's `show-model`, not a
+provider model ID; the host `[model_ref]` must match its reference. Phase 04 Tests/Runs now dispatch saved, validated API jobs to a registered execution worker. An accepted uploaded
 build is not an automatically executable test and device readiness remains separate.
 
 `just setup-android` supplies intake Build Tools 36.0.0; `just device-local-setup`

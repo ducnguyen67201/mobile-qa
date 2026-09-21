@@ -1,8 +1,9 @@
 //! Freeze saved coverage before queuing. Reports are projections of durable facts.
-use super::{apps, execution_store::*, test_definitions as definitions};
+use super::{apps, execution_store::*, model_registry, test_definitions as definitions};
 use crate::errors::{ApiFailure, ApiResult};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::execution::*;
+use mobile_qa_contracts::model_registry::ModelCapability;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use uuid::Uuid;
 
@@ -79,16 +80,30 @@ pub(crate) async fn assemble(
     )
     .await?;
     let profile = definitions::profile(db, app, p.profile_id).await?;
-    if cases.iter().any(|c| {
+    let uses_navigation = cases.iter().any(|c| {
         c.case
             .actions
             .iter()
             .any(|a| a.kind == ActionKind::Navigate)
-    }) && profile.model.is_empty()
-    {
-        out.blockers
-            .push("This plan includes Ask AI steps but the device has no model".into());
-    }
+    });
+    let resolved_model = if uses_navigation {
+        match model_registry::resolve_for_new_work(
+            db,
+            profile.model.as_ref(),
+            &[ModelCapability::MinitapNavigation],
+        )
+        .await
+        {
+            Ok(model) => model,
+            Err(error) if !error.status.is_server_error() => {
+                out.blockers.push(error.message);
+                None
+            }
+            Err(error) => return Err(error),
+        }
+    } else {
+        None
+    };
     for c in &cases {
         if let Err(e) = super::execution_readiness::case_matches(&profile, &c.case) {
             out.blockers.push(e.message);
@@ -172,6 +187,7 @@ pub(crate) async fn assemble(
         },
         environment_revision: field(&env, "revision")?,
         profile,
+        resolved_model,
         cases,
         budget: p.budget.clone(),
         diagnostic_retries: p.diagnostic_retries,

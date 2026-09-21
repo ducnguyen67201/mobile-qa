@@ -1,0 +1,10 @@
+{
+  "reference": {
+    "key": "synthetic.openai",
+    "revision": 1
+  },
+  "display_name": "Synthetic OpenAI-compatible model",
+  "provider": "open_ai",
+  "provider_model": "synthetic-model",
+  "capabilities": ["minitap_navigation", "structured_authoring"]
+}

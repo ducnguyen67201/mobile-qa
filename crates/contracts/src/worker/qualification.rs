@@ -24,6 +24,8 @@ pub struct QualificationRequest {
     pub serial: String,
     pub profile_path: String,
     pub output_root: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_model: Option<crate::model_registry::ResolvedModel>,
 }
 
 impl QualificationRequest {
@@ -39,6 +41,9 @@ impl QualificationRequest {
                 .any(|s| s.is_empty())
         {
             return Err("invalid qualification request");
+        }
+        if let Some(model) = &self.resolved_model {
+            model.validate()?;
         }
         Ok(())
     }
@@ -83,6 +88,8 @@ pub enum QualificationArtifact {
 #[serde(deny_unknown_fields)]
 pub struct QualificationUsage {
     pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_reference: Option<crate::model_registry::ModelReference>,
     #[schemars(range(min = 0, max = 10000))]
     pub calls: u32,
     #[schemars(range(min = 0, max = 10000))]

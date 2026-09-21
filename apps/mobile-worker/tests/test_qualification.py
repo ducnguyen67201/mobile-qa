@@ -76,7 +76,7 @@ def test_request_rejects_before_device(tmp_path, field, value):
 
 def test_request_and_result_roundtrip(tmp_path):
     data = request_data(tmp_path)
-    assert parse_request(json.dumps(data)).model_dump(mode="json") == data
+    assert parse_request(json.dumps(data)).model_dump(mode="json", exclude_none=True) == data
     assert validate_result(json.dumps(result_data())).outcome.value == "blocked"
 
 
@@ -140,9 +140,9 @@ def test_budget_and_atomic_replacement(tmp_path):
 def test_profile_validation(tmp_path):
     path = tmp_path / "profile.toml"
     path.write_text(
-        f'sdk_root="{tmp_path}/sdk"\nstate_root="{tmp_path}/state"\ntoolchain="{tmp_path}/lock.json"\nmodel="demo"\n'
+        f'sdk_root="{tmp_path}/sdk"\nstate_root="{tmp_path}/state"\ntoolchain="{tmp_path}/lock.json"\n[model_ref]\nkey="demo"\nrevision=1\n'
     )
-    assert Profile.load(path).model == "demo"
+    assert Profile.load(path).model_ref.key == "demo"
     path.write_text(path.read_text() + "max_steps=true\n")
     with pytest.raises(QualificationError):
         Profile.load(path)
@@ -151,7 +151,7 @@ def test_profile_validation(tmp_path):
 def test_doctor_fails_without_boot_on_unprepared_host(tmp_path):
     path = tmp_path / "profile.toml"
     path.write_text(
-        f'sdk_root="{tmp_path}/sdk"\nstate_root="{tmp_path}/state"\ntoolchain="{tmp_path}/lock.json"\nmodel="demo"\n'
+        f'sdk_root="{tmp_path}/sdk"\nstate_root="{tmp_path}/state"\ntoolchain="{tmp_path}/lock.json"\n[model_ref]\nkey="demo"\nrevision=1\n'
     )
     proc = subprocess.run(
         [sys.executable, "-m", "mobile_qa_worker.cli", "device-doctor", "--profile", str(path)],

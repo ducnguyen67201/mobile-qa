@@ -395,7 +395,7 @@ export function PhoneWorkspace({
                 !ready ||
                 !sequenceReady(sequence) ||
                 disabled ||
-                (usesAi && !s?.profile.model) ||
+                (usesAi && !s?.resolved_model?.capabilities.includes('minitap_navigation')) ||
                 !!picking
               }
               loading={submit.isPending}

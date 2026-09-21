@@ -151,7 +151,6 @@ def main(author=None, edit_after_queue=None):
                         "adapter": "demo_persistence_v1",
                         "device_identity": str(uuid.uuid4()),
                         "image": "synthetic",
-                        "model": "none",
                         "qualified": True,
                         "qualification_reference": "synthetic-transport-test",
                         "max_apk_bytes": 262144000,

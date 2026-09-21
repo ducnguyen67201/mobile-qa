@@ -21,6 +21,7 @@ import { cancelRun, runQuery } from '@/api/runs'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { ErrorNotice, LoadingPanel, PageHeading } from '@/components/app/feedback'
 import { AttemptReadiness } from '@/components/app/attempt-readiness'
+import { RunCoverageFlow } from '@/components/test-library/coverage-flow'
 export function RunDetail() {
   const { run_id: id = '' } = useParams()
   const { workspaceId = '' } = useWorkspace()
@@ -48,6 +49,7 @@ export function RunDetail() {
         <Alert color="yellow">Simulated execution. No real phone or model was used.</Alert>
       )}
       <RunResult run={r} />
+      <RunCoverageFlow run={r} />
       <Group>
         <Badge>{r.state}</Badge>
         <Text>
@@ -63,6 +65,17 @@ export function RunDetail() {
           Cancel run
         </Button>
       </Group>
+      {r.manifest.resolved_model ? (
+        <Card withBorder padding="sm">
+          <Text fw={600}>{r.manifest.resolved_model.display_name}</Text>
+          <Text size="sm" c="dimmed">
+            {r.manifest.resolved_model.reference.key}@{r.manifest.resolved_model.reference.revision}{' '}
+            · {r.manifest.resolved_model.provider_model}
+          </Text>
+        </Card>
+      ) : r.manifest.profile.model ? (
+        <Alert color="yellow">Legacy model context unavailable</Alert>
+      ) : null}
       {r.state === 'cancel_requested' && (
         <Alert>Cancellation requested. Waiting for your phone to stop and clean up.</Alert>
       )}
@@ -76,7 +89,7 @@ export function RunDetail() {
       <Text size="sm">Build checksum</Text>
       <Code style={{ overflowWrap: 'anywhere' }}>{r.manifest.build_sha256}</Code>
       {r.attempts.map((a) => (
-        <Card key={a.id} withBorder>
+        <Card key={a.id} id={`attempt-${a.id}`} tabIndex={-1} withBorder>
           <Stack gap="sm">
             <Group justify="space-between" align="flex-start" gap="xs">
               <Title order={2} fz="lg">
@@ -172,7 +185,10 @@ export function RunDetail() {
               })}
             {a.usage.map((u, i) => (
               <Text size="sm" key={`${u.model}:${i}`}>
-                {u.model}: {u.calls} calls; {u.input_tokens ?? 'unknown'} input /{' '}
+                {u.model_reference
+                  ? `${u.model_reference.key}@${u.model_reference.revision}`
+                  : u.model}
+                : {u.calls} calls; {u.input_tokens ?? 'unknown'} input /{' '}
                 {u.output_tokens ?? 'unknown'} output tokens; {u.unknown_calls} calls with unknown
                 usage
               </Text>

@@ -19,9 +19,11 @@ import { useWorkspace } from '@/hooks/use-workspace'
 import { useMounted } from '@/hooks/use-mounted'
 import { ErrorNotice, LoadingPanel } from '@/components/app/feedback'
 import { SavedCaseRun } from '@/components/runs/saved-case-run'
+import { SavedSuiteRun } from '@/components/runs/saved-suite-run'
 import { PhoneWorkspace } from '@/components/task-session/phone-workspace'
 import { PlanFields, SuiteFields } from './membership-fields'
-import { Coverage, LibraryIssues } from './library-presentation'
+import { LibraryCoverageFlow } from './coverage-flow'
+import { LibraryIssues } from './library-presentation'
 import {
   caseIssueLocation,
   caseIssueMessage,
@@ -95,6 +97,19 @@ export function DraftEditor({
       invalidate()
     },
   })
+  const saveCurrent = () =>
+    save.mutateAsync(
+      save.isError &&
+        save.variables &&
+        save.variables.expected_revision === saved.entry.revision &&
+        JSON.stringify(save.variables.definition) === JSON.stringify(definition)
+        ? save.variables
+        : {
+            mutation_id: crypto.randomUUID(),
+            expected_revision: saved.entry.revision,
+            definition,
+          },
+    )
   const details = libraryErrorDetails(save.error)
   const savedIssues =
     saved.definition.kind === 'case' && definition.kind === 'case'
@@ -249,20 +264,7 @@ export function DraftEditor({
                 appId={appId}
                 versionId={saved.saved_version_id}
                 dirty={dirty}
-                save={() =>
-                  save.mutateAsync(
-                    save.isError &&
-                      save.variables &&
-                      save.variables.expected_revision === saved.entry.revision &&
-                      JSON.stringify(save.variables.definition) === JSON.stringify(definition)
-                      ? save.variables
-                      : {
-                          mutation_id: crypto.randomUUID(),
-                          expected_revision: saved.entry.revision,
-                          definition,
-                        },
-                  )
-                }
+                save={saveCurrent}
               />
             }
             issues={[...savedIssues, ...failedIssues]}
@@ -277,21 +279,74 @@ export function DraftEditor({
         ) : (
           options.data &&
           (definition.kind === 'suite' ? (
-            <SuiteFields
-              value={definition.content}
-              options={options.data}
-              onChange={(content) => setDefinition({ kind: 'suite', content })}
-            />
+            <Stack gap="lg">
+              <LibraryCoverageFlow
+                definition={definition}
+                options={options.data}
+                runControl={
+                  <SavedSuiteRun
+                    appId={appId}
+                    versionId={saved.saved_version_id}
+                    dirty={dirty}
+                    save={saveCurrent}
+                    profiles={options.data.profiles}
+                  />
+                }
+                onAddCase={(case_version_id) =>
+                  setDefinition({
+                    kind: 'suite',
+                    content: {
+                      ...definition.content,
+                      cases: [
+                        ...definition.content.cases,
+                        { case_version_id, required: true, data_variant: 'default' },
+                      ],
+                    },
+                  })
+                }
+              />
+              <SuiteFields
+                value={definition.content}
+                options={options.data}
+                onChange={(content) => setDefinition({ kind: 'suite', content })}
+              />
+            </Stack>
           ) : (
-            <PlanFields
-              value={definition.content}
-              options={options.data}
-              onChange={(content) => setDefinition({ kind: 'plan', content })}
-            />
+            <Stack gap="lg">
+              <LibraryCoverageFlow
+                definition={definition}
+                options={options.data}
+                onAddCase={(case_version_id) =>
+                  setDefinition({
+                    kind: 'plan',
+                    content: {
+                      ...definition.content,
+                      cases: [
+                        ...definition.content.cases,
+                        { case_version_id, required: true, data_variant: 'default' },
+                      ],
+                    },
+                  })
+                }
+                onAddSuite={(suiteVersionId) =>
+                  setDefinition({
+                    kind: 'plan',
+                    content: {
+                      ...definition.content,
+                      suite_version_ids: [...definition.content.suite_version_ids, suiteVersionId],
+                    },
+                  })
+                }
+              />
+              <PlanFields
+                value={definition.content}
+                options={options.data}
+                onChange={(content) => setDefinition({ kind: 'plan', content })}
+              />
+            </Stack>
           ))
         )}
       </fieldset>
-      {definition.kind !== 'case' && <Coverage value={saved.coverage} saved={!dirty} />}
       {!dirty && renderSaved?.(saved)}
       <Modal
         opened={blocker.state === 'blocked'}

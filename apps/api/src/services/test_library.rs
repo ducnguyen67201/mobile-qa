@@ -402,6 +402,11 @@ pub async fn options(
     .await?
     {
         let p: ExecutionProfile = decode(field(&row, "payload")?)?;
+        let resolved_model = super::model_registry::resolve_for_new_work(db, p.model.as_ref(), &[])
+            .await
+            .ok()
+            .flatten();
+        let model_available = !p.requires_model() || resolved_model.is_some();
         profiles.push(LibraryProfileChoice {
             id: p.id,
             name: p.name,
@@ -409,6 +414,8 @@ pub async fn options(
             package: p.package,
             adapter: p.adapter,
             qualified: p.qualified,
+            resolved_model,
+            model_available,
         });
     }
     let ids=rows(db,"SELECT v.entry_id, v.definition_id FROM test_library_versions v JOIN test_library_entries e

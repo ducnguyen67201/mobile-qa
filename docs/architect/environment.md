@@ -81,7 +81,9 @@ References: [Doppler CLI](https://docs.doppler.com/docs/cli),
 ## Phase 02 SDK child
 
 The explicit device runner injects `OPENAI_API_KEY` through Doppler into its SDK child.
-The approved model ID lives in the nonsecret device profile. The child drops unrelated
+The qualified registry reference lives in the nonsecret device profile as a `[model_ref]`
+table containing `key` and `revision`. Provider model identity comes from the API-frozen
+`ResolvedModel`, not host TOML. The child drops unrelated
 server credentials and tracing exports before SDK import, forces telemetry=false and
 PYTHON_DOTENV_DISABLED=1, and uses a private cwd with no env file. Emulator, fixture
 backend, doctor and offline checks never fetch model secrets. See
@@ -116,8 +118,9 @@ smoke process restart against the same private scratch/artifact directory.
 
 Google sign-in requires `GOOGLE_CLIENT_ID`, injected into the API via Doppler. The API
 exposes this public identifier with the browser-bound login challenge; it is not a
-secret. No Google client secret is used. `MOBILE_QA_DEV_ORIGIN` optionally selects a
-loopback origin for Google's localhost registration; tests ignore this override.
+secret. No Google client secret is used. Development defaults to
+`http://localhost:5173`; `MOBILE_QA_DEV_ORIGIN` optionally selects another loopback
+origin for Google's localhost registration. Tests ignore this override.
 See [Google setup](development.md#google-only-sign-in). Without a configured client,
 Google sign-in returns an explicit unavailable error and offers no password fallback.
 
@@ -137,9 +140,9 @@ Doppler, starts an emulator or calls a model. No .env files are introduced.
 ## Direct-only device profiles
 
 Install worker extras with `uv sync --project apps/mobile-worker --frozen --extra device
---extra ai --extra sdk`. A direct-only host profile may omit `model`; register its API
-execution profile with driver `direct` and empty model. Direct commands need no model secret.
+--extra ai --extra sdk`. A direct-only host profile omits `model_ref`; register its API
+execution profile with driver `direct` and no `model` field. Direct commands need no model secret.
 AI authoring requires an explicitly configured model and a Minitap-capable profile; only its
 isolated child is wrapped in Doppler. Ordinary tests and synthetic smoke remain Doppler-free.
 Use `just dev` for the complete local stack or the owned-device task-worker command
-documented in spec 06; current phone workers advertise protocol 3 for AI discovery.
+documented in spec 06; model-capable workers advertise the exact reference with protocol 5.

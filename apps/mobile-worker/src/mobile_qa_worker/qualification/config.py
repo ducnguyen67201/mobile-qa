@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from mobile_qa_worker.generated.models import QualificationRequest
+from mobile_qa_worker.generated.models import ModelReference, QualificationRequest
 
 PACKAGE = "ai.mobileqa.demo"
 ACTIVITY = PACKAGE + "/.MainActivity"
@@ -22,7 +22,7 @@ class QualificationError(Exception):
 class Profile:
     sdk_root: Path
     state_root: Path
-    model: str
+    model_ref: ModelReference | None
     toolchain: Path
     system_image: str = "system-images;android-35;google_apis;x86_64"
     headless: bool = True
@@ -44,9 +44,12 @@ class Profile:
     def load(cls, path: Path) -> "Profile":
         raw: dict[str, object] = tomllib.loads(path.read_text())
         required = {"sdk_root", "state_root", "toolchain"}
+        if "model" in raw:
+            raise QualificationError("legacy_model_profile_use_model_ref")
+        model_raw = raw.pop("model_ref", None)
         if not required <= raw.keys() or raw.keys() - cls.__dataclass_fields__.keys():
             raise QualificationError("invalid_profile_fields")
-        strings = required | {"model", "doppler_project", "doppler_config", "system_image"}
+        strings = required | {"doppler_project", "doppler_config", "system_image"}
         for name in strings:
             if name in raw and (not isinstance(raw[name], str) or not raw[name]):
                 raise QualificationError("invalid_profile_string")
@@ -62,7 +65,14 @@ class Profile:
             if not value.is_absolute() or value != value.resolve():
                 raise QualificationError("profile_paths_must_be_absolute_without_symlinks")
             raw[name] = value
-        raw.setdefault("model", "")
+        try:
+            raw["model_ref"] = (
+                ModelReference.model_validate(model_raw, strict=True)
+                if model_raw is not None
+                else None
+            )
+        except Exception as error:
+            raise QualificationError("invalid_model_ref") from error
         profile = cls(**cast(dict[str, object], raw))  # type: ignore[arg-type]
         if profile.system_image not in (
             "system-images;android-35;google_apis;x86_64",
@@ -71,8 +81,6 @@ class Profile:
             raise QualificationError("unsupported_system_image")
         if profile.state_root == Path("/") or len(profile.state_root.parts) < 4:
             raise QualificationError("unsafe_state_root")
-        if profile.model == "REQUIRED_APPROVED_MODEL_ID":
-            raise QualificationError("model_profile_required")
         if not 1 <= profile.max_steps <= 100 or profile.navigation_seconds > 180:
             raise QualificationError("invalid_execution_budget")
         if (

@@ -29,18 +29,31 @@ def main(scenario=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument("--apk", type=Path, required=True)
+    parser.add_argument("--model-definition", type=Path, required=True)
     args = parser.parse_args()
     os.umask(0o077)
     run = str(uuid.uuid4())
     directory = ROOT / ".private" / "task-session-acceptance" / run
     directory.mkdir(parents=True, mode=0o700)
     profile = tomllib.loads(args.profile.read_text())
+    model_definition = json.loads(args.model_definition.read_text())
+    if profile.get("model_ref") != model_definition.get("reference"):
+        raise SystemExit("Host model_ref must match the registered model definition")
     # Own isolated state; never rewrite the operator's existing profile or AVD.
     profile["state_root"] = str(directory / "phone-state")
     host_profile = directory / "host.toml"
-    host_profile.write_text(
-        "\n".join(f"{k} = {json.dumps(v)}" for k, v in profile.items()) + "\n"
-    )
+    model_ref = profile.pop("model_ref", None)
+    profile_lines = [f"{k} = {json.dumps(v)}" for k, v in profile.items()]
+    if model_ref is not None:
+        profile_lines.extend(
+            [
+                "",
+                "[model_ref]",
+                f"key = {json.dumps(model_ref['key'])}",
+                f"revision = {int(model_ref['revision'])}",
+            ]
+        )
+    host_profile.write_text("\n".join(profile_lines) + "\n")
     env = {
         **os.environ,
         "MOBILE_QA_TEST_SCOPE": run,
@@ -110,12 +123,15 @@ def main(scenario=None):
                         "adapter": "demo_persistence_v1",
                         "device_identity": "local-emulator-5554",
                         "image": profile["system_image"],
-                        "model": profile["model"],
+                        "model": model_definition["reference"],
                         "qualified": True,
                         "qualification_reference": "existing-local-demo-seam; full campaign remains open",
                         "max_apk_bytes": 104857600,
                     }
                 )
+            )
+            task(
+                env, actor, app, "register-model", file=args.model_definition.resolve()
             )
             task(env, actor, app, "register-profile", file=registered)
             task(

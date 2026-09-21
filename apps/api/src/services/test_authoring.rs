@@ -2,6 +2,7 @@
 use super::{apps, execution_store::*, task_sessions as phones, test_library};
 use crate::errors::{ApiFailure, ApiResult};
 use loco_rs::app::AppContext;
+use mobile_qa_contracts::model_registry::ModelCapability;
 use mobile_qa_contracts::{automation::*, execution::*, task_sessions::*, test_library::*};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use uuid::Uuid;
@@ -20,7 +21,12 @@ pub async fn command(
     if input.title.trim().is_empty() || input.title.len() > 200 {
         return Err(ApiFailure::invalid("Name this task using 1–200 characters"));
     }
-    if input.sequence.uses_ai() && session.profile.model.is_empty() {
+    if input.sequence.uses_ai()
+        && session
+            .resolved_model
+            .as_ref()
+            .is_none_or(|model| !model.has(ModelCapability::MinitapNavigation))
+    {
         return Err(ApiFailure::invalid(
             "This step needs an AI-enabled device profile",
         ));
@@ -93,7 +99,7 @@ async fn enqueue(
     if s.environment_revision != revision_now as u32 {
         return Err(conflict("Environment changed. Open a new session."));
     }
-    if ![2, 3, 4].contains(&s.protocol_version) {
+    if ![2, 3, 4, 5].contains(&s.protocol_version) {
         return Err(conflict(
             "Reconnect with the updated device worker to run direct steps",
         ));
@@ -163,10 +169,15 @@ pub async fn generate(
     if input.engine != Some(DiscoveryEngine::MinitapV1) {
         return Err(conflict("Refresh this page to explore with AI"));
     }
-    if ![3, 4].contains(&s.protocol_version) {
+    if ![3, 4, 5].contains(&s.protocol_version) {
         return Err(conflict("Reconnect with the updated discovery worker"));
     }
-    if s.profile.model.is_empty() || s.profile.driver != Driver::Minitap {
+    if s.profile.driver != Driver::Minitap
+        || s.resolved_model.as_ref().is_none_or(|model| {
+            !model.has(ModelCapability::MinitapNavigation)
+                || !model.has(ModelCapability::StructuredAuthoring)
+        })
+    {
         return Err(ApiFailure::invalid(
             "AI generation needs a configured model. Templates work without AI.",
         ));

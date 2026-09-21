@@ -42,7 +42,7 @@ def test_full_supervisor_with_injected_device(tmp_path, monkeypatch, scenario, e
     data = request_data(tmp_path)
     Path(data["apk_path"]).write_bytes(b"fixture")
     Path(data["profile_path"]).write_text(
-        f'sdk_root="{tmp_path}/sdk"\nstate_root="{tmp_path}/state"\ntoolchain="{tmp_path}/lock.json"\nmodel="demo"\n'
+        f'sdk_root="{tmp_path}/sdk"\nstate_root="{tmp_path}/state"\ntoolchain="{tmp_path}/lock.json"\n[model_ref]\nkey="demo"\nrevision=1\n'
     )
     monkeypatch.setattr(runner, "doctor", lambda p: {"image": "test"})
     monkeypatch.setattr(runner, "fixture_ready", lambda: None)

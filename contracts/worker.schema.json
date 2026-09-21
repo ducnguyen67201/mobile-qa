@@ -4,7 +4,7 @@
   "type": "object",
   "properties": {
     "authoring_request": {
-      "$ref": "#/$defs/AuthoringModelRequest"
+      "$ref": "#/$defs/AuthoringModelEnvelope"
     },
     "authoring_response": {
       "$ref": "#/$defs/AuthoringModelResponse"
@@ -20,6 +20,9 @@
     },
     "execution": {
       "$ref": "#/$defs/ExecutionContracts"
+    },
+    "model_definition": {
+      "$ref": "#/$defs/ModelDefinition"
     },
     "phone_claim": {
       "$ref": "#/$defs/PhoneClaimResponse"
@@ -39,8 +42,14 @@
     "request": {
       "$ref": "#/$defs/FakeExecutionRequest"
     },
+    "resolved_model": {
+      "$ref": "#/$defs/ResolvedModel"
+    },
     "result": {
       "$ref": "#/$defs/FakeExecutionResult"
+    },
+    "worker_model_capabilities": {
+      "$ref": "#/$defs/WorkerModelCapabilities"
     }
   },
   "required": [
@@ -48,6 +57,9 @@
     "discovery_call",
     "discovery_reply",
     "authoring_request",
+    "model_definition",
+    "resolved_model",
+    "worker_model_capabilities",
     "authoring_response",
     "phone_claim",
     "phone_claim_request",
@@ -232,6 +244,22 @@
         "artifacts",
         "usage",
         "events"
+      ]
+    },
+    "AuthoringModelEnvelope": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "$ref": "#/$defs/ResolvedModel"
+        },
+        "request": {
+          "$ref": "#/$defs/AuthoringModelRequest"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "request"
       ]
     },
     "AuthoringModelRequest": {
@@ -531,6 +559,16 @@
         "claim_id": {
           "type": "string",
           "format": "uuid"
+        },
+        "model_capabilities": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WorkerModelCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "profile_id": {
           "type": "string",
@@ -1573,7 +1611,14 @@
           "minimum": 0
         },
         "model": {
-          "type": "string"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelBinding"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "name": {
           "type": "string"
@@ -1597,7 +1642,6 @@
         "adapter",
         "device_identity",
         "image",
-        "model",
         "qualified",
         "qualification_reference",
         "max_apk_bytes"
@@ -1984,6 +2028,79 @@
         "evidence_reference"
       ]
     },
+    "ModelBinding": {
+      "description": "Historical profiles used a raw provider-model string. Consumers may read that\nshape, but API registration rejects it for every new profile.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ModelReference"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "ModelCapability": {
+      "type": "string",
+      "enum": [
+        "minitap_navigation",
+        "structured_authoring"
+      ]
+    },
+    "ModelDefinition": {
+      "type": "object",
+      "properties": {
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelCapability"
+          }
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "provider": {
+          "$ref": "#/$defs/ModelProvider"
+        },
+        "provider_model": {
+          "type": "string"
+        },
+        "reference": {
+          "$ref": "#/$defs/ModelReference"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "reference",
+        "display_name",
+        "provider",
+        "provider_model",
+        "capabilities"
+      ]
+    },
+    "ModelProvider": {
+      "type": "string",
+      "enum": [
+        "open_ai"
+      ]
+    },
+    "ModelReference": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "revision"
+      ]
+    },
     "ModelUsage": {
       "type": "object",
       "properties": {
@@ -2002,6 +2119,16 @@
         },
         "model": {
           "type": "string"
+        },
+        "model_reference": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "output_tokens": {
           "type": [
@@ -2045,6 +2172,9 @@
         "profile_path": {
           "type": "string"
         },
+        "resolved_model": {
+          "$ref": "#/$defs/ResolvedModel"
+        },
         "serial": {
           "type": "string"
         }
@@ -2056,7 +2186,8 @@
         "serial",
         "package",
         "instruction",
-        "max_steps"
+        "max_steps",
+        "resolved_model"
       ]
     },
     "ObservationKind": {
@@ -2091,6 +2222,16 @@
         "claim_id": {
           "type": "string",
           "format": "uuid"
+        },
+        "model_capabilities": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WorkerModelCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "protocol_version": {
           "type": "integer",
@@ -2276,6 +2417,16 @@
           "format": "uint32",
           "default": 0,
           "minimum": 0
+        },
+        "resolved_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResolvedModel"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "revision": {
           "type": "integer",
@@ -2660,6 +2811,16 @@
         "profile_path": {
           "type": "string"
         },
+        "resolved_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResolvedModel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "serial": {
           "type": "string",
           "pattern": "^emulator-5554$"
@@ -2811,6 +2972,16 @@
         "model": {
           "type": "string"
         },
+        "model_reference": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "output_tokens": {
           "type": [
             "integer",
@@ -2882,6 +3053,37 @@
         "data_variant",
         "required",
         "case"
+      ]
+    },
+    "ResolvedModel": {
+      "type": "object",
+      "properties": {
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelCapability"
+          }
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "provider": {
+          "$ref": "#/$defs/ModelProvider"
+        },
+        "provider_model": {
+          "type": "string"
+        },
+        "reference": {
+          "$ref": "#/$defs/ModelReference"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "reference",
+        "display_name",
+        "provider",
+        "provider_model",
+        "capabilities"
       ]
     },
     "RunArtifact": {
@@ -2994,6 +3196,16 @@
         "profile": {
           "$ref": "#/$defs/ExecutionProfile"
         },
+        "resolved_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResolvedModel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "source": {
           "anyOf": [
             {
@@ -3037,6 +3249,24 @@
           "required": [
             "kind",
             "case_version_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "saved_suite_v1"
+            },
+            "suite_version_id": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "suite_version_id"
           ]
         },
         {
@@ -3215,6 +3445,28 @@
         "checked",
         "enabled"
       ]
+    },
+    "WorkerModelCapabilities": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelProvider"
+          }
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

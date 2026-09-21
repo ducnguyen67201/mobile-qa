@@ -67,6 +67,13 @@ function show(blocked = false, embedded = false, protocolVersion = 4) {
     revision: 0,
     environment_revision: 1,
     tasks: [],
+    resolved_model: {
+      reference: { key: 'synthetic.openai', revision: 1 },
+      display_name: 'Synthetic',
+      provider: 'open_ai',
+      provider_model: 'synthetic-model',
+      capabilities: ['minitap_navigation', 'structured_authoring'],
+    },
   }
   const opened: unknown[] = []
   const tasks: PhoneCommandRequest[] = []

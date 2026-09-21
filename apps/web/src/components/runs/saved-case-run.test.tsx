@@ -26,7 +26,7 @@ vi.mock('@/api/task-sessions', () => ({
     queryFn: async () => ({
       active_session: null,
       builds: [{ id: 'build', name: 'v1.1' }],
-      profiles: [{ id: 'profile', name: 'Device' }],
+      profiles: [{ id: 'profile', name: 'Device', model_available: true }],
     }),
   }),
   phoneQuery: () => ({ queryKey: ['phone'], queryFn: async () => null }),

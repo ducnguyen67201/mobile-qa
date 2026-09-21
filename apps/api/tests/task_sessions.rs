@@ -1,17 +1,68 @@
 //! Actual HTTP and PostgreSQL session lifecycle; worker responses are synthetic.
 mod support;
-use mobile_qa::services::{execution_store::*, test_definitions, worker_auth};
+use mobile_qa::services::{execution_store::*, model_registry, test_definitions, worker_auth};
+use mobile_qa_contracts::model_registry::*;
 use mobile_qa_contracts::{automation::*, execution::*, task_sessions::*, test_library::*};
 use support::*;
 
 #[tokio::test]
 async fn task_session_requires_no_plan_and_fences_worker_and_task_identity() {
-    assert_session_protocol(3).await;
+    assert_session_protocol(5).await;
 }
 
 #[tokio::test]
-async fn protocol_four_runs_direct_commands_and_ai_discovery() {
-    assert_session_protocol(4).await;
+async fn historical_model_free_direct_profile_remains_in_phone_options() {
+    let _guard = DATABASE_BOOT.lock().await;
+    request::<App, _, _>(|server, ctx| async move {
+        let owner = login(&server, &ctx).await;
+        let mut input = create_input(owner.org);
+        input.android_package = "ai.mobileqa.demo".into();
+        let app = apps::create(&ctx, owner.user, input).await.unwrap().id;
+        let fixture: RunResponse =
+            serde_json::from_str(include_str!("fixtures/execution/comparison.json")).unwrap();
+        let mut profile = fixture.manifest.profile;
+        profile.id = Uuid::new_v4();
+        let context = profile.execution_context.as_mut().unwrap();
+        context.qualified_profile_id = profile.id;
+        // The comparison snapshot predates strict clean-start checks; registration
+        // needs a fixed, required preflight assertion.
+        let check = &mut context.starting_checks[0];
+        check.checkpoint_id = "preflight".into();
+        check.text_filter.clear();
+        check.required = true;
+        profile.model = None;
+        test_definitions::register_profile(&ctx, owner.user, app, profile.clone())
+            .await
+            .unwrap();
+        worker_auth::register(
+            &ctx,
+            owner.user,
+            app,
+            Uuid::new_v4(),
+            profile.id,
+            &loco_rs::hash::random_string(64),
+        )
+        .await
+        .unwrap();
+        // Both pre-registry sentinels remain model-free reads, never new writes.
+        for legacy in ["none", ""] {
+            exec(
+                &ctx.db,
+                "UPDATE execution_profiles SET payload=jsonb_set(payload,'{model}',$2) WHERE id=$1",
+                vec![profile.id.into(), serde_json::json!(legacy).into()],
+            )
+            .await
+            .unwrap();
+            let response = owner
+                .read(server.get(&format!("/api/apps/{app}/phone-options")))
+                .await;
+            response.assert_status_ok();
+            let profiles = response.json::<PhoneOptions>().profiles;
+            assert_eq!(profiles.len(), 1);
+            assert!(profiles[0].is_model_free());
+        }
+    })
+    .await;
 }
 
 async fn assert_session_protocol(protocol_version: u32) {
@@ -34,6 +85,18 @@ async fn assert_session_protocol(protocol_version: u32) {
             )))
             .await
             .assert_status_ok();
+        let model = ModelDefinition {
+            reference: ModelReference { key: "synthetic.test".into(), revision: 1 },
+            display_name: "Synthetic test model".into(),
+            provider: ModelProvider::OpenAi,
+            provider_model: "test-model".into(),
+            capabilities: vec![ModelCapability::MinitapNavigation, ModelCapability::StructuredAuthoring],
+        };
+        model_registry::register(&ctx.db, &model).await.unwrap();
+        let capabilities = WorkerModelCapabilities {
+            model: Some(model.reference.clone()),
+            providers: vec![ModelProvider::OpenAi],
+        };
         let profile = ExecutionProfile {
         execution_context: None,
             id: Uuid::new_v4(),
@@ -43,7 +106,7 @@ async fn assert_session_protocol(protocol_version: u32) {
             adapter: "demo_persistence_v1".into(),
             device_identity: Uuid::new_v4().to_string(),
             image: "test".into(),
-            model: "test-model".into(),
+            model: Some(ModelBinding::Registered(model.reference.clone())),
             qualified: true,
             qualification_reference: "synthetic-not-device-evidence".into(),
             max_apk_bytes: 104857600,
@@ -55,8 +118,28 @@ async fn assert_session_protocol(protocol_version: u32) {
         worker_auth::register(&ctx, owner.user, app, Uuid::new_v4(), profile.id, &token)
             .await
             .unwrap();
+        let options_path = format!("/api/apps/{app}/phone-options");
+        let before = owner.read(server.get(&options_path)).await;
+        before.assert_status_ok();
+        assert!(before.json::<PhoneOptions>().profiles.is_empty());
+        // An idle poll must commit the capability heartbeat before a first session can exist.
+        let idle = server
+            .post("/api/worker/phone-claims")
+            .add_header("authorization", format!("Bearer {token}"))
+            .json(&PhoneClaimRequest {
+                protocol_version: 5,
+                claim_id: Uuid::new_v4(),
+                model_capabilities: Some(capabilities.clone()),
+            })
+            .await;
+        idle.assert_status_ok();
+        assert!(idle.json::<PhoneClaimResponse>().lease.is_none());
+        assert!(field::<bool>(
+            &one(&ctx.db, "SELECT model_last_seen_at IS NOT NULL AS seen FROM execution_workers WHERE profile_id=$1", vec![profile.id.into()]).await.unwrap(),
+            "seen"
+        ).unwrap());
         let opts = owner
-            .read(server.get(&format!("/api/apps/{app}/phone-options")))
+            .read(server.get(&options_path))
             .await;
         opts.assert_status_ok();
         assert!(opts.json::<PhoneOptions>().blockers.is_empty());
@@ -89,8 +172,9 @@ async fn assert_session_protocol(protocol_version: u32) {
             .post("/api/worker/phone-claims")
             .add_header("authorization", format!("Bearer {token}"))
             .json(&PhoneClaimRequest {
-                protocol_version: 0,
+                protocol_version: 5,
                 claim_id: Uuid::new_v4(),
+                model_capabilities: Some(capabilities.clone()),
             })
             .await;
         claim.assert_status_ok();
@@ -123,21 +207,23 @@ async fn assert_session_protocol(protocol_version: u32) {
                 .add_header("x-lease-token", lease.lease_token.clone())
         };
         publish().json(&status).await.assert_status_ok();
-        let unsupported = serde_json::json!({"id":Uuid::new_v4(),"expected_revision":0,"frame_id":null,"title":"Back","sequence":{"actions":[{"id":"b","checkpoint_id":"b","kind":"direct","instruction":"","command":{"operation":"back"}}],"checks":[]}});
+        let direct_command = serde_json::json!({"id":Uuid::new_v4(),"expected_revision":0,"frame_id":null,"title":"Back","sequence":{"actions":[{"id":"b","checkpoint_id":"b","kind":"direct","instruction":"","command":{"operation":"back"}}],"checks":[]}});
+        let mut stale_screen_command = direct_command.clone();
+        stale_screen_command["frame_id"] = serde_json::json!(Uuid::new_v4());
         assert_eq!(
             owner
                 .write(server.post(&format!("{path}/commands")))
-                .json(&unsupported)
+                .json(&stale_screen_command)
                 .await
                 .status_code()
                 .as_u16(),
             409
         );
-        let legacy_generation = serde_json::json!({"id":Uuid::new_v4(),"session_id":s.id,"expected_revision":0,"category":"smoke","journey":"","allow_writes":false,"reuse_job_id":null,"engine":"minitap_v1"});
+        let stale_generation = serde_json::json!({"id":Uuid::new_v4(),"session_id":s.id,"expected_revision":1,"category":"smoke","journey":"","allow_writes":false,"reuse_job_id":null,"engine":"minitap_v1"});
         assert_eq!(
             owner
                 .write(server.post(&format!("/api/apps/{app}/test-generations")))
-                .json(&legacy_generation)
+                .json(&stale_generation)
                 .await
                 .status_code()
                 .as_u16(),
@@ -237,8 +323,9 @@ async fn assert_session_protocol(protocol_version: u32) {
             .post("/api/worker/phone-claims")
             .add_header("authorization", format!("Bearer {token}"))
             .json(&PhoneClaimRequest {
-                protocol_version: 2,
+                protocol_version: 5,
                 claim_id: Uuid::new_v4(),
+                model_capabilities: Some(capabilities.clone()),
             })
             .await
             .json::<PhoneClaimResponse>()
@@ -257,10 +344,10 @@ async fn assert_session_protocol(protocol_version: u32) {
         direct_publish().json(&status).await.assert_status_ok();
         owner
             .write(server.post(&format!("/api/phones/{}/commands", old_direct.id)))
-            .json(&unsupported)
+            .json(&direct_command)
             .await
             .assert_status_ok();
-        let mut old_generation = legacy_generation.clone();
+        let mut old_generation = stale_generation.clone();
         old_generation["session_id"] = serde_json::json!(old_direct.id);
         assert_eq!(
             owner
@@ -294,6 +381,7 @@ async fn assert_session_protocol(protocol_version: u32) {
             .json(&PhoneClaimRequest {
                 protocol_version,
                 claim_id: Uuid::new_v4(),
+                model_capabilities: Some(capabilities.clone()),
             })
             .await;
         claimed.assert_status_ok();

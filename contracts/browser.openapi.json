@@ -12462,6 +12462,10 @@
               "null"
             ]
           },
+          "cancel_requested": {
+            "type": "boolean",
+            "description": "Cancellation intent persists even when device recovery takes state precedence."
+          },
           "comparison": {
             "oneOf": [
               {

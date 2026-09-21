@@ -60,11 +60,11 @@ export function RunDetail() {
         <Button
           color="red"
           variant="light"
-          disabled={r.state === 'finished' || r.state === 'cancel_requested'}
+          disabled={r.cancel_requested || r.state === 'finished' || r.state === 'cancel_requested'}
           loading={cancel.isPending}
           onClick={() => cancel.mutate()}
         >
-          Cancel run
+          {r.cancel_requested ? 'Cancellation requested' : 'Cancel run'}
         </Button>
       </Group>
       {r.state === 'queued' && r.queue_status && (
@@ -126,9 +126,13 @@ export function RunDetail() {
         <Alert>Cancellation requested. Waiting for your phone to stop and clean up.</Alert>
       )}
       {r.state === 'recovery_required' && (
-        <Alert color="orange">
-          Your phone needs attention before another run can start. The recorded test result is
-          unchanged.
+        <Alert
+          color="orange"
+          title={r.cancel_requested ? 'Cancellation recorded; device recovery required' : undefined}
+        >
+          {r.cancel_requested
+            ? 'Your cancellation request was recorded, but phone cleanup could not be verified. Its reservation remains until an operator recovers the device. The test result is unchanged.'
+            : 'Your phone needs attention before another run can start. The recorded test result is unchanged.'}
         </Alert>
       )}
       {cancel.isError && <ErrorNotice error={cancel.error} retry={() => cancel.mutate()} />}

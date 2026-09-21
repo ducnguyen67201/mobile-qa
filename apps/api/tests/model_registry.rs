@@ -5,7 +5,7 @@ use mobile_qa::services::model_registry;
 use mobile_qa::services::{execution_store::*, runs, scheduler, test_definitions, worker_auth};
 use mobile_qa_contracts::automation::DirectCommand;
 use mobile_qa_contracts::execution::{
-    ActionKind, ClaimRequest, Driver, ExecutionProfile, QueueReason, RunResponse,
+    ActionKind, ClaimRequest, Driver, ExecutionProfile, JobState, QueueReason, RunResponse,
 };
 use mobile_qa_contracts::model_registry::*;
 use mobile_qa_contracts::task_sessions::{OpenPhoneRequest, PhoneSession};
@@ -212,6 +212,13 @@ async fn recovery_queue_links_only_to_a_run_in_the_same_app() {
         let same_app = owner.read(server.get(&format!("/api/runs/{waiting}"))).await.json::<RunResponse>().queue_status.unwrap();
         assert_eq!(same_app.reason, QueueReason::DeviceRecoveryRequired);
         assert_eq!(same_app.blocking_run_id, Some(blocker));
+
+        let cancelled = owner.write(server.post(&format!("/api/runs/{blocker}/cancel"))).await.json::<RunResponse>();
+        assert!(cancelled.cancel_requested);
+        assert_eq!(cancelled.state, JobState::RecoveryRequired);
+        let persisted = owner.read(server.get(&format!("/api/runs/{blocker}"))).await.json::<RunResponse>();
+        assert!(persisted.cancel_requested);
+        assert_eq!(persisted.state, JobState::RecoveryRequired);
 
         // A shared device can block a different app without disclosing its run ID.
         let foreign = login(&server, &ctx).await;

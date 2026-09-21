@@ -403,6 +403,7 @@ pub async fn detail(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<RunRespons
         None
     };
     Ok(RunResponse {
+        cancel_requested: field(&row, "cancel_requested")?,
         build_label: Some(field(&row, "build_label")?),
         queue_status,
         comparison: field::<Option<serde_json::Value>>(&row, "comparison")?

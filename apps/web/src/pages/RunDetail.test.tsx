@@ -83,6 +83,30 @@ it('shows simulated run and pending cancellation without claiming physical stop'
   expect(await screen.findByText(/Waiting for your phone to stop/)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Cancel run' })).toBeDisabled()
 })
+it('shows cancellation separately from required device recovery', async () => {
+  const current = report()
+  current.state = 'recovery_required'
+  current.cancel_requested = true
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      const path = new URL(request.url).pathname
+      if (path.endsWith('/session')) return Response.json(session)
+      if (path.endsWith('/settings')) return Response.json(settings)
+      if (path === `/apps/${appId}` || path === `/api/apps/${appId}`) return Response.json(app)
+      if (path.endsWith(runId)) return Response.json(current)
+      throw new Error(`Unexpected fixture route ${path}`)
+    }),
+  )
+  show()
+  expect(
+    await screen.findByText('Cancellation recorded; device recovery required'),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByText(/reservation remains until an operator recovers the device/),
+  ).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Cancellation requested' })).toBeDisabled()
+})
 it('explains a queued run held for device recovery', async () => {
   const current = report()
   current.state = 'queued'

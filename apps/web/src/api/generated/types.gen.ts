@@ -953,6 +953,10 @@ export type RunResponse = {
     attempts: Array<AttemptResponse>;
     baseline_run_id?: string | null;
     build_label?: string | null;
+    /**
+     * Cancellation intent persists even when device recovery takes state precedence.
+     */
+    cancel_requested?: boolean;
     comparison?: null | RunComparison;
     created_at: string;
     id: string;

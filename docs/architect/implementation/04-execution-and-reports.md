@@ -57,6 +57,11 @@ Use lease generation/fencing tokens, expiry, heartbeats, event IDs and sequence 
 
 On lease expiry, invalidate completion authority and mark recovery required. Terminate/isolate the old execution and verify device/backend reset before reuse. Database fencing alone does not stop an old process tapping the phone. Cancellation remains pending until termination is acknowledged or resources are quarantined; it must not falsely promise immediate physical stop.
 
+Run details expose durable cancellation intent separately from the attempt state. An attempt
+with cancellation requested and recovery required remains quarantined and holds
+reservations until trusted operator recovery records physical reset evidence; the UI
+must show both facts.
+
 Set bounded run time, actions, artifact bytes and model usage where observable. If the SDK cannot enforce an internal action budget, use a process-level hard deadline and record that limitation. Preserve partial evidence on timeout or upload failure.
 
 ## Verification and report rules

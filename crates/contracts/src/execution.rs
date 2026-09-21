@@ -340,6 +340,9 @@ pub struct AttemptResponse {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RunResponse {
+    /// Cancellation intent persists even when device recovery takes state precedence.
+    #[serde(default)]
+    pub cancel_requested: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub build_label: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

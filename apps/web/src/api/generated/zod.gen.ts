@@ -1076,6 +1076,7 @@ export const zRunResponse = z.object({
     attempts: z.array(zAttemptResponse),
     baseline_run_id: z.uuid().nullish(),
     build_label: z.string().nullish(),
+    cancel_requested: z.boolean().optional(),
     comparison: zRunComparison.nullish(),
     created_at: z.iso.datetime(),
     id: z.uuid(),

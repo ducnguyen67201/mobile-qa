@@ -148,6 +148,89 @@ else:
     )
 
 
+def test_android_toolchain_checked_before_claim(tmp_path, monkeypatch):
+    from test_device import profile
+
+    from mobile_qa_worker.execution import runner
+    from mobile_qa_worker.qualification.config import QualificationError
+
+    host = profile(tmp_path)
+    monkeypatch.setenv("JAVA_HOME", str(tmp_path / "jdk17"))
+    monkeypatch.setenv("OPENAI_API_KEY", "must-not-reach-toolchain")
+    monkeypatch.setenv("MOBILE_QA_WORKER_TOKEN", "must-not-reach-child")
+    child_env = runner.child_environment()
+    assert child_env["JAVA_HOME"] == str(tmp_path / "jdk17")
+    assert "OPENAI_API_KEY" not in child_env
+    assert "MOBILE_QA_WORKER_TOKEN" not in child_env
+    observed = []
+
+    def command(args, timeout, env):
+        observed.append((args, timeout, env))
+        raise QualificationError("command_failed")
+
+    monkeypatch.setattr("mobile_qa_worker.qualification.process.command", command)
+    with pytest.raises(QualificationError, match="android_toolchain_unavailable"):
+        runner.preflight_android_tools(host)
+    assert observed[0][0] == [
+        str(host.sdk_root / "cmdline-tools/19.0/bin/avdmanager"),
+        "list",
+        "device",
+    ]
+    assert observed[0][2]["JAVA_HOME"] == str(tmp_path / "jdk17")
+    assert "OPENAI_API_KEY" not in observed[0][2]
+
+
+@pytest.mark.parametrize("emulator_launched", [False, True])
+def test_failed_setup_only_auto_cleans_before_emulator_launch(
+    tmp_path, monkeypatch, emulator_launched
+):
+    from contextlib import nullcontext
+
+    from test_device import profile
+
+    from mobile_qa_worker.execution import actions
+    from mobile_qa_worker.generated.models import Driver
+    from mobile_qa_worker.qualification.config import QualificationError
+
+    host = profile(tmp_path)
+    host.state_root.mkdir()
+    assigned = job()
+    assigned.manifest.profile.image = host.system_image
+    assigned.manifest.profile.driver = Driver.minitap
+    calls = []
+
+    class Device:
+        ever_launched = emulator_launched
+
+        def boot(self, **kwargs):
+            calls.append("boot")
+            raise QualificationError("avd_creation_failed")
+
+        def stop(self):
+            calls.append("stop")
+
+        def discard(self):
+            calls.append("discard")
+
+    monkeypatch.setattr(actions.Profile, "load", lambda _: host)
+    monkeypatch.setattr(actions, "Device", lambda *args: Device())
+    monkeypatch.setattr(actions, "doctor", lambda _: None)
+    monkeypatch.setattr(actions, "boot_id", lambda: "fixture")
+    monkeypatch.setattr(actions, "cancellation", lambda _: nullcontext())
+    monkeypatch.setattr(actions, "backend", lambda _: nullcontext())
+    result = actions.execute(assigned, tmp_path / "profile", tmp_path, "pass")
+    assert calls == (
+        ["boot", "stop", "discard", "boot", "stop"]
+        if emulator_launched
+        else ["boot", "stop", "discard"]
+    )
+    assert result.reason == "avd_creation_failed"
+    assert result.outcome.value == "inconclusive"
+    assert result.reset.value == ("quarantined" if emulator_launched else "verified_clean")
+    assert result.stopped is not emulator_launched
+    assert (host.state_root / "dirty.json").exists() is emulator_launched
+
+
 def test_client_actual_http_response_and_redirect_boundaries():
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     from threading import Thread

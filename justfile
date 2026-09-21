@@ -121,6 +121,14 @@ dev-execution-real origin profile_id state profile:
 smoke-test-library:
     python3 scripts/test_library_smoke.py
 
+# Explicit two-case saved-suite HTTP acceptance with simulated evidence.
+smoke-suite:
+    python3 scripts/smoke_suite.py
+
+# Explicit real local two-case acceptance; never part of ordinary checks.
+smoke-suite-real profile good broken:
+    uv run --no-sync --project apps/mobile-worker --frozen python scripts/regression_acceptance.py --suite --profile {{quote(profile)}} --good {{quote(good)}} --broken {{quote(broken)}}
+
 # Typed direct definitions through the real API; simulated evidence, no model calls.
 smoke-direct-authoring:
     python3 scripts/direct_authoring_smoke.py

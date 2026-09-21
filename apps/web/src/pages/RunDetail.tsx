@@ -47,7 +47,15 @@ export function RunDetail() {
   )
   return (
     <Stack>
-      <PageHeading eyebrow="Release check" title={r.summary} description={app.data.name} />
+      <PageHeading
+        eyebrow={r.manifest.source?.kind === 'saved_suite_v1' ? 'Saved suite' : 'Release check'}
+        title={
+          r.manifest.source?.kind === 'saved_suite_v1'
+            ? `Saved suite · ${r.manifest.cases.length} cases`
+            : r.summary
+        }
+        description={`${app.data.name} · ${r.summary}`}
+      />
       {r.manifest.profile.driver === 'fake' && (
         <Alert color="yellow">Simulated execution. No real phone or model was used.</Alert>
       )}

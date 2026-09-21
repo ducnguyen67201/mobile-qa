@@ -58,24 +58,24 @@ def import_file(env, actor, app, directory, content):
     return match[1]
 
 
-def submit(opener, app, body, csrf):
+def submit(opener, app, body, csrf, source="plan", key=None):
     req = urllib.request.Request(
-        BASE + f"/api/apps/{app}/runs",
+        BASE + f"/api/apps/{app}/{'suite-runs' if source == 'suite' else 'runs'}",
         json.dumps(body).encode(),
         {
             "Origin": ORIGIN,
             "Content-Type": "application/json",
             "X-CSRF-Token": csrf,
-            "Idempotency-Key": str(uuid.uuid4()),
+            "Idempotency-Key": key or str(uuid.uuid4()),
         },
         method="POST",
     )
     with opener.open(req, timeout=30) as response:
-        assert response.status == 201
+        assert response.status in (200, 201)
         return json.load(response)
 
 
-def main(author=None, edit_after_queue=None):
+def main(author=None, edit_after_queue=None, source="plan"):
     os.umask(0o077)
     env = {
         **os.environ,
@@ -210,31 +210,56 @@ def main(author=None, edit_after_queue=None):
                 worker=str(uuid.uuid4()),
                 profile=profile,
             )
-            request(
-                owner,
-                "PUT",
-                f"/api/apps/{app}/default-test-plan",
-                {
-                    "mutation_id": str(uuid.uuid4()),
-                    "expected_revision": 0,
-                    "plan_version_id": plan,
-                },
-                csrf,
-            )
-            preview = request(
-                owner, "GET", f"/api/apps/{app}/execution-plan?build_id={build['id']}"
-            )
+            if source == "plan":
+                request(
+                    owner,
+                    "PUT",
+                    f"/api/apps/{app}/default-test-plan",
+                    {
+                        "mutation_id": str(uuid.uuid4()),
+                        "expected_revision": 0,
+                        "plan_version_id": plan,
+                    },
+                    csrf,
+                )
+                preview = request(
+                    owner,
+                    "GET",
+                    f"/api/apps/{app}/execution-plan?build_id={build['id']}",
+                )
+            else:
+                preview = request(
+                    owner,
+                    "POST",
+                    f"/api/apps/{app}/suite-runs/preview",
+                    {
+                        "suite_version_id": plan,
+                        "build_id": build["id"],
+                        "profile_id": profile,
+                        "environment_revision": 1,
+                    },
+                    csrf,
+                )
             assert not preview["blockers"]
-            queued = submit(
-                owner,
-                app,
+            run_body = (
                 {
+                    "suite_version_id": plan,
+                    "build_id": build["id"],
+                    "profile_id": profile,
+                    "environment_revision": 1,
+                    "baseline_run_id": None,
+                }
+                if source == "suite"
+                else {
                     "build_id": build["id"],
                     "plan_version_id": plan,
                     "environment_revision": 1,
-                },
-                csrf,
+                }
             )
+            queued_key = str(uuid.uuid4())
+            queued = submit(owner, app, run_body, csrf, source, queued_key)
+            if source == "suite":
+                assert submit(owner, app, run_body, csrf, source, queued_key) == queued
             if edit_after_queue is not None:
                 edit_after_queue(owner, csrf, app)
         results = []
@@ -253,47 +278,51 @@ def main(author=None, edit_after_queue=None):
                     else submit(
                         owner,
                         app,
-                        {
-                            "build_id": build["id"],
-                            "plan_version_id": plan,
-                            "environment_revision": 1,
-                        },
+                        {**run_body, "baseline_run_id": results[0]["id"]}
+                        if source == "suite"
+                        else run_body,
                         session["csrf_token"],
+                        source,
                     )
                 )
-                state = ROOT / ".private/execution-smoke" / str(uuid.uuid4())
-                subprocess.run(
-                    [
-                        "uv",
-                        "run",
-                        "--no-sync",
-                        "--project",
-                        str(ROOT / "apps/mobile-worker"),
-                        "--frozen",
-                        "mobile-qa-worker",
-                        "execution-worker",
-                        "--origin",
-                        BASE,
-                        "--profile-id",
-                        profile,
-                        "--state",
-                        str(state),
-                        "--scenario",
-                        scenario,
-                        "--once",
-                    ],
-                    env=env,
-                    check=True,
-                    timeout=120,
-                )
+                for _ in run["manifest"]["cases"]:
+                    state = ROOT / ".private/execution-smoke" / str(uuid.uuid4())
+                    subprocess.run(
+                        [
+                            "uv",
+                            "run",
+                            "--no-sync",
+                            "--project",
+                            str(ROOT / "apps/mobile-worker"),
+                            "--frozen",
+                            "mobile-qa-worker",
+                            "execution-worker",
+                            "--origin",
+                            BASE,
+                            "--profile-id",
+                            profile,
+                            "--state",
+                            str(state),
+                            "--scenario",
+                            scenario,
+                            "--once",
+                        ],
+                        env=env,
+                        check=True,
+                        timeout=120,
+                    )
                 report = request(owner, "GET", "/api/runs/" + run["id"])
                 assert report["manifest"] == queued["manifest"], report
                 assert report["state"] == "finished", report
-                assert report["attempts"][0]["outcome"] == expected, report
-                assert report["attempts"][0]["cleanup"] == "verified_clean"
-                assert len(report["attempts"][0]["artifacts"]) == 2 * len(
-                    report["manifest"]["cases"][0]["case"]["actions"]
-                )
+                assert len(report["attempts"]) == len(report["manifest"]["cases"])
+                for index, attempt in enumerate(report["attempts"]):
+                    assert attempt["outcome"] == expected, report
+                    assert attempt["cleanup"] == "verified_clean"
+                    assert len(attempt["artifacts"]) == 2 * len(
+                        report["manifest"]["cases"][index]["case"]["actions"]
+                    )
+                if source == "suite" and scenario != "pass":
+                    assert report["baseline_run_id"] == results[0]["id"]
                 assert report["manifest"]["profile"]["driver"] == "fake"
                 results.append(report)
         with server(env):

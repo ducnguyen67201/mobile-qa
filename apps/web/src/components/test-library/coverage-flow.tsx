@@ -907,7 +907,7 @@ export function RunCoverageFlow({ run }: { run: RunResponse }) {
             <Text className={styles.kicker}>Live execution map</Text>
           </Group>
           <Title order={2} size="h3">
-            Run sequence
+            Run suite
           </Title>
           <Text size="sm" c="dimmed">
             Real manifest order and latest attempt state. Select a started case to jump to its

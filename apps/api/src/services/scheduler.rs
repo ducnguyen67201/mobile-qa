@@ -184,11 +184,13 @@ pub async fn claim(
                 poll_after_seconds: 5,
             });
         }
+        // Oldest worker-eligible run, then case and diagnostic attempt. IDs make
+        // equal timestamps deterministic; reservations still serialize the app.
         let jobs = rows(
             &tx,
             "SELECT a.id,r.manifest FROM execution_attempts a JOIN execution_runs r ON r.id=a.run_id WHERE \
             r.app_id=$1 AND a.state='queued' AND r.cancel_requested=false AND \
-            r.manifest->'profile'->>'id'=$2 AND ($4 OR NOT (r.manifest ? 'source')) AND ($3 OR NOT jsonb_path_exists(r.manifest, '$.cases[*].case.actions[*] ? (@.kind == \"direct\")')) AND (r.manifest->'resolved_model' IS NULL OR r.manifest->'resolved_model'='null'::jsonb OR EXISTS (SELECT 1 FROM jsonb_array_elements($5::jsonb) compatible WHERE compatible->'reference'=r.manifest->'resolved_model'->'reference' AND compatible->'provider'=r.manifest->'resolved_model'->'provider')) ORDER BY r.created_at,a.case_index,a.number FOR \
+            r.manifest->'profile'->>'id'=$2 AND ($4 OR NOT (r.manifest ? 'source')) AND ($3 OR NOT jsonb_path_exists(r.manifest, '$.cases[*].case.actions[*] ? (@.kind == \"direct\")')) AND (r.manifest->'resolved_model' IS NULL OR r.manifest->'resolved_model'='null'::jsonb OR EXISTS (SELECT 1 FROM jsonb_array_elements($5::jsonb) compatible WHERE compatible->'reference'=r.manifest->'resolved_model'->'reference' AND compatible->'provider'=r.manifest->'resolved_model'->'provider')) ORDER BY r.created_at,r.id,a.case_index,a.number,a.id FOR \
             UPDATE OF a SKIP LOCKED LIMIT 1",
             vec![worker.app_id.into(), worker.profile_id.to_string().into(), (input.version>=2).into(), (input.version>=4).into(), model_registry::eligible_models(input.model_capabilities.as_ref()).into()],
         )

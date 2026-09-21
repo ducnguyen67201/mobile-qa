@@ -1,6 +1,11 @@
 //! Saved suites enter the same immutable manifest and attempt pipeline as release plans.
-use super::{apps, execution_store::*, runs, test_definitions as definitions, test_library};
-use crate::errors::{ApiFailure, ApiResult};
+use super::{
+    apps, execution_store::*, run_baselines, runs, test_definitions as definitions, test_library,
+};
+use crate::{
+    domain::regression,
+    errors::{ApiFailure, ApiResult},
+};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::{execution::*, regression::*};
 use sea_orm::{ConnectionTrait, TransactionTrait};
@@ -79,9 +84,18 @@ pub async fn preview(
     apps::authorized(ctx, actor, app).await?;
     let preview = manifest(&ctx.db, app, &input).await?;
     let manifest = preview.manifest.ok_or_else(ApiFailure::internal)?;
+    let (baselines, suggested_baseline_id) = run_baselines::choices(
+        &ctx.db,
+        app,
+        |run| regression::suite_baseline_eligible(&manifest, run),
+        "Same suite version and conclusive execution context",
+    )
+    .await?;
     Ok(SuiteRunPreview {
         blockers: preview.blockers,
         environment_revision: manifest.environment_revision,
+        baselines,
+        suggested_baseline_id,
     })
 }
 
@@ -138,11 +152,22 @@ pub async fn create(
     if manifest.environment_revision != input.environment_revision {
         return Err(conflict("Environment changed; refresh the run setup"));
     }
+    if let Some(baseline_id) = input.baseline_run_id {
+        one(
+            &tx,
+            "SELECT id FROM execution_runs WHERE id=$1 AND app_id=$2",
+            vec![baseline_id.into(), app.into()],
+        )
+        .await?;
+        if runs::detail(&tx, baseline_id).await?.state != JobState::Finished {
+            return Err(conflict("Baseline must be a completed run"));
+        }
+    }
     let id = Uuid::new_v4();
     exec(
         &tx,
         "INSERT INTO execution_runs(id,app_id,creator_id,build_id,plan_id,idempotency_key,\
-            fingerprint,manifest) VALUES($1,$2,$3,$4,NULL,$5,$6,$7)",
+            fingerprint,manifest,baseline_run_id) VALUES($1,$2,$3,$4,NULL,$5,$6,$7,$8)",
         vec![
             id.into(),
             app.into(),
@@ -151,6 +176,7 @@ pub async fn create(
             key.into(),
             fingerprint.into(),
             json(&manifest)?.into(),
+            input.baseline_run_id.into(),
         ],
     )
     .await?;

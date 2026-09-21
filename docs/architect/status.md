@@ -1,5 +1,34 @@
 # Implementation status and evidence
 
+## Reliable smoke suite — local implementation (2026-09-21)
+
+Saved-suite run setup now requires an explicit build and qualified device,
+shows the chosen build checksum, offers completed-run baseline choices, and
+pins the selected baseline on the immutable multi-case run. The API shares
+candidate scanning with saved-case runs, enforces the same-app completed
+baseline rule, and keeps worker pickup in the existing fenced claim path with
+stable tie-breaks. The report names the saved suite and distinguishes required
+passing checks from optional failures and missing real-device proof. Older
+suite requests without a baseline remain valid and keep their idempotency bytes.
+
+Contract drift, scoped formatting, API Clippy/workspace tests, 158 web tests,
+185 worker tests and the production build passed. The API test pass used a
+disposable PostgreSQL container and process-scoped JDK 17 because the retained
+test database has a stale migration ledger and the default Java is 8. Existing
+test-library and execution HTTP smokes, plus the new two-case saved-suite HTTP
+smoke, passed against a fresh migrated disposable database. All three use the
+fake worker and intake-only APK; they prove routes, attempt order, idempotency,
+baseline pinning and restart persistence, **not** Android verdicts.
+
+The real good/broken two-case harness is implemented as the explicit `--suite`
+mode of `scripts/regression_acceptance.py`. It has not run in this delivery:
+another worktree currently has an API and phone/execution workers attached to
+the same physical host profile. That host also has recorded recovery history;
+do not stop those processes or reuse its device until the operator verifies
+physical state and owns the host for acceptance. The previous rendered-browser
+admin-policy denial remains open. There are no new real suite run IDs or device
+evidence to report.
+
 ## Execution stall recovery hardening — local changes (2026-09-21)
 
 The real execution worker now checks the Android command-line tools before claiming a job and passes the configured JDK to its supervised child. An AVD setup failure before an emulator has ever launched may finish with verified clean cleanup after the owned directory and free ports are checked. Once an emulator has launched, uncertain cleanup remains quarantined and requires operator recovery. The previously held local attempt was explicitly recovered after confirming no active process, dirty marker or current AVD; a later queued attempt exposed a Java 8 selection and left a new dirty AVD state. A fresh host boot and operator recovery are still required for that new attempt. Source and offline tests do not establish a successful live suite run.

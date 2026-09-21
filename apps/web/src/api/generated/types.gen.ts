@@ -1055,11 +1055,14 @@ export type SuiteDefinition = {
 };
 
 export type SuiteRunPreview = {
+    baselines: Array<BaselineChoice>;
     blockers: Array<string>;
     environment_revision: number;
+    suggested_baseline_id?: string | null;
 };
 
 export type SuiteRunRequest = {
+    baseline_run_id?: string | null;
     build_id: string;
     environment_revision: number;
     profile_id: string;

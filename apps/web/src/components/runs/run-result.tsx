@@ -34,7 +34,11 @@ export function RunResult({ run, compact = false }: { run: RunResponse; compact?
     <Card withBorder padding="sm">
       <Stack gap="xs">
         <Group justify="space-between">
-          <Text fw={600}>{run.manifest.cases[0]?.case.title ?? run.summary}</Text>
+          <Text fw={600}>
+            {run.manifest.source?.kind === 'saved_suite_v1'
+              ? `Saved suite · ${run.manifest.cases.length} cases`
+              : (run.manifest.cases[0]?.case.title ?? run.summary)}
+          </Text>
           <Badge color={run.attempts.some((a) => a.outcome === 'failed') ? 'red' : 'gray'}>
             {run.state === 'finished' ? run.summary : run.state.replaceAll('_', ' ')}
           </Badge>
@@ -47,6 +51,9 @@ export function RunResult({ run, compact = false }: { run: RunResponse; compact?
               ? 'Saved suite'
               : 'Release plan'}
           {run.manifest.profile.driver === 'fake' ? ' · Simulated' : ''}
+          {run.manifest.source?.kind === 'saved_suite_v1'
+            ? ` · Version ${run.manifest.source.suite_version_id.slice(0, 8)}`
+            : ''}
         </Text>
         {!run.comparison && (
           <Text size="sm">

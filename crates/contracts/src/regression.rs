@@ -83,11 +83,40 @@ pub struct SuiteRunRequest {
     pub build_id: Uuid,
     pub profile_id: Uuid,
     pub environment_revision: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline_run_id: Option<Uuid>,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct SuiteRunPreview {
     pub blockers: Vec<String>,
     pub environment_revision: i32,
+    pub baselines: Vec<BaselineChoice>,
+    pub suggested_baseline_id: Option<Uuid>,
+}
+#[cfg(test)]
+mod suite_request_tests {
+    use super::*;
+    #[test]
+    fn omitted_baseline_keeps_old_request_identity() {
+        let raw = serde_json::json!({
+            "suite_version_id": Uuid::new_v4(), "build_id": Uuid::new_v4(),
+            "profile_id": Uuid::new_v4(), "environment_revision": 3
+        });
+        let old: SuiteRunRequest = serde_json::from_value(raw.clone()).unwrap();
+        assert_eq!(old.baseline_run_id, None);
+        assert_eq!(serde_json::to_value(&old).unwrap(), raw);
+        let with_baseline = SuiteRunRequest {
+            baseline_run_id: Some(Uuid::new_v4()),
+            ..old
+        };
+        assert_eq!(
+            serde_json::from_value::<SuiteRunRequest>(
+                serde_json::to_value(&with_baseline).unwrap()
+            )
+            .unwrap(),
+            with_baseline
+        );
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct RunHistoryItem {

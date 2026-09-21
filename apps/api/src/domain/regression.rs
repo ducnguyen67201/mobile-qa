@@ -89,6 +89,50 @@ pub fn eligible(current: &RunManifest, baseline: &RunResponse) -> bool {
             })
         })
 }
+pub fn suite_baseline_eligible(current: &RunManifest, baseline: &RunResponse) -> bool {
+    let (
+        Some(RunSource::SavedSuiteV1 {
+            suite_version_id: current_id,
+        }),
+        Some(RunSource::SavedSuiteV1 {
+            suite_version_id: baseline_id,
+        }),
+    ) = (&current.source, &baseline.manifest.source)
+    else {
+        return false;
+    };
+    current_id == baseline_id
+        && context_matches(current, &baseline.manifest)
+        && current.cases.iter().any(|case| case.required)
+        && current
+            .cases
+            .iter()
+            .filter(|case| case.required)
+            .all(|case| {
+                baseline
+                    .manifest
+                    .cases
+                    .iter()
+                    .filter(|prior| {
+                        prior.case.key == case.case.key
+                            && prior.data_variant == case.data_variant
+                            && prior.definition_id == case.definition_id
+                            && prior.content_hash == case.content_hash
+                    })
+                    .count()
+                    == 1
+                    && baseline
+                        .manifest
+                        .cases
+                        .iter()
+                        .find(|prior| {
+                            prior.case.key == case.case.key
+                                && prior.data_variant == case.data_variant
+                        })
+                        .and_then(|prior| outcome(baseline, prior))
+                        .is_some()
+            })
+}
 pub fn transition(before: Outcome, after: Outcome, different_build: bool) -> ComparisonKind {
     match (before, after) {
         (Outcome::Passed, Outcome::Failed) if different_build => ComparisonKind::Regression,
@@ -313,5 +357,28 @@ mod policy_tests {
         raw["plan_hash"] = serde_json::json!("legacy");
         let decoded: RunManifest = serde_json::from_value(raw.clone()).unwrap();
         assert_eq!(serde_json::to_value(decoded).unwrap(), raw);
+    }
+    #[test]
+    fn suite_suggestion_needs_exact_version_context_and_all_required_proof() {
+        let mut prior = passed();
+        let suite_id = Uuid::new_v4();
+        prior.manifest.source = Some(RunSource::SavedSuiteV1 {
+            suite_version_id: suite_id,
+        });
+        let mut current = prior.manifest.clone();
+        assert!(suite_baseline_eligible(&current, &prior));
+        let mut second = prior.manifest.cases[0].clone();
+        second.definition_id = Uuid::new_v4();
+        second.case.key = "second-case".into();
+        current.cases.push(second);
+        assert!(!suite_baseline_eligible(&current, &prior));
+        current.cases.pop();
+        current.source = Some(RunSource::SavedSuiteV1 {
+            suite_version_id: Uuid::new_v4(),
+        });
+        assert!(!suite_baseline_eligible(&current, &prior));
+        current.source = prior.manifest.source.clone();
+        prior.attempts[0].preflight = None;
+        assert!(!suite_baseline_eligible(&current, &prior));
     }
 }

@@ -12887,9 +12887,16 @@
         "type": "object",
         "required": [
           "blockers",
-          "environment_revision"
+          "environment_revision",
+          "baselines"
         ],
         "properties": {
+          "baselines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BaselineChoice"
+            }
+          },
           "blockers": {
             "type": "array",
             "items": {
@@ -12899,6 +12906,13 @@
           "environment_revision": {
             "type": "integer",
             "format": "int32"
+          },
+          "suggested_baseline_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -12911,6 +12925,13 @@
           "environment_revision"
         ],
         "properties": {
+          "baseline_run_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
           "build_id": {
             "type": "string",
             "format": "uuid"

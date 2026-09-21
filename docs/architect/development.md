@@ -406,6 +406,34 @@ or reviewer provisioning is needed. Spec 05 documents legacy mutation retry beha
 The existing browser admin-policy restriction is binding. Source design review,
 DOM tests and HTTP acceptance must be reported separately from rendered/device proof.
 
+### Reliable smoke suite acceptance
+
+Run `just smoke-suite` after the code checks/build. It saves two independently
+versioned cases and one suite through authenticated test-library routes, submits
+the exact suite version, runs each queued case through the fake HTTP worker, and
+checks idempotency, baseline pinning and reports across API restarts. Its APK is
+an intake fixture and the resulting evidence is simulated.
+
+For an explicitly authorized real local acceptance, use the existing isolated
+regression harness in suite mode:
+
+```bash
+just smoke-suite-real /absolute/path/qualified-host.toml \
+  /absolute/path/good.apk /absolute/path/broken.apk
+```
+
+Inspect any retained host journal, dirty marker, process and device reservation
+first. Follow the operator recovery procedure with physical reset evidence;
+never remove those markers to force a claim. The harness creates a separate
+test workspace and host state root, qualifies the demo profile, saves two
+independent cases, and runs the good then broken demo builds with the first
+run pinned as baseline. Case one checks immediate visibility; case two checks
+persistence after restart. The expected broken report leaves case one passed
+and marks only the verified persistence check as a regression. Store its
+private run IDs, hashes, preflight/cleanup and evidence receipts for review.
+Rendered browser acceptance remains a separate gate under the existing admin
+policy.
+
 ### Minitap discovery acceptance
 
 `just smoke-minitap-discovery /absolute/qualified-profile.toml /absolute/sample.apk` is an

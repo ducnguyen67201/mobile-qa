@@ -14,6 +14,7 @@ Start here before planning or changing the application.
 | How do Rust, TypeScript and Python agree on data?                     | [Transport contracts](contracts.md)                                   |
 | What comes first; what can run concurrently?                          | [Master implementation spec](implementation/00-master-spec.md)        |
 | How will Minitap explore flows and propose reusable tests?            | [Minitap flow discovery](implementation/08-minitap-flow-discovery.md) |
+| What closes the first repeatable smoke-suite run?                     | [Reliable smoke suite](implementation/10-reliable-smoke-suite.md)     |
 | How do we develop, validate and scope CI?                             | [Development workflow](development.md)                                |
 | How do we qualify the Android runner?                                 | [Device qualification](device-qualification.md)                       |
 | How do we add model capacity without changing saved runs?             | [Model capacity](implementation/09-model-catalog-and-capacity.md)     |

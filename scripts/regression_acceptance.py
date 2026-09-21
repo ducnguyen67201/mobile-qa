@@ -1,4 +1,6 @@
-"""Explicit real-device 07B acceptance. Never invoked by ordinary checks.
+"""Explicit real-device 07B case or two-case smoke-suite acceptance.
+
+Never invoked by ordinary checks.
 
 Run with the worker's uv environment, --profile pointing at a nonsecret host TOML,
 and --good/--broken at the local-only sample/sampleBroken APKs. Uses isolated test
@@ -147,9 +149,9 @@ def upload(owner, csrf, app, apk):
     return build["id"]
 
 
-def submit(owner, csrf, app, body):
+def submit(owner, csrf, app, body, source="case"):
     req = urllib.request.Request(
-        BASE + f"/api/apps/{app}/case-runs",
+        BASE + f"/api/apps/{app}/{'suite-runs' if source == 'suite' else 'case-runs'}",
         json.dumps(body).encode(),
         {
             "Origin": ORIGIN,
@@ -169,6 +171,9 @@ def main():
     parser.add_argument("--profile", type=Path, required=True)
     parser.add_argument("--good", type=Path, required=True)
     parser.add_argument("--broken", type=Path, required=True)
+    parser.add_argument(
+        "--suite", action="store_true", help="Run the two-case smoke-suite acceptance"
+    )
     args = parser.parse_args()
     os.umask(0o077)
     directory = ROOT / ".private/regression-acceptance" / str(uuid.uuid4())
@@ -313,6 +318,41 @@ def main():
                 },
             }
             case_id = import_file(env, actor, app, directory, case)
+            if args.suite:
+                appears = json.loads(json.dumps(case))
+                appears["content"].update(
+                    key="saved-task-appears",
+                    title="A saved task appears immediately",
+                    actions=appears["content"]["actions"][:2],
+                    checks=appears["content"]["checks"][:2],
+                )
+                appears_id = import_file(env, actor, app, directory, appears)
+                suite_id = import_file(
+                    env,
+                    actor,
+                    app,
+                    directory,
+                    {
+                        "kind": "suite",
+                        "content": {
+                            "key": "task-smoke-suite",
+                            "version": 1,
+                            "title": "Tasks smoke suite",
+                            "cases": [
+                                {
+                                    "case_version_id": appears_id,
+                                    "data_variant": "default",
+                                    "required": True,
+                                },
+                                {
+                                    "case_version_id": case_id,
+                                    "data_variant": "default",
+                                    "required": True,
+                                },
+                            ],
+                        },
+                    },
+                )
             task(
                 env,
                 actor,
@@ -322,74 +362,108 @@ def main():
                 profile=profile_id,
             )
             results = []
-            for index, (build, verdict) in enumerate(
-                [
-                    (builds[0], "no_baseline"),
-                    (builds[1], "regression"),
-                    (builds[1], "still_failing"),
-                ]
+            for index, build in enumerate(
+                builds if args.suite else [builds[0], builds[1], builds[1]]
             ):
                 body = {
-                    "case_version_id": case_id,
+                    "suite_version_id" if args.suite else "case_version_id": suite_id
+                    if args.suite
+                    else case_id,
                     "build_id": build,
                     "profile_id": profile_id,
                     "environment_revision": 1,
                     "baseline_run_id": results[-1]["id"] if results else None,
                 }
                 preview = request(
-                    owner, "POST", f"/api/apps/{app}/case-runs/preview", body, csrf
+                    owner,
+                    "POST",
+                    f"/api/apps/{app}/{'suite-runs' if args.suite else 'case-runs'}/preview",
+                    body,
+                    csrf,
                 )
                 assert not preview["blockers"], preview
                 if results:
                     assert preview["suggested_baseline_id"] == results[-1]["id"], (
                         preview
                     )
-                run = submit(owner, csrf, app, body)
-                print(f"Executing real run {index + 1}: {run['id']}", flush=True)
-                with (directory / f"worker-{index}.log").open("w") as log:
-                    subprocess.run(
-                        [
-                            "uv",
-                            "run",
-                            "--no-sync",
-                            "--project",
-                            str(ROOT / "apps/mobile-worker"),
-                            "--frozen",
-                            "mobile-qa-worker",
-                            "execution-worker",
-                            "--origin",
-                            BASE,
-                            "--profile-id",
-                            profile_id,
-                            "--state",
-                            str(directory / f"worker-{index}"),
-                            "--profile",
-                            str(host_file),
-                            "--once",
-                        ],
-                        env=env,
-                        check=True,
-                        timeout=900,
-                        stdout=log,
-                        stderr=subprocess.STDOUT,
-                    )
+                run = submit(owner, csrf, app, body, "suite" if args.suite else "case")
+                print(
+                    f"Executing real {'suite ' if args.suite else ''}run {index + 1}: {run['id']}",
+                    flush=True,
+                )
+                for case_index in range(2 if args.suite else 1):
+                    with (directory / f"worker-{index}-{case_index}.log").open(
+                        "w"
+                    ) as log:
+                        subprocess.run(
+                            [
+                                "uv",
+                                "run",
+                                "--no-sync",
+                                "--project",
+                                str(ROOT / "apps/mobile-worker"),
+                                "--frozen",
+                                "mobile-qa-worker",
+                                "execution-worker",
+                                "--origin",
+                                BASE,
+                                "--profile-id",
+                                profile_id,
+                                "--state",
+                                str(directory / f"worker-{index}-{case_index}"),
+                                "--profile",
+                                str(host_file),
+                                "--once",
+                            ],
+                            env=env,
+                            check=True,
+                            timeout=900,
+                            stdout=log,
+                            stderr=subprocess.STDOUT,
+                        )
                 report = request(owner, "GET", "/api/runs/" + run["id"])
                 (directory / f"run-{index}.json").write_text(
                     json.dumps(report, indent=2)
                 )
                 assert report["state"] == "finished", report
-                assert report["comparison"]["cases"][0]["kind"] == verdict, report
-                assert report["attempts"][0]["outcome"] == (
-                    "passed" if index == 0 else "failed"
+                if args.suite:
+                    assert report["manifest"]["source"] == {
+                        "kind": "saved_suite_v1",
+                        "suite_version_id": suite_id,
+                    }, report
+                    assert [a["outcome"] for a in report["attempts"]] == (
+                        ["passed", "passed"] if index == 0 else ["passed", "failed"]
+                    ), report
+                    assert [c["kind"] for c in report["comparison"]["cases"]] == (
+                        ["no_baseline", "no_baseline"]
+                        if index == 0
+                        else ["unchanged", "regression"]
+                    ), report
+                else:
+                    assert (
+                        report["comparison"]["cases"][0]["kind"]
+                        == ["no_baseline", "regression", "still_failing"][index]
+                    ), report
+                    assert report["attempts"][0]["outcome"] == (
+                        "passed" if index == 0 else "failed"
+                    ), report
+                assert all(
+                    a["cleanup"] == "verified_clean" and a["preflight"]
+                    for a in report["attempts"]
                 ), report
                 if index:
-                    failed = report["comparison"]["cases"][0]["current_checks"][-1]
+                    failed = report["comparison"]["cases"][1 if args.suite else 0][
+                        "current_checks"
+                    ][-1]
                     assert (
                         failed["check_id"] == "persists"
                         and failed["observation_kind"] == "absent"
                     ), failed
                 results.append(report)
-                print(f"Verified: {verdict}", flush=True)
+                print(
+                    f"Verified: {[c['kind'] for c in report['comparison']['cases']]}",
+                    flush=True,
+                )
         with server(env):
             owner = client()
             google_sign_in(owner, key, credentials)
@@ -400,7 +474,7 @@ def main():
                 r["id"] for r in results
             }
         print(
-            f"Real pass → regression → still failing and restart/history passed. Evidence: {directory}"
+            f"Real {'two-case suite' if args.suite else 'case'} good → broken and restart/history passed. Evidence: {directory}"
         )
 
 

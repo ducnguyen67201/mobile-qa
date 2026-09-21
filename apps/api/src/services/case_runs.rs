@@ -1,5 +1,7 @@
 //! Saved cases enter the same immutable manifest/attempt pipeline as release plans.
-use super::{apps, execution_store::*, runs, test_definitions as definitions, test_library};
+use super::{
+    apps, execution_store::*, run_baselines, runs, test_definitions as definitions, test_library,
+};
 use crate::{
     domain::regression,
     errors::{ApiFailure, ApiResult},
@@ -65,46 +67,13 @@ pub async fn preview(
     apps::authorized(ctx, actor, app).await?;
     let p = manifest(&ctx.db, app, &input).await?;
     let m = p.manifest.ok_or_else(ApiFailure::internal)?;
-    let mut baselines = vec![];
-    // Keep the recent choices compact, but continue keyset scanning until the
-    // latest eligible result is found. Unrelated runs must not hide a baseline.
-    let mut cursor_time: Option<chrono::DateTime<chrono::Utc>> = None;
-    let mut cursor_id: Option<Uuid> = None;
-    loop {
-        let page = rows(&ctx.db,
-            "SELECT r.id,r.created_at,COALESCE(b.metadata->>'version_name',b.original_filename) AS label \
-             FROM execution_runs r JOIN builds b ON b.id=r.build_id WHERE r.app_id=$1 \
-             AND EXISTS (SELECT 1 FROM execution_attempts a WHERE a.run_id=r.id) \
-             AND NOT EXISTS (SELECT 1 FROM execution_attempts a WHERE a.run_id=r.id AND a.state <> 'finished') \
-             AND ($2::timestamptz IS NULL OR (r.created_at,r.id)<($2,$3::uuid)) \
-             ORDER BY r.created_at DESC,r.id DESC LIMIT 100",
-            vec![app.into(), cursor_time.into(), cursor_id.into()]).await?;
-        for row in &page {
-            let r = runs::detail(&ctx.db, field(row, "id")?).await?;
-            let compatible = regression::eligible(&m, &r);
-            cursor_time = Some(r.created_at);
-            cursor_id = Some(r.id);
-            if baselines.len() < 100 || compatible {
-                baselines.push(BaselineChoice {
-                    id: r.id,
-                    build_id: r.manifest.build_id,
-                    build_label: field(row, "label")?,
-                    created_at: r.created_at,
-                    compatible,
-                    reason: if compatible {
-                        "Same test version and execution context"
-                    } else {
-                        "Different test/context or no conclusive, clean result"
-                    }
-                    .into(),
-                });
-            }
-        }
-        if page.len() < 100 || baselines.iter().any(|b| b.compatible) {
-            break;
-        }
-    }
-    let suggested_baseline_id = baselines.iter().find(|b| b.compatible).map(|b| b.id);
+    let (baselines, suggested_baseline_id) = run_baselines::choices(
+        &ctx.db,
+        app,
+        |run| regression::eligible(&m, run),
+        "Same test version and execution context",
+    )
+    .await?;
     Ok(CaseRunPreview {
         blockers: p.blockers,
         environment_revision: m.environment_revision,

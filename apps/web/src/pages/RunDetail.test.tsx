@@ -136,7 +136,7 @@ it('explains a queued run held for device recovery', async () => {
     `/runs/${blockingRunId}?workspace=${app.organization_id}`,
   )
   expect(
-    status.compareDocumentPosition(screen.getByRole('heading', { name: 'Run sequence' })) &
+    status.compareDocumentPosition(screen.getByRole('heading', { name: 'Run suite' })) &
       Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy()
 })

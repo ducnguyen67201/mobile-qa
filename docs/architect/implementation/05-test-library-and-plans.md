@@ -23,14 +23,16 @@ reports use a linear execution flow derived only from the frozen manifest and ac
 because the manifest does not retain suite provenance. Flow lines communicate containment and
 order, not dependencies: every case still begins from its required clean state. The adjacent
 form/report remains the authority for detailed editing or evidence.
-When a suite has an executable saved version, its canvas exposes one **Run sequence** action.
-The browser chooses the newest available build and first qualified profile, refreshes server
+When a suite has an executable saved version, its canvas exposes one **Run suite** action.
+The tester chooses a build, qualified device and optional baseline. The browser refreshes server
 readiness, closes any idle interactive phone session, submits the exact suite version
-idempotently and opens the persisted live run map. Unsaved changes use the same action as
-**Save & run**, so the queued manifest always pins the version returned by Save. The run map
+idempotently and opens the persisted live run map. Unsaved changes use **Save & run suite**,
+so the queued manifest always pins the version returned by Save. The run map
 polls durable attempt state and changes each numbered step from queued to running to its recorded
 outcome; selecting a started step jumps to its evidence. A suite run uses a transient bounded
 execution policy and does not create or mutate a release plan.
+The [reliable smoke-suite spec](10-reliable-smoke-suite.md) owns explicit
+run setup, pinned baseline, picker order and acceptance limits.
 At narrow widths the map becomes a full-size top-to-bottom sequence instead of scaling the
 desktop columns down. Ordinary wheel scrolling continues to move the page; intentional canvas
 panning is bounded so the sequence cannot be lost in empty space. Saved case and suite pickers

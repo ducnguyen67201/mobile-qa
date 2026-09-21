@@ -40,6 +40,7 @@ pub mod test_library_save;
 
 pub mod case_runs;
 pub mod model_registry;
+pub mod run_baselines;
 pub mod run_comparisons;
 pub mod run_history;
 pub mod suite_runs;

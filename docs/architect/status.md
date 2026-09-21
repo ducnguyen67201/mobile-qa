@@ -1,5 +1,9 @@
 # Implementation status and evidence
 
+## Execution stall recovery hardening — local validation (2026-09-21)
+
+The real execution worker checks the Android command-line tools before claiming a job and passes the configured JDK to its supervised child. Controlled demo execution can report verified clean cleanup when AVD setup fails before any emulator process starts, after disposal and free-port checks. Once an emulator has launched, uncertain cleanup remains quarantined and needs operator recovery. Focused worker tests and static checks passed; a successful live suite run remains unverified because an earlier local attempt left a dirty device marker requiring host recovery.
+
 ## 07B regression labels and history — local implementation (2026-09-20)
 
 The [focused delivery](implementation/07b-regression-label-and-history.md) now creates

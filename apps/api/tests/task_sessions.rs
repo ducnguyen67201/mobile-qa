@@ -11,11 +11,6 @@ async fn task_session_requires_no_plan_and_fences_worker_and_task_identity() {
 }
 
 #[tokio::test]
-async fn protocol_four_runs_direct_commands_and_ai_discovery() {
-    assert_session_protocol(5).await;
-}
-
-#[tokio::test]
 async fn historical_model_free_direct_profile_remains_in_phone_options() {
     let _guard = DATABASE_BOOT.lock().await;
     request::<App, _, _>(|server, ctx| async move {
@@ -27,11 +22,14 @@ async fn historical_model_free_direct_profile_remains_in_phone_options() {
             serde_json::from_str(include_str!("fixtures/execution/comparison.json")).unwrap();
         let mut profile = fixture.manifest.profile;
         profile.id = Uuid::new_v4();
-        profile
-            .execution_context
-            .as_mut()
-            .unwrap()
-            .qualified_profile_id = profile.id;
+        let context = profile.execution_context.as_mut().unwrap();
+        context.qualified_profile_id = profile.id;
+        // The comparison snapshot predates strict clean-start checks; registration
+        // needs a fixed, required preflight assertion.
+        let check = &mut context.starting_checks[0];
+        check.checkpoint_id = "preflight".into();
+        check.text_filter.clear();
+        check.required = true;
         profile.model = None;
         test_definitions::register_profile(&ctx, owner.user, app, profile.clone())
             .await
@@ -209,21 +207,23 @@ async fn assert_session_protocol(protocol_version: u32) {
                 .add_header("x-lease-token", lease.lease_token.clone())
         };
         publish().json(&status).await.assert_status_ok();
-        let unsupported = serde_json::json!({"id":Uuid::new_v4(),"expected_revision":0,"frame_id":null,"title":"Back","sequence":{"actions":[{"id":"b","checkpoint_id":"b","kind":"direct","instruction":"","command":{"operation":"back"}}],"checks":[]}});
+        let direct_command = serde_json::json!({"id":Uuid::new_v4(),"expected_revision":0,"frame_id":null,"title":"Back","sequence":{"actions":[{"id":"b","checkpoint_id":"b","kind":"direct","instruction":"","command":{"operation":"back"}}],"checks":[]}});
+        let mut stale_screen_command = direct_command.clone();
+        stale_screen_command["frame_id"] = serde_json::json!(Uuid::new_v4());
         assert_eq!(
             owner
                 .write(server.post(&format!("{path}/commands")))
-                .json(&unsupported)
+                .json(&stale_screen_command)
                 .await
                 .status_code()
                 .as_u16(),
             409
         );
-        let legacy_generation = serde_json::json!({"id":Uuid::new_v4(),"session_id":s.id,"expected_revision":0,"category":"smoke","journey":"","allow_writes":false,"reuse_job_id":null,"engine":"minitap_v1"});
+        let stale_generation = serde_json::json!({"id":Uuid::new_v4(),"session_id":s.id,"expected_revision":1,"category":"smoke","journey":"","allow_writes":false,"reuse_job_id":null,"engine":"minitap_v1"});
         assert_eq!(
             owner
                 .write(server.post(&format!("/api/apps/{app}/test-generations")))
-                .json(&legacy_generation)
+                .json(&stale_generation)
                 .await
                 .status_code()
                 .as_u16(),
@@ -344,10 +344,10 @@ async fn assert_session_protocol(protocol_version: u32) {
         direct_publish().json(&status).await.assert_status_ok();
         owner
             .write(server.post(&format!("/api/phones/{}/commands", old_direct.id)))
-            .json(&unsupported)
+            .json(&direct_command)
             .await
             .assert_status_ok();
-        let mut old_generation = legacy_generation.clone();
+        let mut old_generation = stale_generation.clone();
         old_generation["session_id"] = serde_json::json!(old_direct.id);
         assert_eq!(
             owner

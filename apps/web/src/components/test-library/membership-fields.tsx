@@ -30,20 +30,23 @@ export function CaseMembership({
   selections,
   options,
   onChange,
+  kind,
 }: {
   selections: CaseSelection[]
   options: LibraryOptionsResponse
   onChange: (selections: CaseSelection[]) => void
+  kind: 'suite' | 'plan'
 }) {
   const cases = options.saved_versions.filter((v) => v.version.definition.kind === 'case')
   return (
     <Stack gap="sm">
       <Title order={3} size="h4">
-        Case sequence
+        {kind === 'suite' ? 'Included test cases' : 'Direct cases'}
       </Title>
       <Text size="sm" c="dimmed">
-        Steps run in this numbered order. Add cases on the map above; use these controls to reorder
-        or remove them.
+        {kind === 'suite'
+          ? 'Each case has its own action sequence and expected checks. Workers pick eligible cases when the device is free. Use these controls to organize or remove them.'
+          : 'Add direct cases on the map above. Use these controls to organize or remove them.'}
       </Text>
       {!selections.length && (
         <Text size="sm" c="dimmed">
@@ -69,7 +72,7 @@ export function CaseMembership({
             <Stack gap="xs">
               <Group justify="space-between">
                 <Text size="sm" fw={500}>
-                  Step {i + 1} ·{' '}
+                  Case {i + 1} ·{' '}
                   {current
                     ? choiceLabel(current)
                     : `Unavailable version · ${selection.case_version_id}`}
@@ -89,7 +92,7 @@ export function CaseMembership({
                 </Text>
               )}
               <Checkbox
-                label={`Required step ${i + 1}`}
+                label={`Required case ${i + 1}`}
                 checked={selection.required}
                 onChange={(e) =>
                   onChange(
@@ -145,6 +148,7 @@ export function SuiteFields({
           selections={value.cases}
           options={options}
           onChange={(cases) => onChange({ ...value, cases })}
+          kind="suite"
         />
       </Stack>
     </Card>
@@ -188,10 +192,10 @@ export function PlanFields({
               Organize coverage
             </Title>
             <Text size="sm" c="dimmed">
-              The map above is the release sequence. These controls change its explicit order.
+              The map above shows release coverage. These controls change its display order.
             </Text>
             <Text size="sm" fw={600}>
-              Suite sequence
+              Included suites
             </Text>
             {value.suite_version_ids.map((id, i) => {
               const current = suites.find((v) => v.version.id === id)
@@ -264,6 +268,7 @@ export function PlanFields({
             selections={value.cases}
             options={options}
             onChange={(cases) => onChange({ ...value, cases })}
+            kind="plan"
           />
         </Stack>
       </Card>

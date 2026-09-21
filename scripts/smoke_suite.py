@@ -79,6 +79,6 @@ def author(owner, csrf, app, profile):
 if __name__ == "__main__":
     execution_main(author=author, source="suite")
     print(
-        "Saved-suite HTTP smoke passed: two ordered cases, idempotent queue, "
+        "Saved-suite HTTP smoke passed: two independent cases, idempotent queue, "
         "pass/fail/blocked fake attempts, pinned baseline and restart persistence; simulated only"
     )

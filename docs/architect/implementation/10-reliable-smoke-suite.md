@@ -37,14 +37,16 @@ completed runs later for an ad-hoc comparison is outside this delivery.
 1. A **case** owns one scenario: ordered actions, explicit expected checks,
    prerequisites, and its own clean start and cleanup. An action sequence saved
    from the phone becomes a case when the tester confirms its expectations. A
-   **suite** is an ordered set of exact saved case-version references, with each
-   reference's data variant and requiredness. It cannot contain an unsaved phone
-   sequence as a second member type. A **plan** remains the reusable release
+   **suite** is a set of exact saved case-version references, displayed in an
+   author-chosen order, with each reference's data variant and requiredness. It
+   cannot contain an unsaved or check-free phone sequence as a second member
+   type. A **plan** remains the reusable release
    policy over suites/cases and devices.
-2. A suite's arrows communicate membership and display/claim order, not data or
-   success dependencies. Each case starts from its declared clean state. A failed
-   case does not make a later case pass or skip it implicitly. If cleanup holds
-   the phone, later cases remain queued behind recovery rather than acquiring
+2. The suite map shows independent members connected to the suite, without
+   case-to-case execution arrows. Display order does not set claim priority.
+   Each case starts from its declared clean state. A failed case does not make
+   another case pass or skip it implicitly. If cleanup holds the phone, other
+   cases remain queued behind recovery rather than acquiring
    a fabricated result. Exact duplicate selections resolve once; conflicting
    versions or requiredness of one logical
    case are rejected by the existing resolver.
@@ -87,7 +89,8 @@ completed runs later for an ad-hoc comparison is outside this delivery.
    mark cleanup verified to make a smoke run proceed. Direct-only cases need no
    model calls; AI navigation still requires its frozen qualified assignment.
 9. Names in the Tests UI identify the object: **Run suite** / **Save & run
-   suite**. Keep “sequence” for the case action list or visual execution order.
+   suite**. Keep “sequence” for a case's ordered actions; label the suite map
+   as independent test cases.
    The run page identifies a saved suite, build, device, per-case status,
    expected/observed evidence, baseline and coverage gaps. Browser display does
    not calculate the verdict.
@@ -95,8 +98,11 @@ completed runs later for an ad-hoc comparison is outside this delivery.
     Python worker or the suite canvas. Queue one attempt per resolved case when
     the run is created. A compatible worker may claim only an eligible attempt
     for its registered app and qualified profile. Within that eligible set,
-    prefer the oldest run, then the suite's case order, then the diagnostic
-    attempt number. Use stable run and attempt IDs to break equal timestamps.
+    prefer the oldest run; for a saved suite, choose any queued eligible case
+    using diagnostic attempt number and stable attempt ID as deterministic
+    tie-breaks, without consulting its displayed case order. Release plans
+    retain their existing case-index order. Use stable run IDs to break equal
+    timestamps.
     A worker that cannot run an older attempt must not block a compatible newer
     one. There is no user-set priority or cross-app FIFO guarantee in this slice.
 
@@ -113,8 +119,10 @@ occupy the same app/device reservation; execution and authoring have no global
 priority over one another.
 
 For eligible attempts, the total order is `(run.created_at, run.id,
-case_index, attempt.number, attempt.id)`. This makes selection deterministic
-when timestamps tie. Selection is work-conserving
+claim_order, attempt.number, attempt.id)`, where `claim_order` is zero for a
+saved suite and `case_index` for other run sources. Thus suite membership order
+does not select the next task; attempt IDs make the choice deterministic.
+Selection is work-conserving
 within a worker's eligible set: an older run for an offline/incompatible profile
 does not prevent a different worker from taking its own eligible work. The suite
 does not promise global FIFO across apps, profiles, or device hosts.
@@ -125,17 +133,18 @@ Therefore only one attempt for that app and physical device can execute at a
 time. It issues a short fenced lease; the worker runs exactly the manifest case
 at `case_index`, heartbeats, publishes evidence, and reports completion.
 Only verified physical cleanup releases the reservations and wakes the next
-claim. A failed but clean case still lets the next case run. An authorized
+claim. A failed but clean case still lets another case run. An authorized
 diagnostic retry, when configured, is inserted as attempt 2 for the same case
-after cleanup and sorts before later case indices. Unverified cleanup or an
-expired lease retains the reservation and requires recovery; the picker does
-not skip ahead within that app to make the suite look complete.
+after cleanup; saved-suite runs currently configure no diagnostic retries.
+Unverified cleanup or an expired lease retains the reservation and requires
+recovery; the picker does not skip ahead within that app to make the suite look
+complete.
 
-For example, a suite with A, B, C creates attempts `(0,1)`, `(1,1)`, `(2,1)`.
-The first worker claim gets A. While A holds the app reservation, another claim
-gets no work for that app. After clean A, the next claim gets B (or A attempt 2
-if its configured diagnostic retry was inserted), then C. This ordering is an
-execution convenience; B never consumes A's result as a prerequisite. Queue
+For example, a suite displaying A, B, C creates attempts `(0,1)`, `(1,1)`,
+`(2,1)`. The first worker claim may get B if B's attempt ID sorts first. While
+B holds the app reservation, another claim gets no work for that app. After
+verified cleanup, the next claim gets one of the remaining eligible cases.
+These cases never consume one another's results as prerequisites. Queue
 reasons distinguish capacity busy, worker offline/incompatible, model
 unavailable, and device recovery required from an app test failure.
 
@@ -166,7 +175,7 @@ run manifests and report bytes remain unchanged.
    exact version. Preserve the current idempotent Save & run and phone-session
    cleanup behavior. Update suite/report wording and optional-failure summary.
    Add stable tie-breaks to the existing claim query and focused real-database
-   tests for ordered pickup, diagnostic retry, incompatible worker bypass, and
+   tests for independent suite pickup, diagnostic retry, incompatible worker bypass, and
    reservation/recovery blocking. Do not add a second scheduler.
 3. Extend route, pure policy, UI and secret-free HTTP smoke coverage for two
    cases, duplicate submission, cross-app/revoked access, immutable pins,

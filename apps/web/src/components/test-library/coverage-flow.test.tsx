@@ -114,7 +114,7 @@ it('adds saved coverage directly from the canvas editor', async () => {
       <LibraryCoverageFlow definition={suite} options={options} onAddCase={onAddCase} />
     </MantineProvider>,
   )
-  await userEvent.click(screen.getByRole('combobox', { name: 'Add saved case to sequence' }))
+  await userEvent.click(screen.getByRole('combobox', { name: 'Add saved test case to suite' }))
   await userEvent.click(screen.getByRole('option', { name: 'Valid sign-in · v4' }))
   expect(onAddCase).toHaveBeenCalledWith(signIn.version.id)
   unmount()
@@ -138,12 +138,12 @@ it('adds saved coverage directly from the canvas editor', async () => {
       />
     </MantineProvider>,
   )
-  await userEvent.click(screen.getByRole('combobox', { name: 'Add saved suite to sequence' }))
+  await userEvent.click(screen.getByRole('combobox', { name: 'Add saved suite to release check' }))
   await userEvent.click(screen.getByRole('option', { name: /Authentication/ }))
   expect(onAddSuite).toHaveBeenCalledWith(authentication.version.id)
 })
 
-it('connects suite cases as an explicit numbered sequence', () => {
+it('shows suite cases as independent members without execution arrows', () => {
   const suite: LibraryDraftDefinition = {
     kind: 'suite',
     content: {
@@ -160,12 +160,19 @@ it('connects suite cases as an explicit numbered sequence', () => {
   const model = buildLibraryCoverageFlow(suite, options)
   expect(
     model.nodes.filter((node) => node.type === 'case').map((node) => node.data.eyebrow),
-  ).toEqual(['Step 1', 'Step 2', 'Step 3'])
-  expect(model.edges.filter((item) => item.id.startsWith('sequence-'))).toHaveLength(2)
-  expect(model.edges[0]).toMatchObject({
-    source: 'coverage-root',
-    target: expect.stringContaining('case-1-'),
-  })
+  ).toEqual(['Case 1', 'Case 2', 'Case 3'])
+  expect(model.edges).toHaveLength(3)
+  expect(model.edges.every((item) => item.source === 'coverage-root')).toBe(true)
+})
+
+it('keeps cases inside a release plan suite free of execution arrows', () => {
+  if (plan.kind !== 'plan') throw new Error('fixture must be a plan')
+  const model = buildLibraryCoverageFlow(
+    { kind: 'plan', content: { ...plan.content, cases: [] } },
+    options,
+  )
+  expect(model.nodes.filter((node) => node.type === 'case')).toHaveLength(2)
+  expect(model.edges.filter((item) => item.id.startsWith('sequence-'))).toHaveLength(0)
 })
 
 it('deduplicates identical logical cases across suites and direct selections', () => {
@@ -396,6 +403,17 @@ it('derives a complete dynamic legend from real attempts', () => {
   )
   expect(screen.getByLabelText('Flow status legend')).toHaveTextContent('RunningPassedQueued')
   expect(screen.queryByText('Failed')).not.toBeInTheDocument()
+})
+
+it('shows saved-suite run cases without implying execution order', () => {
+  const run = runFixture()
+  run.manifest.source = { kind: 'saved_suite_v1', suite_version_id: 'suite-version' }
+  const model = buildRunCoverageFlow(run)
+  expect(model.nodes.find((node) => node.type === 'group')?.data.title).toBe('Suite cases')
+  expect(
+    model.nodes.filter((node) => node.type === 'case').map((node) => node.data.eyebrow),
+  ).toEqual(['Case 1', 'Case 2', 'Case 3'])
+  expect(model.edges.filter((item) => item.id.startsWith('sequence-'))).toHaveLength(0)
 })
 
 it('marks finished case cards with their result while later cases remain queued', () => {

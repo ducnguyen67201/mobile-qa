@@ -52,7 +52,12 @@ async fn prepared(
         .await;
     res.assert_status_ok();
     let build = res.json::<BuildResponse>();
-    assert_eq!(build.validation.state, ValidationState::Validated);
+    assert_eq!(
+        build.validation.state,
+        ValidationState::Validated,
+        "{:?}",
+        build.validation
+    );
     let profile = ExecutionProfile {
         execution_context: None,
         id: Uuid::new_v4(),
@@ -918,6 +923,20 @@ async fn saved_suite_route_queues_each_numbered_case_in_one_immutable_run() {
             .await;
         retry.assert_status_ok();
         assert_eq!(retry.json::<RunResponse>().id, run.id);
+        // Put the second displayed case first in the stable attempt-ID order.
+        // A suite claim must not inherit the editor's membership order.
+        for (case_index, attempt_id) in [
+            (0, Uuid::from_u128(u128::MAX)),
+            (1, Uuid::from_u128(u128::MAX - 1)),
+        ] {
+            exec(
+                &ctx.db,
+                "UPDATE execution_attempts SET id=$3 WHERE run_id=$1 AND case_index=$2",
+                vec![run.id.into(), case_index.into(), attempt_id.into()],
+            )
+            .await
+            .unwrap();
+        }
         let claim = scheduler::claim(
             &ctx,
             &worker,
@@ -933,7 +952,7 @@ async fn saved_suite_route_queues_each_numbered_case_in_one_immutable_run() {
         .lease
         .unwrap();
         assert_eq!(claim.run_id, run.id);
-        assert_eq!(claim.case_index, 0);
+        assert_eq!(claim.case_index, 1);
         assert!(scheduler::claim(
             &ctx,
             &worker,
@@ -1005,7 +1024,7 @@ async fn saved_suite_route_queues_each_numbered_case_in_one_immutable_run() {
         .lease
         .unwrap();
         assert_eq!(next.run_id, run.id);
-        assert_eq!(next.case_index, 1);
+        assert_eq!(next.case_index, 0);
     })
     .await;
 }

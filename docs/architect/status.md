@@ -7,26 +7,37 @@ shows the chosen build checksum, offers completed-run baseline choices without
 preselecting a suggestion, and pins the selected baseline on the immutable
 multi-case run. The API shares candidate scanning with saved-case runs, enforces
 the same-app completed baseline rule, and keeps worker pickup in the existing
-fenced claim path with
-stable tie-breaks. The report names the saved suite and distinguishes required
+fenced claim path with stable tie-breaks. Saved suite cases are independent:
+the editor's display order no longer sets pickup order, and the coverage map
+does not draw case-to-case execution arrows. The report names the saved suite
+and distinguishes required
 passing checks from optional failures and missing real-device proof. Older
 suite requests without a baseline remain valid and keep their idempotency bytes.
 
-Contract drift, scoped formatting, API Clippy/workspace tests, 159 web tests,
+Contract drift, scoped formatting, API Clippy/workspace tests, 161 web tests,
 185 worker tests and the production build passed. The API test pass used a
 disposable PostgreSQL container and process-scoped JDK 17 because the retained
 test database has a stale migration ledger and the default Java is 8. Existing
 test-library and execution HTTP smokes, plus the new two-case saved-suite HTTP
 smoke, passed against a fresh migrated disposable database. All three use the
-fake worker and intake-only APK; they prove routes, attempt order, idempotency,
+fake worker and intake-only APK; they prove routes, independent case pickup,
+idempotency,
 baseline pinning and restart persistence, **not** Android verdicts.
 
+The clarified suite picker passed a focused real-database route test using a
+fresh temporary PostgreSQL instance: the second displayed case was claimed
+first, a concurrent claim remained blocked by the reservation, and recovery
+held the app until verified. The two-case simulated HTTP suite smoke passed
+again after the change. This checkout's local JDK setting was corrected to
+the JDK 17 home directory for APK intake validation.
+
 The real good/broken two-case harness is implemented as the explicit `--suite`
-mode of `scripts/regression_acceptance.py`. It has not run in this delivery:
-another worktree currently has an API and phone/execution workers attached to
-the same physical host profile. That host also has recorded recovery history;
-do not stop those processes or reuse its device until the operator verifies
-physical state and owns the host for acceptance. The previous rendered-browser
+mode of `scripts/regression_acceptance.py`. It has not run in this delivery.
+During the original validation, another worktree owned the API and workers for
+the same physical host profile. That stack has since been stopped cleanly and
+this checkout's local API, web and workers have connected, but device state and
+recovery history still need operator verification before real acceptance.
+The previous rendered-browser
 admin-policy denial remains open. There are no new real suite run IDs or device
 evidence to report.
 

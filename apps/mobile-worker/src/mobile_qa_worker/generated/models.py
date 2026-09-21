@@ -517,6 +517,12 @@ class WorkerModelCapabilities(BaseModel):
         extra='forbid',
     )
     model: ModelReference | None = None
+    models: Annotated[
+        list[ModelReference] | None,
+        Field(
+            description='Protocol 6 qualified references. Protocol 5 uses `model` above.'
+        ),
+    ] = None
     providers: list[ModelProvider] | None = None
 
 
@@ -1073,6 +1079,7 @@ class RunManifest(BaseModel):
     diagnostic_retries: Annotated[int, Field(ge=0, le=255)]
     environment_revision: int
     exclusions: list[str]
+    model_assignment_revision: Annotated[int | None, Field(ge=0)] = None
     plan_hash: str | None = None
     plan_version_id: UUID | None = None
     profile: ExecutionProfile
@@ -1223,11 +1230,14 @@ class PhoneSession(BaseModel):
         extra='forbid',
     )
     app_id: UUID
+    authoring_assignment_revision: Annotated[int | None, Field(ge=0)] = None
+    authoring_model: ResolvedModel | None = None
     build_id: UUID
     environment_revision: Annotated[int, Field(ge=0)] = 0
     frame: PhoneFrame | None = None
     id: UUID
     message: str
+    model_assignment_revision: Annotated[int | None, Field(ge=0)] = None
     profile: ExecutionProfile
     protocol_version: Annotated[int, Field(ge=0)] = 0
     resolved_model: ResolvedModel | None = None

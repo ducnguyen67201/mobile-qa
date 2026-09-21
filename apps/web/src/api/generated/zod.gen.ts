@@ -586,6 +586,20 @@ export const zPreflightAcknowledgement = z.object({
     generation: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
+export const zQueueReason = z.enum([
+    'worker_offline',
+    'model_unavailable',
+    'capacity_busy',
+    'device_recovery_required',
+    'awaiting_worker_claim'
+]);
+
+export const zQueueStatus = z.object({
+    last_compatible_worker_at: z.iso.datetime().nullish(),
+    reason: zQueueReason,
+    wait_seconds: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
 export const zReadinessResponse = z.object({
     account: zCheckState,
     account_configured: z.boolean(),
@@ -945,11 +959,14 @@ export const zPhoneTask = z.object({
 
 export const zPhoneSession = z.object({
     app_id: z.uuid(),
+    authoring_assignment_revision: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish(),
+    authoring_model: zResolvedModel.nullish(),
     build_id: z.uuid(),
     environment_revision: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).optional(),
     frame: zPhoneFrame.nullish(),
     id: z.uuid(),
     message: z.string(),
+    model_assignment_revision: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish(),
     profile: zExecutionProfile,
     protocol_version: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).optional(),
     resolved_model: zResolvedModel.nullish(),
@@ -1030,6 +1047,7 @@ export const zRunManifest = z.object({
     diagnostic_retries: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     exclusions: z.array(z.string()),
+    model_assignment_revision: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish(),
     plan_hash: z.string().nullish(),
     plan_version_id: z.uuid().nullish(),
     profile: zExecutionProfile,
@@ -1060,6 +1078,7 @@ export const zRunResponse = z.object({
     created_at: z.iso.datetime(),
     id: z.uuid(),
     manifest: zRunManifest,
+    queue_status: zQueueStatus.nullish(),
     state: zJobState,
     summary: z.string()
 });
@@ -1255,6 +1274,7 @@ export const zBuildListResponse = z.object({
 
 export const zWorkerModelCapabilities = z.object({
     model: zModelReference.nullish(),
+    models: z.array(zModelReference).optional(),
     providers: z.array(zModelProvider).optional()
 });
 

@@ -5,7 +5,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::{
     execution::{Driver, ExecutionProfile},
-    model_registry::ModelCapability,
+    model_registry::{ModelCapability, ModelPurpose},
     task_sessions::*,
 };
 use sea_orm::{ConnectionTrait, QueryResult, TransactionTrait};
@@ -78,30 +78,29 @@ pub async fn options(ctx: &AppContext, user: Uuid, app: Uuid) -> ApiResult<Phone
             && matches!(profile.driver, Driver::Minitap | Driver::Direct)
             && profile.package == a.android_package
     }) {
-        if profile.is_model_free() {
+        if profile.driver == Driver::Direct && profile.is_model_free() {
             profiles.push(profile);
             continue;
         }
-        let Ok(Some(resolved)) = model_registry::resolve_for_new_work(
-            &ctx.db,
-            profile.model.as_ref(),
-            &[ModelCapability::MinitapNavigation],
-        )
-        .await
+        let Ok(assignment) =
+            model_registry::active_assignment(&ctx.db, app, profile.id, ModelPurpose::Navigation)
+                .await
         else {
             continue;
         };
-        let advertised=rows(&ctx.db,"SELECT model_capabilities FROM execution_workers WHERE profile_id=$1 AND revoked=false AND model_last_seen_at>now()-interval '90 seconds' AND model_capabilities IS NOT NULL",vec![profile.id.into()]).await?;
-        let compatible = advertised.iter().any(|row| {
-            field(row, "model_capabilities")
-                .and_then(decode)
-                .is_ok_and(|capabilities| {
-                    model_registry::worker_matches(&resolved, Some(&capabilities))
-                })
-        });
-        if compatible {
-            profiles.push(profile);
-        }
+        let Ok(Some(_resolved)) = (if let Some((model, _)) = assignment {
+            Ok(Some(model))
+        } else {
+            model_registry::resolve_for_new_work(
+                &ctx.db,
+                profile.model.as_ref(),
+                &[ModelCapability::MinitapNavigation],
+            )
+            .await
+        }) else {
+            continue;
+        };
+        profiles.push(profile);
     }
     let active_session=rows(&ctx.db,"SELECT id FROM phone_sessions WHERE app_id=$1 AND creator_id=$2 AND payload->>'state' NOT IN ('closed','quarantined') ORDER BY created_at DESC LIMIT 1",vec![app.into(),user.into()]).await?.first().map(|r|field(r,"id")).transpose()?;
     let mut blockers = vec![];
@@ -194,16 +193,43 @@ pub async fn open(
         .await?,
         "revision",
     )?;
-    let resolved_model = model_registry::resolve_for_new_work(
-        &tx,
-        profile.model.as_ref(),
-        if profile.driver == Driver::Minitap {
-            &[ModelCapability::MinitapNavigation]
-        } else {
-            &[]
-        },
-    )
-    .await?;
+    let assignment = if profile.driver == Driver::Minitap {
+        model_registry::active_assignment(&tx, app, profile.id, ModelPurpose::Navigation).await?
+    } else {
+        None
+    };
+    let resolved_model = if let Some((model, _)) = &assignment {
+        Some(model.clone())
+    } else {
+        model_registry::resolve_for_new_work(
+            &tx,
+            profile.model.as_ref(),
+            if profile.driver == Driver::Minitap {
+                &[ModelCapability::MinitapNavigation]
+            } else {
+                &[]
+            },
+        )
+        .await?
+    };
+    if profile.driver == Driver::Minitap && resolved_model.is_none() {
+        return Err(conflict("No active navigation model assignment"));
+    }
+    let authoring_assignment = if profile.driver == Driver::Minitap {
+        model_registry::active_assignment(&tx, app, profile.id, ModelPurpose::StructuredAuthoring)
+            .await?
+    } else {
+        None
+    };
+    let authoring_model = authoring_assignment
+        .as_ref()
+        .map(|(model, _)| model.clone())
+        .or_else(|| {
+            resolved_model
+                .as_ref()
+                .filter(|model| model.has(ModelCapability::StructuredAuthoring))
+                .cloned()
+        });
     let s = PhoneSession {
         environment_revision: environment_revision as u32,
         revision: 0,
@@ -213,6 +239,9 @@ pub async fn open(
         build_id: build,
         profile: profile.clone(),
         resolved_model,
+        model_assignment_revision: assignment.map(|(_, revision)| revision),
+        authoring_model,
+        authoring_assignment_revision: authoring_assignment.map(|(_, revision)| revision),
         state: PhoneState::Queued,
         message: "Waiting for a device".into(),
         frame: None,
@@ -339,8 +368,13 @@ pub async fn claim(
     w: &Worker,
     input: PhoneClaimRequest,
 ) -> ApiResult<PhoneClaimResponse> {
-    if ![0, 2, 3, 4, 5].contains(&input.protocol_version) {
+    if ![0, 2, 3, 4, 5, 6].contains(&input.protocol_version) {
         return Err(conflict("Unsupported phone protocol"));
+    }
+    if let Some(capabilities) = input.model_capabilities.as_ref() {
+        capabilities
+            .validate(input.protocol_version)
+            .map_err(ApiFailure::invalid)?;
     }
     reconcile(ctx).await?;
     let tx = ctx.db.begin().await?;
@@ -384,7 +418,7 @@ pub async fn claim(
     {
         return Ok(PhoneClaimResponse { lease: None });
     }
-    let pending=rows(&tx,"SELECT * FROM phone_sessions WHERE app_id=$1 AND profile_id=$2 AND payload->>'state'='queued' AND deadline>now() ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED",vec![w.app_id.into(),w.profile_id.into()]).await?;
+    let pending=rows(&tx,"SELECT * FROM phone_sessions WHERE app_id=$1 AND profile_id=$2 AND payload->>'state'='queued' AND deadline>now() AND (payload->'resolved_model' IS NULL OR payload->'resolved_model'='null'::jsonb OR EXISTS (SELECT 1 FROM jsonb_array_elements($3::jsonb) compatible WHERE compatible->'reference'=payload->'resolved_model'->'reference' AND compatible->'provider'=payload->'resolved_model'->'provider')) AND (payload->'authoring_model' IS NULL OR payload->'authoring_model'='null'::jsonb OR EXISTS (SELECT 1 FROM jsonb_array_elements($3::jsonb) compatible WHERE compatible->'reference'=payload->'authoring_model'->'reference' AND compatible->'provider'=payload->'authoring_model'->'provider')) ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED",vec![w.app_id.into(),w.profile_id.into(),model_registry::eligible_models(input.model_capabilities.as_ref()).into()]).await?;
     let Some(r) = pending.first() else {
         return Ok(PhoneClaimResponse { lease: None });
     };
@@ -397,6 +431,14 @@ pub async fn claim(
             return Ok(PhoneClaimResponse { lease: None });
         }
     }
+    if let Some(resolved) = s.authoring_model.as_ref() {
+        if input.protocol_version < 5
+            || !model_registry::worker_matches(resolved, input.model_capabilities.as_ref())
+        {
+            tracing::warn!(reason_code="worker_authoring_model_reference_mismatch",worker_id=%w.id,"phone claim left queued");
+            return Ok(PhoneClaimResponse { lease: None });
+        }
+    }
     rows(
         &tx,
         "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
@@ -404,7 +446,7 @@ pub async fn claim(
     )
     .await?;
     s.protocol_version = input.protocol_version;
-    if p.driver == Driver::Direct && ![2, 3, 4, 5].contains(&input.protocol_version) {
+    if p.driver == Driver::Direct && ![2, 3, 4, 5, 6].contains(&input.protocol_version) {
         return Err(conflict("Update this worker for direct execution"));
     }
     s.state = PhoneState::Preparing;

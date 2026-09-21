@@ -82,6 +82,28 @@ it('shows simulated run and pending cancellation without claiming physical stop'
   expect(await screen.findByText(/Waiting for your phone to stop/)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Cancel run' })).toBeDisabled()
 })
+it('explains a queued run held for device recovery', async () => {
+  const current = report()
+  current.state = 'queued'
+  current.queue_status = {
+    reason: 'device_recovery_required',
+    last_compatible_worker_at: null,
+    wait_seconds: 30,
+  }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      const path = new URL(request.url).pathname
+      if (path.endsWith('/session')) return Response.json(session)
+      if (path.endsWith('/settings')) return Response.json(settings)
+      if (path === `/apps/${appId}` || path === `/api/apps/${appId}`) return Response.json(app)
+      if (path.endsWith(runId)) return Response.json(current)
+      throw new Error(`Unexpected fixture route ${path}`)
+    }),
+  )
+  show()
+  expect(await screen.findByText(/held for operator recovery/)).toBeInTheDocument()
+})
 it('does not present malformed persisted results as a report', async () => {
   vi.stubGlobal(
     'fetch',
@@ -120,7 +142,7 @@ it('shows the exact frozen model assignment used by the run', async () => {
   expect(await screen.findByText('Approved navigation')).toBeInTheDocument()
   expect(screen.getByText(/approved\.navigation@3.*provider-model/)).toBeInTheDocument()
 })
-it('labels historical raw-model runs without guessing their registry identity', async () => {
+it('does not warn about model context for direct-only historical runs', async () => {
   const current = report()
   vi.stubGlobal(
     'fetch',
@@ -134,5 +156,6 @@ it('labels historical raw-model runs without guessing their registry identity', 
     }),
   )
   show()
-  expect(await screen.findByText('Legacy model context unavailable')).toBeInTheDocument()
+  expect(await screen.findByText('Build checksum')).toBeInTheDocument()
+  expect(screen.queryByText('Legacy model context unavailable')).not.toBeInTheDocument()
 })

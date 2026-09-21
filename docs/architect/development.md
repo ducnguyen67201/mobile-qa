@@ -149,8 +149,8 @@ existing automated check, not a claim of rendered browser acceptance.
 
 ### Model registry rollout and recovery
 
-Use the trusted `execution` task to `register-model file:<safe-json>`, `show-model key:<key>
-revision:<n>`, or `retire-model key:<key> revision:<n>`. Registry documents contain no secret,
+Use the trusted `execution` task to `register-model actor:<operator-id> app:<app-id> file:<safe-json>`, `show-model key:<key>
+revision:<n>`, or `retire-model actor:<operator-id> app:<app-id> key:<key> revision:<n>`. Registry documents contain no secret,
 Doppler scope, timeout or token policy. Before rollout, count and drain or explicitly cancel
 active legacy runs/sessions; apply migration 000010; register the approved definition; manually
 change private host TOML to `[model_ref]`; then restart API and workers. Confirm a protocol-5

@@ -20,14 +20,23 @@ def require_capability(resolved: ResolvedModel, capability: ModelCapability) -> 
         raise QualificationError("model_capability_unavailable")
 
 
-def require_host_assignment(resolved: ResolvedModel, host: ModelReference | None) -> None:
-    if host is None or host != resolved.reference:
+def require_host_assignment(resolved: ResolvedModel, host: ModelReference | Profile | None) -> None:
+    refs = (
+        (
+            [item.reference for item in host.qualified_models]
+            + ([host.model_ref] if host.model_ref else [])
+        )
+        if isinstance(host, Profile)
+        else [host]
+    )
+    if resolved.reference not in refs:
         raise QualificationError("worker_model_reference_mismatch")
 
 
 def worker_capabilities(profile: Profile | None) -> WorkerModelCapabilities:
     return WorkerModelCapabilities(
         model=profile.model_ref if profile else None,
+        models=[item.reference for item in profile.qualified_models] if profile else [],
         providers=[ModelProvider.open_ai],
     )
 

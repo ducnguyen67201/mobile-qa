@@ -165,6 +165,11 @@ pub async fn create(
     let run = runs::detail(&tx, id).await?;
     tx.commit().await?;
     super::execution_wakeup::notify(ctx);
-    tracing::info!(run_id=%id,app_id=%app,phase="queued",source="saved_suite_v1","Saved suite queued");
+    let reason_code = run
+        .queue_status
+        .as_ref()
+        .map(|status| word(&status.reason))
+        .unwrap_or_else(|| "unknown".into());
+    tracing::info!(run_id=%id,app_id=%app,phase="queued",source="saved_suite_v1",reason_code=%reason_code,"Saved suite queued");
     Ok((run, true))
 }

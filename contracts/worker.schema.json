@@ -2382,6 +2382,24 @@
           "type": "string",
           "format": "uuid"
         },
+        "authoring_assignment_revision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "authoring_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResolvedModel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "build_id": {
           "type": "string",
           "format": "uuid"
@@ -2408,6 +2426,14 @@
         },
         "message": {
           "type": "string"
+        },
+        "model_assignment_revision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
         },
         "profile": {
           "$ref": "#/$defs/ExecutionProfile"
@@ -3180,6 +3206,14 @@
             "type": "string"
           }
         },
+        "model_assignment_revision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
         "plan_hash": {
           "type": [
             "string",
@@ -3458,6 +3492,13 @@
               "type": "null"
             }
           ]
+        },
+        "models": {
+          "description": "Protocol 6 qualified references. Protocol 5 uses `model` above.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelReference"
+          }
         },
         "providers": {
           "type": "array",

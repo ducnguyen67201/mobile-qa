@@ -1,5 +1,29 @@
 # Implementation status and evidence
 
+## Model catalog capacity — locally validated (2026-09-21)
+
+An additive model assignment revision and audit store, protocol-6 qualified worker
+set, compatible claim selection and computed run queue reasons are implemented on
+this branch. New navigation and structured-authoring work resolve active assignments
+independently of the physical device profile and freeze them in run/session payloads.
+The worker accepts the old ADB-only `no-model-adb-demo` sentinel as model-free, so
+that private historical profile does not abort startup. A pre-existing
+recovery-required reservation still requires explicit operator recovery before any
+worker can claim the physical phone.
+Queue creation logs the bounded reason code; run details refresh the reason as worker
+and reservation state changes. Direct-only runs no longer show a legacy model warning.
+
+Contract drift, formatting, Clippy, Rust workspace tests (65), web typecheck/lint
+and 152 web tests, Ruff/Pyright and 182 worker test cases pass across the consolidated
+pass and focused retries. The web production build and Cargo workspace build pass.
+The API used a disposable
+PostgreSQL container because the retained local test database has a different branch's
+migration ledger; signed synthetic APK fixtures were generated with local Android
+tools. The route tests cover immutable assignment revisions, distinct phone authoring
+models, compatible claims, and offline/mismatch/busy/recovery queue reasons. No live
+device/provider qualification or rollout was performed. Assignment `max_calls` is
+recorded but not yet enforced as a runtime stop condition.
+
 ## 07B regression labels and history — local implementation (2026-09-20)
 
 The [focused delivery](implementation/07b-regression-label-and-history.md) now creates

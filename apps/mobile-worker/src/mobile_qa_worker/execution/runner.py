@@ -344,7 +344,7 @@ def serve(
                 response = client.send(
                     "/api/worker/claims",
                     {
-                        "version": 5,
+                        "version": 6 if host_profile and host_profile.qualified_models else 5,
                         "claim_id": claim_id,
                         "profile_id": str(profile_id),
                         "model_capabilities": capabilities,

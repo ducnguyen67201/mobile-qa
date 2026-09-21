@@ -99,7 +99,7 @@ async fn enqueue(
     if s.environment_revision != revision_now as u32 {
         return Err(conflict("Environment changed. Open a new session."));
     }
-    if ![2, 3, 4, 5].contains(&s.protocol_version) {
+    if ![2, 3, 4, 5, 6].contains(&s.protocol_version) {
         return Err(conflict(
             "Reconnect with the updated device worker to run direct steps",
         ));
@@ -169,14 +169,17 @@ pub async fn generate(
     if input.engine != Some(DiscoveryEngine::MinitapV1) {
         return Err(conflict("Refresh this page to explore with AI"));
     }
-    if ![3, 4, 5].contains(&s.protocol_version) {
+    if ![3, 4, 5, 6].contains(&s.protocol_version) {
         return Err(conflict("Reconnect with the updated discovery worker"));
     }
     if s.profile.driver != Driver::Minitap
-        || s.resolved_model.as_ref().is_none_or(|model| {
-            !model.has(ModelCapability::MinitapNavigation)
-                || !model.has(ModelCapability::StructuredAuthoring)
-        })
+        || s.resolved_model
+            .as_ref()
+            .is_none_or(|model| !model.has(ModelCapability::MinitapNavigation))
+        || s.authoring_model
+            .as_ref()
+            .or(s.resolved_model.as_ref())
+            .is_none_or(|model| !model.has(ModelCapability::StructuredAuthoring))
     {
         return Err(ApiFailure::invalid(
             "AI generation needs a configured model. Templates work without AI.",

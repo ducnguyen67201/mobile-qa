@@ -250,7 +250,10 @@ def run_session(
         raise QualificationError("worker_profile_mismatch")
     if lease.session.resolved_model is not None:
         require_capability(lease.session.resolved_model, ModelCapability.minitap_navigation)
-        require_host_assignment(lease.session.resolved_model, profile.model_ref)
+        require_host_assignment(lease.session.resolved_model, profile)
+    if lease.session.authoring_model is not None:
+        require_capability(lease.session.authoring_model, ModelCapability.structured_authoring)
+        require_host_assignment(lease.session.authoring_model, profile)
     with host_lock(profile.state_root) as dirty:
         if dirty.exists():
             raise QualificationError("device_recovery_required")
@@ -365,13 +368,17 @@ def serve(origin: str, state: Path, profile_path: Path, once: bool = False) -> N
                 "/api/worker/phone-claims",
                 {
                     "claim_id": str(claim_id),
-                    "protocol_version": 5,
+                    "protocol_version": 6 if profile.qualified_models else 5,
                     "model_capabilities": capabilities,
                 },
                 PhoneClaimResponse,
             )
             if not connected:
-                print("Worker connected: phone sessions, protocol 5", flush=True)
+                protocol = 6 if profile.qualified_models else 5
+                print(
+                    f"Worker connected: phone sessions, protocol {protocol}",
+                    flush=True,
+                )
                 connected = True
             if response.lease:
                 if shutdown.is_set():

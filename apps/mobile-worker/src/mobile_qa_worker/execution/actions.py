@@ -116,7 +116,7 @@ def execute(
     if profile.system_image != job.manifest.profile.image:
         raise ValueError("host_profile_does_not_match_manifest")
     if job.manifest.resolved_model is not None:
-        require_host_assignment(job.manifest.resolved_model, profile.model_ref)
+        require_host_assignment(job.manifest.resolved_model, profile)
     evidence = Evidence(directory / "evidence", definition.budget.artifact_bytes)
     device = Device(profile, evidence)
     outcome, reason, reset, stopped = (

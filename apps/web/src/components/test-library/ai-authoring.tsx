@@ -85,7 +85,7 @@ export function GenerationPanel({
   const ai =
     session?.profile.driver === 'minitap' &&
     hasModelCapability(session.resolved_model, 'minitap_navigation') &&
-    hasModelCapability(session.resolved_model, 'structured_authoring')
+    hasModelCapability(session.authoring_model ?? session.resolved_model, 'structured_authoring')
   return (
     <Card withBorder>
       <Stack>

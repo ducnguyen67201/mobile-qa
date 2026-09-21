@@ -149,7 +149,7 @@ def run(
             raise QualificationError("generation_budget_exhausted")
         progress.usage.calls += 1
         publish("AI is preparing test suggestions")
-        resolved_model = connection.session.resolved_model
+        resolved_model = connection.session.authoring_model or connection.session.resolved_model
         if resolved_model is None:
             raise QualificationError("model_capability_unavailable")
         try:

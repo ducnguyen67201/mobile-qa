@@ -210,12 +210,13 @@ def explore(
     request_path = directory / "discovery-request.json"
     from mobile_qa_worker.execution.journal import write
 
-    if connection.session.resolved_model is None:
+    model = connection.session.authoring_model or connection.session.resolved_model
+    if model is None:
         raise QualificationError("model_capability_unavailable")
     write(
         request_path,
         {
-            "model": connection.session.resolved_model.model_dump(mode="json"),
+            "model": model.model_dump(mode="json"),
             "request": task.generation.model_dump(mode="json"),
         },
     )

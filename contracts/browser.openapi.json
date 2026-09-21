@@ -11538,6 +11538,24 @@
             "type": "string",
             "format": "uuid"
           },
+          "authoring_assignment_revision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "authoring_model": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResolvedModel"
+              }
+            ]
+          },
           "build_id": {
             "type": "string",
             "format": "uuid"
@@ -11563,6 +11581,14 @@
           },
           "message": {
             "type": "string"
+          },
+          "model_assignment_revision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
           },
           "profile": {
             "$ref": "#/components/schemas/ExecutionProfile"
@@ -11963,6 +11989,41 @@
         },
         "additionalProperties": false
       },
+      "QueueReason": {
+        "type": "string",
+        "enum": [
+          "worker_offline",
+          "model_unavailable",
+          "capacity_busy",
+          "device_recovery_required",
+          "awaiting_worker_claim"
+        ]
+      },
+      "QueueStatus": {
+        "type": "object",
+        "required": [
+          "reason",
+          "wait_seconds"
+        ],
+        "properties": {
+          "last_compatible_worker_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/QueueReason"
+          },
+          "wait_seconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
       "ReadinessResponse": {
         "type": "object",
         "required": [
@@ -12315,6 +12376,14 @@
               "type": "string"
             }
           },
+          "model_assignment_revision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
           "plan_hash": {
             "type": [
               "string",
@@ -12404,6 +12473,16 @@
           },
           "manifest": {
             "$ref": "#/components/schemas/RunManifest"
+          },
+          "queue_status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QueueStatus"
+              }
+            ]
           },
           "state": {
             "$ref": "#/components/schemas/JobState"
@@ -13173,6 +13252,13 @@
                 "$ref": "#/components/schemas/ModelReference"
               }
             ]
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelReference"
+            },
+            "description": "Protocol 6 qualified references. Protocol 5 uses `model` above."
           },
           "providers": {
             "type": "array",

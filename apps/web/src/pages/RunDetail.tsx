@@ -42,6 +42,9 @@ export function RunDetail() {
   if (app.data.organization_id !== workspaceId)
     return <Text>This run belongs to a different workspace.</Text>
   const r = run.data
+  const usesNavigation = r.manifest.cases.some((entry) =>
+    entry.case.actions.some((action) => action.kind === 'navigate'),
+  )
   return (
     <Stack>
       <PageHeading eyebrow="Release check" title={r.summary} description={app.data.name} />
@@ -65,6 +68,28 @@ export function RunDetail() {
           Cancel run
         </Button>
       </Group>
+      {r.state === 'queued' && r.queue_status && (
+        <Alert color={r.queue_status.reason === 'device_recovery_required' ? 'orange' : 'blue'}>
+          {
+            (
+              {
+                worker_offline: 'Waiting for a device worker to connect.',
+                model_unavailable: 'No connected worker is qualified for this run’s model.',
+                capacity_busy: 'The phone is busy with another session or run.',
+                device_recovery_required: 'The phone is held for operator recovery.',
+                awaiting_worker_claim:
+                  'A compatible worker is connected. Waiting for its next claim.',
+              } as const
+            )[r.queue_status.reason]
+          }
+          {r.queue_status.last_compatible_worker_at && (
+            <Text size="xs">
+              Last compatible worker heartbeat:{' '}
+              {new Date(r.queue_status.last_compatible_worker_at).toLocaleString()}
+            </Text>
+          )}
+        </Alert>
+      )}
       {r.manifest.resolved_model ? (
         <Card withBorder padding="sm">
           <Text fw={600}>{r.manifest.resolved_model.display_name}</Text>
@@ -73,7 +98,7 @@ export function RunDetail() {
             · {r.manifest.resolved_model.provider_model}
           </Text>
         </Card>
-      ) : r.manifest.profile.model ? (
+      ) : usesNavigation && r.manifest.profile.model ? (
         <Alert color="yellow">Legacy model context unavailable</Alert>
       ) : null}
       {r.state === 'cancel_requested' && (

@@ -19,11 +19,21 @@ class QualificationError(Exception):
 
 
 @dataclass(frozen=True)
+class QualifiedModel:
+    reference: ModelReference
+    evidence_reference: str
+    sdk_sha256: str
+    runtime_sha256: str
+    image: str
+
+
+@dataclass(frozen=True)
 class Profile:
     sdk_root: Path
     state_root: Path
     model_ref: ModelReference | None
     toolchain: Path
+    qualified_models: tuple[QualifiedModel, ...] = ()
     system_image: str = "system-images;android-35;google_apis;x86_64"
     headless: bool = True
     doppler_project: str = "mobile-qa"
@@ -44,9 +54,15 @@ class Profile:
     def load(cls, path: Path) -> "Profile":
         raw: dict[str, object] = tomllib.loads(path.read_text())
         required = {"sdk_root", "state_root", "toolchain"}
-        if "model" in raw:
+        legacy_model = raw.pop("model", None)
+        # Old ADB-only demo profiles stored this sentinel. It never represented a
+        # provider assignment and must not prevent a direct-only worker from starting.
+        if legacy_model is not None and legacy_model != "no-model-adb-demo":
             raise QualificationError("legacy_model_profile_use_model_ref")
         model_raw = raw.pop("model_ref", None)
+        if legacy_model is not None and model_raw is not None:
+            raise QualificationError("invalid_model_ref")
+        qualified_raw: object = raw.pop("qualified_models", [])
         if not required <= raw.keys() or raw.keys() - cls.__dataclass_fields__.keys():
             raise QualificationError("invalid_profile_fields")
         strings = required | {"doppler_project", "doppler_config", "system_image"}
@@ -73,6 +89,54 @@ class Profile:
             )
         except Exception as error:
             raise QualificationError("invalid_model_ref") from error
+        if not isinstance(qualified_raw, list):
+            raise QualificationError("invalid_qualified_models")
+        qualified_items = cast(list[object], qualified_raw)
+        if len(qualified_items) > 8 or (model_raw is not None and qualified_items):
+            raise QualificationError("invalid_qualified_models")
+        qualified: list[QualifiedModel] = []
+        for candidate in qualified_items:
+            if not isinstance(candidate, dict):
+                raise QualificationError("invalid_qualified_models")
+            item = cast(dict[str, object], candidate)
+            if set(item) != {
+                "key",
+                "revision",
+                "evidence_reference",
+                "sdk_sha256",
+                "runtime_sha256",
+                "image",
+            }:
+                raise QualificationError("invalid_qualified_models")
+            try:
+                reference = ModelReference.model_validate(
+                    {"key": item["key"], "revision": item["revision"]}, strict=True
+                )
+            except Exception as error:
+                raise QualificationError("invalid_qualified_models") from error
+            evidence = item["evidence_reference"]
+            sdk = item["sdk_sha256"]
+            runtime = item["runtime_sha256"]
+            image = item["image"]
+            if (
+                not isinstance(evidence, str)
+                or not 1 <= len(evidence) <= 1000
+                or not isinstance(sdk, str)
+                or len(sdk) != 64
+                or any(c not in "0123456789abcdef" for c in sdk)
+                or not isinstance(runtime, str)
+                or len(runtime) != 64
+                or any(c not in "0123456789abcdef" for c in runtime)
+                or not isinstance(image, str)
+                or image != raw.get("system_image", cls.system_image)
+            ):
+                raise QualificationError("invalid_qualified_models")
+            qualified.append(QualifiedModel(reference, evidence, sdk, runtime, image))
+        if len({(item.reference.key, item.reference.revision) for item in qualified}) != len(
+            qualified
+        ):
+            raise QualificationError("duplicate_qualified_model")
+        raw["qualified_models"] = tuple(qualified)
         profile = cls(**cast(dict[str, object], raw))  # type: ignore[arg-type]
         if profile.system_image not in (
             "system-images;android-35;google_apis;x86_64",

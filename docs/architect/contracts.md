@@ -57,7 +57,9 @@ snapshots and worker advertisements. `ExecutionProfile.model` is optional: new w
 `ModelReference`, while the untagged string variant exists only to read historical payloads.
 Model-enabled manifests and phone sessions carry `resolved_model`; child model requests use that
 snapshot rather than re-resolving host configuration. Protocol-5 claim advertisements are
-additive, but protocol 5 is mandatory whenever a frozen model assignment exists.
+additive. Protocol 5 is mandatory for a frozen model assignment with one host model;
+protocol 6 advertises a bounded qualified model set. Claims still require the exact
+frozen reference and provider, and a direct-only claim needs no model.
 
 ## Future work
 

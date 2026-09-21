@@ -52,7 +52,12 @@ async fn prepared(
         .await;
     res.assert_status_ok();
     let build = res.json::<BuildResponse>();
-    assert_eq!(build.validation.state, ValidationState::Validated);
+    assert_eq!(
+        build.validation.state,
+        ValidationState::Validated,
+        "{:?}",
+        build.validation
+    );
     let profile = ExecutionProfile {
         execution_context: None,
         id: Uuid::new_v4(),
@@ -389,8 +394,9 @@ async fn real_database_competing_claims_and_immutable_definition_boundaries() {
         )
         .await
         .is_err());
+        let mut run_ids = vec![];
         for k in ["a", "b"] {
-            runs::create(
+            let (run, _) = runs::create(
                 &ctx,
                 owner.user,
                 app,
@@ -403,7 +409,15 @@ async fn real_database_competing_claims_and_immutable_definition_boundaries() {
             )
             .await
             .unwrap();
+            run_ids.push(run.id);
         }
+        exec(
+            &ctx.db,
+            "UPDATE execution_runs SET created_at='2026-01-01T00:00:00Z' WHERE id=$1 OR id=$2",
+            vec![run_ids[0].into(), run_ids[1].into()],
+        )
+        .await
+        .unwrap();
         let (a, b) = tokio::join!(
             scheduler::claim(
                 &ctx,
@@ -426,10 +440,12 @@ async fn real_database_competing_claims_and_immutable_definition_boundaries() {
                 }
             )
         );
-        assert_eq!(
-            usize::from(a.unwrap().lease.is_some()) + usize::from(b.unwrap().lease.is_some()),
-            1
-        );
+        let claimed: Vec<_> = [a.unwrap().lease, b.unwrap().lease]
+            .into_iter()
+            .flatten()
+            .collect();
+        assert_eq!(claimed.len(), 1);
+        assert_eq!(claimed[0].run_id, *run_ids.iter().min().unwrap());
         // Independent transactions see the same unreleased app reservation.
         let tx = ctx.db.begin().await.unwrap();
         let reservations = rows(
@@ -873,6 +889,7 @@ async fn saved_suite_route_queues_each_numbered_case_in_one_immutable_run() {
             build_id: build,
             profile_id: worker.profile_id,
             environment_revision: 1,
+            baseline_run_id: None,
         };
         let path = format!("/api/apps/{app}/suite-runs");
         let preview = owner
@@ -906,6 +923,108 @@ async fn saved_suite_route_queues_each_numbered_case_in_one_immutable_run() {
             .await;
         retry.assert_status_ok();
         assert_eq!(retry.json::<RunResponse>().id, run.id);
+        // Put the second displayed case first in the stable attempt-ID order.
+        // A suite claim must not inherit the editor's membership order.
+        for (case_index, attempt_id) in [
+            (0, Uuid::from_u128(u128::MAX)),
+            (1, Uuid::from_u128(u128::MAX - 1)),
+        ] {
+            exec(
+                &ctx.db,
+                "UPDATE execution_attempts SET id=$3 WHERE run_id=$1 AND case_index=$2",
+                vec![run.id.into(), case_index.into(), attempt_id.into()],
+            )
+            .await
+            .unwrap();
+        }
+        let claim = scheduler::claim(
+            &ctx,
+            &worker,
+            ClaimRequest {
+                version: 4,
+                claim_id: Uuid::new_v4(),
+                profile_id: worker.profile_id,
+                model_capabilities: None,
+            },
+        )
+        .await
+        .unwrap()
+        .lease
+        .unwrap();
+        assert_eq!(claim.run_id, run.id);
+        assert_eq!(claim.case_index, 1);
+        assert!(scheduler::claim(
+            &ctx,
+            &worker,
+            ClaimRequest {
+                version: 4,
+                claim_id: Uuid::new_v4(),
+                profile_id: worker.profile_id,
+                model_capabilities: None,
+            }
+        )
+        .await
+        .unwrap()
+        .lease
+        .is_none());
+        let mut with_baseline = body.clone();
+        with_baseline.baseline_run_id = Some(run.id);
+        let denied = owner
+            .write(server.post(&path))
+            .add_header("idempotency-key", "suite-incomplete-baseline")
+            .json(&with_baseline)
+            .await;
+        denied.assert_status(axum::http::StatusCode::CONFLICT);
+        exec(
+            &ctx.db,
+            "UPDATE execution_attempts SET expires_at=now()-interval '1 second' WHERE id=$1",
+            vec![claim.attempt_id.into()],
+        )
+        .await
+        .unwrap();
+        scheduler::reconcile(&ctx).await.unwrap();
+        assert!(
+            scheduler::claim(
+                &ctx,
+                &worker,
+                ClaimRequest {
+                    version: 4,
+                    claim_id: Uuid::new_v4(),
+                    profile_id: worker.profile_id,
+                    model_capabilities: None,
+                }
+            )
+            .await
+            .unwrap()
+            .lease
+            .is_none(),
+            "recovery must hold the app reservation"
+        );
+        scheduler::recover(
+            &ctx,
+            owner.user,
+            app,
+            claim.attempt_id,
+            "isolated fixture reset verified",
+        )
+        .await
+        .unwrap();
+        let next = scheduler::claim(
+            &ctx,
+            &worker,
+            ClaimRequest {
+                version: 4,
+                claim_id: Uuid::new_v4(),
+                profile_id: worker.profile_id,
+                model_capabilities: None,
+            },
+        )
+        .await
+        .unwrap()
+        .lease
+        .unwrap();
+        assert_eq!(next.run_id, run.id);
+        assert_eq!(next.case_index, 0);
     })
     .await;
 }

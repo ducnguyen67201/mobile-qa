@@ -51,7 +51,7 @@ const options: LibraryOptionsResponse = {
   saved_versions: [caseChoice, suiteChoice],
 }
 
-it('shows numbered steps and keeps explicit removal controls below the canvas', async () => {
+it('shows independent suite cases and keeps explicit removal controls below the canvas', async () => {
   const onChange = vi.fn()
   render(
     <MantineProvider theme={theme} env="test">
@@ -59,10 +59,11 @@ it('shows numbered steps and keeps explicit removal controls below the canvas', 
         selections={[{ case_version_id: 'case-version', required: true, data_variant: 'default' }]}
         options={options}
         onChange={onChange}
+        kind="suite"
       />
     </MantineProvider>,
   )
-  expect(screen.getByText(/Step 1 · A saved task survives a restart/)).toBeInTheDocument()
+  expect(screen.getByText(/Case 1 · A saved task survives a restart/)).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Remove case selection 1' }))
   expect(onChange).toHaveBeenCalledWith([])
   expect(screen.queryByRole('combobox', { name: /Add saved case/ })).not.toBeInTheDocument()

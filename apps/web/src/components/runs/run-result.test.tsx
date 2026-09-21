@@ -22,6 +22,28 @@ const display = (comparison?: unknown) => {
   )
 }
 describe('run comparison display', () => {
+  it('names a saved suite from its source and number of cases', () => {
+    const run = zRunResponse.parse(fixture)
+    run.manifest.source = {
+      kind: 'saved_suite_v1',
+      suite_version_id: '11111111-1111-4111-8111-111111111111',
+    }
+    run.manifest.cases.push({
+      ...run.manifest.cases[0]!,
+      definition_id: '22222222-2222-4222-8222-222222222222',
+    })
+    render(
+      <MantineProvider>
+        <QueryClientProvider client={new QueryClient()}>
+          <MemoryRouter>
+            <RunResult run={run} compact />
+          </MemoryRouter>
+        </QueryClientProvider>
+      </MantineProvider>,
+    )
+    expect(screen.getByText('Saved suite · 2 cases')).toBeInTheDocument()
+    expect(screen.queryByText('Saved task survives restart')).not.toBeInTheDocument()
+  })
   it('does not invent a regression from an execution failure', () => {
     display()
     expect(screen.getByText('Finalizing comparison…')).toBeInTheDocument()

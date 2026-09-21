@@ -20,6 +20,12 @@ vi.mock('@/api/regression', () => ({
   }),
   createSuiteRun: mocks.create,
 }))
+vi.mock('@/api/setup', () => ({
+  buildQuery: (_app: string, id: string) => ({
+    queryKey: ['build', id],
+    queryFn: async () => ({ sha256: 'a'.repeat(64) }),
+  }),
+}))
 vi.mock('@/api/task-sessions', () => ({
   phoneOptionsQuery: () => ({
     queryKey: ['phone-options'],
@@ -36,7 +42,12 @@ vi.mock('@/api/task-sessions', () => ({
 beforeEach(() => {
   mocks.create.mockReset()
   mocks.preview.mockReset()
-  mocks.preview.mockResolvedValue({ blockers: [], environment_revision: 7 })
+  mocks.preview.mockResolvedValue({
+    blockers: [],
+    environment_revision: 7,
+    baselines: [],
+    suggested_baseline_id: null,
+  })
 })
 
 function Location() {
@@ -81,18 +92,28 @@ function show({
     </MantineProvider>,
   )
 }
+async function chooseSetup() {
+  await userEvent.click(await screen.findByRole('combobox', { name: 'Build to test' }))
+  await userEvent.click(await screen.findByRole('option', { name: 'v1.1' }))
+  await userEvent.click(screen.getByRole('combobox', { name: 'Test device' }))
+  await userEvent.click(await screen.findByRole('option', { name: 'Device' }))
+  expect(await screen.findByText(/Build checksum:/)).toBeInTheDocument()
+}
 
 it('queues the saved suite in one click and opens its live run map', async () => {
   const run = zRunResponse.parse(fixture)
   mocks.create.mockResolvedValue(run)
   show()
-  await userEvent.click(await screen.findByRole('button', { name: 'Run sequence' }))
+  expect(screen.getByRole('button', { name: 'Run suite' })).toBeDisabled()
+  await chooseSetup()
+  await userEvent.click(screen.getByRole('button', { name: 'Run suite' }))
   await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
   expect(mocks.create.mock.calls[0]![1]).toEqual({
     suite_version_id: 'suite-version',
     build_id: 'build',
     profile_id: 'profile',
     environment_revision: 7,
+    baseline_run_id: null,
   })
   expect(await screen.findByText(`/runs/${run.id}`)).toBeInTheDocument()
 })
@@ -103,7 +124,8 @@ it('saves a changed sequence and retries the exact queued request after a lost r
     .mockRejectedValueOnce(new Error('Response lost'))
     .mockResolvedValueOnce(zRunResponse.parse(fixture))
   show({ dirty: true, save })
-  await userEvent.click(await screen.findByRole('button', { name: 'Save & run' }))
+  await chooseSetup()
+  await userEvent.click(await screen.findByRole('button', { name: 'Save & run suite' }))
   await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
   const first = mocks.create.mock.calls[0]!
   expect(first[1]).toMatchObject({ suite_version_id: 'new-suite-version' })
@@ -111,4 +133,68 @@ it('saves a changed sequence and retries the exact queued request after a lost r
   await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2))
   expect(mocks.create.mock.calls[1]).toEqual(first)
   expect(save).toHaveBeenCalledTimes(1)
+})
+
+it('offers a suggestion without selecting a baseline for the tester', async () => {
+  mocks.preview.mockResolvedValue({
+    blockers: [],
+    environment_revision: 7,
+    baselines: [
+      {
+        id: 'shown-run',
+        build_id: 'old-build',
+        build_label: 'v1.0',
+        created_at: '2026-09-20T12:00:00Z',
+        compatible: true,
+        reason: 'Same suite',
+      },
+    ],
+    suggested_baseline_id: 'shown-run',
+  })
+  mocks.create.mockResolvedValue(zRunResponse.parse(fixture))
+  show()
+  await chooseSetup()
+  expect(await screen.findByText(/Suggested baseline: v1.0/)).toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: 'Compare with' })).toHaveValue(
+    'None — establish a first result',
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Run suite' }))
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
+  expect(mocks.create.mock.calls[0]![1].baseline_run_id).toBeNull()
+})
+
+it('pins the explicitly selected suite baseline even when the readiness suggestion changes', async () => {
+  mocks.preview.mockResolvedValue({
+    blockers: [],
+    environment_revision: 7,
+    baselines: [
+      {
+        id: 'shown-run',
+        build_id: 'old-build',
+        build_label: 'v1.0',
+        created_at: '2026-09-20T12:00:00Z',
+        compatible: true,
+        reason: 'Same suite',
+      },
+    ],
+    suggested_baseline_id: 'shown-run',
+  })
+  mocks.create.mockResolvedValue(zRunResponse.parse(fixture))
+  show()
+  await chooseSetup()
+  await userEvent.click(await screen.findByRole('combobox', { name: 'Compare with' }))
+  await userEvent.click(
+    await screen.findByRole('option', {
+      name: `v1.0 · ${new Date('2026-09-20T12:00:00Z').toLocaleString()}`,
+    }),
+  )
+  mocks.preview.mockResolvedValue({
+    blockers: [],
+    environment_revision: 7,
+    baselines: [],
+    suggested_baseline_id: 'newer-run',
+  })
+  await userEvent.click(screen.getByRole('button', { name: 'Run suite' }))
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
+  expect(mocks.create.mock.calls[0]![1].baseline_run_id).toBe('shown-run')
 })

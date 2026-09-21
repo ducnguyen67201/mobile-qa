@@ -12,28 +12,33 @@ snapshots still require the existing semantic fields and required evidence check
 Suites select exact case versions. Plans select exact suites/cases and an execution
 profile, with requiredness, variants and budgets. Builds are selected when running.
 
-Suite and release-plan editors also present their ordered membership as a non-connectable
-coverage flow. Authors select saved cases or suites directly from a canvas toolbar; a selection
-appends the next numbered step immediately. Arrowed step rails visualize the stored order, while
-the adjacent keyboard-accessible detail list retains explicit move, remove and requiredness
-controls. The flow is a live projection of the existing form values and saved-version options;
+Suite and release-plan editors present membership as a non-connectable coverage
+map. A suite connects each saved test case directly to the suite; it has no
+case-to-case execution arrows. The author can arrange cases for readability,
+but workers may claim any eligible suite case. A release plan retains its
+numbered display order. Authors select saved cases or suites directly from a
+canvas toolbar, while the adjacent keyboard-accessible detail list retains
+explicit move, remove and requiredness controls. The map is a live projection
+of the existing form values and saved-version options;
 its layout coordinates are browser presentation state and are never persisted as test semantics.
 Frozen versions preserve the same hierarchy, including visibly unavailable references. Run
-reports use a linear execution flow derived only from the frozen manifest and actual attempts
-because the manifest does not retain suite provenance. Flow lines communicate containment and
-order, not dependencies: every case still begins from its required clean state. The adjacent
+reports derive their coverage map from the frozen manifest and actual attempts;
+saved-suite reports show independent cases, while release plans retain display
+order. Every case begins from its required clean state. The adjacent
 form/report remains the authority for detailed editing or evidence.
-When a suite has an executable saved version, its canvas exposes one **Run sequence** action.
-The browser chooses the newest available build and first qualified profile, refreshes server
+When a suite has an executable saved version, its canvas exposes one **Run suite** action.
+The tester chooses a build, qualified device and optional baseline. The browser refreshes server
 readiness, closes any idle interactive phone session, submits the exact suite version
-idempotently and opens the persisted live run map. Unsaved changes use the same action as
-**Save & run**, so the queued manifest always pins the version returned by Save. The run map
-polls durable attempt state and changes each numbered step from queued to running to its recorded
+idempotently and opens the persisted live run map. Unsaved changes use **Save & run suite**,
+so the queued manifest always pins the version returned by Save. The run map
+polls durable attempt state and changes each case from queued to running to its recorded
 outcome; selecting a started step jumps to its evidence. A suite run uses a transient bounded
 execution policy and does not create or mutate a release plan.
-At narrow widths the map becomes a full-size top-to-bottom sequence instead of scaling the
+The [reliable smoke-suite spec](10-reliable-smoke-suite.md) owns explicit
+run setup, pinned baseline, picker order and acceptance limits.
+At narrow widths the map becomes a full-size top-to-bottom layout instead of scaling the
 desktop columns down. Ordinary wheel scrolling continues to move the page; intentional canvas
-panning is bounded so the sequence cannot be lost in empty space. Saved case and suite pickers
+panning is bounded so the coverage map cannot be lost in empty space. Saved case and suite pickers
 add a selection immediately, while explicit keyboard-accessible move and remove controls remain
 the only way to reorder or remove membership. The map is the primary coverage summary, so the
 draft editor does not repeat it in a second large coverage card. Advanced execution values may

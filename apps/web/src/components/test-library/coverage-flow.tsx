@@ -403,7 +403,7 @@ export function buildLibraryCoverageFlow(
       data: {
         kind: 'case',
         orientation,
-        eyebrow: `Step ${order}`,
+        eyebrow: `${definition.kind === 'suite' ? 'Case' : 'Step'} ${order}`,
         title: value?.version.definition.content.title ?? 'Unavailable saved case',
         version: value?.version.definition.content.version,
         order,
@@ -426,22 +426,17 @@ export function buildLibraryCoverageFlow(
   }
   if (definition.kind === 'suite') {
     let localIndex = 0
-    let previousCaseId: string | undefined
     definition.content.cases.forEach((selection) => {
       const nodeId = addCase(selection, rootId, localIndex, false)
       if (!nodeId) return
-      edges.push(
-        previousCaseId
-          ? sequenceEdge(previousCaseId, nodeId)
-          : edge(`edge-${rootId}-${nodeId}`, rootId, nodeId, true),
-      )
-      previousCaseId = nodeId
+      edges.push(edge(`edge-${rootId}-${nodeId}`, rootId, nodeId, true))
       localIndex += 1
     })
     verticalY += localIndex * 114
   } else {
     const groups: Array<{
       id: string
+      kind: 'direct' | 'suite'
       eyebrow: string
       title: string
       version?: number
@@ -452,6 +447,7 @@ export function buildLibraryCoverageFlow(
     if (definition.content.cases.length)
       groups.push({
         id: 'direct-cases',
+        kind: 'direct',
         eyebrow: 'Outside suites',
         title: 'Direct cases',
         status: 'ready',
@@ -462,6 +458,7 @@ export function buildLibraryCoverageFlow(
         const value = suiteVersion(options, id)
         return {
           id: `suite-${index}-${id}`,
+          kind: 'suite' as const,
           eyebrow: `Suite ${index + 1}`,
           title: value?.version.definition.content.title ?? 'Unavailable saved suite',
           version: value?.version.definition.content.version,
@@ -504,7 +501,8 @@ export function buildLibraryCoverageFlow(
       group.selections.forEach((selection) => {
         const nodeId = addCase(selection, group.id, localIndex, true)
         if (!nodeId) return
-        if (previousCaseId) edges.push(sequenceEdge(previousCaseId, nodeId))
+        if (group.kind === 'direct' && previousCaseId)
+          edges.push(sequenceEdge(previousCaseId, nodeId))
         previousCaseId = nodeId
         localIndex += 1
       })
@@ -593,7 +591,8 @@ export function buildRunCoverageFlow(
   orientation: FlowOrientation = 'horizontal',
 ): CoverageFlowModel {
   const rootId = 'run-root'
-  const groupId = 'run-sequence'
+  const groupId = 'run-cases'
+  const savedSuite = run.manifest.source?.kind === 'saved_suite_v1'
   const itemCount = run.manifest.cases.length
   const groupHeight =
     orientation === 'vertical'
@@ -634,12 +633,12 @@ export function buildRunCoverageFlow(
       style: { width: orientation === 'vertical' ? 324 : 690, height: groupHeight },
       draggable: false,
       connectable: false,
-      ariaLabel: `Execution order, ${caseCount(itemCount)}`,
+      ariaLabel: `${savedSuite ? 'Suite cases' : 'Execution order'}, ${caseCount(itemCount)}`,
       data: {
         kind: 'group',
         orientation,
         eyebrow: 'Manifest',
-        title: 'Execution order',
+        title: savedSuite ? 'Suite cases' : 'Execution order',
         detail: caseCount(itemCount),
         band: true,
       },
@@ -667,7 +666,7 @@ export function buildRunCoverageFlow(
       data: {
         kind: 'case',
         orientation,
-        eyebrow: `Step ${index + 1}`,
+        eyebrow: `${savedSuite ? 'Case' : 'Step'} ${index + 1}`,
         title: resolved.case.title,
         version: resolved.case.version,
         order: index + 1,
@@ -678,7 +677,7 @@ export function buildRunCoverageFlow(
         onActivate: attempt && activate ? () => activate(attempt.id) : undefined,
       },
     })
-    if (previousCaseId) edges.push(sequenceEdge(previousCaseId, nodeId))
+    if (!savedSuite && previousCaseId) edges.push(sequenceEdge(previousCaseId, nodeId))
     previousCaseId = nodeId
   })
   return {
@@ -764,18 +763,19 @@ function CoverageCanvasEditor({
     definition.content.cases.length +
     (definition.kind === 'plan' ? definition.content.suite_version_ids.length : 0)
   const full = selectionCount >= 100
+  const isSuite = definition.kind === 'suite'
   return (
     <Stack gap={6}>
       <Group gap={6}>
         <Plus size={14} aria-hidden />
         <Text size="xs" fw={700} tt="uppercase" lts="0.08em">
-          Add to sequence
+          {isSuite ? 'Add test case' : 'Add to release check'}
         </Text>
       </Group>
       {definition.kind === 'plan' && onAddSuite && (
         <Select
           label="Saved suite"
-          aria-label="Add saved suite to sequence"
+          aria-label="Add saved suite to release check"
           size="xs"
           searchable
           disabled={full || !suites.length}
@@ -789,8 +789,8 @@ function CoverageCanvasEditor({
       )}
       {onAddCase && (
         <Select
-          label="Saved case"
-          aria-label="Add saved case to sequence"
+          label={isSuite ? 'Saved test case' : 'Saved case'}
+          aria-label={isSuite ? 'Add saved test case to suite' : 'Add saved case to release check'}
           size="xs"
           searchable
           disabled={full || !cases.length}
@@ -803,7 +803,9 @@ function CoverageCanvasEditor({
         />
       )}
       <Text size="xs" c="dimmed">
-        New items become the next numbered step.
+        {isSuite
+          ? 'Saved cases are independent. A worker picks an eligible case when the device is free.'
+          : 'New items become the next numbered item.'}
       </Text>
     </Stack>
   )
@@ -858,12 +860,14 @@ export function LibraryCoverageFlow({
             </Text>
           </Group>
           <Title order={2} size="h3">
-            {definition.kind === 'plan' ? 'Release sequence' : 'Suite sequence'}
+            {definition.kind === 'plan' ? 'Release coverage' : 'Suite test cases'}
           </Title>
           <Text size="sm" c="dimmed">
-            {frozen
-              ? 'This map reflects exact saved versions. Lines show containment and order, never test dependencies.'
-              : 'Add coverage on the canvas. Numbered arrows show run order; every case still starts from a clean state.'}
+            {definition.kind === 'suite'
+              ? 'A suite groups saved test cases. Each case has its own action sequence and expected checks, starts clean, and can be picked when eligible.'
+              : frozen
+                ? 'This map reflects exact saved versions. Lines show containment and display order, never test dependencies.'
+                : 'Add coverage on the canvas. Numbered arrows show display order; every case still starts from a clean state.'}
           </Text>
         </Stack>
         <div className={styles.surfaceActions}>
@@ -907,11 +911,12 @@ export function RunCoverageFlow({ run }: { run: RunResponse }) {
             <Text className={styles.kicker}>Live execution map</Text>
           </Group>
           <Title order={2} size="h3">
-            Run sequence
+            Run suite
           </Title>
           <Text size="sm" c="dimmed">
-            Real manifest order and latest attempt state. Select a started case to jump to its
-            evidence.
+            {run.manifest.source?.kind === 'saved_suite_v1'
+              ? 'Independent saved cases and their latest attempt state. Select a started case to view evidence.'
+              : 'Manifest display order and latest attempt state. Select a started case to view evidence.'}
           </Text>
         </Stack>
         <Badge variant="outline">{run.state.replaceAll('_', ' ')}</Badge>

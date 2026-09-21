@@ -122,3 +122,23 @@ the existing reservation and fencing rules. A missing or incompatible worker lea
 the job queued with a computed explanation. Recovery reservations remain an explicit
 operator gate. The catalog does not infer provider support or host qualification from
 a model name.
+
+## 2026-09-21 — Explicit smoke-suite run selection
+
+A saved suite remains a collection of independently reset case versions;
+its display order is not a shared-state workflow or claim priority. Each member
+is a saved test case with expected checks; a raw action sequence cannot be a
+suite member. The first repeatable smoke
+delivery asks the tester to select a build and qualified device explicitly and
+pins an optional completed baseline run at submission. This replaces the current
+suite button's implicit newest-build/first-profile choice. The existing run
+manifest, attempt, evidence and comparison pipeline owns the result; no second
+suite engine or approval step is added. The API remains the worker task picker:
+it filters by worker compatibility, claims the oldest eligible run and then any
+eligible saved-suite case under app and device reservations, and waits for
+verified cleanup before another claim. Stable attempt IDs select among suite
+cases without using the editor's order; release plans keep their case order.
+Stable run IDs make equal timestamps
+deterministic; an incompatible older run does not block eligible work. The
+[focused spec](implementation/10-reliable-smoke-suite.md) defines the business
+rules and acceptance boundary.

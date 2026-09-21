@@ -755,11 +755,14 @@ export const zSuiteDefinition = z.object({
 });
 
 export const zSuiteRunPreview = z.object({
+    baselines: z.array(zBaselineChoice),
     blockers: z.array(z.string()),
-    environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+    environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    suggested_baseline_id: z.uuid().nullish()
 });
 
 export const zSuiteRunRequest = z.object({
+    baseline_run_id: z.uuid().nullish(),
     build_id: z.uuid(),
     environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     profile_id: z.uuid(),

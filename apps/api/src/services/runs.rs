@@ -508,6 +508,57 @@ async fn queue_status(
     })
 }
 
+fn verified_required_pass(
+    manifest: &RunManifest,
+    case: &ResolvedCase,
+    attempt: &AttemptResponse,
+) -> bool {
+    if attempt.outcome != Some(Outcome::Passed)
+        || attempt.state != JobState::Finished
+        || attempt.cleanup != CleanupState::VerifiedClean
+        || !attempt.recovery_events.is_empty()
+        || attempt
+            .original_cleanup
+            .as_ref()
+            .is_some_and(|receipt| !receipt.stopped || receipt.reset != CleanupState::VerifiedClean)
+    {
+        return false;
+    }
+    let Some(context) = manifest.profile.execution_context.as_ref() else {
+        return true;
+    };
+    if !attempt.preflight.as_ref().is_some_and(|proof| {
+        &proof.context == context
+            && proof.attempt_id == attempt.id
+            && proof.build_sha256 == manifest.build_sha256
+    }) || !attempt
+        .original_cleanup
+        .as_ref()
+        .is_some_and(|receipt| receipt.stopped && receipt.reset == CleanupState::VerifiedClean)
+    {
+        return false;
+    }
+    case.case
+        .checks
+        .iter()
+        .filter(|check| check.required)
+        .all(|check| {
+            attempt.checks.iter().any(|result| {
+                result.check_id == check.id
+                    && result.outcome == Outcome::Passed
+                    && (result.observed.is_some()
+                        || result.observation_kind
+                            == Some(mobile_qa_contracts::regression::ObservationKind::Absent))
+                    && !result.artifact_ids.is_empty()
+                    && result.artifact_ids.iter().all(|id| {
+                        attempt.artifacts.iter().any(|artifact| {
+                            artifact.id == *id && artifact.state == EvidenceState::Sealed
+                        })
+                    })
+            })
+        })
+}
+
 pub fn summary(manifest: &RunManifest, attempts: &[AttemptResponse]) -> String {
     let required: Vec<_> = manifest.cases.iter().filter(|c| c.required).collect();
     if required.iter().any(|c| {
@@ -519,24 +570,35 @@ pub fn summary(manifest: &RunManifest, attempts: &[AttemptResponse]) -> String {
     }
     if required.is_empty()
         || required.iter().any(|c| {
-            let a: Vec<_> = attempts
+            let matching: Vec<_> = attempts
                 .iter()
                 .filter(|a| a.case_version_id == c.definition_id)
                 .collect();
-            a.is_empty()
-                || a.iter().any(|a| {
-                    a.outcome != Some(Outcome::Passed)
-                        || a.state != JobState::Finished
-                        || a.cleanup != CleanupState::VerifiedClean
-                        || !a.recovery_events.is_empty()
-                        || a.original_cleanup
-                            .as_ref()
-                            .is_some_and(|r| !r.stopped || r.reset != CleanupState::VerifiedClean)
-                        || (manifest.profile.execution_context.is_some() && a.preflight.is_none())
-                })
+            matching.is_empty()
+                || matching
+                    .iter()
+                    .any(|attempt| !verified_required_pass(manifest, c, attempt))
         })
     {
         return "Incomplete / review required".into();
+    }
+    if manifest.cases.iter().filter(|c| !c.required).any(|c| {
+        attempts
+            .iter()
+            .any(|a| a.case_version_id == c.definition_id && a.outcome == Some(Outcome::Failed))
+    }) {
+        return "Required checks passed; optional failures detected".into();
+    }
+    if manifest.cases.iter().filter(|c| !c.required).any(|c| {
+        !attempts
+            .iter()
+            .any(|a| a.case_version_id == c.definition_id)
+            || attempts.iter().any(|a| {
+                a.case_version_id == c.definition_id
+                    && (a.state != JobState::Finished || a.outcome != Some(Outcome::Passed))
+            })
+    }) {
+        return "Incomplete / review required; optional cases unresolved".into();
     }
     "Required checks passed".into()
 }
@@ -600,4 +662,48 @@ pub async fn list(
         None
     };
     Ok(RunListResponse { items, next_cursor })
+}
+
+#[cfg(test)]
+mod summary_tests {
+    use super::*;
+    #[test]
+    fn required_proof_and_optional_failures_are_reported_separately() {
+        let mut run: RunResponse = serde_json::from_str(include_str!(
+            "../../tests/fixtures/execution/comparison.json"
+        ))
+        .unwrap();
+        assert_eq!(
+            summary(&run.manifest, &run.attempts),
+            "Required checks passed"
+        );
+        let proof = run.attempts[0].preflight.clone();
+        run.attempts[0].preflight = None;
+        assert_eq!(
+            summary(&run.manifest, &run.attempts),
+            "Incomplete / review required"
+        );
+        run.attempts[0].preflight = proof;
+        run.attempts[0].artifacts[0].state = EvidenceState::Unavailable;
+        assert_eq!(
+            summary(&run.manifest, &run.attempts),
+            "Incomplete / review required"
+        );
+        run.attempts[0].artifacts[0].state = EvidenceState::Sealed;
+        let mut optional = run.manifest.cases[0].clone();
+        optional.definition_id = Uuid::new_v4();
+        optional.case.key = "optional".into();
+        optional.required = false;
+        let mut attempt = run.attempts[0].clone();
+        attempt.id = Uuid::new_v4();
+        attempt.case_version_id = optional.definition_id;
+        attempt.preflight.as_mut().unwrap().attempt_id = attempt.id;
+        attempt.outcome = Some(Outcome::Failed);
+        run.manifest.cases.push(optional);
+        run.attempts.push(attempt);
+        assert_eq!(
+            summary(&run.manifest, &run.attempts),
+            "Required checks passed; optional failures detected"
+        );
+    }
 }

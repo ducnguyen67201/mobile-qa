@@ -27,7 +27,7 @@ explicit real-device suite mode were added.
 | ---------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Suite contract compatibility | Done                        | Old omitted baseline round-trip test and generated OpenAPI/SDK/Zod.                                                                    |
 | Shared baseline admission    | Done                        | Shared candidate scan, exact suite suggestion, completed same-app pin, route test.                                                     |
-| Deterministic worker pickup  | Done                        | Stable ID tie-breaks; route claim test checks pickup independent of suite display order and reservation blocking.                       |
+| Deterministic worker pickup  | Done                        | Stable ID tie-breaks; route claim test checks pickup independent of suite display order and reservation blocking.                      |
 | Honest report policy         | Done                        | Real proof and sealed required-check evidence; optional failures explicit.                                                             |
 | Explicit suite UI            | Done                        | Build/device/baseline choices, checksum, frozen retry, readiness, DOM tests.                                                           |
 | Suite report                 | Done                        | Saved-suite heading/version, per-case existing evidence, server result.                                                                |
@@ -41,7 +41,7 @@ explicit real-device suite mode were added.
 | Generated contract drift and contract tests          | Pass; `just types`, `just check-contracts`.                                    |
 | Scoped Rust/TS/Python format and changed-script Ruff | Pass.                                                                          |
 | API Clippy and workspace tests                       | Pass with a disposable migrated PostgreSQL database and process-scoped JDK 17. |
-| Web typecheck, lint, tests                           | Pass; 25 files, 161 tests after the suite-membership clarification.           |
+| Web typecheck, lint, tests                           | Pass; 25 files, 161 tests after the suite-membership clarification.            |
 | Worker Ruff, Pyright, tests                          | Pass; 185 tests.                                                               |
 | Production build                                     | Pass; Vite and Cargo. Vite retains its existing large-chunk warning.           |
 | HTTP acceptance                                      | Pass; `smoke-test-library`, `smoke-execution`, `smoke-suite`, all simulated.   |
@@ -49,13 +49,13 @@ explicit real-device suite mode were added.
 
 ## Files changed
 
-| Area          | Files                                                                                                               | Change                                                              |
-| ------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Contracts     | `crates/contracts/src/regression.rs`, generated OpenAPI/browser SDK/Zod                                             | Add optional suite baseline and preview choices.                    |
+| Area          | Files                                                                                                               | Change                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Contracts     | `crates/contracts/src/regression.rs`, generated OpenAPI/browser SDK/Zod                                             | Add optional suite baseline and preview choices.                              |
 | API           | `run_baselines.rs`, `case_runs.rs`, `suite_runs.rs`, `scheduler.rs`, `runs.rs`, `domain/regression.rs`, route tests | Share candidate lookup, pin baseline, select eligible claims, verify summary. |
-| Web           | `saved-suite-run.tsx`, `run-result.tsx`, `RunDetail.tsx`, coverage flow and tests                                   | Explicit choices, source labels and assertions.                     |
-| Scripts       | `smoke_suite.py`, `execution_smoke.py`, `regression_acceptance.py`, `justfile`                                      | Two-case simulated and opt-in real acceptance.                      |
-| Documentation | Architect spec 10, status, development, decisions, README and spec 05                                               | Record rules, implemented behavior and open gates.                  |
+| Web           | `saved-suite-run.tsx`, `run-result.tsx`, `RunDetail.tsx`, coverage flow and tests                                   | Explicit choices, source labels and assertions.                               |
+| Scripts       | `smoke_suite.py`, `execution_smoke.py`, `regression_acceptance.py`, `justfile`                                      | Two-case simulated and opt-in real acceptance.                                |
+| Documentation | Architect spec 10, status, development, decisions, README and spec 05                                               | Record rules, implemented behavior and open gates.                            |
 
 ## Deviations from plan
 

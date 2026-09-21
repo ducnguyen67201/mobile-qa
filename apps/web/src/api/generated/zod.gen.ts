@@ -596,6 +596,7 @@ export const zQueueReason = z.enum([
 ]);
 
 export const zQueueStatus = z.object({
+    blocking_run_id: z.uuid().nullish(),
     last_compatible_worker_at: z.iso.datetime().nullish(),
     reason: zQueueReason,
     wait_seconds: z.int().gte(0).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })

@@ -92,7 +92,9 @@ with the last compatible worker heartbeat. A missing heartbeat is an observation
 not proof that a model or device is permanently unavailable. Show the reason above
 the execution map on Runs and in operator logs; do not expose credentials, private
 host paths or raw provider errors. A queued job should never imply that execution
-has begun.
+has begun. When a recovery-required execution attempt blocks another run in the
+same app, expose a link to that blocking run for diagnosis. A device reservation
+held by another app may explain the wait, but must not reveal that app's run ID.
 
 Roll out additively: register and review the new definition; qualify it against the
 pinned worker/SDK and reliability scenarios; stage a worker advertisement; activate

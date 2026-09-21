@@ -177,6 +177,65 @@ async fn assignment_revisions_change_only_future_resolution() {
 }
 
 #[tokio::test]
+async fn recovery_queue_links_only_to_a_run_in_the_same_app() {
+    let _guard = DATABASE_BOOT.lock().await;
+    request::<App, _, _>(|server, ctx| async move {
+        let owner = login(&server, &ctx).await;
+        let mut input = create_input(owner.org);
+        input.android_package = "ai.mobileqa.demo".into();
+        let app = apps::create(&ctx, owner.user, input).await.unwrap().id;
+        let bytes = fixture("execution");
+        let upload = new_upload(&server, &owner, app, &bytes).await;
+        transfer(&server, &owner, app, upload.id, bytes)
+            .await
+            .assert_status_ok();
+        let build = owner
+            .write(server.post(&format!("/api/apps/{app}/build-uploads/{}/complete", upload.id)))
+            .await
+            .json::<BuildResponse>();
+
+        let mut run_fixture: RunResponse =
+            serde_json::from_str(include_str!("fixtures/execution/comparison.json")).unwrap();
+        run_fixture.manifest.app_id = app;
+        run_fixture.manifest.build_id = build.id;
+        run_fixture.manifest.profile.device_identity = Uuid::new_v4().to_string();
+        let device = run_fixture.manifest.profile.device_identity.clone();
+        let blocker = Uuid::new_v4();
+        exec(&ctx.db, "INSERT INTO execution_runs(id,app_id,creator_id,build_id,plan_id,idempotency_key,fingerprint,manifest) VALUES($1,$2,$3,$4,NULL,$5,$6,$7)", vec![blocker.into(),app.into(),owner.user.into(),build.id.into(),"blocker".into(),"blocker".into(),json(&run_fixture.manifest).unwrap().into()]).await.unwrap();
+        let attempt = Uuid::new_v4();
+        exec(&ctx.db, "INSERT INTO execution_attempts(id,run_id,case_index,state,cleanup) VALUES($1,$2,0,'recovery_required','quarantined')", vec![attempt.into(),blocker.into()]).await.unwrap();
+        exec(&ctx.db, "INSERT INTO execution_reservations(resource,attempt_id) VALUES($1,$2)", vec![format!("device:{device}").into(),attempt.into()]).await.unwrap();
+
+        let waiting = Uuid::new_v4();
+        exec(&ctx.db, "INSERT INTO execution_runs(id,app_id,creator_id,build_id,plan_id,idempotency_key,fingerprint,manifest) VALUES($1,$2,$3,$4,NULL,$5,$6,$7)", vec![waiting.into(),app.into(),owner.user.into(),build.id.into(),"waiting".into(),"waiting".into(),json(&run_fixture.manifest).unwrap().into()]).await.unwrap();
+        exec(&ctx.db, "INSERT INTO execution_attempts(id,run_id,case_index) VALUES($1,$2,0)", vec![Uuid::new_v4().into(),waiting.into()]).await.unwrap();
+        let same_app = owner.read(server.get(&format!("/api/runs/{waiting}"))).await.json::<RunResponse>().queue_status.unwrap();
+        assert_eq!(same_app.reason, QueueReason::DeviceRecoveryRequired);
+        assert_eq!(same_app.blocking_run_id, Some(blocker));
+
+        // A shared device can block a different app without disclosing its run ID.
+        let foreign = login(&server, &ctx).await;
+        let mut foreign_input = create_input(foreign.org);
+        foreign_input.android_package = "ai.mobileqa.demo".into();
+        let foreign_app = apps::create(&ctx, foreign.user, foreign_input).await.unwrap().id;
+        let bytes = fixture("execution");
+        let upload = new_upload(&server, &foreign, foreign_app, &bytes).await;
+        transfer(&server, &foreign, foreign_app, upload.id, bytes)
+            .await
+            .assert_status_ok();
+        let foreign_build = foreign.write(server.post(&format!("/api/apps/{foreign_app}/build-uploads/{}/complete", upload.id))).await.json::<BuildResponse>();
+        run_fixture.manifest.app_id = foreign_app;
+        run_fixture.manifest.build_id = foreign_build.id;
+        let foreign_run = Uuid::new_v4();
+        exec(&ctx.db, "INSERT INTO execution_runs(id,app_id,creator_id,build_id,plan_id,idempotency_key,fingerprint,manifest) VALUES($1,$2,$3,$4,NULL,$5,$6,$7)", vec![foreign_run.into(),foreign_app.into(),foreign.user.into(),foreign_build.id.into(),"foreign-device".into(),"foreign-device".into(),json(&run_fixture.manifest).unwrap().into()]).await.unwrap();
+        exec(&ctx.db, "INSERT INTO execution_attempts(id,run_id,case_index) VALUES($1,$2,0)", vec![Uuid::new_v4().into(),foreign_run.into()]).await.unwrap();
+        let cross_app = foreign.read(server.get(&format!("/api/runs/{foreign_run}"))).await.json::<RunResponse>().queue_status.unwrap();
+        assert_eq!(cross_app.reason, QueueReason::DeviceRecoveryRequired);
+        assert_eq!(cross_app.blocking_run_id, None);
+    }).await;
+}
+
+#[tokio::test]
 async fn registry_is_immutable_resolvable_and_retirable() {
     let _guard = DATABASE_BOOT.lock().await;
     request::<App, _, _>(|_server, ctx| async move {

@@ -15,7 +15,7 @@ import {
   Title,
 } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useParams } from 'react-router'
+import { Link, useParams } from 'react-router'
 import { appQuery } from '@/api/setup'
 import { cancelRun, runQuery } from '@/api/runs'
 import { useWorkspace } from '@/hooks/use-workspace'
@@ -91,6 +91,17 @@ export function RunDetail() {
               } as const
             )[r.queue_status.reason]
           }
+          {r.queue_status.reason === 'device_recovery_required' &&
+            r.queue_status.blocking_run_id && (
+              <Text size="sm">
+                <Anchor
+                  component={Link}
+                  to={`/runs/${r.queue_status.blocking_run_id}?workspace=${workspaceId}`}
+                >
+                  View the run requiring recovery
+                </Anchor>
+              </Text>
+            )}
           {r.queue_status.last_compatible_worker_at && (
             <Text size="xs">
               Last compatible worker heartbeat:{' '}

@@ -850,6 +850,10 @@ export type PreflightRequest = {
 export type QueueReason = 'worker_offline' | 'model_unavailable' | 'worker_upgrade_required' | 'capacity_busy' | 'device_recovery_required' | 'awaiting_worker_claim';
 
 export type QueueStatus = {
+    /**
+     * Exposed only when the recovery-held attempt belongs to this run's app.
+     */
+    blocking_run_id?: string | null;
     last_compatible_worker_at?: string | null;
     reason: QueueReason;
     wait_seconds: number;

@@ -469,19 +469,22 @@ async fn queue_status(
             }
         }
     }
-    let reservations=rows(db,"SELECT a.state AS attempt_state,s.payload->>'state' AS phone_state FROM execution_reservations r LEFT JOIN execution_attempts a ON a.id=r.attempt_id LEFT JOIN phone_sessions s ON s.id=r.session_id WHERE r.resource=$1 OR r.resource=$2",vec![format!("app:{}",manifest.app_id).into(),format!("device:{}",manifest.profile.device_identity).into()]).await?;
-    let reason = if reservations.iter().any(|row| {
-        field::<Option<String>>(row, "attempt_state")
-            .ok()
-            .flatten()
-            .as_deref()
-            == Some("recovery_required")
-            || field::<Option<String>>(row, "phone_state")
-                .ok()
-                .flatten()
-                .as_deref()
-                == Some("quarantined")
-    }) {
+    let reservations=rows(db,"SELECT a.state AS attempt_state,s.payload->>'state' AS phone_state,br.id AS blocking_run_id,br.app_id AS blocking_app_id FROM execution_reservations r LEFT JOIN execution_attempts a ON a.id=r.attempt_id LEFT JOIN execution_runs br ON br.id=a.run_id LEFT JOIN phone_sessions s ON s.id=r.session_id WHERE r.resource=$1 OR r.resource=$2",vec![format!("app:{}",manifest.app_id).into(),format!("device:{}",manifest.profile.device_identity).into()]).await?;
+    let mut recovery_required = false;
+    let mut blocking_run_id = None;
+    for row in &reservations {
+        let attempt_state: Option<String> = field(row, "attempt_state")?;
+        let phone_state: Option<String> = field(row, "phone_state")?;
+        if attempt_state.as_deref() == Some("recovery_required") {
+            recovery_required = true;
+            if field::<Option<Uuid>>(row, "blocking_app_id")? == Some(manifest.app_id) {
+                blocking_run_id = field(row, "blocking_run_id")?;
+            }
+        } else if phone_state.as_deref() == Some("quarantined") {
+            recovery_required = true;
+        }
+    }
+    let reason = if recovery_required {
         QueueReason::DeviceRecoveryRequired
     } else if !reservations.is_empty() {
         QueueReason::CapacityBusy
@@ -496,6 +499,7 @@ async fn queue_status(
     };
     Ok(QueueStatus {
         reason,
+        blocking_run_id,
         last_compatible_worker_at: last_compatible,
         wait_seconds: (chrono::Utc::now() - created_at)
             .num_seconds()

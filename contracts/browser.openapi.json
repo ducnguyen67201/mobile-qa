@@ -12007,6 +12007,14 @@
           "wait_seconds"
         ],
         "properties": {
+          "blocking_run_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Exposed only when the recovery-held attempt belongs to this run's app."
+          },
           "last_compatible_worker_at": {
             "type": [
               "string",

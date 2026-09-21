@@ -371,6 +371,8 @@ pub enum QueueReason {
 #[serde(deny_unknown_fields)]
 pub struct QueueStatus {
     pub reason: QueueReason,
+    /// Exposed only when the recovery-held attempt belongs to this run's app.
+    pub blocking_run_id: Option<Uuid>,
     pub last_compatible_worker_at: Option<DateTime<Utc>>,
     pub wait_seconds: u32,
 }

@@ -9,6 +9,7 @@ import { theme } from '@/theme'
 import { app, appId, buildId, session, settings } from '@/test/fixtures'
 import type { RunResponse } from '@/api/generated/types.gen'
 const runId = '33333333-3333-4333-8333-333333333333'
+const blockingRunId = '44444444-4444-4444-8444-444444444444'
 function report(): RunResponse {
   return {
     id: runId,
@@ -87,6 +88,7 @@ it('explains a queued run held for device recovery', async () => {
   current.state = 'queued'
   current.queue_status = {
     reason: 'device_recovery_required',
+    blocking_run_id: blockingRunId,
     last_compatible_worker_at: null,
     wait_seconds: 30,
   }
@@ -105,6 +107,10 @@ it('explains a queued run held for device recovery', async () => {
   const status = await screen.findByText('Waiting for device recovery')
   expect(screen.getByText(/A previous attempt still holds the phone/)).toBeInTheDocument()
   expect(screen.getByText(/No test has been evaluated/)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'View the run requiring recovery' })).toHaveAttribute(
+    'href',
+    `/runs/${blockingRunId}?workspace=${app.organization_id}`,
+  )
   expect(
     status.compareDocumentPosition(screen.getByRole('heading', { name: 'Run sequence' })) &
       Node.DOCUMENT_POSITION_FOLLOWING,

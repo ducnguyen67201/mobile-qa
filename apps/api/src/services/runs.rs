@@ -3,7 +3,7 @@ use super::{apps, execution_store::*, model_registry, test_definitions as defini
 use crate::errors::{ApiFailure, ApiResult};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::execution::*;
-use mobile_qa_contracts::model_registry::ModelCapability;
+use mobile_qa_contracts::model_registry::{ModelCapability, ModelPurpose};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use uuid::Uuid;
 
@@ -86,14 +86,22 @@ pub(crate) async fn assemble(
             .iter()
             .any(|a| a.kind == ActionKind::Navigate)
     });
+    let assignment = if uses_navigation && profile.driver == Driver::Minitap {
+        model_registry::active_assignment(db, app, profile.id, ModelPurpose::Navigation).await?
+    } else {
+        None
+    };
     let resolved_model = if uses_navigation {
-        match model_registry::resolve_for_new_work(
-            db,
-            profile.model.as_ref(),
-            &[ModelCapability::MinitapNavigation],
-        )
-        .await
-        {
+        match if let Some((model, _)) = &assignment {
+            Ok(Some(model.clone()))
+        } else {
+            model_registry::resolve_for_new_work(
+                db,
+                profile.model.as_ref(),
+                &[ModelCapability::MinitapNavigation],
+            )
+            .await
+        } {
             Ok(model) => model,
             Err(error) if !error.status.is_server_error() => {
                 out.blockers.push(error.message);
@@ -104,6 +112,10 @@ pub(crate) async fn assemble(
     } else {
         None
     };
+    if uses_navigation && profile.driver == Driver::Minitap && resolved_model.is_none() {
+        out.blockers
+            .push("An operator must activate a navigation model assignment".into());
+    }
     for c in &cases {
         if let Err(e) = super::execution_readiness::case_matches(&profile, &c.case) {
             out.blockers.push(e.message);
@@ -188,6 +200,7 @@ pub(crate) async fn assemble(
         environment_revision: field(&env, "revision")?,
         profile,
         resolved_model,
+        model_assignment_revision: assignment.map(|(_, revision)| revision),
         cases,
         budget: p.budget.clone(),
         diagnostic_retries: p.diagnostic_retries,
@@ -274,7 +287,12 @@ pub async fn create(
     let result = detail(&tx, id).await?;
     tx.commit().await?;
     super::execution_wakeup::notify(ctx);
-    tracing::info!(run_id=%id,app_id=%app,phase="queued","Approved execution queued");
+    let reason_code = result
+        .queue_status
+        .as_ref()
+        .map(|status| word(&status.reason))
+        .unwrap_or_else(|| "unknown".into());
+    tracing::info!(run_id=%id,app_id=%app,phase="queued",reason_code=%reason_code,"Approved execution queued");
     Ok((result, true))
 }
 
@@ -378,8 +396,16 @@ pub async fn detail(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<RunRespons
         JobState::Queued
     };
     let summary = summary(&manifest, &attempts);
+    let created_at: chrono::DateTime<chrono::Utc> = field(&row, "created_at")?;
+    let queue_status = if state == JobState::Queued {
+        Some(queue_status(db, &manifest, created_at).await?)
+    } else {
+        None
+    };
     Ok(RunResponse {
+        cancel_requested: field(&row, "cancel_requested")?,
         build_label: Some(field(&row, "build_label")?),
+        queue_status,
         comparison: field::<Option<serde_json::Value>>(&row, "comparison")?
             .map(decode)
             .transpose()?,
@@ -388,8 +414,97 @@ pub async fn detail(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<RunRespons
         manifest,
         state,
         summary,
-        created_at: field(&row, "created_at")?,
+        created_at,
         attempts,
+    })
+}
+
+async fn queue_status(
+    db: &impl ConnectionTrait,
+    manifest: &RunManifest,
+    created_at: chrono::DateTime<chrono::Utc>,
+) -> ApiResult<QueueStatus> {
+    let workers=rows(db,"SELECT execution_model_capabilities,execution_protocol_version,execution_last_seen_at FROM execution_workers WHERE app_id=$1 AND profile_id=$2 AND revoked=false",vec![manifest.app_id.into(),manifest.profile.id.into()]).await?;
+    let mut live = false;
+    let mut model_live = false;
+    let mut compatible_live = false;
+    let mut last_compatible = None;
+    let threshold = chrono::Utc::now() - chrono::Duration::seconds(90);
+    for row in workers {
+        let seen: Option<chrono::DateTime<chrono::Utc>> = field(&row, "execution_last_seen_at")?;
+        let version: Option<i32> = field(&row, "execution_protocol_version")?;
+        let capabilities =
+            field::<Option<serde_json::Value>>(&row, "execution_model_capabilities")?.and_then(
+                |v| decode::<mobile_qa_contracts::model_registry::WorkerModelCapabilities>(v).ok(),
+            );
+        let model_matches = manifest
+            .resolved_model
+            .as_ref()
+            .is_none_or(|model| model_registry::worker_matches(model, capabilities.as_ref()));
+        let protocol_matches = version.is_some_and(|version| {
+            version >= 1
+                && (manifest.profile.execution_context.is_none() || version >= 3)
+                && (manifest.source.is_none() || version >= 4)
+                && (version >= 2
+                    || !manifest.cases.iter().any(|case| {
+                        case.case
+                            .actions
+                            .iter()
+                            .any(|action| action.kind == ActionKind::Direct)
+                    }))
+                && (manifest.resolved_model.is_none() || version >= 5)
+        });
+        let matches = model_matches && protocol_matches;
+        if let Some(seen) = seen {
+            if seen > threshold {
+                live = true;
+                if model_matches {
+                    model_live = true;
+                }
+                if matches {
+                    compatible_live = true;
+                }
+            }
+            if matches && last_compatible.is_none_or(|last| seen > last) {
+                last_compatible = Some(seen);
+            }
+        }
+    }
+    let reservations=rows(db,"SELECT a.state AS attempt_state,s.payload->>'state' AS phone_state,br.id AS blocking_run_id,br.app_id AS blocking_app_id FROM execution_reservations r LEFT JOIN execution_attempts a ON a.id=r.attempt_id LEFT JOIN execution_runs br ON br.id=a.run_id LEFT JOIN phone_sessions s ON s.id=r.session_id WHERE r.resource=$1 OR r.resource=$2",vec![format!("app:{}",manifest.app_id).into(),format!("device:{}",manifest.profile.device_identity).into()]).await?;
+    let mut recovery_required = false;
+    let mut blocking_run_id = None;
+    for row in &reservations {
+        let attempt_state: Option<String> = field(row, "attempt_state")?;
+        let phone_state: Option<String> = field(row, "phone_state")?;
+        if attempt_state.as_deref() == Some("recovery_required") {
+            recovery_required = true;
+            if field::<Option<Uuid>>(row, "blocking_app_id")? == Some(manifest.app_id) {
+                blocking_run_id = field(row, "blocking_run_id")?;
+            }
+        } else if phone_state.as_deref() == Some("quarantined") {
+            recovery_required = true;
+        }
+    }
+    let reason = if recovery_required {
+        QueueReason::DeviceRecoveryRequired
+    } else if !reservations.is_empty() {
+        QueueReason::CapacityBusy
+    } else if !live {
+        QueueReason::WorkerOffline
+    } else if !model_live {
+        QueueReason::ModelUnavailable
+    } else if !compatible_live {
+        QueueReason::WorkerUpgradeRequired
+    } else {
+        QueueReason::AwaitingWorkerClaim
+    };
+    Ok(QueueStatus {
+        reason,
+        blocking_run_id,
+        last_compatible_worker_at: last_compatible,
+        wait_seconds: (chrono::Utc::now() - created_at)
+            .num_seconds()
+            .clamp(0, u32::MAX as i64) as u32,
     })
 }
 

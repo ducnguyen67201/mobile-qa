@@ -16,6 +16,7 @@ Start here before planning or changing the application.
 | How will Minitap explore flows and propose reusable tests?            | [Minitap flow discovery](implementation/08-minitap-flow-discovery.md) |
 | How do we develop, validate and scope CI?                             | [Development workflow](development.md)                                |
 | How do we qualify the Android runner?                                 | [Device qualification](device-qualification.md)                       |
+| How do we add model capacity without changing saved runs?             | [Model capacity](implementation/09-model-catalog-and-capacity.md)     |
 | Where do we deploy first and how do we migrate later?                 | [Hosting](hosting.md)                                                 |
 | How do secrets and environment selection work?                        | [Doppler environment](environment.md)                                 |
 | Why did we choose this approach?                                      | [Decision record](decisions.md)                                       |

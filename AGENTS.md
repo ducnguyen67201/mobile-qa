@@ -29,6 +29,16 @@ examples, download secrets to files, or commit tokens. Vite env-file loading is 
 Only wrap secret-consuming server processes; local checks/fake runs remain Doppler-free.
 See docs/architect/environment.md. Do not change the user's Doppler auth/config without scope.
 
+For local app sessions, run `just dev` from a configured checkout. It builds the API
+once and starts PostgreSQL, the Doppler-injected API, Vite, the phone worker and the
+execution worker. Do not wrap `just dev` itself in Doppler: its supervisor injects
+secrets separately into the API and workers, while Vite gets no server secrets. Use
+`just dev-logs` to inspect startup, `just dev-stop` to stop its owned processes, and
+`just dev-restart` after source changes. If ports are occupied, identify their owners
+and stop only services this task owns. A recovery journal can block a worker; inspect
+its log and follow device recovery rather than deleting journals or reservations.
+Restarting the API invalidates local sign-in sessions. See docs/architect/development.md.
+
 Comments must make scaffold/fake/generated boundaries and non-obvious rules clear.
 Follow docs/architect/commenting.md; explain purpose and constraints without narrating
 every line. Keep comments aligned with implementation and preserve generator markers.

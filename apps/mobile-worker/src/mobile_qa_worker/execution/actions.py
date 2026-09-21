@@ -116,7 +116,7 @@ def execute(
     if profile.system_image != job.manifest.profile.image:
         raise ValueError("host_profile_does_not_match_manifest")
     if job.manifest.resolved_model is not None:
-        require_host_assignment(job.manifest.resolved_model, profile.model_ref)
+        require_host_assignment(job.manifest.resolved_model, profile)
     evidence = Evidence(directory / "evidence", definition.budget.artifact_bytes)
     device = Device(profile, evidence)
     outcome, reason, reset, stopped = (
@@ -220,23 +220,26 @@ def execute(
                         raise QualificationError("execution_stop_unconfirmed")
                     device.stop()
                     device.discard()
-                    with backend("ready"):
-                        device.boot(timeout=profile.cleanup_seconds)
-                        device.install(directory / "build.apk", job.manifest.build_sha256)
-                        device.launch()
-                        device.adb(
-                            "shell",
-                            "run-as",
-                            definition.package,
-                            "sh",
-                            "-c",
-                            "'test ! -e shared_prefs/tasks.xml'",
-                        )
-                        observation = device.capture("reset", task)
-                        if observation.task_present:
-                            raise QualificationError("reset_contaminated")
-                        device.stop()
-                        device.discard()
+                    if device.ever_launched:
+                        with backend("ready"):
+                            device.boot(timeout=profile.cleanup_seconds)
+                            device.install(directory / "build.apk", job.manifest.build_sha256)
+                            device.launch()
+                            device.adb(
+                                "shell",
+                                "run-as",
+                                definition.package,
+                                "sh",
+                                "-c",
+                                "'test ! -e shared_prefs/tasks.xml'",
+                            )
+                            observation = device.capture("reset", task)
+                            if observation.task_present:
+                                raise QualificationError("reset_contaminated")
+                            device.stop()
+                            device.discard()
+                    # An AVD creation failure before Popen cannot have touched the phone.
+                    # Still prove the owned directory is gone and emulator ports are free.
                     reset, stopped = "verified_clean", True
                     dirty.unlink()
             except (QualificationError, OSError):

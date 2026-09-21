@@ -402,10 +402,21 @@ pub async fn options(
     .await?
     {
         let p: ExecutionProfile = decode(field(&row, "payload")?)?;
-        let resolved_model = super::model_registry::resolve_for_new_work(db, p.model.as_ref(), &[])
-            .await
-            .ok()
-            .flatten();
+        let assignment = super::model_registry::active_assignment(
+            db,
+            app,
+            p.id,
+            mobile_qa_contracts::model_registry::ModelPurpose::Navigation,
+        )
+        .await?;
+        let resolved_model = if let Some((model, _)) = assignment {
+            Some(model)
+        } else {
+            super::model_registry::resolve_for_new_work(db, p.model.as_ref(), &[])
+                .await
+                .ok()
+                .flatten()
+        };
         let model_available = !p.requires_model() || resolved_model.is_some();
         profiles.push(LibraryProfileChoice {
             id: p.id,

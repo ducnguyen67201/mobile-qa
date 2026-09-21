@@ -23,8 +23,33 @@ from mobile_qa_worker.generated.models import (
     PreflightAcknowledgement,
     PreflightRequest,
 )
+from mobile_qa_worker.qualification.config import Profile, QualificationError
 from mobile_qa_worker.qualification.evidence import sha256
 from mobile_qa_worker.qualification.process import host_lock, stop_group
+
+
+def preflight_android_tools(profile: Profile) -> None:
+    """Reject a broken JDK/SDK before a claim can reserve the physical device."""
+    from mobile_qa_worker.device.android import host_environment
+    from mobile_qa_worker.qualification.process import command
+
+    try:
+        command(
+            [str(profile.sdk_root / "cmdline-tools/19.0/bin/avdmanager"), "list", "device"],
+            15,
+            host_environment(profile),
+        )
+    except (OSError, QualificationError) as exc:
+        raise QualificationError("android_toolchain_unavailable") from exc
+
+
+def child_environment() -> dict[str, str]:
+    # Keep the verified Android JDK, but never pass API or provider credentials.
+    return {
+        k: v
+        for k, v in os.environ.items()
+        if k in ("PATH", "HOME", "LANG", "LC_ALL", "JAVA_HOME", "VIRTUAL_ENV")
+    }
 
 
 def dispatch_child(
@@ -179,7 +204,7 @@ def run_lease(
     ]
     if profile:
         args += ["--profile", str(profile)]
-    env = {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG", "VIRTUAL_ENV")}
+    env = child_environment()
     with (directory / "supervisor.log").open("wb") as log:
         child = subprocess.Popen(
             args,
@@ -326,8 +351,6 @@ def serve(
     client = Client(origin, os.environ.get("MOBILE_QA_WORKER_TOKEN", ""))
     host_profile = None
     if profile is not None:
-        from mobile_qa_worker.qualification.config import Profile
-
         host_profile = Profile.load(profile)
     from mobile_qa_worker.model_runtime import worker_capabilities
 
@@ -336,6 +359,8 @@ def serve(
     with host_lock(state):
         if journal.exists() and read(journal).get("state") == "active":
             raise ValueError("active_execution_requires_operator_recovery")
+        if host_profile is not None:
+            preflight_android_tools(host_profile)
         connected = False
         while True:
             claim_id = str(read(journal)["claim_id"]) if journal.exists() else str(uuid4())
@@ -344,7 +369,7 @@ def serve(
                 response = client.send(
                     "/api/worker/claims",
                     {
-                        "version": 5,
+                        "version": 6 if host_profile and host_profile.qualified_models else 5,
                         "claim_id": claim_id,
                         "profile_id": str(profile_id),
                         "model_capabilities": capabilities,

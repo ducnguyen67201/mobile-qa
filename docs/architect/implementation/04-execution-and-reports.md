@@ -57,6 +57,13 @@ Use lease generation/fencing tokens, expiry, heartbeats, event IDs and sequence 
 
 On lease expiry, invalidate completion authority and mark recovery required. Terminate/isolate the old execution and verify device/backend reset before reuse. Database fencing alone does not stop an old process tapping the phone. Cancellation remains pending until termination is acknowledged or resources are quarantined; it must not falsely promise immediate physical stop.
 
+Run details expose durable cancellation intent separately from the attempt state. An attempt
+with cancellation requested and recovery required remains quarantined and holds
+reservations until trusted operator recovery records physical reset evidence; the UI
+must show both facts.
+
+The supervisor enforces the run deadline and stops its owned child process group. Before a real worker claims a job, it checks that the host Android tools can run with its selected JDK; the child inherits the same `JAVA_HOME`. If AVD setup fails before an emulator process has ever launched, the owned directory can be discarded and free ports verified as clean cleanup. Once an emulator has launched, an unverified stop or reset remains quarantined; elapsed queue time alone never releases its reservation. The queued run displays `device_recovery_required` until explicit operator recovery with physical evidence.
+
 Set bounded run time, actions, artifact bytes and model usage where observable. If the SDK cannot enforce an internal action budget, use a process-level hard deadline and record that limitation. Preserve partial evidence on timeout or upload failure.
 
 ## Verification and report rules

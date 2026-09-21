@@ -189,5 +189,11 @@ pub async fn create(
     let r = runs::detail(&tx, id).await?;
     tx.commit().await?;
     super::execution_wakeup::notify(ctx);
+    let reason_code = r
+        .queue_status
+        .as_ref()
+        .map(|status| word(&status.reason))
+        .unwrap_or_else(|| "unknown".into());
+    tracing::info!(run_id=%id,app_id=%app,phase="queued",source="saved_case_v1",reason_code=%reason_code,"Saved case queued");
     Ok((r, true))
 }

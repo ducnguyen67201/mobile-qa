@@ -54,6 +54,11 @@ Calculate cost per delivered report from allocated host idle time + active execu
 
 No per-customer database or service is needed by default. Preserve tenant scope and isolated device/account resources; do not add concurrency before reset and backend test-data isolation are reliable.
 
+The proposed [model catalog and qualified capacity design](09-model-catalog-and-capacity.md)
+extends the existing immutable model registry when more than one model or worker is
+needed. Its assignment and worker-routing work remains separate from the initial
+pilot's manually provisioned capacity and acceptance gate.
+
 ## Pilot handoff acceptance
 
 One customer app completes onboarding, a validated run, a new-build rerun and a reviewed comparison report. Record at least one actionable finding or explicit coverage limitation, actual turnaround/cost and customer feedback. Provide operator instructions for install failure, stuck worker, leaked lease, missing evidence, secret rotation and deletion. This is the point to sell a repeatable supported service with measured scope.

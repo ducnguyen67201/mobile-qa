@@ -79,6 +79,22 @@ it.each([5])(
     expect(fetch).toHaveBeenCalledTimes(1)
   },
 )
+it('uses a separately frozen structured-authoring model', async () => {
+  const navigation = {
+    ...session.resolved_model!,
+    capabilities: ['minitap_navigation' as const],
+  }
+  const authoring = {
+    ...session.resolved_model!,
+    reference: { key: 'synthetic.authoring', revision: 1 },
+    capabilities: ['structured_authoring' as const],
+  }
+  show({ ...session, protocol_version: 6, resolved_model: navigation, authoring_model: authoring })
+  await userEvent.click(
+    screen.getByRole('checkbox', { name: 'Allow AI to tap, type and change test data' }),
+  )
+  expect(screen.getByRole('button', { name: 'Explore with AI' })).toBeEnabled()
+})
 it('keeps exploration unavailable for incompatible sessions and offers reconnect', async () => {
   const reconnect = vi.fn()
   show({ ...session, protocol_version: 2 }, reconnect)

@@ -148,6 +148,17 @@ def test_profile_validation(tmp_path):
         Profile.load(path)
 
 
+def test_old_adb_only_profile_sentinel_is_model_free(tmp_path):
+    path = tmp_path / "profile.toml"
+    path.write_text(
+        f'sdk_root="{tmp_path}/sdk"\nstate_root="{tmp_path}/state"\ntoolchain="{tmp_path}/lock.json"\nmodel="no-model-adb-demo"\n'
+    )
+    assert Profile.load(path).model_ref is None
+    path.write_text(path.read_text().replace("no-model-adb-demo", "gpt-4.1"))
+    with pytest.raises(QualificationError, match="legacy_model_profile_use_model_ref"):
+        Profile.load(path)
+
+
 def test_doctor_fails_without_boot_on_unprepared_host(tmp_path):
     path = tmp_path / "profile.toml"
     path.write_text(

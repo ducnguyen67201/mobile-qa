@@ -15,7 +15,7 @@ import {
   Title,
 } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useParams } from 'react-router'
+import { Link, useParams } from 'react-router'
 import { appQuery } from '@/api/setup'
 import { cancelRun, runQuery } from '@/api/runs'
 import { useWorkspace } from '@/hooks/use-workspace'
@@ -42,6 +42,9 @@ export function RunDetail() {
   if (app.data.organization_id !== workspaceId)
     return <Text>This run belongs to a different workspace.</Text>
   const r = run.data
+  const usesNavigation = r.manifest.cases.some((entry) =>
+    entry.case.actions.some((action) => action.kind === 'navigate'),
+  )
   return (
     <Stack>
       <PageHeading eyebrow="Release check" title={r.summary} description={app.data.name} />
@@ -49,7 +52,6 @@ export function RunDetail() {
         <Alert color="yellow">Simulated execution. No real phone or model was used.</Alert>
       )}
       <RunResult run={r} />
-      <RunCoverageFlow run={r} />
       <Group>
         <Badge>{r.state}</Badge>
         <Text>
@@ -58,13 +60,57 @@ export function RunDetail() {
         <Button
           color="red"
           variant="light"
-          disabled={r.state === 'finished' || r.state === 'cancel_requested'}
+          disabled={r.cancel_requested || r.state === 'finished' || r.state === 'cancel_requested'}
           loading={cancel.isPending}
           onClick={() => cancel.mutate()}
         >
-          Cancel run
+          {r.cancel_requested ? 'Cancellation requested' : 'Cancel run'}
         </Button>
       </Group>
+      {r.state === 'queued' && r.queue_status && (
+        <Alert
+          color={r.queue_status.reason === 'device_recovery_required' ? 'orange' : 'blue'}
+          title={
+            r.queue_status.reason === 'device_recovery_required'
+              ? 'Waiting for device recovery'
+              : 'Waiting to start'
+          }
+        >
+          {
+            (
+              {
+                worker_offline: 'Waiting for a device worker to connect.',
+                model_unavailable: 'No connected worker is qualified for this run’s model.',
+                worker_upgrade_required:
+                  'A connected worker needs a newer execution protocol for this run.',
+                capacity_busy: 'The phone is busy with another session or run.',
+                device_recovery_required:
+                  'A previous attempt still holds the phone. An operator must recover it before this run can start. No test has been evaluated.',
+                awaiting_worker_claim:
+                  'A compatible worker is connected. Waiting for its next claim.',
+              } as const
+            )[r.queue_status.reason]
+          }
+          {r.queue_status.reason === 'device_recovery_required' &&
+            r.queue_status.blocking_run_id && (
+              <Text size="sm">
+                <Anchor
+                  component={Link}
+                  to={`/runs/${r.queue_status.blocking_run_id}?workspace=${workspaceId}`}
+                >
+                  View the run requiring recovery
+                </Anchor>
+              </Text>
+            )}
+          {r.queue_status.last_compatible_worker_at && (
+            <Text size="xs">
+              Last compatible worker heartbeat:{' '}
+              {new Date(r.queue_status.last_compatible_worker_at).toLocaleString()}
+            </Text>
+          )}
+        </Alert>
+      )}
+      <RunCoverageFlow run={r} />
       {r.manifest.resolved_model ? (
         <Card withBorder padding="sm">
           <Text fw={600}>{r.manifest.resolved_model.display_name}</Text>
@@ -73,16 +119,20 @@ export function RunDetail() {
             · {r.manifest.resolved_model.provider_model}
           </Text>
         </Card>
-      ) : r.manifest.profile.model ? (
+      ) : usesNavigation && r.manifest.profile.model ? (
         <Alert color="yellow">Legacy model context unavailable</Alert>
       ) : null}
       {r.state === 'cancel_requested' && (
         <Alert>Cancellation requested. Waiting for your phone to stop and clean up.</Alert>
       )}
       {r.state === 'recovery_required' && (
-        <Alert color="orange">
-          Your phone needs attention before another run can start. The recorded test result is
-          unchanged.
+        <Alert
+          color="orange"
+          title={r.cancel_requested ? 'Cancellation recorded; device recovery required' : undefined}
+        >
+          {r.cancel_requested
+            ? 'Your cancellation request was recorded, but phone cleanup could not be verified. Its reservation remains until an operator recovers the device. The test result is unchanged.'
+            : 'Your phone needs attention before another run can start. The recorded test result is unchanged.'}
         </Alert>
       )}
       {cancel.isError && <ErrorNotice error={cancel.error} retry={() => cancel.mutate()} />}

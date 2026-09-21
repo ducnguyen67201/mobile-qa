@@ -269,6 +269,8 @@ pub struct RunManifest {
     pub profile: ExecutionProfile,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resolved_model: Option<crate::model_registry::ResolvedModel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_assignment_revision: Option<u32>,
     pub cases: Vec<ResolvedCase>,
     pub budget: ExecutionBudget,
     pub diagnostic_retries: u8,
@@ -338,8 +340,13 @@ pub struct AttemptResponse {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RunResponse {
+    /// Cancellation intent persists even when device recovery takes state precedence.
+    #[serde(default)]
+    pub cancel_requested: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub build_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub queue_status: Option<QueueStatus>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub comparison: Option<crate::regression::RunComparison>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -350,6 +357,27 @@ pub struct RunResponse {
     pub summary: String,
     pub created_at: DateTime<Utc>,
     pub attempts: Vec<AttemptResponse>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QueueReason {
+    WorkerOffline,
+    ModelUnavailable,
+    WorkerUpgradeRequired,
+    CapacityBusy,
+    DeviceRecoveryRequired,
+    AwaitingWorkerClaim,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct QueueStatus {
+    pub reason: QueueReason,
+    /// Exposed only when the recovery-held attempt belongs to this run's app.
+    pub blocking_run_id: Option<Uuid>,
+    pub last_compatible_worker_at: Option<DateTime<Utc>>,
+    pub wait_seconds: u32,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -643,8 +671,7 @@ impl ExecutionProfile {
             || !bounded(&self.package, 255)
             || !(1..=262144000).contains(&self.max_apk_bytes)
             || (self.qualified && !bounded(&self.qualification_reference, 1000))
-            || (self.driver == Driver::Minitap
-                && (self.model.is_none() || self.max_apk_bytes > 104857600))
+            || (self.driver == Driver::Minitap && self.max_apk_bytes > 104857600)
         {
             return Err("invalid or unsupported execution profile");
         }

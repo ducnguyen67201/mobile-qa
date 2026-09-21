@@ -9,7 +9,9 @@ use loco_rs::{
     task::{Task, TaskInfo, Vars},
 };
 use mobile_qa_contracts::execution::*;
-use mobile_qa_contracts::model_registry::{ModelDefinition, ModelReference};
+use mobile_qa_contracts::model_registry::{
+    ModelAssignment, ModelAssignmentState, ModelDefinition, ModelReference,
+};
 use uuid::Uuid;
 pub struct Execution;
 fn arg<'a>(v: &'a Vars, name: &str) -> ApiResult<&'a str> {
@@ -36,8 +38,11 @@ pub async fn execute(ctx: &AppContext, v: &Vars) -> ApiResult<()> {
         return crate::services::run_artifacts::cleanup_pending(ctx).await;
     }
     if action == "register-model" {
+        let actor = id(v, "actor")?;
+        let app = id(v, "app")?;
+        defs::operator(ctx, actor, app).await?;
         let definition: ModelDefinition = read(arg(v, "file")?)?;
-        let resolved = model_registry::register(&ctx.db, &definition).await?;
+        let resolved = model_registry::register(&ctx.db, actor, &definition).await?;
         println!(
             "{}",
             serde_json::to_string(&resolved).map_err(|_| ApiFailure::internal())?
@@ -52,6 +57,7 @@ pub async fn execute(ctx: &AppContext, v: &Vars) -> ApiResult<()> {
                 .map_err(|_| ApiFailure::invalid("Invalid model revision"))?,
         };
         if action == "retire-model" {
+            defs::operator(ctx, id(v, "actor")?, id(v, "app")?).await?;
             model_registry::retire(&ctx.db, &reference).await?;
         } else {
             let (resolved, retired) = model_registry::resolve(&ctx.db, &reference).await?;
@@ -68,6 +74,25 @@ pub async fn execute(ctx: &AppContext, v: &Vars) -> ApiResult<()> {
     let actor = id(v, "actor")?;
     let app = id(v, "app")?;
     match action {
+        "stage-model-assignment" => {
+            let assignment: ModelAssignment = read(arg(v, "file")?)?;
+            if assignment.app_id != app {
+                return Err(ApiFailure::invalid("Assignment app differs"));
+            }
+            model_registry::stage_assignment(ctx, actor, &assignment).await?;
+        }
+        "activate-model-assignment" | "drain-model-assignment" | "retire-model-assignment" => {
+            let assignment: ModelAssignment = read(arg(v, "file")?)?;
+            if assignment.app_id != app {
+                return Err(ApiFailure::invalid("Assignment app differs"));
+            }
+            let state = match action {
+                "activate-model-assignment" => ModelAssignmentState::Active,
+                "drain-model-assignment" => ModelAssignmentState::Draining,
+                _ => ModelAssignmentState::Retired,
+            };
+            model_registry::transition_assignment(ctx, actor, &assignment, state).await?;
+        }
         "import" => {
             let definition = read(arg(v, "file")?)?;
             let d = defs::import(

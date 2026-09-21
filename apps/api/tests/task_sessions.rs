@@ -92,10 +92,11 @@ async fn assert_session_protocol(protocol_version: u32) {
             provider_model: "test-model".into(),
             capabilities: vec![ModelCapability::MinitapNavigation, ModelCapability::StructuredAuthoring],
         };
-        model_registry::register(&ctx.db, &model).await.unwrap();
+        model_registry::register(&ctx.db, owner.user, &model).await.unwrap();
         let capabilities = WorkerModelCapabilities {
             model: Some(model.reference.clone()),
             providers: vec![ModelProvider::OpenAi],
+            models: vec![],
         };
         let profile = ExecutionProfile {
         execution_context: None,
@@ -121,7 +122,7 @@ async fn assert_session_protocol(protocol_version: u32) {
         let options_path = format!("/api/apps/{app}/phone-options");
         let before = owner.read(server.get(&options_path)).await;
         before.assert_status_ok();
-        assert!(before.json::<PhoneOptions>().profiles.is_empty());
+        assert_eq!(before.json::<PhoneOptions>().profiles.len(),1);
         // An idle poll must commit the capability heartbeat before a first session can exist.
         let idle = server
             .post("/api/worker/phone-claims")

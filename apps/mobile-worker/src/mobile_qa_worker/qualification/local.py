@@ -87,6 +87,7 @@ def write_profile(path: Path, profile: Profile) -> None:
         path.chmod(0o600)
         values = asdict(profile)
         values.pop("model_ref")
+        values.pop("qualified_models")
         model_ref = profile.model_ref.model_dump(mode="json") if profile.model_ref else None
         for key, value in values.items():
             stream.write(
@@ -96,6 +97,14 @@ def write_profile(path: Path, profile: Profile) -> None:
             stream.write("\n[model_ref]\n")
             stream.write(f"key = {json.dumps(model_ref['key'])}\n")
             stream.write(f"revision = {model_ref['revision']}\n")
+        for qualified in profile.qualified_models:
+            stream.write("\n[[qualified_models]]\n")
+            stream.write(f"key = {json.dumps(qualified.reference.key)}\n")
+            stream.write(f"revision = {qualified.reference.revision}\n")
+            stream.write(f"evidence_reference = {json.dumps(qualified.evidence_reference)}\n")
+            stream.write(f"sdk_sha256 = {json.dumps(qualified.sdk_sha256)}\n")
+            stream.write(f"runtime_sha256 = {json.dumps(qualified.runtime_sha256)}\n")
+            stream.write(f"image = {json.dumps(qualified.image)}\n")
 
 
 def run_local(args: argparse.Namespace) -> int:

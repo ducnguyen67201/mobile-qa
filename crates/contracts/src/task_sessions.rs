@@ -101,6 +101,12 @@ pub struct PhoneSession {
     pub profile: ExecutionProfile,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resolved_model: Option<crate::model_registry::ResolvedModel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_assignment_revision: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authoring_model: Option<crate::model_registry::ResolvedModel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authoring_assignment_revision: Option<u32>,
     pub state: PhoneState,
     pub message: String,
     pub frame: Option<PhoneFrame>,

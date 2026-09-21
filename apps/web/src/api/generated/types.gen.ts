@@ -757,11 +757,14 @@ export type PhoneSelection = {
 
 export type PhoneSession = {
     app_id: string;
+    authoring_assignment_revision?: number | null;
+    authoring_model?: null | ResolvedModel;
     build_id: string;
     environment_revision?: number;
     frame?: null | PhoneFrame;
     id: string;
     message: string;
+    model_assignment_revision?: number | null;
     profile: ExecutionProfile;
     protocol_version?: number;
     resolved_model?: null | ResolvedModel;
@@ -842,6 +845,18 @@ export type PreflightReceipt = {
 export type PreflightRequest = {
     generation: number;
     receipt: PreflightReceipt;
+};
+
+export type QueueReason = 'worker_offline' | 'model_unavailable' | 'worker_upgrade_required' | 'capacity_busy' | 'device_recovery_required' | 'awaiting_worker_claim';
+
+export type QueueStatus = {
+    /**
+     * Exposed only when the recovery-held attempt belongs to this run's app.
+     */
+    blocking_run_id?: string | null;
+    last_compatible_worker_at?: string | null;
+    reason: QueueReason;
+    wait_seconds: number;
 };
 
 export type ReadinessResponse = {
@@ -926,6 +941,7 @@ export type RunManifest = {
     diagnostic_retries: number;
     environment_revision: number;
     exclusions: Array<string>;
+    model_assignment_revision?: number | null;
     plan_hash?: string | null;
     plan_version_id?: string | null;
     profile: ExecutionProfile;
@@ -937,10 +953,15 @@ export type RunResponse = {
     attempts: Array<AttemptResponse>;
     baseline_run_id?: string | null;
     build_label?: string | null;
+    /**
+     * Cancellation intent persists even when device recovery takes state precedence.
+     */
+    cancel_requested?: boolean;
     comparison?: null | RunComparison;
     created_at: string;
     id: string;
     manifest: RunManifest;
+    queue_status?: null | QueueStatus;
     state: JobState;
     summary: string;
 };
@@ -1119,6 +1140,10 @@ export type ValidationState = 'validating' | 'validated' | 'invalid' | 'unsuppor
 
 export type WorkerModelCapabilities = {
     model?: null | ModelReference;
+    /**
+     * Protocol 6 qualified references. Protocol 5 uses `model` above.
+     */
+    models?: Array<ModelReference>;
     providers?: Array<ModelProvider>;
 };
 

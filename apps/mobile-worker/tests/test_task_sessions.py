@@ -135,6 +135,7 @@ def test_session_binds_image_and_model_before_side_effects(
             id=uuid4(),
             profile=ExecutionProfile.model_validate(raw),
             resolved_model=resolved,
+            authoring_model=None,
         )
     )
     monkeypatch.setattr(task_sessions.Profile, "load", lambda _: host)

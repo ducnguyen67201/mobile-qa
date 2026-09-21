@@ -78,6 +78,7 @@ def seam(monkeypatch):
         stopped=threading.Event(),
         failed=threading.Event(),
         session=SimpleNamespace(
+            authoring_model=None,
             profile=SimpleNamespace(package=PACKAGE),
             resolved_model=ResolvedModel.model_validate(
                 {

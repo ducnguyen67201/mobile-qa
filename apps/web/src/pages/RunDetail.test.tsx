@@ -9,6 +9,7 @@ import { theme } from '@/theme'
 import { app, appId, buildId, session, settings } from '@/test/fixtures'
 import type { RunResponse } from '@/api/generated/types.gen'
 const runId = '33333333-3333-4333-8333-333333333333'
+const blockingRunId = '44444444-4444-4444-8444-444444444444'
 function report(): RunResponse {
   return {
     id: runId,
@@ -82,6 +83,85 @@ it('shows simulated run and pending cancellation without claiming physical stop'
   expect(await screen.findByText(/Waiting for your phone to stop/)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Cancel run' })).toBeDisabled()
 })
+it('shows cancellation separately from required device recovery', async () => {
+  const current = report()
+  current.state = 'recovery_required'
+  current.cancel_requested = true
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      const path = new URL(request.url).pathname
+      if (path.endsWith('/session')) return Response.json(session)
+      if (path.endsWith('/settings')) return Response.json(settings)
+      if (path === `/apps/${appId}` || path === `/api/apps/${appId}`) return Response.json(app)
+      if (path.endsWith(runId)) return Response.json(current)
+      throw new Error(`Unexpected fixture route ${path}`)
+    }),
+  )
+  show()
+  expect(
+    await screen.findByText('Cancellation recorded; device recovery required'),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByText(/reservation remains until an operator recovers the device/),
+  ).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Cancellation requested' })).toBeDisabled()
+})
+it('explains a queued run held for device recovery', async () => {
+  const current = report()
+  current.state = 'queued'
+  current.queue_status = {
+    reason: 'device_recovery_required',
+    blocking_run_id: blockingRunId,
+    last_compatible_worker_at: null,
+    wait_seconds: 30,
+  }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      const path = new URL(request.url).pathname
+      if (path.endsWith('/session')) return Response.json(session)
+      if (path.endsWith('/settings')) return Response.json(settings)
+      if (path === `/apps/${appId}` || path === `/api/apps/${appId}`) return Response.json(app)
+      if (path.endsWith(runId)) return Response.json(current)
+      throw new Error(`Unexpected fixture route ${path}`)
+    }),
+  )
+  show()
+  const status = await screen.findByText('Waiting for device recovery')
+  expect(screen.getByText(/A previous attempt still holds the phone/)).toBeInTheDocument()
+  expect(screen.getByText(/No test has been evaluated/)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'View the run requiring recovery' })).toHaveAttribute(
+    'href',
+    `/runs/${blockingRunId}?workspace=${app.organization_id}`,
+  )
+  expect(
+    status.compareDocumentPosition(screen.getByRole('heading', { name: 'Run sequence' })) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
+})
+it('explains when a polling worker cannot claim a run with its protocol', async () => {
+  const current = report()
+  current.state = 'queued'
+  current.queue_status = {
+    reason: 'worker_upgrade_required',
+    last_compatible_worker_at: null,
+    wait_seconds: 30,
+  }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      const path = new URL(request.url).pathname
+      if (path.endsWith('/session')) return Response.json(session)
+      if (path.endsWith('/settings')) return Response.json(settings)
+      if (path === `/apps/${appId}` || path === `/api/apps/${appId}`) return Response.json(app)
+      if (path.endsWith(runId)) return Response.json(current)
+      throw new Error(`Unexpected fixture route ${path}`)
+    }),
+  )
+  show()
+  expect(await screen.findByText(/newer execution protocol/)).toBeInTheDocument()
+})
 it('does not present malformed persisted results as a report', async () => {
   vi.stubGlobal(
     'fetch',
@@ -120,7 +200,7 @@ it('shows the exact frozen model assignment used by the run', async () => {
   expect(await screen.findByText('Approved navigation')).toBeInTheDocument()
   expect(screen.getByText(/approved\.navigation@3.*provider-model/)).toBeInTheDocument()
 })
-it('labels historical raw-model runs without guessing their registry identity', async () => {
+it('does not warn about model context for direct-only historical runs', async () => {
   const current = report()
   vi.stubGlobal(
     'fetch',
@@ -134,5 +214,6 @@ it('labels historical raw-model runs without guessing their registry identity', 
     }),
   )
   show()
-  expect(await screen.findByText('Legacy model context unavailable')).toBeInTheDocument()
+  expect(await screen.findByText('Build checksum')).toBeInTheDocument()
+  expect(screen.queryByText('Legacy model context unavailable')).not.toBeInTheDocument()
 })

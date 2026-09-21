@@ -52,7 +52,6 @@ export function RunDetail() {
         <Alert color="yellow">Simulated execution. No real phone or model was used.</Alert>
       )}
       <RunResult run={r} />
-      <RunCoverageFlow run={r} />
       <Group>
         <Badge>{r.state}</Badge>
         <Text>
@@ -69,7 +68,14 @@ export function RunDetail() {
         </Button>
       </Group>
       {r.state === 'queued' && r.queue_status && (
-        <Alert color={r.queue_status.reason === 'device_recovery_required' ? 'orange' : 'blue'}>
+        <Alert
+          color={r.queue_status.reason === 'device_recovery_required' ? 'orange' : 'blue'}
+          title={
+            r.queue_status.reason === 'device_recovery_required'
+              ? 'Waiting for device recovery'
+              : 'Waiting to start'
+          }
+        >
           {
             (
               {
@@ -78,7 +84,8 @@ export function RunDetail() {
                 worker_upgrade_required:
                   'A connected worker needs a newer execution protocol for this run.',
                 capacity_busy: 'The phone is busy with another session or run.',
-                device_recovery_required: 'The phone is held for operator recovery.',
+                device_recovery_required:
+                  'A previous attempt still holds the phone. An operator must recover it before this run can start. No test has been evaluated.',
                 awaiting_worker_claim:
                   'A compatible worker is connected. Waiting for its next claim.',
               } as const
@@ -92,6 +99,7 @@ export function RunDetail() {
           )}
         </Alert>
       )}
+      <RunCoverageFlow run={r} />
       {r.manifest.resolved_model ? (
         <Card withBorder padding="sm">
           <Text fw={600}>{r.manifest.resolved_model.display_name}</Text>

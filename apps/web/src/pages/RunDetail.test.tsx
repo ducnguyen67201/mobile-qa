@@ -102,7 +102,13 @@ it('explains a queued run held for device recovery', async () => {
     }),
   )
   show()
-  expect(await screen.findByText(/held for operator recovery/)).toBeInTheDocument()
+  const status = await screen.findByText('Waiting for device recovery')
+  expect(screen.getByText(/A previous attempt still holds the phone/)).toBeInTheDocument()
+  expect(screen.getByText(/No test has been evaluated/)).toBeInTheDocument()
+  expect(
+    status.compareDocumentPosition(screen.getByRole('heading', { name: 'Run sequence' })) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
 })
 it('explains when a polling worker cannot claim a run with its protocol', async () => {
   const current = report()

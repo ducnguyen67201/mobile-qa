@@ -13,7 +13,7 @@ from uuid import uuid4
 import pytest
 
 from mobile_qa_worker.authoring import discovery_broker as broker
-from mobile_qa_worker.generated.models import DiscoveryCall, PhoneFrame, PhoneTask
+from mobile_qa_worker.generated.models import DiscoveryCall, PhoneFrame, PhoneTask, ResolvedModel
 from mobile_qa_worker.qualification.config import QualificationError
 
 PACKAGE = "ai.mobileqa.demo"
@@ -77,7 +77,18 @@ def seam(monkeypatch):
     connection = SimpleNamespace(
         stopped=threading.Event(),
         failed=threading.Event(),
-        session=SimpleNamespace(profile=SimpleNamespace(package=PACKAGE)),
+        session=SimpleNamespace(
+            profile=SimpleNamespace(package=PACKAGE),
+            resolved_model=ResolvedModel.model_validate(
+                {
+                    "reference": {"key": "synthetic.discovery", "revision": 1},
+                    "display_name": "Synthetic discovery",
+                    "provider": "open_ai",
+                    "provider_model": "synthetic-model",
+                    "capabilities": ["minitap_navigation", "structured_authoring"],
+                }
+            ),
+        ),
         update=lambda **kw: updates.append(kw["task"].model_copy(deep=True)),
     )
     device = SimpleNamespace(adb=lambda *_: b"mResumedActivity: ai.mobileqa.demo/.MainActivity")
@@ -250,7 +261,8 @@ def test_only_recorded_prefix_can_be_proposed_and_reuse_never_explores(
     monkeypatch.setattr(broker, "explore", lambda *_: pytest.fail("reuse must not explore"))
 
     def invoke(*args):
-        assert args[0].root.kind == "propose"
+        assert args[0].request.root.kind == "propose"
+        assert args[0].model.reference == b.connection.session.resolved_model.reference
         return AuthoringModelResponse.model_validate(
             {
                 "decision": None,

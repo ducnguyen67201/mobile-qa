@@ -426,18 +426,8 @@ export function buildLibraryCoverageFlow(
       version?: number
       status: CoverageFlowStatus
       selections: CaseSelection[]
-    }> = definition.content.suite_version_ids.map((id, index) => {
-      const value = suiteVersion(options, id)
-      return {
-        id: `suite-${index}-${id}`,
-        eyebrow: `Suite ${index + 1}`,
-        title: value?.version.definition.content.title ?? 'Unavailable saved suite',
-        version: value?.version.definition.content.version,
-        status: savedStatus(value),
-        selections:
-          value?.version.definition.kind === 'suite' ? value.version.definition.content.cases : [],
-      }
-    })
+    }> = []
+    // The API manifest resolves direct selections before expanding pinned suites.
     if (definition.content.cases.length)
       groups.push({
         id: 'direct-cases',
@@ -446,6 +436,22 @@ export function buildLibraryCoverageFlow(
         status: 'ready',
         selections: definition.content.cases,
       })
+    groups.push(
+      ...definition.content.suite_version_ids.map((id, index) => {
+        const value = suiteVersion(options, id)
+        return {
+          id: `suite-${index}-${id}`,
+          eyebrow: `Suite ${index + 1}`,
+          title: value?.version.definition.content.title ?? 'Unavailable saved suite',
+          version: value?.version.definition.content.version,
+          status: savedStatus(value),
+          selections:
+            value?.version.definition.kind === 'suite'
+              ? value.version.definition.content.cases
+              : [],
+        }
+      }),
+    )
     groups.forEach((group) => {
       const groupNode: CoverageNode = {
         id: group.id,

@@ -78,7 +78,7 @@ pub async fn options(ctx: &AppContext, user: Uuid, app: Uuid) -> ApiResult<Phone
             && matches!(profile.driver, Driver::Minitap | Driver::Direct)
             && profile.package == a.android_package
     }) {
-        if profile.model.is_none() {
+        if profile.is_model_free() {
             profiles.push(profile);
             continue;
         }
@@ -352,12 +352,7 @@ pub async fn claim(
     .await?;
     let p = test_definitions::profile(&tx, w.app_id, w.profile_id).await?;
     p.validate().map_err(ApiFailure::invalid)?;
-    exec(
-        &tx,
-        "UPDATE execution_workers SET model_capabilities=$2,model_last_seen_at=now() WHERE id=$1",
-        vec![w.id.into(), json(&input.model_capabilities)?.into()],
-    )
-    .await?;
+    model_registry::advertise(&ctx.db, w.id, input.model_capabilities.as_ref()).await?;
     if p.execution_context.is_some() && input.protocol_version < 4 {
         return Ok(PhoneClaimResponse { lease: None });
     }

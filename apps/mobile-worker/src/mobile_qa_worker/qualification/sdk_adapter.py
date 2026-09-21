@@ -6,10 +6,11 @@ import os
 from pathlib import Path
 from typing import cast
 
-from mobile_qa_worker.generated.models import ResolvedModel
+from mobile_qa_worker.generated.models import ModelCapability, ResolvedModel
 from mobile_qa_worker.model_runtime import (
     minitap_model,
     prepare_provider_environment,
+    require_capability,
     usage_identity,
 )
 from mobile_qa_worker.qualification.config import Profile, QualificationError, parse_request
@@ -82,6 +83,7 @@ async def navigate(
     goal: str,
 ) -> None:
     """Shared pinned SDK seam; the caller owns the authorized navigation instruction."""
+    require_capability(resolved_model, ModelCapability.minitap_navigation)
     prepare_provider_environment(resolved_model, result_path.parent)
     # Keep SDK ADB helpers on the same pinned tools/user state as the supervisor.
     os.environ["PATH"] = (

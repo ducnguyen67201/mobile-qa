@@ -278,8 +278,10 @@ organization differs from the selected workspace before loading builds/uploads.
 ### Combined app setup and phone runner
 
 This branch retains main's Mantine dashboard, sign-in, workspace and APK intake flows.
-Use `just dev` for that application and `just device-local-agent MODEL` for the
-standalone demo runner. Phase 04 Tests/Runs now dispatch saved, validated API jobs to a registered execution worker. An accepted uploaded
+Use `just dev` for that application and `just device-local-agent
+/absolute/private/path/resolved-model.json` for the standalone demo runner. The argument is a
+private `ResolvedModel` JSON file obtained with the trusted `execution` task's `show-model`, not a
+provider model ID; the host `[model_ref]` must match its reference. Phase 04 Tests/Runs now dispatch saved, validated API jobs to a registered execution worker. An accepted uploaded
 build is not an automatically executable test and device readiness remains separate.
 
 `just setup-android` supplies intake Build Tools 36.0.0; `just device-local-setup`

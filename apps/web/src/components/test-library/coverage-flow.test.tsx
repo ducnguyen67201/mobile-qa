@@ -183,7 +183,7 @@ it('deduplicates identical logical cases across suites and direct selections', (
     saved_versions: [...options.saved_versions, secondSuite],
   })
   expect(model.nodes.filter((node) => node.type === 'case').map((node) => node.data.title)).toEqual(
-    ['Valid sign-in', 'Invalid password', 'Backend unavailable'],
+    ['Valid sign-in', 'Backend unavailable', 'Invalid password'],
   )
   expect(model.nodes.filter((node) => node.type === 'case').map((node) => node.data.order)).toEqual(
     [1, 2, 3],
@@ -191,10 +191,28 @@ it('deduplicates identical logical cases across suites and direct selections', (
   expect(model.nodes.find((node) => node.id.startsWith('suite-1'))?.data.count).toBe(0)
 })
 
+it('numbers mixed plan coverage in the same direct-then-suite order as the manifest', () => {
+  if (plan.kind !== 'plan') throw new Error('fixture must be a plan')
+  const model = buildLibraryCoverageFlow(
+    {
+      kind: 'plan',
+      content: { ...plan.content, cases: [selection(backendUnavailable.version.id)] },
+    },
+    options,
+  )
+  expect(model.nodes.filter((node) => node.type === 'case').map((node) => node.data.title)).toEqual(
+    ['Backend unavailable', 'Valid sign-in', 'Invalid password'],
+  )
+  expect(model.nodes.filter((node) => node.type === 'case').map((node) => node.data.order)).toEqual(
+    [1, 2, 3],
+  )
+  expect(model.nodes.find((node) => node.type === 'group')?.id).toBe('direct-cases')
+})
+
 it('surfaces requiredness, version and variant conflicts using the backend logical key', () => {
   const requiredness = buildLibraryCoverageFlow(plan, options)
   const invalidNode = requiredness.nodes.find((node) => node.data.title === 'Invalid password')
-  expect(invalidNode?.data.required).toBe(false)
+  expect(invalidNode?.data.required).toBe(true)
   expect(invalidNode?.data.status).toBe('needs_setup')
   expect(invalidNode?.data.detail).toBe('Conflicting selection')
   expect(requiredness.nodes.find((node) => node.id === 'coverage-root')?.data.status).toBe(

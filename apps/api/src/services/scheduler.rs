@@ -127,19 +127,14 @@ pub async fn claim(
     )
     .await?;
     let profile = test_definitions::profile(&tx, worker.app_id, worker.profile_id).await?;
-    exec(
-        &tx,
-        "UPDATE execution_workers SET model_capabilities=$2,model_last_seen_at=now() WHERE id=$1",
-        vec![worker.id.into(), json(&input.model_capabilities)?.into()],
-    )
-    .await?;
+    profile.validate().map_err(ApiFailure::invalid)?;
+    model_registry::advertise(&ctx.db, worker.id, input.model_capabilities.as_ref()).await?;
     if profile.execution_context.is_some() && input.version < 3 {
         return Ok(ClaimResponse {
             lease: None,
             poll_after_seconds: 5,
         });
     }
-    profile.validate().map_err(ApiFailure::invalid)?;
     let prior = rows(
         &tx,
         "SELECT a.id,a.state,r.manifest FROM execution_attempts a JOIN execution_runs r ON r.id=a.run_id WHERE a.worker_id=$1 AND a.claim_id=$2",

@@ -3,10 +3,14 @@ import json
 import subprocess
 import sys
 from types import SimpleNamespace
+from typing import cast
 
+import pytest
 from test_qualification import request_data
 
+from mobile_qa_worker.generated.models import ModelCapability
 from mobile_qa_worker.qualification import sdk_adapter
+from mobile_qa_worker.qualification.config import Profile, QualificationError
 from mobile_qa_worker.qualification.sdk_adapter import UsageRecorder
 
 
@@ -62,6 +66,27 @@ assert os.environ['MOBILE_USE_TELEMETRY_ENABLED']=='false'
 assert not any(name.startswith('minitap') for name in sys.modules)
 """
     subprocess.run([sys.executable, "-c", code, str(tmp_path)], check=True)
+
+
+def test_qualification_rejects_non_navigation_model_before_provider_setup(tmp_path, monkeypatch):
+    restricted = model().model_copy(update={"capabilities": [ModelCapability.structured_authoring]})
+    monkeypatch.setattr(
+        sdk_adapter,
+        "prepare_provider_environment",
+        lambda *_: pytest.fail("provider setup must not run"),
+    )
+    with pytest.raises(QualificationError, match="model_capability_unavailable"):
+        asyncio.run(
+            sdk_adapter.navigate(
+                cast(Profile, SimpleNamespace()),
+                restricted,
+                "emulator-5554",
+                "ai.mobileqa.demo",
+                "synthetic-attempt",
+                tmp_path / "result.json",
+                "Navigate",
+            )
+        )
 
 
 def test_sdk_exact_public_seam(tmp_path, monkeypatch):

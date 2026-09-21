@@ -6,6 +6,23 @@ use mobile_qa_contracts::model_registry::{
     WorkerModelCapabilities,
 };
 use sea_orm::{ConnectionTrait, TransactionSession, TransactionTrait};
+use uuid::Uuid;
+
+/// Poll advertisements are committed independently of a lease transaction: an idle
+/// worker must become visible in phone options before the first session exists.
+pub async fn advertise(
+    db: &impl ConnectionTrait,
+    worker: Uuid,
+    capabilities: Option<&WorkerModelCapabilities>,
+) -> ApiResult<()> {
+    exec(
+        db,
+        "UPDATE execution_workers SET model_capabilities=$2,model_last_seen_at=now() WHERE id=$1 AND revoked=false",
+        vec![worker.into(), json(&capabilities)?.into()],
+    )
+    .await?;
+    Ok(())
+}
 
 pub async fn register(
     db: &(impl ConnectionTrait + TransactionTrait),

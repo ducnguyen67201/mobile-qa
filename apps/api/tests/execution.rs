@@ -123,6 +123,30 @@ async fn route_manifest_idempotency_and_worker_fencing() {
         let owner = login(&server, &ctx).await;
         let foreign = login(&server, &ctx).await;
         let (app, build, plan, w, token) = prepared(&server, &ctx, &owner).await;
+        let idle = scheduler::claim(
+            &ctx,
+            &w,
+            ClaimRequest {
+                version: 1,
+                claim_id: Uuid::new_v4(),
+                profile_id: w.profile_id,
+                model_capabilities: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert!(idle.lease.is_none());
+        assert!(field::<bool>(
+            &one(
+                &ctx.db,
+                "SELECT model_last_seen_at IS NOT NULL AS seen FROM execution_workers WHERE id=$1",
+                vec![w.id.into()]
+            )
+            .await
+            .unwrap(),
+            "seen"
+        )
+        .unwrap());
         let input = CreateRunRequest {
             build_id: build,
             plan_version_id: plan,
@@ -921,6 +945,8 @@ async fn comparison_finalization_is_durable_idempotent_and_baseline_is_pinned() 
         let fixture:RunResponse=serde_json::from_str(include_str!("fixtures/execution/comparison.json")).unwrap();
         let mut profile=fixture.manifest.profile;
         profile.id=Uuid::new_v4();
+        // The serialized fixture is historical; a newly registered direct profile uses null.
+        profile.model=None;
         let context=profile.execution_context.as_mut().unwrap();
         context.qualified_profile_id=profile.id;
         let starting_check=&mut context.starting_checks[0];

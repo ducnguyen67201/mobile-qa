@@ -95,10 +95,12 @@ broken build is expected: command exit 0 means the expected outcome and reset ma
 It does not establish AI-agent reliability or support arbitrary customer APKs.
 
 To exercise **Minitap on the same real phone**, configure `OPENAI_API_KEY` in the local
-profile's Doppler config and explicitly select your OpenAI model:
+profile's Doppler config. Register an approved nonsecret model definition with the trusted
+`execution` task, use `show-model key:<key> revision:<n>` to obtain its `ResolvedModel` JSON,
+and save that JSON at a private path. The local profile's `[model_ref]` must match it exactly:
 
 ```sh
-just device-local-agent YOUR_MODEL_ID
+just device-local-agent /absolute/private/path/resolved-model.json
 ```
 
 This makes billed model calls. `.private/device-local/profile.toml` contains nonsecret

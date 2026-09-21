@@ -15,6 +15,58 @@ async fn protocol_four_runs_direct_commands_and_ai_discovery() {
     assert_session_protocol(5).await;
 }
 
+#[tokio::test]
+async fn historical_model_free_direct_profile_remains_in_phone_options() {
+    let _guard = DATABASE_BOOT.lock().await;
+    request::<App, _, _>(|server, ctx| async move {
+        let owner = login(&server, &ctx).await;
+        let mut input = create_input(owner.org);
+        input.android_package = "ai.mobileqa.demo".into();
+        let app = apps::create(&ctx, owner.user, input).await.unwrap().id;
+        let fixture: RunResponse =
+            serde_json::from_str(include_str!("fixtures/execution/comparison.json")).unwrap();
+        let mut profile = fixture.manifest.profile;
+        profile.id = Uuid::new_v4();
+        profile
+            .execution_context
+            .as_mut()
+            .unwrap()
+            .qualified_profile_id = profile.id;
+        profile.model = None;
+        test_definitions::register_profile(&ctx, owner.user, app, profile.clone())
+            .await
+            .unwrap();
+        worker_auth::register(
+            &ctx,
+            owner.user,
+            app,
+            Uuid::new_v4(),
+            profile.id,
+            &loco_rs::hash::random_string(64),
+        )
+        .await
+        .unwrap();
+        // Both pre-registry sentinels remain model-free reads, never new writes.
+        for legacy in ["none", ""] {
+            exec(
+                &ctx.db,
+                "UPDATE execution_profiles SET payload=jsonb_set(payload,'{model}',$2) WHERE id=$1",
+                vec![profile.id.into(), serde_json::json!(legacy).into()],
+            )
+            .await
+            .unwrap();
+            let response = owner
+                .read(server.get(&format!("/api/apps/{app}/phone-options")))
+                .await;
+            response.assert_status_ok();
+            let profiles = response.json::<PhoneOptions>().profiles;
+            assert_eq!(profiles.len(), 1);
+            assert!(profiles[0].is_model_free());
+        }
+    })
+    .await;
+}
+
 async fn assert_session_protocol(protocol_version: u32) {
     let _guard = DATABASE_BOOT.lock().await;
     request::<App, _, _>(|server, ctx| async move {
@@ -68,8 +120,28 @@ async fn assert_session_protocol(protocol_version: u32) {
         worker_auth::register(&ctx, owner.user, app, Uuid::new_v4(), profile.id, &token)
             .await
             .unwrap();
+        let options_path = format!("/api/apps/{app}/phone-options");
+        let before = owner.read(server.get(&options_path)).await;
+        before.assert_status_ok();
+        assert!(before.json::<PhoneOptions>().profiles.is_empty());
+        // An idle poll must commit the capability heartbeat before a first session can exist.
+        let idle = server
+            .post("/api/worker/phone-claims")
+            .add_header("authorization", format!("Bearer {token}"))
+            .json(&PhoneClaimRequest {
+                protocol_version: 5,
+                claim_id: Uuid::new_v4(),
+                model_capabilities: Some(capabilities.clone()),
+            })
+            .await;
+        idle.assert_status_ok();
+        assert!(idle.json::<PhoneClaimResponse>().lease.is_none());
+        assert!(field::<bool>(
+            &one(&ctx.db, "SELECT model_last_seen_at IS NOT NULL AS seen FROM execution_workers WHERE profile_id=$1", vec![profile.id.into()]).await.unwrap(),
+            "seen"
+        ).unwrap());
         let opts = owner
-            .read(server.get(&format!("/api/apps/{app}/phone-options")))
+            .read(server.get(&options_path))
             .await;
         opts.assert_status_ok();
         assert!(opts.json::<PhoneOptions>().blockers.is_empty());

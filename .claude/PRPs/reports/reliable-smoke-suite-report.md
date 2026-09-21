@@ -4,7 +4,8 @@
 
 The saved-suite path now asks for an explicit build and qualified device, shows
 the selected checksum and suite version, offers an optional completed-run
-baseline, and freezes that selection in the existing multi-case run. The API
+baseline without preselecting the suggestion, and freezes the tester's choice
+in the existing multi-case run. The API
 shares baseline candidate lookup with saved cases. The existing scheduler
 claims worker-eligible attempts in a deterministic run/case/attempt order.
 Reports identify the suite and do not call missing clean-start proof or an
@@ -39,7 +40,7 @@ explicit real-device suite mode were added.
 | Generated contract drift and contract tests          | Pass; `just types`, `just check-contracts`.                                    |
 | Scoped Rust/TS/Python format and changed-script Ruff | Pass.                                                                          |
 | API Clippy and workspace tests                       | Pass with a disposable migrated PostgreSQL database and process-scoped JDK 17. |
-| Web typecheck, lint, tests                           | Pass; 25 files, 158 tests.                                                     |
+| Web typecheck, lint, tests                           | Pass; 25 files, 159 tests.                                                     |
 | Worker Ruff, Pyright, tests                          | Pass; 185 tests.                                                               |
 | Production build                                     | Pass; Vite and Cargo. Vite retains its existing large-chunk warning.           |
 | HTTP acceptance                                      | Pass; `smoke-test-library`, `smoke-execution`, `smoke-suite`, all simulated.   |

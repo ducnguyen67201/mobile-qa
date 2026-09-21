@@ -3,15 +3,16 @@
 ## Reliable smoke suite — local implementation (2026-09-21)
 
 Saved-suite run setup now requires an explicit build and qualified device,
-shows the chosen build checksum, offers completed-run baseline choices, and
-pins the selected baseline on the immutable multi-case run. The API shares
-candidate scanning with saved-case runs, enforces the same-app completed
-baseline rule, and keeps worker pickup in the existing fenced claim path with
+shows the chosen build checksum, offers completed-run baseline choices without
+preselecting a suggestion, and pins the selected baseline on the immutable
+multi-case run. The API shares candidate scanning with saved-case runs, enforces
+the same-app completed baseline rule, and keeps worker pickup in the existing
+fenced claim path with
 stable tie-breaks. The report names the saved suite and distinguishes required
 passing checks from optional failures and missing real-device proof. Older
 suite requests without a baseline remain valid and keep their idempotency bytes.
 
-Contract drift, scoped formatting, API Clippy/workspace tests, 158 web tests,
+Contract drift, scoped formatting, API Clippy/workspace tests, 159 web tests,
 185 worker tests and the production build passed. The API test pass used a
 disposable PostgreSQL container and process-scoped JDK 17 because the retained
 test database has a stale migration ledger and the default Java is 8. Existing

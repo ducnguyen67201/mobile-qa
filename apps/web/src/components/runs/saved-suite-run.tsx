@@ -51,8 +51,10 @@ export function SavedSuiteRun({
     ...suiteRunPreviewQuery(appId, setup),
     enabled: !!versionId && !dirty && !!buildId && !!profile,
   })
-  const selectedBaseline =
-    baselineId ?? (dirty ? '' : (readiness.data?.suggested_baseline_id ?? ''))
+  const selectedBaseline = baselineId ?? ''
+  const suggestedBaseline = readiness.data?.baselines.find(
+    (value) => value.id === readiness.data?.suggested_baseline_id,
+  )
 
   const submit = useMutation({
     mutationFn: async (displayedBaseline: string) => {
@@ -184,6 +186,12 @@ export function SavedSuiteRun({
           change()
         }}
       />
+      {suggestedBaseline && (
+        <Text size="xs" c="dimmed">
+          Suggested baseline: {suggestedBaseline.build_label} ·{' '}
+          {new Date(suggestedBaseline.created_at).toLocaleString()}
+        </Text>
+      )}
       {dirty && (
         <Text size="xs">
           Save will create a new suite version; readiness is checked after saving.

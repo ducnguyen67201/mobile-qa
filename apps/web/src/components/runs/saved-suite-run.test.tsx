@@ -135,7 +135,7 @@ it('saves a changed sequence and retries the exact queued request after a lost r
   expect(save).toHaveBeenCalledTimes(1)
 })
 
-it('pins the displayed suite baseline even when the readiness suggestion changes', async () => {
+it('offers a suggestion without selecting a baseline for the tester', async () => {
   mocks.preview.mockResolvedValue({
     blockers: [],
     environment_revision: 7,
@@ -154,10 +154,39 @@ it('pins the displayed suite baseline even when the readiness suggestion changes
   mocks.create.mockResolvedValue(zRunResponse.parse(fixture))
   show()
   await chooseSetup()
-  await waitFor(() =>
-    expect(screen.getByRole('combobox', { name: 'Compare with' })).toHaveValue(
-      `v1.0 · ${new Date('2026-09-20T12:00:00Z').toLocaleString()}`,
-    ),
+  expect(await screen.findByText(/Suggested baseline: v1.0/)).toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: 'Compare with' })).toHaveValue(
+    'None — establish a first result',
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Run suite' }))
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
+  expect(mocks.create.mock.calls[0]![1].baseline_run_id).toBeNull()
+})
+
+it('pins the explicitly selected suite baseline even when the readiness suggestion changes', async () => {
+  mocks.preview.mockResolvedValue({
+    blockers: [],
+    environment_revision: 7,
+    baselines: [
+      {
+        id: 'shown-run',
+        build_id: 'old-build',
+        build_label: 'v1.0',
+        created_at: '2026-09-20T12:00:00Z',
+        compatible: true,
+        reason: 'Same suite',
+      },
+    ],
+    suggested_baseline_id: 'shown-run',
+  })
+  mocks.create.mockResolvedValue(zRunResponse.parse(fixture))
+  show()
+  await chooseSetup()
+  await userEvent.click(await screen.findByRole('combobox', { name: 'Compare with' }))
+  await userEvent.click(
+    await screen.findByRole('option', {
+      name: `v1.0 · ${new Date('2026-09-20T12:00:00Z').toLocaleString()}`,
+    }),
   )
   mocks.preview.mockResolvedValue({
     blockers: [],

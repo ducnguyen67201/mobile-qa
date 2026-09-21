@@ -15,6 +15,23 @@ for every case. On another build, the tester can pin an earlier suite run as a
 baseline and see which comparable checks changed. A queued, blocked, incomplete,
 or recovery-held run never appears as a passing smoke check.
 
+## Two-build workflow
+
+Each submission creates one run for one build. Run A selects saved suite v3 and
+build 1.3 with no baseline, executes each case from its declared clean start,
+and retains the report. After Run A completes, Run B selects the same suite v3
+and build 1.4, and the tester explicitly chooses Run A as its baseline before
+submitting. The baseline run ID is frozen in Run B; the same qualified device
+profile may be reused after verified cleanup. The runs have separate immutable
+manifests and never install two APKs in one emulator session.
+
+When Run B finishes, verified Passed→Failed is Regression, Failed→Passed is
+Recovered, Failed→Failed is Still failing, and Passed→Passed is Unchanged.
+Changed test versions or execution context and missing clean proof are Not
+comparable. This compares release builds, not randomized user groups. A
+historical run cannot gain or change its baseline afterward; selecting any two
+completed runs later for an ad-hoc comparison is outside this delivery.
+
 ## Business rules
 
 1. A **case** owns one scenario: ordered actions, explicit expected checks,
@@ -38,8 +55,9 @@ or recovery-held run never appears as a passing smoke check.
    acceptance fixture uses two or three concise cases, not a new product limit.
 4. Before submission, show the exact suite version, selected build and checksum,
    qualified device, readiness blockers, and baseline choice. The tester chooses
-   the build and device explicitly. A suggested baseline is only a suggestion:
-   selecting it or None happens at click time, and its ID is frozen with the run.
+   the build and device explicitly. No baseline is selected by default; an
+   eligible prior run may be shown as a suggestion, but the tester must choose
+   it before submission. The chosen ID or None is frozen with the run.
    Refresh, retry, a newer upload, or a newer result cannot silently change that
    choice. A suite can run without a baseline to establish its first result.
 5. A suite run uses the existing immutable manifest, attempts, lease fencing,

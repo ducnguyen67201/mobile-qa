@@ -847,7 +847,7 @@ export type PreflightRequest = {
     receipt: PreflightReceipt;
 };
 
-export type QueueReason = 'worker_offline' | 'model_unavailable' | 'capacity_busy' | 'device_recovery_required' | 'awaiting_worker_claim';
+export type QueueReason = 'worker_offline' | 'model_unavailable' | 'worker_upgrade_required' | 'capacity_busy' | 'device_recovery_required' | 'awaiting_worker_claim';
 
 export type QueueStatus = {
     last_compatible_worker_at?: string | null;

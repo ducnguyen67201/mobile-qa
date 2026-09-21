@@ -423,24 +423,43 @@ async fn queue_status(
     manifest: &RunManifest,
     created_at: chrono::DateTime<chrono::Utc>,
 ) -> ApiResult<QueueStatus> {
-    let workers=rows(db,"SELECT model_capabilities,model_last_seen_at FROM execution_workers WHERE app_id=$1 AND profile_id=$2 AND revoked=false",vec![manifest.app_id.into(),manifest.profile.id.into()]).await?;
+    let workers=rows(db,"SELECT execution_model_capabilities,execution_protocol_version,execution_last_seen_at FROM execution_workers WHERE app_id=$1 AND profile_id=$2 AND revoked=false",vec![manifest.app_id.into(),manifest.profile.id.into()]).await?;
     let mut live = false;
+    let mut model_live = false;
     let mut compatible_live = false;
     let mut last_compatible = None;
     let threshold = chrono::Utc::now() - chrono::Duration::seconds(90);
     for row in workers {
-        let seen: Option<chrono::DateTime<chrono::Utc>> = field(&row, "model_last_seen_at")?;
-        let capabilities = field::<Option<serde_json::Value>>(&row, "model_capabilities")?
-            .and_then(|v| {
-                decode::<mobile_qa_contracts::model_registry::WorkerModelCapabilities>(v).ok()
-            });
-        let matches = manifest
+        let seen: Option<chrono::DateTime<chrono::Utc>> = field(&row, "execution_last_seen_at")?;
+        let version: Option<i32> = field(&row, "execution_protocol_version")?;
+        let capabilities =
+            field::<Option<serde_json::Value>>(&row, "execution_model_capabilities")?.and_then(
+                |v| decode::<mobile_qa_contracts::model_registry::WorkerModelCapabilities>(v).ok(),
+            );
+        let model_matches = manifest
             .resolved_model
             .as_ref()
             .is_none_or(|model| model_registry::worker_matches(model, capabilities.as_ref()));
+        let protocol_matches = version.is_some_and(|version| {
+            version >= 1
+                && (manifest.profile.execution_context.is_none() || version >= 3)
+                && (manifest.source.is_none() || version >= 4)
+                && (version >= 2
+                    || !manifest.cases.iter().any(|case| {
+                        case.case
+                            .actions
+                            .iter()
+                            .any(|action| action.kind == ActionKind::Direct)
+                    }))
+                && (manifest.resolved_model.is_none() || version >= 5)
+        });
+        let matches = model_matches && protocol_matches;
         if let Some(seen) = seen {
             if seen > threshold {
                 live = true;
+                if model_matches {
+                    model_live = true;
+                }
                 if matches {
                     compatible_live = true;
                 }
@@ -468,8 +487,10 @@ async fn queue_status(
         QueueReason::CapacityBusy
     } else if !live {
         QueueReason::WorkerOffline
-    } else if !compatible_live {
+    } else if !model_live {
         QueueReason::ModelUnavailable
+    } else if !compatible_live {
+        QueueReason::WorkerUpgradeRequired
     } else {
         QueueReason::AwaitingWorkerClaim
     };

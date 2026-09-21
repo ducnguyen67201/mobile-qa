@@ -75,6 +75,8 @@ export function RunDetail() {
               {
                 worker_offline: 'Waiting for a device worker to connect.',
                 model_unavailable: 'No connected worker is qualified for this run’s model.',
+                worker_upgrade_required:
+                  'A connected worker needs a newer execution protocol for this run.',
                 capacity_busy: 'The phone is busy with another session or run.',
                 device_recovery_required: 'The phone is held for operator recovery.',
                 awaiting_worker_claim:

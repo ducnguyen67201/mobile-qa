@@ -37,7 +37,7 @@ irrelevant legacy model warning.
 | Generated contracts  | Pass                                    | `just types`, then `just check-contracts` with zero drift                                                                                                                                            |
 | Static analysis      | Pass                                    | Rust fmt/Clippy, web typecheck/ESLint, Ruff/Pyright                                                                                                                                                  |
 | Rust tests           | Pass                                    | 65 tests on a disposable PostgreSQL database, including new assignment and claim tests                                                                                                               |
-| Web tests            | Pass                                    | 152 tests                                                                                                                                                                                            |
+| Web tests            | Pass                                    | 153 tests, including the worker protocol queue message                                                                                                                                               |
 | Worker tests         | Pass across full pass and focused retry | 176 passed in the consolidated run; six failures were a transient loopback test and fixtures missing the new optional field. The affected 24 tests passed after fixes/retry, covering all 182 cases. |
 | Builds               | Pass                                    | Web production bundle and Cargo workspace                                                                                                                                                            |
 | Live device/provider | Not run                                 | Explicit operator qualification and recovery gates                                                                                                                                                   |
@@ -60,6 +60,8 @@ and locally generated signed synthetic APKs. It did not reset development data.
 - The existing `no-model-adb-demo` host sentinel is accepted only as a model-free
   historical profile to address the worker startup failure without editing private
   operator state.
+- Review hardening requires one live phone worker to support both active model purposes
+  and records execution protocol heartbeats separately from phone polls.
 - `max_calls` is versioned assignment metadata but is not yet a runtime stop
   condition. Existing workflow budgets remain in effect; this limit must be enforced
   before presenting it as a hard spend cap.

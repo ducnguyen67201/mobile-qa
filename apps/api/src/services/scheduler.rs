@@ -133,7 +133,13 @@ pub async fn claim(
     .await?;
     let profile = test_definitions::profile(&tx, worker.app_id, worker.profile_id).await?;
     profile.validate().map_err(ApiFailure::invalid)?;
-    model_registry::advertise(&ctx.db, worker.id, input.model_capabilities.as_ref()).await?;
+    model_registry::advertise_execution(
+        &ctx.db,
+        worker.id,
+        input.version,
+        input.model_capabilities.as_ref(),
+    )
+    .await?;
     if profile.execution_context.is_some() && input.version < 3 {
         return Ok(ClaimResponse {
             lease: None,

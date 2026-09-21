@@ -40,6 +40,8 @@ a second model registry or an automatic model fallback.
   unknown rather than inferred from a model name.
 - Use explicit staged, active, draining and retired _routing_ states. Activation
   permits new assignments only after a compatible qualified worker is live.
+  If both phone purposes have active assignments, one live phone worker must
+  advertise both exact references before either assignment can be activated.
   Draining stops new assignments but allows already frozen queued work to finish on
   matching capacity. Retirement preserves definitions and historical snapshots.
   A safety shutdown revokes workers/cancels affected work explicitly; retirement
@@ -67,8 +69,9 @@ in the initial product UI.
 
 A worker may advertise a bounded set of exact references only after each has
 qualification evidence for its pinned worker runtime, SDK revision and device/image
-combination. The API stores the latest authenticated advertisement with a short
-liveness window. The set is operator configured on the worker host; registry presence
+combination. The API stores separate execution and phone poll versions, capabilities
+and heartbeat times with a short liveness window. A phone poll does not establish
+execution claim eligibility. The set is operator configured on the worker host; registry presence
 alone never qualifies a host. A worker with no model references can still claim
 direct-only jobs. One physical device retains one active lease, regardless of how
 many models its worker supports.
@@ -84,7 +87,7 @@ credentials app/profile scoped and provider secrets in the isolated SDK child.
 ## Queue explanation and rollout
 
 Preserve the durable `queued` state, but expose a computed, bounded reason such as
-`worker_offline`, `model_unavailable`, `capacity_busy` or `device_recovery_required`
+`worker_offline`, `model_unavailable`, `worker_upgrade_required`, `capacity_busy` or `device_recovery_required`
 with the last compatible worker heartbeat. A missing heartbeat is an observation,
 not proof that a model or device is permanently unavailable. Show the reason on Runs
 and in operator logs; do not expose credentials, private host paths or raw provider
@@ -133,8 +136,9 @@ workers advertise up to eight references from a host profile carrying nonsecret
 qualification evidence, while protocol 5 still supports one reference. The API picks
 the oldest compatible queued attempt or phone session. A phone session freezes a
 separate structured-authoring model when assigned and requires the worker to support
-both exact references. Run details compute queue wait,
-reason and last compatible heartbeat from current worker and reservation state.
+both exact references on one live phone worker before activation. Run details compute
+queue wait, reason and last compatible execution heartbeat using the worker's actual
+claim protocol gates and current reservation state.
 
 This source and simulated-test capability does not qualify a new provider model,
 runtime, SDK build or physical device. Operators must verify the evidence fields and

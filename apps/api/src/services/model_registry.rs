@@ -9,16 +9,33 @@ use sea_orm::{ConnectionTrait, TransactionSession, TransactionTrait};
 use uuid::Uuid;
 
 /// Poll advertisements are committed independently of a lease transaction: an idle
-/// worker must become visible in phone options before the first session exists.
-pub async fn advertise(
+/// worker must become visible before the first job exists. Keep claim protocols
+/// separate because a phone poll cannot prove execution claim eligibility.
+pub async fn advertise_execution(
     db: &impl ConnectionTrait,
     worker: Uuid,
+    version: u8,
     capabilities: Option<&WorkerModelCapabilities>,
 ) -> ApiResult<()> {
     exec(
         db,
-        "UPDATE execution_workers SET model_capabilities=$2,model_last_seen_at=now() WHERE id=$1 AND revoked=false",
-        vec![worker.into(), json(&capabilities)?.into()],
+        "UPDATE execution_workers SET model_capabilities=$2,model_last_seen_at=now(),execution_model_capabilities=$2,execution_last_seen_at=now(),execution_protocol_version=$3 WHERE id=$1 AND revoked=false",
+        vec![worker.into(), json(&capabilities)?.into(), (version as i32).into()],
+    )
+    .await?;
+    Ok(())
+}
+
+pub async fn advertise_phone(
+    db: &impl ConnectionTrait,
+    worker: Uuid,
+    version: u32,
+    capabilities: Option<&WorkerModelCapabilities>,
+) -> ApiResult<()> {
+    exec(
+        db,
+        "UPDATE execution_workers SET model_capabilities=$2,model_last_seen_at=now(),phone_model_capabilities=$2,phone_last_seen_at=now(),phone_protocol_version=$3 WHERE id=$1 AND revoked=false",
+        vec![worker.into(), json(&capabilities)?.into(), (version as i32).into()],
     )
     .await?;
     Ok(())
@@ -287,12 +304,59 @@ pub async fn transition_assignment(
         if retired {
             return Err(conflict("Model revision is retired"));
         }
-        let live = rows(&tx,"SELECT model_capabilities FROM execution_workers WHERE app_id=$1 AND profile_id=$2 AND revoked=false AND model_last_seen_at>now()-interval '90 seconds'",vec![assignment.app_id.into(),assignment.profile_id.into()]).await?;
+        let counterpart = rows(&tx,"SELECT payload FROM model_assignments WHERE app_id=$1 AND profile_id=$2 AND purpose<>$3 AND state='active'",vec![assignment.app_id.into(),assignment.profile_id.into(),purpose_name(assignment.purpose).into()]).await?;
+        let other = counterpart
+            .first()
+            .map(|row| decode::<ModelAssignment>(field(row, "payload")?))
+            .transpose()?;
+        let other = if let Some(other) = other {
+            Some(resolve(&tx, &other.reference).await?.0)
+        } else {
+            None
+        };
+        let live = rows(&tx,"SELECT phone_model_capabilities,phone_protocol_version,phone_last_seen_at,execution_model_capabilities,execution_protocol_version,execution_last_seen_at FROM execution_workers WHERE app_id=$1 AND profile_id=$2 AND revoked=false",vec![assignment.app_id.into(),assignment.profile_id.into()]).await?;
+        let recent = chrono::Utc::now() - chrono::Duration::seconds(90);
         if !live.iter().any(|row| {
-            field::<serde_json::Value>(row, "model_capabilities")
+            let phone_caps = field::<Option<serde_json::Value>>(row, "phone_model_capabilities")
                 .ok()
-                .and_then(|v| decode::<WorkerModelCapabilities>(v).ok())
-                .is_some_and(|capabilities| worker_matches(&resolved, Some(&capabilities)))
+                .flatten()
+                .and_then(|value| decode::<WorkerModelCapabilities>(value).ok());
+            let phone_version = field::<Option<i32>>(row, "phone_protocol_version")
+                .ok()
+                .flatten()
+                .unwrap_or(0);
+            let phone_seen =
+                field::<Option<chrono::DateTime<chrono::Utc>>>(row, "phone_last_seen_at")
+                    .ok()
+                    .flatten();
+            let phone_matches = phone_version >= 5
+                && phone_seen.is_some_and(|seen| seen > recent)
+                && worker_matches(&resolved, phone_caps.as_ref())
+                && other
+                    .as_ref()
+                    .is_none_or(|model| worker_matches(model, phone_caps.as_ref()));
+            if phone_matches {
+                return true;
+            }
+            if assignment.purpose != ModelPurpose::Navigation || other.is_some() {
+                return false;
+            }
+            let execution_caps =
+                field::<Option<serde_json::Value>>(row, "execution_model_capabilities")
+                    .ok()
+                    .flatten()
+                    .and_then(|value| decode::<WorkerModelCapabilities>(value).ok());
+            let execution_version = field::<Option<i32>>(row, "execution_protocol_version")
+                .ok()
+                .flatten()
+                .unwrap_or(0);
+            let execution_seen =
+                field::<Option<chrono::DateTime<chrono::Utc>>>(row, "execution_last_seen_at")
+                    .ok()
+                    .flatten();
+            execution_version >= 5
+                && execution_seen.is_some_and(|seen| seen > recent)
+                && worker_matches(&resolved, execution_caps.as_ref())
         }) {
             return Err(conflict(
                 "A qualified compatible worker must be live before activation",

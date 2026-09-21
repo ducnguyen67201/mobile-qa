@@ -361,6 +361,7 @@ pub struct RunResponse {
 pub enum QueueReason {
     WorkerOffline,
     ModelUnavailable,
+    WorkerUpgradeRequired,
     CapacityBusy,
     DeviceRecoveryRequired,
     AwaitingWorkerClaim,

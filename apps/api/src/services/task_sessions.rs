@@ -386,7 +386,13 @@ pub async fn claim(
     .await?;
     let p = test_definitions::profile(&tx, w.app_id, w.profile_id).await?;
     p.validate().map_err(ApiFailure::invalid)?;
-    model_registry::advertise(&ctx.db, w.id, input.model_capabilities.as_ref()).await?;
+    model_registry::advertise_phone(
+        &ctx.db,
+        w.id,
+        input.protocol_version,
+        input.model_capabilities.as_ref(),
+    )
+    .await?;
     if p.execution_context.is_some() && input.protocol_version < 4 {
         return Ok(PhoneClaimResponse { lease: None });
     }

@@ -104,6 +104,28 @@ it('explains a queued run held for device recovery', async () => {
   show()
   expect(await screen.findByText(/held for operator recovery/)).toBeInTheDocument()
 })
+it('explains when a polling worker cannot claim a run with its protocol', async () => {
+  const current = report()
+  current.state = 'queued'
+  current.queue_status = {
+    reason: 'worker_upgrade_required',
+    last_compatible_worker_at: null,
+    wait_seconds: 30,
+  }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      const path = new URL(request.url).pathname
+      if (path.endsWith('/session')) return Response.json(session)
+      if (path.endsWith('/settings')) return Response.json(settings)
+      if (path === `/apps/${appId}` || path === `/api/apps/${appId}`) return Response.json(app)
+      if (path.endsWith(runId)) return Response.json(current)
+      throw new Error(`Unexpected fixture route ${path}`)
+    }),
+  )
+  show()
+  expect(await screen.findByText(/newer execution protocol/)).toBeInTheDocument()
+})
 it('does not present malformed persisted results as a report', async () => {
   vi.stubGlobal(
     'fetch',

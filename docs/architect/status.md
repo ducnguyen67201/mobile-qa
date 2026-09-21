@@ -12,9 +12,11 @@ recovery-required reservation still requires explicit operator recovery before a
 worker can claim the physical phone.
 Queue creation logs the bounded reason code; run details refresh the reason as worker
 and reservation state changes. Direct-only runs no longer show a legacy model warning.
+Review hardening requires one live phone worker to support both assigned purposes and
+counts a worker as run-compatible only when its execution poll protocol can claim the run.
 
 Contract drift, formatting, Clippy, Rust workspace tests (65), web typecheck/lint
-and 152 web tests, Ruff/Pyright and 182 worker test cases pass across the consolidated
+and 153 web tests, Ruff/Pyright and 182 worker test cases pass across the consolidated
 pass and focused retries. The web production build and Cargo workspace build pass.
 The API used a disposable
 PostgreSQL container because the retained local test database has a different branch's

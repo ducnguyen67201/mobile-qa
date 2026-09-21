@@ -589,6 +589,7 @@ export const zPreflightAcknowledgement = z.object({
 export const zQueueReason = z.enum([
     'worker_offline',
     'model_unavailable',
+    'worker_upgrade_required',
     'capacity_busy',
     'device_recovery_required',
     'awaiting_worker_claim'

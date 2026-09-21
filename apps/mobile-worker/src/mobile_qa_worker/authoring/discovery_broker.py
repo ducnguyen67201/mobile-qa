@@ -210,7 +210,15 @@ def explore(
     request_path = directory / "discovery-request.json"
     from mobile_qa_worker.execution.journal import write
 
-    write(request_path, task.generation.model_dump(mode="json"))
+    if connection.session.resolved_model is None:
+        raise QualificationError("model_capability_unavailable")
+    write(
+        request_path,
+        {
+            "model": connection.session.resolved_model.model_dump(mode="json"),
+            "request": task.generation.model_dump(mode="json"),
+        },
+    )
     args = [
         "doppler",
         "run",

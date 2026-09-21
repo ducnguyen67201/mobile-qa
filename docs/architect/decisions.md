@@ -20,6 +20,7 @@ product. Update this record when the decision changes; implementation state belo
 | A12 | docs/architect is the documentation authority               | Keep a portable, versioned source of truth in the actual repository                                                                                            | [Index](README.md)                                         |
 | A13 | Railway private Buckets first for hosted APKs; AWS S3 later | User-selected storage direction; reusable S3-compatible adapter, stable keys/checksums and verified data migration; implementation/provisioning remain planned | [App setup](implementation/03-app-setup-and-ui-backend.md) |
 | A14 | Railway application hosting first; AWS later when needed    | Portable application image and PostgreSQL; Android/KVM hosting remains separately gated                                                                        | [Hosting](hosting.md)                                      |
+| A15 | One shared immutable model registry and frozen assignment   | API resolves `key@revision` once; workers advertise exact compatibility, provider calls use the frozen snapshot, and no automatic fallback changes a run       | [Contracts](contracts.md)                                  |
 
 No second general agent framework, queue platform or orchestration service is required
 for the first implementation. Revisit these only with a concrete unmet requirement and
@@ -98,3 +99,13 @@ history. Migration 000008 preserves old decisions as legacy audit without fabric
 approvals for new saves. Retain internal draft storage/routes to limit wire churn;
 namespace new mutation fingerprints so old retries fail closed rather than deserialize
 obsolete receipts. Spec 05 owns the detailed upgrade and execution invariants.
+
+## 2026-09-21 — Shared model registry and downstream resolution
+
+Model identity is the immutable `(key, revision)` pair. The API-local registry stores only
+nonsecret provider metadata and explicit capabilities. New profiles write a typed reference;
+historical raw strings remain readable only through a bounded compatibility resolver. Creating
+a model-enabled run or phone session freezes a complete `ResolvedModel` snapshot. Workers do not
+select a model: protocol 5 advertises their qualified reference and compiled provider support,
+and the API admits an exact match before a reservation or lease. Provider credentials remain in
+the isolated Doppler child. There is no implicit model fallback or browser model picker.

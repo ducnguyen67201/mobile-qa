@@ -16,6 +16,7 @@ from mobile_qa_worker.generated.models import (
     ModelUsage,
     NavigationRequest,
 )
+from mobile_qa_worker.model_runtime import require_host_assignment
 from mobile_qa_worker.qualification.campaign import backend
 from mobile_qa_worker.qualification.config import Profile, QualificationError
 from mobile_qa_worker.qualification.device import Device, doctor
@@ -43,6 +44,7 @@ def sdk_action(
             "package": job.manifest.profile.package,
             "instruction": instruction,
             "max_steps": step_budget,
+            "resolved_model": job.manifest.resolved_model,
         }
     )
     request_path = directory / "request.json"
@@ -111,11 +113,10 @@ def execute(
         or definition.adapter != "demo_persistence_v1"
     ):
         raise ValueError("unsupported_device_adapter")
-    if (
-        profile.model != job.manifest.profile.model
-        or profile.system_image != job.manifest.profile.image
-    ):
+    if profile.system_image != job.manifest.profile.image:
         raise ValueError("host_profile_does_not_match_manifest")
+    if job.manifest.resolved_model is not None:
+        require_host_assignment(job.manifest.resolved_model, profile.model_ref)
     evidence = Evidence(directory / "evidence", definition.budget.artifact_bytes)
     device = Device(profile, evidence)
     outcome, reason, reset, stopped = (

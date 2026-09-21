@@ -5,6 +5,7 @@ pub fn context_matches(a: &RunManifest, b: &RunManifest) -> bool {
     a.app_id == b.app_id
         && a.environment_revision == b.environment_revision
         && a.profile == b.profile
+        && a.resolved_model == b.resolved_model
 }
 pub fn outcome(run: &RunResponse, case: &ResolvedCase) -> Option<Outcome> {
     if run.state != JobState::Finished || run.manifest.profile.execution_context.is_none() {
@@ -272,7 +273,11 @@ mod policy_tests {
                 7 => f.attempts[0].outcome = Some(Outcome::Blocked),
                 8 => f.attempts.push(b.attempts[0].clone()),
                 9 => f.attempts[0].preflight.as_mut().unwrap().context.locale = "changed".into(),
-                _ => f.manifest.profile.model = "changed".into(),
+                _ => {
+                    f.manifest.profile.model = Some(
+                        mobile_qa_contracts::model_registry::ModelBinding::Legacy("changed".into()),
+                    )
+                }
             };
             assert_eq!(
                 compare(&f, Some(&b)).cases[0].kind,

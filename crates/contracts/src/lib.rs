@@ -7,6 +7,7 @@ pub mod worker;
 
 pub mod execution;
 pub mod execution_api;
+pub mod model_registry;
 
 pub mod test_library;
 pub mod test_library_api;

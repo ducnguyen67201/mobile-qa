@@ -84,26 +84,24 @@ def test_shutdown_during_empty_claim_leaves_no_dirty_marker(tmp_path, monkeypatc
             return SimpleNamespace(lease=None)
 
     monkeypatch.setattr(task_sessions, "Client", Client)
+    from test_device import profile
+
+    monkeypatch.setattr(task_sessions.Profile, "load", lambda _: profile(tmp_path))
     task_sessions.serve("http://127.0.0.1:5150", tmp_path, tmp_path / "unused.toml")
     assert not (tmp_path / "dirty.json").exists()
 
 
 @pytest.mark.parametrize(
-    "driver,registered_model,host_model,image_matches,accepted",
+    "host_key,image_matches,accepted",
     [
-        ("minitap", "approved", "different", True, False),
-        ("minitap", "approved", "", True, False),
-        ("minitap", "approved", "approved", True, True),
-        ("minitap", "approved", "approved", False, False),
-        ("direct", "approved", "different", True, False),
-        ("direct", "approved", "approved", True, True),
-        ("direct", "", "unused-host-model", True, True),
-        ("direct", "", "", True, True),
-        ("direct", "", "", False, False),
+        ("different", True, False),
+        (None, True, False),
+        ("approved", True, True),
+        ("approved", False, False),
     ],
 )
 def test_session_binds_image_and_model_before_side_effects(
-    tmp_path, monkeypatch, driver, registered_model, host_model, image_matches, accepted
+    tmp_path, monkeypatch, host_key, image_matches, accepted
 ):
     from dataclasses import replace
     from types import SimpleNamespace
@@ -113,16 +111,32 @@ def test_session_binds_image_and_model_before_side_effects(
     from test_execution import job
 
     from mobile_qa_worker import task_sessions
-    from mobile_qa_worker.generated.models import ExecutionProfile
+    from mobile_qa_worker.generated.models import ExecutionProfile, ModelReference, ResolvedModel
 
-    host = replace(host_profile(tmp_path), model=host_model)
+    host_ref = ModelReference(key=host_key, revision=1) if host_key else None
+    host = replace(host_profile(tmp_path), model_ref=host_ref)
     raw = job().manifest.profile.model_dump(mode="json")
     raw.update(
-        driver=driver,
-        model=registered_model,
+        driver="minitap",
+        model={"key": "approved", "revision": 1},
         image=host.system_image if image_matches else "different-image",
     )
-    lease = SimpleNamespace(session=SimpleNamespace(profile=ExecutionProfile.model_validate(raw)))
+    resolved = ResolvedModel.model_validate(
+        {
+            "reference": {"key": "approved", "revision": 1},
+            "display_name": "Approved",
+            "provider": "open_ai",
+            "provider_model": "provider-model",
+            "capabilities": ["minitap_navigation"],
+        }
+    )
+    lease = SimpleNamespace(
+        session=SimpleNamespace(
+            id=uuid4(),
+            profile=ExecutionProfile.model_validate(raw),
+            resolved_model=resolved,
+        )
+    )
     monkeypatch.setattr(task_sessions.Profile, "load", lambda _: host)
 
     class AdmissionReached(Exception):
@@ -137,7 +151,10 @@ def test_session_binds_image_and_model_before_side_effects(
             task_sessions.run_session(client, lease, tmp_path, tmp_path / "host.toml")
         lock.assert_called_once_with(host.state_root)
     else:
-        with pytest.raises(QualificationError, match="^worker_profile_mismatch$"):
+        with pytest.raises(
+            QualificationError,
+            match="^(worker_profile_mismatch|worker_model_reference_mismatch)$",
+        ):
             task_sessions.run_session(client, lease, tmp_path, tmp_path / "host.toml")
         lock.assert_not_called()
     assert client.mock_calls == []

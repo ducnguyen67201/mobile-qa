@@ -17,6 +17,12 @@ from mobile_qa_worker.generated.models import (
     DiscoveryCall,
     DiscoveryReply,
     GenerateTestsRequest,
+    ResolvedModel,
+)
+from mobile_qa_worker.model_runtime import (
+    minitap_model,
+    prepare_provider_environment,
+    structured_model,
 )
 from mobile_qa_worker.qualification.config import PACKAGE, Profile, QualificationError
 
@@ -78,6 +84,7 @@ def check_context(messages: object) -> None:
 def configure_agent(
     client: BrokerClient,
     profile: Profile,
+    resolved_model: ResolvedModel,
     package: str,
     model_factory: Callable[..., Any] | None = None,
 ) -> Any:
@@ -86,8 +93,7 @@ def configure_agent(
         raise QualificationError("sdk_compatibility_version_mismatch")
     from langchain_core.callbacks import AsyncCallbackHandler
     from langchain_core.tools import InjectedToolCallId, tool
-    from langchain_openai import ChatOpenAI
-    from minitap.mobile_use.config import LLM, LLMConfig, LLMConfigUtils, LLMWithFallback
+    from minitap.mobile_use.config import LLMConfig, LLMConfigUtils
     from minitap.mobile_use.sdk import Agent
     from minitap.mobile_use.sdk.builders.agent_config_builder import AgentConfigBuilder
     from minitap.mobile_use.sdk.types import AgentProfile, DevicePlatform
@@ -136,13 +142,12 @@ def configure_agent(
     callbacks = Callbacks()
 
     def bounded_model(model_name: str, temperature: float = 1) -> Any:
-        factory = model_factory or ChatOpenAI
-        return factory(
-            model=model_name,
-            max_retries=0,
+        return structured_model(
+            resolved_model,
             timeout=40,
             max_completion_tokens=2000,
             callbacks=[callbacks],
+            factory=model_factory,
         )
 
     sdk_llm.get_openai_llm = bounded_model
@@ -214,9 +219,7 @@ def configure_agent(
 
     cortex.create_device_controller = image_controller
 
-    node = LLMWithFallback(
-        provider="openai", model=profile.model, fallback=LLM(provider="openai", model=profile.model)
-    )
+    node = minitap_model(resolved_model)
     llm = LLMConfig(
         planner=node,
         orchestrator=node,
@@ -248,10 +251,10 @@ def configure_agent(
 
 def run(request_path: Path, profile_path: Path) -> None:
     profile = Profile.load(profile_path)
-    request = GenerateTestsRequest.model_validate_json(request_path.read_bytes())
-    from mobile_qa_worker.qualification.sdk_adapter import prepare_environment
-
-    prepare_environment(request_path.parent.resolve())
+    payload = json.loads(request_path.read_bytes())
+    resolved_model = ResolvedModel.model_validate(payload["model"], strict=True)
+    request = GenerateTestsRequest.model_validate(payload["request"], strict=True)
+    prepare_provider_environment(resolved_model, request_path.parent.resolve())
     os.environ["LANGSMITH_TRACING"] = "false"
     # Keep the IPC writer while suppressing all upstream logging/private reasoning.
     writer = os.fdopen(os.dup(sys.stdout.fileno()), "wb", buffering=0)
@@ -263,7 +266,7 @@ def run(request_path: Path, profile_path: Path) -> None:
     async def task() -> None:
         from minitap.mobile_use.sdk.types import TaskRequest
 
-        agent = configure_agent(client, profile, PACKAGE)
+        agent = configure_agent(client, profile, resolved_model, PACKAGE)
         scope = (
             "You may interact within this test-data journey."
             if request.allow_writes

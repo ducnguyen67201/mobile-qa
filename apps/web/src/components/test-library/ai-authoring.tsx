@@ -30,6 +30,7 @@ import { ErrorNotice } from '@/components/app/feedback'
 import { DiscoveryActivity, actionLabel, discoveryGap } from './discovery-activity'
 import { TaskSteps } from '@/components/task-session/task-steps'
 import classes from './proposal-review.module.css'
+import { hasModelCapability } from '@/lib/model-capabilities'
 
 const defaultJourneys: Record<CoverageKind, string> = {
   smoke:
@@ -81,7 +82,10 @@ export function GenerationPanel({
     mutationFn: () => cancelTestGeneration(session!.app_id, active!.id),
     onSuccess: onSession,
   })
-  const ai = !!session?.profile.model && session.profile.driver === 'minitap'
+  const ai =
+    session?.profile.driver === 'minitap' &&
+    hasModelCapability(session.resolved_model, 'minitap_navigation') &&
+    hasModelCapability(session.resolved_model, 'structured_authoring')
   return (
     <Card withBorder>
       <Stack>

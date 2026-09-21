@@ -203,8 +203,16 @@ def test_sdk_unconfirmed_process_stop_is_quarantined(tmp_path, monkeypatch):
     profile = SimpleNamespace(
         doppler_project="unused", doppler_config="unused", init_seconds=1, navigation_seconds=1
     )
+    assigned = job()
+    assigned.manifest.resolved_model = {
+        "reference": {"key": "synthetic.openai", "revision": 1},
+        "display_name": "Synthetic",
+        "provider": "open_ai",
+        "provider_model": "synthetic-model",
+        "capabilities": ["minitap_navigation"],
+    }
     with pytest.raises(QualificationError, match="sdk_cleanup_unconfirmed"):
-        actions.sdk_action(job(), profile, tmp_path / "profile", tmp_path / "sdk", "Open", 1, [])
+        actions.sdk_action(assigned, profile, tmp_path / "profile", tmp_path / "sdk", "Open", 1, [])
 
 
 def test_checkpoint_deadline_respects_approved_window(monkeypatch):

@@ -237,7 +237,8 @@ pub struct ExecutionProfile {
     pub adapter: String,
     pub device_identity: String,
     pub image: String,
-    pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<crate::model_registry::ModelBinding>,
     pub qualified: bool,
     pub qualification_reference: String,
     pub max_apk_bytes: u32,
@@ -266,6 +267,8 @@ pub struct RunManifest {
     pub plan_hash: Option<String>,
     pub environment_revision: i32,
     pub profile: ExecutionProfile,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_model: Option<crate::model_registry::ResolvedModel>,
     pub cases: Vec<ResolvedCase>,
     pub budget: ExecutionBudget,
     pub diagnostic_retries: u8,
@@ -360,6 +363,8 @@ pub struct ClaimRequest {
     pub version: u8,
     pub claim_id: Uuid,
     pub profile_id: Uuid,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_capabilities: Option<crate::model_registry::WorkerModelCapabilities>,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -429,6 +434,8 @@ pub struct ArtifactReceipt {
 #[serde(deny_unknown_fields)]
 pub struct ModelUsage {
     pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_reference: Option<crate::model_registry::ModelReference>,
     pub calls: u32,
     pub unknown_calls: u32,
     pub input_tokens: Option<u32>,
@@ -593,7 +600,43 @@ fn validate_selections(selections: &[CaseSelection]) -> Result<(), &'static str>
     Ok(())
 }
 impl ExecutionProfile {
+    pub fn registered_model(&self) -> Option<&crate::model_registry::ModelReference> {
+        match self.model.as_ref() {
+            Some(crate::model_registry::ModelBinding::Registered(reference)) => Some(reference),
+            _ => None,
+        }
+    }
+
+    pub fn uses_legacy_model(&self) -> bool {
+        matches!(
+            self.model,
+            Some(crate::model_registry::ModelBinding::Legacy(_))
+        )
+    }
+
+    pub fn requires_model(&self) -> bool {
+        self.driver == Driver::Minitap
+    }
+
+    pub fn is_model_free(&self) -> bool {
+        match self.model.as_ref() {
+            None => true,
+            Some(crate::model_registry::ModelBinding::Legacy(value)) => {
+                value.trim().is_empty() || value == "none"
+            }
+            Some(crate::model_registry::ModelBinding::Registered(_)) => false,
+        }
+    }
+
     pub fn validate(&self) -> Result<(), &'static str> {
+        if let Some(crate::model_registry::ModelBinding::Registered(reference)) = &self.model {
+            reference.validate()?;
+        }
+        if let Some(crate::model_registry::ModelBinding::Legacy(value)) = &self.model {
+            if self.driver == Driver::Minitap && !bounded(value, 200) {
+                return Err("invalid or unsupported execution profile");
+            }
+        }
         if !bounded(&self.name, 200)
             || !bounded(&self.device_identity, 200)
             || !bounded(&self.image, 200)
@@ -601,7 +644,7 @@ impl ExecutionProfile {
             || !(1..=262144000).contains(&self.max_apk_bytes)
             || (self.qualified && !bounded(&self.qualification_reference, 1000))
             || (self.driver == Driver::Minitap
-                && (!bounded(&self.model, 100) || self.max_apk_bytes > 104857600))
+                && (self.model.is_none() || self.max_apk_bytes > 104857600))
         {
             return Err("invalid or unsupported execution profile");
         }
@@ -611,7 +654,7 @@ impl ExecutionProfile {
             "android_direct_v1"
                 if self.driver == Driver::Direct
                     && self.qualified
-                    && self.model.is_empty()
+                    && self.is_model_free()
                     && self.max_apk_bytes <= 104857600 =>
             {
                 self.execution_context
@@ -640,6 +683,7 @@ pub struct NavigationRequest {
     pub package: String,
     pub instruction: String,
     pub max_steps: u32,
+    pub resolved_model: crate::model_registry::ResolvedModel,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]

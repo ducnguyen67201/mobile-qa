@@ -48,7 +48,6 @@ def setup() -> None:
             "sdk_root": str(SDK),
             "state_root": str(LOCAL / "state"),
             "toolchain": str(ROOT / "infra/device-host/toolchain.lock.json"),
-            "model": "no-model-adb-demo",
             "system_image": f"system-images;android-35;google_apis;{abi}",
             "headless": system != "Darwin",
             "doppler_project": "mobile-qa",
@@ -85,7 +84,7 @@ def main() -> None:
     parser.add_argument(
         "--scenario", choices=["good", "broken", "unavailable"], default="good"
     )
-    parser.add_argument("--model")
+    parser.add_argument("--resolved-model", type=Path)
     args = parser.parse_args()
     if args.action == "setup":
         setup()
@@ -112,8 +111,10 @@ def main() -> None:
             "--scenario",
             args.scenario,
         ]
-        if args.model:
-            command.extend(["--agent", "--model", args.model])
+        if args.resolved_model:
+            command.extend(
+                ["--agent", "--resolved-model", str(args.resolved_model.resolve())]
+            )
         # Replace the wrapper so Ctrl-C reaches the supervisor without an outer
         # subprocess.call killing it while its bounded cleanup is still running.
         os.chdir(ROOT)

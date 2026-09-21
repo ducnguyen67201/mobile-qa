@@ -99,6 +99,8 @@ pub struct PhoneSession {
     pub app_id: Uuid,
     pub build_id: Uuid,
     pub profile: ExecutionProfile,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_model: Option<crate::model_registry::ResolvedModel>,
     pub state: PhoneState,
     pub message: String,
     pub frame: Option<PhoneFrame>,
@@ -132,6 +134,8 @@ pub struct PhoneClaimRequest {
     #[serde(default)]
     pub protocol_version: u32,
     pub claim_id: Uuid,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_capabilities: Option<crate::model_registry::WorkerModelCapabilities>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]

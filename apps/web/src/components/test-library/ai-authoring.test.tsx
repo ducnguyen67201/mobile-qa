@@ -20,6 +20,13 @@ const session: PhoneSession = {
   message: '',
   frame: null,
   tasks: [],
+  resolved_model: {
+    reference: { key: 'synthetic.openai', revision: 1 },
+    display_name: 'Synthetic',
+    provider: 'open_ai',
+    provider_model: 'synthetic-model',
+    capabilities: ['minitap_navigation', 'structured_authoring'],
+  },
   profile: {
     id,
     name: 'Phone',
@@ -48,7 +55,7 @@ function show(value = session, onReconnect?: () => void) {
   return success
 }
 afterEach(() => vi.unstubAllGlobals())
-it.each([3, 4])(
+it.each([5])(
   'protocol %i sends explicit exploration with the engine and scope',
   async (protocol) => {
     const fetch = vi.fn(async (r: Request) => {

@@ -9,6 +9,7 @@ use uuid::Uuid;
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RunSource {
     SavedCaseV1 { case_version_id: Uuid },
+    SavedSuiteV1 { suite_version_id: Uuid },
     ReleasePlanV1 { plan_version_id: Uuid },
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
@@ -74,6 +75,19 @@ pub struct CaseRunPreview {
     pub environment_revision: i32,
     pub baselines: Vec<BaselineChoice>,
     pub suggested_baseline_id: Option<Uuid>,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SuiteRunRequest {
+    pub suite_version_id: Uuid,
+    pub build_id: Uuid,
+    pub profile_id: Uuid,
+    pub environment_revision: i32,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct SuiteRunPreview {
+    pub blockers: Vec<String>,
+    pub environment_revision: i32,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct RunHistoryItem {

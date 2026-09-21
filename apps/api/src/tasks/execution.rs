@@ -1,7 +1,7 @@
 //! Trusted, explicit execution maintenance. JSON files contain definitions, never secrets.
 use crate::{
     errors::{ApiFailure, ApiResult},
-    services::{scheduler, test_definitions as defs, worker_auth},
+    services::{model_registry, scheduler, test_definitions as defs, worker_auth},
 };
 use async_trait::async_trait;
 use loco_rs::{
@@ -9,6 +9,7 @@ use loco_rs::{
     task::{Task, TaskInfo, Vars},
 };
 use mobile_qa_contracts::execution::*;
+use mobile_qa_contracts::model_registry::{ModelDefinition, ModelReference};
 use uuid::Uuid;
 pub struct Execution;
 fn arg<'a>(v: &'a Vars, name: &str) -> ApiResult<&'a str> {
@@ -33,6 +34,36 @@ pub async fn execute(ctx: &AppContext, v: &Vars) -> ApiResult<()> {
     if action == "reconcile" {
         scheduler::reconcile(ctx).await?;
         return crate::services::run_artifacts::cleanup_pending(ctx).await;
+    }
+    if action == "register-model" {
+        let definition: ModelDefinition = read(arg(v, "file")?)?;
+        let resolved = model_registry::register(&ctx.db, &definition).await?;
+        println!(
+            "{}",
+            serde_json::to_string(&resolved).map_err(|_| ApiFailure::internal())?
+        );
+        return Ok(());
+    }
+    if matches!(action, "show-model" | "retire-model") {
+        let reference = ModelReference {
+            key: arg(v, "key")?.to_owned(),
+            revision: arg(v, "revision")?
+                .parse()
+                .map_err(|_| ApiFailure::invalid("Invalid model revision"))?,
+        };
+        if action == "retire-model" {
+            model_registry::retire(&ctx.db, &reference).await?;
+        } else {
+            let (resolved, retired) = model_registry::resolve(&ctx.db, &reference).await?;
+            if retired {
+                return Err(ApiFailure::invalid("Model revision is retired"));
+            }
+            println!(
+                "{}",
+                serde_json::to_string(&resolved).map_err(|_| ApiFailure::internal())?
+            );
+        }
+        return Ok(());
     }
     let actor = id(v, "actor")?;
     let app = id(v, "app")?;

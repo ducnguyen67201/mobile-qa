@@ -45,15 +45,6 @@ class CheckMethod(StrEnum):
     manual = 'manual'
 
 
-class ClaimRequest(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    claim_id: UUID
-    profile_id: UUID
-    version: Annotated[int, Field(ge=0, le=255)]
-
-
 class CleanupState(StrEnum):
     pending = 'pending'
     verified_clean = 'verified_clean'
@@ -244,6 +235,23 @@ class LeaseStatusResponse(BaseModel):
     state: JobState
 
 
+class ModelCapability(StrEnum):
+    minitap_navigation = 'minitap_navigation'
+    structured_authoring = 'structured_authoring'
+
+
+class ModelProvider(StrEnum):
+    open_ai = 'open_ai'
+
+
+class ModelReference(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key: str
+    revision: Annotated[int, Field(ge=0)]
+
+
 class ModelUsage(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -251,20 +259,9 @@ class ModelUsage(BaseModel):
     calls: Annotated[int, Field(ge=0)]
     input_tokens: Annotated[int | None, Field(ge=0)] = None
     model: str
+    model_reference: ModelReference | None = None
     output_tokens: Annotated[int | None, Field(ge=0)] = None
     unknown_calls: Annotated[int, Field(ge=0)]
-
-
-class NavigationRequest(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    attempt_id: UUID
-    instruction: str
-    max_steps: Annotated[int, Field(ge=0)]
-    package: str
-    profile_path: str
-    serial: str
 
 
 class ObservationKind(StrEnum):
@@ -285,14 +282,6 @@ class Outcome2(StrEnum):
     passed = 'passed'
     failed = 'failed'
     blocked = 'blocked'
-
-
-class PhoneClaimRequest(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    claim_id: UUID
-    protocol_version: Annotated[int, Field(ge=0)] = 0
 
 
 class PhoneControl(BaseModel):
@@ -380,22 +369,6 @@ class QualificationOutcome(StrEnum):
     inconclusive = 'inconclusive'
 
 
-class QualificationRequest(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    activity: Annotated[str, Field(pattern='^ai\\.mobileqa\\.demo/\\.MainActivity$')]
-    apk_path: str
-    attempt_id: UUID
-    case_id: Annotated[str, Field(pattern='^persist-task-v1$')]
-    expected_apk_sha256: Annotated[str, Field(pattern='^[0-9a-f]{64}$')]
-    output_root: str
-    package: Annotated[str, Field(pattern='^ai\\.mobileqa\\.demo$')]
-    profile_path: str
-    serial: Annotated[str, Field(pattern='^emulator-5554$')]
-    version: Annotated[int, Field(ge=1, le=1)]
-
-
 class QualificationReset(StrEnum):
     verified_clean = 'verified_clean'
     quarantined = 'quarantined'
@@ -414,6 +387,7 @@ class QualificationUsage(BaseModel):
     calls: Annotated[int, Field(ge=0, le=10000)]
     input_tokens: Annotated[int | None, Field(ge=0)] = None
     model: str
+    model_reference: ModelReference | None = None
     output_tokens: Annotated[int | None, Field(ge=0)] = None
     unknown_calls: Annotated[int, Field(ge=0, le=10000)]
 
@@ -425,6 +399,17 @@ class RecoveryEvent(BaseModel):
     actor_id: UUID
     created_at: AwareDatetime
     evidence_reference: str
+
+
+class ResolvedModel(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    capabilities: list[ModelCapability]
+    display_name: str
+    provider: ModelProvider
+    provider_model: str
+    reference: ModelReference
 
 
 class RunArtifact(BaseModel):
@@ -454,12 +439,20 @@ class RunSource2(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
+    kind: Literal['saved_suite_v1']
+    suite_version_id: UUID
+
+
+class RunSource3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     kind: Literal['release_plan_v1']
     plan_version_id: UUID
 
 
-class RunSource(RootModel[RunSource1 | RunSource2]):
-    root: RunSource1 | RunSource2
+class RunSource(RootModel[RunSource1 | RunSource2 | RunSource3]):
+    root: RunSource1 | RunSource2 | RunSource3
 
 
 class Scenario1(BaseModel):
@@ -519,6 +512,14 @@ class UiProperty(StrEnum):
     enabled = 'enabled'
 
 
+class WorkerModelCapabilities(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    model: ModelReference | None = None
+    providers: list[ModelProvider] | None = None
+
+
 class ArtifactReceipt(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -537,6 +538,16 @@ class CheckResult(BaseModel):
     observed: str | None = None
     outcome: Outcome
     reason: str
+
+
+class ClaimRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    claim_id: UUID
+    model_capabilities: WorkerModelCapabilities | None = None
+    profile_id: UUID
+    version: Annotated[int, Field(ge=0, le=255)]
 
 
 class CleanupRequest(BaseModel):
@@ -761,6 +772,65 @@ class LocalExecutionResult(BaseModel):
     usage: list[ModelUsage]
 
 
+class ModelBinding(RootModel[ModelReference | str]):
+    root: Annotated[
+        ModelReference | str,
+        Field(
+            description='Historical profiles used a raw provider-model string. Consumers may read that\nshape, but API registration rejects it for every new profile.'
+        ),
+    ]
+
+
+class ModelDefinition(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    capabilities: list[ModelCapability]
+    display_name: str
+    provider: ModelProvider
+    provider_model: str
+    reference: ModelReference
+
+
+class NavigationRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    attempt_id: UUID
+    instruction: str
+    max_steps: Annotated[int, Field(ge=0)]
+    package: str
+    profile_path: str
+    resolved_model: ResolvedModel
+    serial: str
+
+
+class PhoneClaimRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    claim_id: UUID
+    model_capabilities: WorkerModelCapabilities | None = None
+    protocol_version: Annotated[int, Field(ge=0)] = 0
+
+
+class QualificationRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    activity: Annotated[str, Field(pattern='^ai\\.mobileqa\\.demo/\\.MainActivity$')]
+    apk_path: str
+    attempt_id: UUID
+    case_id: Annotated[str, Field(pattern='^persist-task-v1$')]
+    expected_apk_sha256: Annotated[str, Field(pattern='^[0-9a-f]{64}$')]
+    output_root: str
+    package: Annotated[str, Field(pattern='^ai\\.mobileqa\\.demo$')]
+    profile_path: str
+    resolved_model: ResolvedModel | None = None
+    serial: Annotated[str, Field(pattern='^emulator-5554$')]
+    version: Annotated[int, Field(ge=1, le=1)]
+
+
 class QualificationResult(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -921,7 +991,7 @@ class ExecutionProfile(BaseModel):
     id: UUID
     image: str
     max_apk_bytes: Annotated[int, Field(ge=0)]
-    model: str
+    model: ModelBinding | None = None
     name: str
     package: str
     qualification_reference: str
@@ -1006,6 +1076,7 @@ class RunManifest(BaseModel):
     plan_hash: str | None = None
     plan_version_id: UUID | None = None
     profile: ExecutionProfile
+    resolved_model: ResolvedModel | None = None
     source: RunSource | None = None
 
 
@@ -1028,6 +1099,14 @@ class AttemptResponse(BaseModel):
     recovery_events: list[RecoveryEvent] | None = None
     state: JobState
     usage: list[ModelUsage]
+
+
+class AuthoringModelEnvelope(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    model: ResolvedModel
+    request: AuthoringModelRequest
 
 
 class AuthoringModelResponse(BaseModel):
@@ -1151,6 +1230,7 @@ class PhoneSession(BaseModel):
     message: str
     profile: ExecutionProfile
     protocol_version: Annotated[int, Field(ge=0)] = 0
+    resolved_model: ResolvedModel | None = None
     revision: Annotated[int, Field(ge=0)] = 0
     state: PhoneState
     tasks: list[PhoneTask]
@@ -1177,16 +1257,19 @@ class WorkerContracts(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    authoring_request: AuthoringModelRequest
+    authoring_request: AuthoringModelEnvelope
     authoring_response: AuthoringModelResponse
     discovery_call: DiscoveryCall
     discovery_drafts: DiscoveryDraftBatch
     discovery_reply: DiscoveryReply
     execution: ExecutionContracts
+    model_definition: ModelDefinition
     phone_claim: PhoneClaimResponse
     phone_claim_request: PhoneClaimRequest
     phone_update: PhoneUpdate
     probe: ContractProbe
     qualification: QualificationContracts
     request: FakeExecutionRequest
+    resolved_model: ResolvedModel
     result: FakeExecutionResult
+    worker_model_capabilities: WorkerModelCapabilities

@@ -71,9 +71,13 @@ def main() -> int:
     local.add_argument("--profile", type=Path, required=True)
     local.add_argument("--scenario", choices=["good", "broken", "unavailable"], default="good")
     local.add_argument(
-        "--agent", action="store_true", help="Use Minitap; requires --model and Doppler"
+        "--agent", action="store_true", help="Use Minitap; requires --resolved-model and Doppler"
     )
-    local.add_argument("--model", help="Explicit OpenAI model for this agent attempt")
+    local.add_argument(
+        "--resolved-model",
+        type=Path,
+        help="Safe ResolvedModel JSON exported by the API execution task",
+    )
     local.add_argument("--headless", action="store_true")
     child = commands.add_parser("_sdk-run", help=argparse.SUPPRESS)
     child.add_argument("--request", type=Path, required=True)

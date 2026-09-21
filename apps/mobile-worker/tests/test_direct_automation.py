@@ -132,7 +132,16 @@ def test_sequence_dispatches_only_explicit_ai_steps(monkeypatch, tmp_path):
     updates = []
     connection = SimpleNamespace(
         stopped=threading.Event(),
-        session=SimpleNamespace(profile=SimpleNamespace(package=PACKAGE)),
+        session=SimpleNamespace(
+            profile=SimpleNamespace(package=PACKAGE),
+            resolved_model={
+                "reference": {"key": "approved", "revision": 1},
+                "display_name": "Approved",
+                "provider": "open_ai",
+                "provider_model": "provider-model",
+                "capabilities": ["minitap_navigation"],
+            },
+        ),
         update=lambda **kw: updates.append(kw["task"].model_copy(deep=True)),
     )
     task = PhoneTask.model_validate(

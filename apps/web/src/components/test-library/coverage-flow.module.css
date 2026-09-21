@@ -1,0 +1,324 @@
+.surface {
+  overflow: hidden;
+  border-color: var(--flow-border);
+  background: var(--flow-surface);
+  box-shadow: 0 18px 48px var(--flow-shadow);
+}
+.surfaceHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.35rem 0.9rem;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  background: var(--flow-header);
+}
+.surfaceActions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 0.55rem;
+  align-items: flex-end;
+}
+.kicker,
+.eyebrow {
+  color: var(--flow-eyebrow);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.legend {
+  display: flex;
+  min-height: 2.4rem;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  align-items: center;
+  padding: 0.55rem 1.35rem;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-white);
+}
+.canvas {
+  width: 100%;
+  background: var(--flow-canvas);
+}
+.canvasEditor {
+  position: relative;
+  z-index: 5;
+  padding: 0.75rem 1.35rem;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  background: color-mix(in srgb, var(--flow-canvas) 86%, white);
+}
+.canvasEditor > div {
+  max-width: 560px;
+}
+.flowViewport {
+  position: relative;
+  width: 100%;
+  min-height: 360px;
+}
+.node {
+  position: relative;
+  width: 250px;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--flow-border);
+  border-radius: var(--mantine-radius-lg);
+  background: var(--mantine-color-white);
+  color: var(--mantine-color-text);
+  font: inherit;
+  text-align: left;
+  box-shadow: 0 8px 18px var(--flow-node-shadow);
+}
+.node :global(.react-flow__handle),
+.groupBand :global(.react-flow__handle) {
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--flow-canvas);
+  background: var(--flow-handle);
+}
+.rootNode {
+  width: 260px;
+  min-height: 126px;
+  padding: 1.1rem 1rem 1rem;
+  border-color: var(--mantine-color-forest-7);
+  background: var(--workspace-nav);
+  color: var(--workspace-nav-text);
+  box-shadow: 0 14px 32px var(--flow-root-shadow);
+}
+.rootNode :global(.react-flow__handle) {
+  border-color: var(--workspace-nav);
+  background: var(--workspace-accent);
+}
+.rootNode .eyebrow {
+  color: var(--flow-root-muted);
+}
+.rootNode .status {
+  color: var(--workspace-nav-text);
+}
+.rootGlyph {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  margin-bottom: 0.7rem;
+  place-items: center;
+  border-radius: var(--mantine-radius-md);
+  background: var(--workspace-accent);
+  color: var(--workspace-nav);
+}
+.rootTitle {
+  display: -webkit-box;
+  margin-top: 0.2rem;
+  overflow: hidden;
+  font-size: 1.08rem;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.rootMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.85rem;
+  align-items: center;
+  margin-top: 0.75rem;
+  color: var(--flow-root-muted);
+  font-size: 0.72rem;
+}
+.groupNode {
+  width: 270px;
+  border-left: 4px solid var(--flow-rail-strong);
+  background: var(--flow-group);
+}
+.groupBand {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--flow-border);
+  border-radius: calc(var(--mantine-radius-lg) + 2px);
+  background: var(--flow-group);
+  box-shadow: inset 4px 0 0 var(--flow-rail-strong);
+}
+.groupHeader {
+  position: absolute;
+  top: 1rem;
+  left: 1.1rem;
+  width: 260px;
+  padding-right: 0.8rem;
+}
+.groupRail {
+  position: absolute;
+  top: 3rem;
+  bottom: 1.5rem;
+  left: 304px;
+  width: 2px;
+  background: var(--flow-rail);
+}
+.caseWrap {
+  position: relative;
+  padding-left: 22px;
+}
+.caseWrap > .sequenceHandle {
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--flow-canvas);
+  background: var(--flow-rail-strong);
+}
+.caseNode {
+  width: 310px;
+  min-height: 84px;
+}
+.ordinal {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 7px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 3px solid var(--flow-canvas);
+  border-radius: 50%;
+  background: var(--mantine-color-forest-7);
+  color: var(--mantine-color-white);
+  font-size: 0.73rem;
+  font-weight: 700;
+  box-shadow: 0 2px 8px var(--flow-root-shadow);
+}
+.nodeHeader,
+.nodeMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.nodeHeader {
+  justify-content: space-between;
+}
+.nodeTitle {
+  display: -webkit-box;
+  margin-top: 0.28rem;
+  overflow: hidden;
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.nodeMeta {
+  flex-wrap: wrap;
+  margin-top: 0.55rem;
+  color: var(--mantine-color-dimmed);
+  font-size: 0.68rem;
+}
+.version,
+.required,
+.optional {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 650;
+}
+.version {
+  padding: 0.1rem 0.38rem;
+  background: var(--mantine-color-forest-1);
+  color: var(--mantine-color-forest-7);
+}
+.required {
+  color: var(--mantine-color-forest-7);
+}
+.optional {
+  color: var(--mantine-color-dimmed);
+}
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.24rem;
+  color: var(--flow-status-neutral);
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+.status[data-status='passed'],
+.status[data-status='ready'] {
+  color: var(--flow-status-success);
+}
+.status[data-status='running'] {
+  color: var(--flow-status-running);
+}
+.status[data-status='failed'],
+.status[data-status='missing'] {
+  color: var(--flow-status-danger);
+}
+.status[data-status='blocked'],
+.status[data-status='needs_setup'],
+.status[data-status='recovery'] {
+  color: var(--flow-status-warning);
+}
+.actionNode {
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+.actionNode:hover {
+  transform: translateY(-1px);
+  border-color: var(--mantine-color-forest-5);
+  box-shadow: 0 10px 22px var(--flow-root-shadow);
+}
+.actionNode:focus-visible,
+:global(.react-flow__node:focus-visible) .node,
+:global(.react-flow__node:focus-visible) .groupBand {
+  outline: 3px solid var(--mantine-color-forest-3);
+  outline-offset: 3px;
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 48em) {
+  .surfaceHeader {
+    display: grid;
+  }
+  .surfaceActions {
+    align-items: flex-start;
+  }
+  .verticalNode.caseNode {
+    width: 274px;
+    min-height: 92px;
+  }
+  .verticalNode.rootNode {
+    width: 270px;
+  }
+  .verticalBand {
+    box-shadow: inset 0 4px 0 var(--flow-rail-strong);
+  }
+  .verticalBand .groupHeader {
+    top: 0.85rem;
+    left: 1rem;
+    width: 286px;
+    padding: 0;
+  }
+  .verticalBand .groupRail {
+    top: 76px;
+    right: 1.25rem;
+    bottom: 1rem;
+    left: 28px;
+    width: 2px;
+  }
+  .canvasEditor {
+    padding: 0.75rem 1rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .actionNode {
+    transition: none;
+  }
+  .spin {
+    animation: none;
+  }
+}

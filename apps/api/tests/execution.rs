@@ -62,7 +62,7 @@ async fn prepared(
         adapter: "demo_persistence_v1".into(),
         device_identity: Uuid::new_v4().to_string(),
         image: "synthetic".into(),
-        model: "none".into(),
+        model: None,
         qualified: true,
         qualification_reference: "synthetic-fixture-only".into(),
         max_apk_bytes: 262144000,
@@ -206,6 +206,7 @@ async fn route_manifest_idempotency_and_worker_fencing() {
                 version: 1,
                 claim_id: cid,
                 profile_id: w.profile_id,
+                model_capabilities: None,
             })
             .await;
         response.assert_status_ok();
@@ -218,6 +219,7 @@ async fn route_manifest_idempotency_and_worker_fencing() {
                 version: 1,
                 claim_id: Uuid::new_v4(),
                 profile_id: w.profile_id,
+                model_capabilities: None,
             },
         )
         .await
@@ -230,6 +232,7 @@ async fn route_manifest_idempotency_and_worker_fencing() {
                 version: 1,
                 claim_id: cid,
                 profile_id: w.profile_id,
+                model_capabilities: None,
             },
         )
         .await
@@ -384,7 +387,8 @@ async fn real_database_competing_claims_and_immutable_definition_boundaries() {
                 ClaimRequest {
                     version: 1,
                     claim_id: Uuid::new_v4(),
-                    profile_id: w.profile_id
+                    profile_id: w.profile_id,
+                    model_capabilities: None,
                 }
             ),
             scheduler::claim(
@@ -393,7 +397,8 @@ async fn real_database_competing_claims_and_immutable_definition_boundaries() {
                 ClaimRequest {
                     version: 1,
                     claim_id: Uuid::new_v4(),
-                    profile_id: w.profile_id
+                    profile_id: w.profile_id,
+                    model_capabilities: None,
                 }
             )
         );
@@ -476,7 +481,7 @@ async fn evidence_http_roundtrip_pass_failure_and_blocked() {
  let owner=login(&server,&ctx).await;let(app,build,plan,w,token)=prepared(&server,&ctx,&owner).await;
  for (scenario,expected) in [("pass",Outcome::Passed),("fail",Outcome::Failed),("blocked",Outcome::Blocked)]{
  let(run,_)=runs::create(&ctx,owner.user,app,scenario,CreateRunRequest{build_id:build,plan_version_id:plan,environment_revision:1}).await.unwrap();
- let lease=scheduler::claim(&ctx,&w,ClaimRequest{version:1,claim_id:Uuid::new_v4(),profile_id:w.profile_id}).await.unwrap().lease.unwrap();
+ let lease=scheduler::claim(&ctx,&w,ClaimRequest{version:1,claim_id:Uuid::new_v4(),profile_id:w.profile_id,model_capabilities:None}).await.unwrap().lease.unwrap();
  let prefix=format!("/api/worker/attempts/{}",lease.attempt_id);let mut artifact_id=Uuid::nil();
  for cp in ["created","reopened"]{
  let task=format!("qa-{}",lease.attempt_id);let marker=if scenario=="blocked"{"prerequisite_unavailable"}else{"ready_marker"};
@@ -513,6 +518,7 @@ async fn long_poll_wakes_on_committed_run_and_times_out_without_reserving() {
             version: 1,
             claim_id: Uuid::new_v4(),
             profile_id: worker.profile_id,
+            model_capabilities: None,
         };
         let start = tokio::time::Instant::now();
         let idle =
@@ -585,6 +591,7 @@ async fn long_poll_rechecks_revocation_after_waking() {
                 version: 1,
                 claim_id: Uuid::new_v4(),
                 profile_id: worker.profile_id,
+                model_capabilities: None,
             },
             Duration::from_secs(2),
         );
@@ -613,7 +620,7 @@ async fn clean_start_route_is_fenced_and_recovery_keeps_original_evidence() {
         let owner=login(&server,&ctx).await;
         let(app,build,_,_,_)=prepared(&server,&ctx,&owner).await;
         // The APK is a synthetic fixture; this exercises generic admission, not real-app qualification.
-        let mut p=ExecutionProfile {execution_context:None,id:Uuid::new_v4(),name:"Direct fixture".into(),driver:Driver::Direct,package:"ai.mobileqa.demo".into(),adapter:"android_direct_v1".into(),device_identity:Uuid::new_v4().to_string(),image:"system-images;android-35;google_apis;x86_64".into(),model:String::new(),qualified:true,qualification_reference:"synthetic local-state qualification".into(),max_apk_bytes:104857600};
+        let mut p=ExecutionProfile {execution_context:None,id:Uuid::new_v4(),name:"Direct fixture".into(),driver:Driver::Direct,package:"ai.mobileqa.demo".into(),adapter:"android_direct_v1".into(),device_identity:Uuid::new_v4().to_string(),image:"system-images;android-35;google_apis;x86_64".into(),model:None,qualified:true,qualification_reference:"synthetic local-state qualification".into(),max_apk_bytes:104857600};
         let start=ExpectedCheck {id:"empty".into(),checkpoint_id:"preflight".into(),description:"Input empty".into(),method:CheckMethod::UiPropertyEqualsV1,resource_id:"ai.mobileqa.demo:id/task_input".into(),text_filter:String::new(),property:UiProperty::Text,expected:String::new(),ready_resource_id:"ai.mobileqa.demo:id/task_input".into(),prerequisite_check_ids:vec![],required:true,observation_seconds:1};
         p.execution_context=Some(ExecutionContextV1 {schema_version:1,adapter_revision:p.adapter.clone(),verifier_revision:"ui_v1".into(),worker_runtime_revision:"direct_v1".into(),reset_policy_hash:"a".repeat(64),qualified_profile_id:p.id,package:p.package.clone(),launch_component:"ai.mobileqa.demo/.MainActivity".into(),image:p.image.clone(),abi:"x86_64".into(),width:1080,height:1920,density:420,locale:"en-US".into(),timezone:"Etc/UTC".into(),state_scope:"local_only".into(),qualification_reference:p.qualification_reference.clone(),starting_checks:vec![start],stages:StageBudgets{boot_seconds:60,install_seconds:60,start_seconds:30,cleanup_seconds:60}});
         defs::register_profile(&ctx,owner.user,app,p.clone()).await.unwrap();
@@ -625,8 +632,8 @@ async fn clean_start_route_is_fenced_and_recovery_keeps_original_evidence() {
         let w=worker_auth::Worker{id:Uuid::new_v4(),app_id:app,profile_id:p.id};let token=loco_rs::hash::random_string(64);
         worker_auth::register(&ctx,owner.user,app,w.id,p.id,&token).await.unwrap();
         let(run,_)=runs::create(&ctx,owner.user,app,"clean",CreateRunRequest{build_id:build,plan_version_id:plan.id,environment_revision:1}).await.unwrap();
-        for version in [1,2] {assert!(scheduler::claim(&ctx,&w,ClaimRequest{version,claim_id:Uuid::new_v4(),profile_id:p.id}).await.unwrap().lease.is_none());}
-        let lease=scheduler::claim(&ctx,&w,ClaimRequest{version:3,claim_id:Uuid::new_v4(),profile_id:p.id}).await.unwrap().lease.unwrap();
+        for version in [1,2] {assert!(scheduler::claim(&ctx,&w,ClaimRequest{version,claim_id:Uuid::new_v4(),profile_id:p.id,model_capabilities:None}).await.unwrap().lease.is_none());}
+        let lease=scheduler::claim(&ctx,&w,ClaimRequest{version:3,claim_id:Uuid::new_v4(),profile_id:p.id,model_capabilities:None}).await.unwrap().lease.unwrap();
         let prefix=format!("/api/worker/attempts/{}",lease.attempt_id);
         let event=EventRequest{generation:lease.generation,events:vec![ExecutionEvent{id:Uuid::new_v4(),sequence:1,action_id:"create".into(),phase:"started".into(),message:"Starting".into()}]};
         error(&server.post(&format!("{prefix}/events")).add_header("authorization",format!("Bearer {token}")).add_header("x-lease-token",&lease.lease_token).json(&event).await,409);
@@ -736,7 +743,8 @@ async fn saved_case_routes_pin_inputs_retry_once_and_use_protocol_four() {
                 ClaimRequest {
                     version,
                     claim_id: Uuid::new_v4(),
-                    profile_id: worker.profile_id
+                    profile_id: worker.profile_id,
+                    model_capabilities: None,
                 }
             )
             .await
@@ -748,6 +756,7 @@ async fn saved_case_routes_pin_inputs_retry_once_and_use_protocol_four() {
             version: 4,
             claim_id: Uuid::new_v4(),
             profile_id: worker.profile_id,
+            model_capabilities: None,
         };
         assert_eq!(
             scheduler::claim(&ctx, &worker, claim.clone())
@@ -788,6 +797,91 @@ async fn saved_case_routes_pin_inputs_retry_once_and_use_protocol_four() {
             .comparison
             .is_none());
         runs::cancel(&ctx, owner.user, first.id).await.unwrap();
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn saved_suite_route_queues_each_numbered_case_in_one_immutable_run() {
+    use mobile_qa_contracts::regression::*;
+    let _guard = DATABASE_BOOT.lock().await;
+    request::<App, _, _>(|server, ctx| async move {
+        let owner = login(&server, &ctx).await;
+        let (app, build, plan, worker, _) = prepared(&server, &ctx, &owner).await;
+        let TestDefinition::Plan(plan_definition) =
+            defs::get(&ctx.db, app, plan).await.unwrap().definition
+        else {
+            panic!("fixture plan expected")
+        };
+        let first_case = plan_definition.cases[0].case_version_id;
+        let TestDefinition::Case(mut second_definition) = definition() else {
+            panic!("fixture case expected")
+        };
+        second_definition.key = "second-saved-step".into();
+        second_definition.title = "Second saved step".into();
+        let second_case =
+            saved_definition(&ctx, &owner, app, TestDefinition::Case(second_definition)).await;
+        let suite = saved_definition(
+            &ctx,
+            &owner,
+            app,
+            TestDefinition::Suite(SuiteDefinition {
+                key: "ordered-suite".into(),
+                version: 1,
+                title: "Ordered suite".into(),
+                cases: vec![
+                    CaseSelection {
+                        case_version_id: first_case,
+                        data_variant: "default".into(),
+                        required: true,
+                    },
+                    CaseSelection {
+                        case_version_id: second_case.id,
+                        data_variant: "default".into(),
+                        required: true,
+                    },
+                ],
+            }),
+        )
+        .await;
+        let body = SuiteRunRequest {
+            suite_version_id: suite.id,
+            build_id: build,
+            profile_id: worker.profile_id,
+            environment_revision: 1,
+        };
+        let path = format!("/api/apps/{app}/suite-runs");
+        let preview = owner
+            .write(server.post(&format!("{path}/preview")))
+            .json(&body)
+            .await;
+        preview.assert_status_ok();
+        assert!(preview.json::<SuiteRunPreview>().blockers.is_empty());
+        let response = owner
+            .write(server.post(&path))
+            .add_header("idempotency-key", "suite-run")
+            .json(&body)
+            .await;
+        response.assert_status(axum::http::StatusCode::CREATED);
+        let run = response.json::<RunResponse>();
+        assert_eq!(
+            run.manifest.source,
+            Some(RunSource::SavedSuiteV1 {
+                suite_version_id: suite.id
+            })
+        );
+        assert!(run.manifest.plan_version_id.is_none());
+        assert_eq!(run.manifest.cases.len(), 2);
+        assert_eq!(run.attempts.len(), 2);
+        assert_eq!(run.attempts[0].case_version_id, first_case);
+        assert_eq!(run.attempts[1].case_version_id, second_case.id);
+        let retry = owner
+            .write(server.post(&path))
+            .add_header("idempotency-key", "suite-run")
+            .json(&body)
+            .await;
+        retry.assert_status_ok();
+        assert_eq!(retry.json::<RunResponse>().id, run.id);
     })
     .await;
 }

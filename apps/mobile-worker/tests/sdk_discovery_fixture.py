@@ -13,10 +13,20 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
+from mobile_qa_worker.generated.models import ResolvedModel
 from mobile_qa_worker.qualification.sdk_adapter import prepare_environment
 
 os.environ["OPENAI_API_KEY"] = "synthetic-offline-no-network"
-prepare_environment(Path(sys.argv[1]))
+resolved = ResolvedModel.model_validate(
+    {
+        "reference": {"key": "offline", "revision": 1},
+        "display_name": "Offline",
+        "provider": "open_ai",
+        "provider_model": "offline",
+        "capabilities": ["minitap_navigation"],
+    }
+)
+prepare_environment(resolved, Path(sys.argv[1]))
 
 
 def deny_network(*args, **kwargs):
@@ -187,7 +197,8 @@ class Broker:
 async def main():
     agent = configure_agent(
         Broker(),
-        SimpleNamespace(model="offline"),
+        SimpleNamespace(max_steps=30),
+        resolved,
         "ai.mobileqa.demo",
         model_factory=lambda **kw: ScriptedModel(callbacks=kw["callbacks"]),
     )

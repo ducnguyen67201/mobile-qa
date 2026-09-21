@@ -324,6 +324,14 @@ def serve(
     state = state.resolve()
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
     client = Client(origin, os.environ.get("MOBILE_QA_WORKER_TOKEN", ""))
+    host_profile = None
+    if profile is not None:
+        from mobile_qa_worker.qualification.config import Profile
+
+        host_profile = Profile.load(profile)
+    from mobile_qa_worker.model_runtime import worker_capabilities
+
+    capabilities = worker_capabilities(host_profile).model_dump(mode="json")
     journal = state / "execution.json"
     with host_lock(state):
         if journal.exists() and read(journal).get("state") == "active":
@@ -335,7 +343,12 @@ def serve(
             try:
                 response = client.send(
                     "/api/worker/claims",
-                    {"version": 4, "claim_id": claim_id, "profile_id": str(profile_id)},
+                    {
+                        "version": 5,
+                        "claim_id": claim_id,
+                        "profile_id": str(profile_id),
+                        "model_capabilities": capabilities,
+                    },
                     ClaimResponse,
                 )
             except TransportError as exc:

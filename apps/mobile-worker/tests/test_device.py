@@ -13,7 +13,12 @@ from mobile_qa_worker.qualification.process import command, host_lock, stop_grou
 
 
 def profile(tmp_path):
-    return Profile(tmp_path / "sdk", tmp_path / "state", "demo-model", tmp_path / "lock.json")
+    return Profile(
+        tmp_path / "sdk",
+        tmp_path / "state",
+        None,
+        tmp_path / "lock.json",
+    )
 
 
 def test_environment_excludes_server_secrets(tmp_path, monkeypatch):

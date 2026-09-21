@@ -41,7 +41,11 @@ export function RunResult({ run, compact = false }: { run: RunResponse; compact?
         </Group>
         <Text size="xs" c="dimmed">
           {new Date(run.created_at).toLocaleString()} ·{' '}
-          {run.manifest.source?.kind === 'saved_case_v1' ? 'Saved test' : 'Release plan'}
+          {run.manifest.source?.kind === 'saved_case_v1'
+            ? 'Saved test'
+            : run.manifest.source?.kind === 'saved_suite_v1'
+              ? 'Saved suite'
+              : 'Release plan'}
           {run.manifest.profile.driver === 'fake' ? ' · Simulated' : ''}
         </Text>
         {!run.comparison && (

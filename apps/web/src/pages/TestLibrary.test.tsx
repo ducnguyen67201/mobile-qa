@@ -359,10 +359,10 @@ it('changes a pinned case version only when the author explicitly chooses the ne
     }),
   )
   show(`/tests/${appId}/${entryId}`)
-  expect(await screen.findByText(`${libraryCase.title} · v1`)).toBeInTheDocument()
+  expect(await screen.findByText(`Step 1 · ${libraryCase.title} · v1`)).toBeInTheDocument()
   expect(requests).toHaveLength(0)
   await userEvent.click(screen.getByRole('button', { name: 'Use newer saved v2' }))
-  expect(screen.getByText(`${libraryCase.title} · v2`)).toBeInTheDocument()
+  expect(screen.getByText(`Step 1 · ${libraryCase.title} · v2`)).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Save' }))
   await waitFor(() => expect(requests).toHaveLength(1))
   expect(requests[0]).toMatchObject({

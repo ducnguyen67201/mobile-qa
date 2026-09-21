@@ -13,6 +13,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 from xml.etree import ElementTree
 
+from mobile_qa_worker.generated.models import ResolvedModel
 from mobile_qa_worker.qualification.campaign import accepted, backend
 from mobile_qa_worker.qualification.config import (
     ACTIVITY,
@@ -84,19 +85,32 @@ def write_profile(path: Path, profile: Profile) -> None:
     """Persist nonsecret settings only; refuse replacement of an existing run profile."""
     with path.open("x") as stream:
         path.chmod(0o600)
-        for key, value in asdict(profile).items():
+        values = asdict(profile)
+        values.pop("model_ref")
+        model_ref = profile.model_ref.model_dump(mode="json") if profile.model_ref else None
+        for key, value in values.items():
             stream.write(
                 f"{key} = {json.dumps(str(value) if isinstance(value, Path) else value)}\n"
             )
+        if model_ref is not None:
+            stream.write("\n[model_ref]\n")
+            stream.write(f"key = {json.dumps(model_ref['key'])}\n")
+            stream.write(f"revision = {model_ref['revision']}\n")
 
 
 def run_local(args: argparse.Namespace) -> int:
-    if bool(args.agent) != bool(args.model):
-        raise QualificationError("agent_requires_explicit_model_and_agent_flag")
+    if bool(args.agent) != bool(args.resolved_model):
+        raise QualificationError("agent_requires_resolved_model_document")
+    resolved_model = None
+    if args.resolved_model:
+        path = Path(args.resolved_model).resolve()
+        if not path.is_file() or path.stat().st_size > 1048576:
+            raise QualificationError("invalid_resolved_model_document")
+        resolved_model = ResolvedModel.model_validate_json(path.read_bytes(), strict=True)
     profile = Profile.load(Path(args.profile).resolve())
     profile = replace(
         profile,
-        model=args.model if args.agent else "no-model-adb-demo",
+        model_ref=resolved_model.reference if resolved_model else None,
         headless=args.headless or profile.headless,
     )
     # Fail before booting or fetching any secret when setup/build is missing.
@@ -123,6 +137,9 @@ def run_local(args: argparse.Namespace) -> int:
                 "serial": SERIAL,
                 "profile_path": str(profile_path),
                 "output_root": str(output),
+                "resolved_model": (
+                    resolved_model.model_dump(mode="json") if resolved_model else None
+                ),
             }
         )
     )

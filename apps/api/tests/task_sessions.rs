@@ -1,17 +1,18 @@
 //! Actual HTTP and PostgreSQL session lifecycle; worker responses are synthetic.
 mod support;
-use mobile_qa::services::{execution_store::*, test_definitions, worker_auth};
+use mobile_qa::services::{execution_store::*, model_registry, test_definitions, worker_auth};
+use mobile_qa_contracts::model_registry::*;
 use mobile_qa_contracts::{automation::*, execution::*, task_sessions::*, test_library::*};
 use support::*;
 
 #[tokio::test]
 async fn task_session_requires_no_plan_and_fences_worker_and_task_identity() {
-    assert_session_protocol(3).await;
+    assert_session_protocol(5).await;
 }
 
 #[tokio::test]
 async fn protocol_four_runs_direct_commands_and_ai_discovery() {
-    assert_session_protocol(4).await;
+    assert_session_protocol(5).await;
 }
 
 async fn assert_session_protocol(protocol_version: u32) {
@@ -34,6 +35,18 @@ async fn assert_session_protocol(protocol_version: u32) {
             )))
             .await
             .assert_status_ok();
+        let model = ModelDefinition {
+            reference: ModelReference { key: "synthetic.test".into(), revision: 1 },
+            display_name: "Synthetic test model".into(),
+            provider: ModelProvider::OpenAi,
+            provider_model: "test-model".into(),
+            capabilities: vec![ModelCapability::MinitapNavigation, ModelCapability::StructuredAuthoring],
+        };
+        model_registry::register(&ctx.db, &model).await.unwrap();
+        let capabilities = WorkerModelCapabilities {
+            model: Some(model.reference.clone()),
+            providers: vec![ModelProvider::OpenAi],
+        };
         let profile = ExecutionProfile {
         execution_context: None,
             id: Uuid::new_v4(),
@@ -43,7 +56,7 @@ async fn assert_session_protocol(protocol_version: u32) {
             adapter: "demo_persistence_v1".into(),
             device_identity: Uuid::new_v4().to_string(),
             image: "test".into(),
-            model: "test-model".into(),
+            model: Some(ModelBinding::Registered(model.reference.clone())),
             qualified: true,
             qualification_reference: "synthetic-not-device-evidence".into(),
             max_apk_bytes: 104857600,
@@ -89,8 +102,9 @@ async fn assert_session_protocol(protocol_version: u32) {
             .post("/api/worker/phone-claims")
             .add_header("authorization", format!("Bearer {token}"))
             .json(&PhoneClaimRequest {
-                protocol_version: 0,
+                protocol_version: 5,
                 claim_id: Uuid::new_v4(),
+                model_capabilities: Some(capabilities.clone()),
             })
             .await;
         claim.assert_status_ok();
@@ -237,8 +251,9 @@ async fn assert_session_protocol(protocol_version: u32) {
             .post("/api/worker/phone-claims")
             .add_header("authorization", format!("Bearer {token}"))
             .json(&PhoneClaimRequest {
-                protocol_version: 2,
+                protocol_version: 5,
                 claim_id: Uuid::new_v4(),
+                model_capabilities: Some(capabilities.clone()),
             })
             .await
             .json::<PhoneClaimResponse>()
@@ -294,6 +309,7 @@ async fn assert_session_protocol(protocol_version: u32) {
             .json(&PhoneClaimRequest {
                 protocol_version,
                 claim_id: Uuid::new_v4(),
+                model_capabilities: Some(capabilities.clone()),
             })
             .await;
         claimed.assert_status_ok();

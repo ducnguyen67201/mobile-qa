@@ -5,6 +5,15 @@ Depends on: 04–05, existing phase 06 sessions and a qualified Android executio
 Owns: Rust command/generation services and contracts, Python device execution and bounded
 AI authoring, React test creation and the shared phone workspace.
 
+## Shared model runtime
+
+The API freezes model capabilities in each phone session. Navigate requires
+`minitap_navigation`; proposal drafting additionally requires `structured_authoring`. The worker's
+single `model_runtime.py` boundary translates providers, allowlists credentials, constructs
+LangChain/Minitap models and attaches registered usage identity. Host TOML supplies only the
+qualified `model_ref` and Doppler scope. Protocol 5 advertises that reference before leasing; no
+browser picker or automatic provider fallback is introduced.
+
 ## Current behavior and next deliverable
 
 Ordinary actions now use a shared Python direct executor. Minitap runs only explicit

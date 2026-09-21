@@ -1,5 +1,5 @@
 //! Short PostgreSQL leases plus persistent reservations; never replay device effects on expiry.
-use super::{execution_store::*, runs, test_definitions, worker_auth::Worker};
+use super::{execution_store::*, model_registry, runs, test_definitions, worker_auth::Worker};
 use crate::errors::{ApiFailure, ApiResult};
 use chrono::{DateTime, Utc};
 use loco_rs::app::AppContext;
@@ -115,7 +115,7 @@ pub async fn claim(
     worker: &Worker,
     input: ClaimRequest,
 ) -> ApiResult<ClaimResponse> {
-    if ![1, 2, 3, 4].contains(&input.version) || input.profile_id != worker.profile_id {
+    if ![1, 2, 3, 4, 5].contains(&input.version) || input.profile_id != worker.profile_id {
         return Err(conflict("Unsupported protocol or worker profile"));
     }
     reconcile(ctx).await?;
@@ -127,6 +127,12 @@ pub async fn claim(
     )
     .await?;
     let profile = test_definitions::profile(&tx, worker.app_id, worker.profile_id).await?;
+    exec(
+        &tx,
+        "UPDATE execution_workers SET model_capabilities=$2,model_last_seen_at=now() WHERE id=$1",
+        vec![worker.id.into(), json(&input.model_capabilities)?.into()],
+    )
+    .await?;
     if profile.execution_context.is_some() && input.version < 3 {
         return Ok(ClaimResponse {
             lease: None,
@@ -134,13 +140,6 @@ pub async fn claim(
         });
     }
     profile.validate().map_err(ApiFailure::invalid)?;
-    // The advisory lock serializes shared physical identity even across app-scoped workers.
-    rows(
-        &tx,
-        "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
-        vec![profile.device_identity.clone().into()],
-    )
-    .await?;
     let prior = rows(
         &tx,
         "SELECT a.id,a.state,r.manifest FROM execution_attempts a JOIN execution_runs r ON r.id=a.run_id WHERE a.worker_id=$1 AND a.claim_id=$2",
@@ -181,7 +180,7 @@ pub async fn claim(
         }
         let jobs = rows(
             &tx,
-            "SELECT a.id FROM execution_attempts a JOIN execution_runs r ON r.id=a.run_id WHERE \
+            "SELECT a.id,r.manifest FROM execution_attempts a JOIN execution_runs r ON r.id=a.run_id WHERE \
             r.app_id=$1 AND a.state='queued' AND r.cancel_requested=false AND \
             r.manifest->'profile'->>'id'=$2 AND ($4 OR NOT (r.manifest ? 'source')) AND ($3 OR NOT jsonb_path_exists(r.manifest, '$.cases[*].case.actions[*] ? (@.kind == \"direct\")')) ORDER BY r.created_at,a.case_index,a.number FOR \
             UPDATE OF a SKIP LOCKED LIMIT 1",
@@ -194,6 +193,25 @@ pub async fn claim(
                 poll_after_seconds: 5,
             });
         };
+        let manifest: RunManifest = decode(field(r, "manifest")?)?;
+        if let Some(resolved) = manifest.resolved_model.as_ref() {
+            if input.version < 5
+                || !model_registry::worker_matches(resolved, input.model_capabilities.as_ref())
+            {
+                tracing::warn!(reason_code = "worker_model_reference_mismatch", worker_id=%worker.id, "execution claim left queued");
+                return Ok(ClaimResponse {
+                    lease: None,
+                    poll_after_seconds: 5,
+                });
+            }
+        }
+        // Acquire the physical-device lock only after model admission has passed.
+        rows(
+            &tx,
+            "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+            vec![profile.device_identity.clone().into()],
+        )
+        .await?;
         let id: Uuid = field(r, "id")?;
         for resource in [
             format!("app:{}", worker.app_id),

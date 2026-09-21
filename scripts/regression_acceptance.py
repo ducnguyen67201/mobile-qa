@@ -231,7 +231,6 @@ def main():
                 "adapter": "android_direct_v1",
                 "device_identity": "local-regression-fixture",
                 "image": host.system_image,
-                "model": "",
                 "qualified": True,
                 "qualification_reference": reference,
                 "max_apk_bytes": 104857600,

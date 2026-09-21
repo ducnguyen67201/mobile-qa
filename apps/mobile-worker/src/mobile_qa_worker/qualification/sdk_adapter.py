@@ -6,13 +6,19 @@ import os
 from pathlib import Path
 from typing import cast
 
+from mobile_qa_worker.generated.models import ResolvedModel
+from mobile_qa_worker.model_runtime import (
+    minitap_model,
+    prepare_provider_environment,
+    usage_identity,
+)
 from mobile_qa_worker.qualification.config import Profile, QualificationError, parse_request
 from mobile_qa_worker.qualification.evidence import atomic_json
 from mobile_qa_worker.qualification.sdk_compat import install_tool_runtime_compat
 
 
 class UsageRecorder:
-    def __init__(self, model: str):
+    def __init__(self, model: ResolvedModel):
         self.model = model
         self.calls: dict[str, tuple[int, int] | None] = {}
 
@@ -34,7 +40,7 @@ class UsageRecorder:
         known = [value for value in self.calls.values() if value is not None]
         unknown = len(self.calls) - len(known)
         return {
-            "model": self.model,
+            **usage_identity(self.model),
             "calls": len(self.calls),
             "unknown_calls": unknown,
             "input_tokens": sum(v[0] for v in known) if known else None,
@@ -42,51 +48,33 @@ class UsageRecorder:
         }
 
 
-def prepare_environment(directory: Path) -> None:
-    if directory != directory.resolve() or (directory / ".env").exists():
-        raise QualificationError("unsafe_sdk_directory")
-    key = os.environ.get("OPENAI_API_KEY")
-    if not key:
-        raise QualificationError("model_credentials_unavailable")
-    allowed = {
-        k: v
-        for k, v in os.environ.items()
-        if k in ("PATH", "LANG", "LC_ALL", "VIRTUAL_ENV", "HOME")
-    }
-    temp = directory / "tmp"
-    temp.mkdir(mode=0o700, exist_ok=True)
-    allowed.update(
-        OPENAI_API_KEY=key,
-        MOBILE_USE_TELEMETRY_ENABLED="false",
-        PYTHON_DOTENV_DISABLED="1",
-        TMPDIR=str(temp),
-        TZ="UTC",
-    )
-    os.environ.clear()
-    os.environ.update(allowed)
-    os.chdir(directory)
-    os.umask(0o077)
-    # Bound individual files produced by upstream logging/trace code as well.
-    import resource
-
-    resource.setrlimit(resource.RLIMIT_FSIZE, (16777216, 16777216))
+prepare_environment = prepare_provider_environment
 
 
 async def execute(request_path: Path, result_path: Path) -> None:
     request = parse_request(request_path.read_text())
     profile = Profile.load(Path(request.profile_path))
+    if request.resolved_model is None:
+        raise QualificationError("model_capability_unavailable")
     goal = (
         f"Create exactly one task with the exact text qa-{request.attempt_id}. "
         "Press Save, verify the task is displayed in the list, then stop. "
         "Do not delete tasks, close the app, or change any settings."
     )
     await navigate(
-        profile, request.serial, request.package, str(request.attempt_id), result_path, goal
+        profile,
+        request.resolved_model,
+        request.serial,
+        request.package,
+        str(request.attempt_id),
+        result_path,
+        goal,
     )
 
 
 async def navigate(
     profile: Profile,
+    resolved_model: ResolvedModel,
     serial: str,
     package: str,
     attempt_id: str,
@@ -94,7 +82,7 @@ async def navigate(
     goal: str,
 ) -> None:
     """Shared pinned SDK seam; the caller owns the authorized navigation instruction."""
-    prepare_environment(result_path.parent)
+    prepare_provider_environment(resolved_model, result_path.parent)
     # Keep SDK ADB helpers on the same pinned tools/user state as the supervisor.
     os.environ["PATH"] = (
         str(profile.sdk_root / "platform-tools") + os.pathsep + os.environ.get("PATH", "")
@@ -110,13 +98,13 @@ async def navigate(
     from langchain_core.callbacks import AsyncCallbackHandler
     from langchain_core.messages import AIMessage
     from langchain_core.outputs import ChatGeneration, LLMResult
-    from minitap.mobile_use.config import LLM, LLMConfig, LLMConfigUtils, LLMWithFallback
+    from minitap.mobile_use.config import LLMConfig, LLMConfigUtils
     from minitap.mobile_use.sdk import Agent
     from minitap.mobile_use.sdk.builders.agent_config_builder import AgentConfigBuilder
     from minitap.mobile_use.sdk.types import AgentProfile, DevicePlatform, TaskRequest
 
     install_tool_runtime_compat()
-    recorder = UsageRecorder(profile.model)
+    recorder = UsageRecorder(resolved_model)
 
     class Callbacks(AsyncCallbackHandler):
         async def on_chat_model_start(
@@ -142,11 +130,7 @@ async def navigate(
             except (AttributeError, IndexError, TypeError, ValueError):
                 recorder.start(str(run_id))
 
-    node = LLMWithFallback(
-        provider="openai",
-        model=profile.model,
-        fallback=LLM(provider="openai", model=profile.model),
-    )
+    node = minitap_model(resolved_model)
     llm = LLMConfig(
         planner=node,
         orchestrator=node,

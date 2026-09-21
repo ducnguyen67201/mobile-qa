@@ -2,7 +2,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import * as sdk from './generated/sdk.gen'
 import * as z from './generated/zod.gen'
-import type { CaseRunRequest } from './generated/types.gen'
+import type { CaseRunRequest, SuiteRunRequest } from './generated/types.gen'
 import { checked, headers, options } from './session-transport'
 export const caseRunPreviewQuery = (appId: string, body: CaseRunRequest) =>
   queryOptions({
@@ -26,6 +26,32 @@ export const createCaseRun = (appId: string, body: CaseRunRequest, key: string) 
       path: { app_id: appId },
       headers: { ...headers(), 'Idempotency-Key': key },
       body: z.zCaseRunRequest.parse(body),
+    }),
+    z.zRunResponse,
+    [200, 201],
+  )
+export const suiteRunPreviewQuery = (appId: string, body: SuiteRunRequest) =>
+  queryOptions({
+    queryKey: ['suite-run-preview', appId, body],
+    enabled: !!body.suite_version_id && !!body.build_id && !!body.profile_id,
+    queryFn: () =>
+      checked(
+        sdk.previewSuiteRun({
+          ...options,
+          path: { app_id: appId },
+          headers: headers(),
+          body: z.zSuiteRunRequest.parse(body),
+        }),
+        z.zSuiteRunPreview,
+      ),
+  })
+export const createSuiteRun = (appId: string, body: SuiteRunRequest, key: string) =>
+  checked(
+    sdk.createSuiteRun({
+      ...options,
+      path: { app_id: appId },
+      headers: { ...headers(), 'Idempotency-Key': key },
+      body: z.zSuiteRunRequest.parse(body),
     }),
     z.zRunResponse,
     [200, 201],

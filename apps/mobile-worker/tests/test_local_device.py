@@ -132,10 +132,10 @@ def test_profile_roundtrip_and_strict_host_fields(tmp_path):
         Profile.load(path)
 
 
-@pytest.mark.parametrize("agent,model", [(True, None), (False, "some-model")])
-def test_agent_requires_explicit_choice_before_any_io(agent, model):
+@pytest.mark.parametrize("agent,resolved_model", [(True, None), (False, "model.json")])
+def test_agent_requires_explicit_choice_before_any_io(agent, resolved_model):
     with pytest.raises(QualificationError, match="agent_requires"):
-        local.run_local(argparse.Namespace(agent=agent, model=model))
+        local.run_local(argparse.Namespace(agent=agent, resolved_model=resolved_model))
 
 
 def test_demo_navigation_uses_current_control_bounds():
@@ -189,7 +189,7 @@ def test_local_broken_success_means_expected_failure_and_clean_reset(tmp_path, m
 
     monkeypatch.setattr(local, "run_attempt", attempt)
     args = argparse.Namespace(
-        profile=pp, agent=False, model=None, headless=False, scenario="broken"
+        profile=pp, agent=False, resolved_model=None, headless=False, scenario="broken"
     )
     assert local.run_local(args) == 1
     assert calls == ["adb-demo"]

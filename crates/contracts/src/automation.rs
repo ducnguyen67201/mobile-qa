@@ -281,6 +281,12 @@ pub enum AuthoringModelRequest {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(deny_unknown_fields)]
+pub struct AuthoringModelEnvelope {
+    pub model: crate::model_registry::ResolvedModel,
+    pub request: AuthoringModelRequest,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct AuthoringModelResponse {
     pub decision: Option<DiscoveryDecision>,
     pub batch: Option<ProposalBatch>,

@@ -209,6 +209,7 @@ export type CheckState = 'not_checked' | 'operator_reported_ok' | 'operator_repo
 
 export type ClaimRequest = {
     claim_id: string;
+    model_capabilities?: null | WorkerModelCapabilities;
     profile_id: string;
     version: number;
 };
@@ -442,7 +443,7 @@ export type ExecutionProfile = {
     id: string;
     image: string;
     max_apk_bytes: number;
-    model: string;
+    model?: null | ModelBinding;
     name: string;
     package: string;
     qualification_reference: string;
@@ -626,9 +627,11 @@ export type LibraryProfileChoice = {
     adapter: string;
     driver: Driver;
     id: string;
+    model_available: boolean;
     name: string;
     package: string;
     qualified: boolean;
+    resolved_model?: null | ResolvedModel;
 };
 
 export type LibraryVersionListResponse = {
@@ -658,10 +661,34 @@ export type LogoutResponse = {
 
 export type MembershipRole = 'operator' | 'member';
 
+/**
+ * Historical profiles used a raw provider-model string. Consumers may read that
+ * shape, but API registration rejects it for every new profile.
+ */
+export type ModelBinding = ModelReference | string;
+
+export type ModelCapability = 'minitap_navigation' | 'structured_authoring';
+
+export type ModelDefinition = {
+    capabilities: Array<ModelCapability>;
+    display_name: string;
+    provider: ModelProvider;
+    provider_model: string;
+    reference: ModelReference;
+};
+
+export type ModelProvider = 'open_ai';
+
+export type ModelReference = {
+    key: string;
+    revision: number;
+};
+
 export type ModelUsage = {
     calls: number;
     input_tokens?: number | null;
     model: string;
+    model_reference?: null | ModelReference;
     output_tokens?: number | null;
     unknown_calls: number;
 };
@@ -737,6 +764,7 @@ export type PhoneSession = {
     message: string;
     profile: ExecutionProfile;
     protocol_version?: number;
+    resolved_model?: null | ResolvedModel;
     revision?: number;
     state: PhoneState;
     tasks: Array<PhoneTask>;
@@ -842,6 +870,14 @@ export type ResolvedCase = {
     required: boolean;
 };
 
+export type ResolvedModel = {
+    capabilities: Array<ModelCapability>;
+    display_name: string;
+    provider: ModelProvider;
+    provider_model: string;
+    reference: ModelReference;
+};
+
 export type RunArtifact = {
     attempt_id: string;
     byte_size: number;
@@ -893,6 +929,7 @@ export type RunManifest = {
     plan_hash?: string | null;
     plan_version_id?: string | null;
     profile: ExecutionProfile;
+    resolved_model?: null | ResolvedModel;
     source?: null | RunSource;
 };
 
@@ -911,6 +948,9 @@ export type RunResponse = {
 export type RunSource = {
     case_version_id: string;
     kind: 'saved_case_v1';
+} | {
+    kind: 'saved_suite_v1';
+    suite_version_id: string;
 } | {
     kind: 'release_plan_v1';
     plan_version_id: string;
@@ -993,6 +1033,18 @@ export type SuiteDefinition = {
     version: number;
 };
 
+export type SuiteRunPreview = {
+    blockers: Array<string>;
+    environment_revision: number;
+};
+
+export type SuiteRunRequest = {
+    build_id: string;
+    environment_revision: number;
+    profile_id: string;
+    suite_version_id: string;
+};
+
 export type SwipeDirection = 'up' | 'down' | 'left' | 'right';
 
 export type TestAction = {
@@ -1064,6 +1116,11 @@ export type UserIdentity = {
 };
 
 export type ValidationState = 'validating' | 'validated' | 'invalid' | 'unsupported' | 'error';
+
+export type WorkerModelCapabilities = {
+    model?: null | ModelReference;
+    providers?: Array<ModelProvider>;
+};
 
 export type ListAppsData = {
     body?: never;
@@ -2575,6 +2632,147 @@ export type CreateRunResponses = {
 };
 
 export type CreateRunResponse = CreateRunResponses[keyof CreateRunResponses];
+
+export type CreateSuiteRunData = {
+    body: SuiteRunRequest;
+    headers: {
+        'Idempotency-Key': string;
+    };
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/suite-runs';
+};
+
+export type CreateSuiteRunErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type CreateSuiteRunError = CreateSuiteRunErrors[keyof CreateSuiteRunErrors];
+
+export type CreateSuiteRunResponses = {
+    /**
+     * Idempotent replay
+     */
+    200: RunResponse;
+    /**
+     * Success
+     */
+    201: RunResponse;
+};
+
+export type CreateSuiteRunResponse = CreateSuiteRunResponses[keyof CreateSuiteRunResponses];
+
+export type PreviewSuiteRunData = {
+    body: SuiteRunRequest;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/suite-runs/preview';
+};
+
+export type PreviewSuiteRunErrors = {
+    /**
+     * API error
+     */
+    400: ApiError;
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    403: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    413: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    429: ApiError;
+    /**
+     * API error
+     */
+    500: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type PreviewSuiteRunError = PreviewSuiteRunErrors[keyof PreviewSuiteRunErrors];
+
+export type PreviewSuiteRunResponses = {
+    /**
+     * Success
+     */
+    200: SuiteRunPreview;
+};
+
+export type PreviewSuiteRunResponse = PreviewSuiteRunResponses[keyof PreviewSuiteRunResponses];
 
 export type GenerateTestsData = {
     body: GenerateTestsRequest;

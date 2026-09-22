@@ -216,14 +216,28 @@ pub async fn create(
     key: &str,
     input: CreateRunRequest,
 ) -> ApiResult<(RunResponse, bool)> {
+    create_with_quote(ctx, actor, app, key, input, None).await
+}
+
+pub async fn create_with_quote(
+    ctx: &AppContext,
+    actor: Uuid,
+    app: Uuid,
+    key: &str,
+    input: CreateRunRequest,
+    quote_id: Option<Uuid>,
+) -> ApiResult<(RunResponse, bool)> {
     apps::authorized(ctx, actor, app).await?;
     if !bounded(key, 128) {
         return Err(ApiFailure::invalid(
             "Idempotency-Key must contain 1–128 printable bytes",
         ));
     }
-    let fingerprint =
-        hash(serde_json::to_vec(&(actor, &input)).map_err(|_| ApiFailure::internal())?);
+    let fingerprint = if let Some(id) = quote_id {
+        hash(serde_json::to_vec(&(actor, &input, id)).map_err(|_| ApiFailure::internal())?)
+    } else {
+        hash(serde_json::to_vec(&(actor, &input)).map_err(|_| ApiFailure::internal())?)
+    };
     let tx = ctx.db.begin().await?;
     one(
         &tx,
@@ -274,6 +288,18 @@ pub async fn create(
             fingerprint.into(),
             json(&manifest)?.into(),
         ],
+    )
+    .await?;
+    super::commercial::reserve_or_test_fixture(
+        ctx,
+        &tx,
+        actor,
+        app,
+        quote_id,
+        "release_plan",
+        &super::commercial::plan_hash(actor, &input)?,
+        &manifest,
+        id,
     )
     .await?;
     for (index, _) in manifest.cases.iter().enumerate() {
@@ -633,6 +659,8 @@ pub async fn cancel(ctx: &AppContext, user: Uuid, id: Uuid) -> ApiResult<RunResp
         vec![id.into()],
     )
     .await?;
+    // A run canceled before any worker claim consumed no delivered device check.
+    super::commercial::credit_queued_cancel(&tx, user, id).await?;
     let result = detail(&tx, id).await?;
     tx.commit().await?;
     Ok(result)

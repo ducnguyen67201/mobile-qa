@@ -130,6 +130,72 @@ export const zCleanupRequest = z.object({
 
 export const zCommandPurpose = z.enum(['trial', 'manual']);
 
+export const zCommercialOffer = z.enum(['pilot', 'recurring']);
+
+export const zCommercialAgreementView = z.object({
+    base_cents: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    check_cap: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    check_cents: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    currency: z.string(),
+    ends_at: z.iso.datetime(),
+    first_source_version_id: z.uuid(),
+    id: z.uuid(),
+    offer: zCommercialOffer,
+    price_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    profile_id: z.uuid(),
+    second_source_version_id: z.uuid().nullish(),
+    second_suite_cents: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    starts_at: z.iso.datetime()
+});
+
+export const zCommercialPilotRequest = z.object({
+    coverage_note: z.string()
+});
+
+export const zCommercialPilotResponse = z.object({
+    app_id: z.uuid(),
+    id: z.uuid()
+});
+
+export const zCommercialQuoteResponse = z.object({
+    amount_cents: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    app_id: z.uuid(),
+    build_id: z.uuid(),
+    case_count: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    check_cap: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    checks_after_authorization: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    credits_after_authorization: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish(),
+    currency: z.string(),
+    expires_at: z.iso.datetime(),
+    id: z.uuid(),
+    kind: z.string(),
+    maximum_credits: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish(),
+    profile_id: z.uuid(),
+    source_version_id: z.uuid()
+});
+
+export const zCommercialState = z.enum([
+    'uncontracted',
+    'active',
+    'paused',
+    'expired'
+]);
+
+export const zCommercialUsageState = z.enum([
+    'reserved',
+    'delivered',
+    'credited'
+]);
+
+export const zCommercialUsageView = z.object({
+    amount_cents: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    created_at: z.iso.datetime(),
+    reason: z.string().nullish(),
+    reviewed_at: z.iso.datetime().nullish(),
+    run_id: z.uuid(),
+    state: zCommercialUsageState
+});
+
 export const zComparisonKind = z.enum([
     'regression',
     'still_failing',
@@ -172,6 +238,72 @@ export const zCreateRunRequest = z.object({
 export const zCreateWorkspaceRequest = z.object({
     id: z.uuid(),
     name: z.string().min(1).max(100)
+});
+
+export const zCreditCheckoutResponse = z.object({
+    url: z.string()
+});
+
+export const zCreditPlan = z.enum([
+    'starter',
+    'plus',
+    'business'
+]);
+
+export const zCreditCheckoutRequest = z.object({
+    plan: zCreditPlan
+});
+
+export const zCreditPlanChangeRequest = z.object({
+    plan: zCreditPlan
+});
+
+export const zCreditPlanView = z.object({
+    currency: z.string(),
+    monthly_cents: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    monthly_credits: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    plan: zCreditPlan
+});
+
+export const zCreditUsageView = z.object({
+    charged_credits: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    device_seconds: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish(),
+    held_credits: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    input_tokens: z.string().nullish(),
+    measured_credits: z.string().nullish(),
+    output_tokens: z.string().nullish(),
+    reason: z.string().nullish(),
+    run_id: z.uuid(),
+    state: z.string(),
+    stored_bytes: z.string().nullish()
+});
+
+export const zCreditAccessView = z.object({
+    available_credits: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    charged_credits: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    granted_credits: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    held_credits: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    pending_effective_at: z.iso.datetime().nullish(),
+    pending_plan: zCreditPlan.nullish(),
+    period_end: z.iso.datetime(),
+    period_start: z.iso.datetime(),
+    plan: zCreditPlan,
+    rate_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    usage: z.array(zCreditUsageView)
+});
+
+export const zCommercialAccessResponse = z.object({
+    agreement: zCommercialAgreementView.nullish(),
+    app_id: z.uuid(),
+    credit: zCreditAccessView.nullish(),
+    credited_checks: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    delivered_check_cents: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    delivered_checks: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    pilot_request_id: z.uuid().nullish(),
+    plans: z.array(zCreditPlanView),
+    reserved_checks: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
+    state: zCommercialState,
+    usage: z.array(zCommercialUsageView)
 });
 
 export const zDefaultPlanResponse = z.object({
@@ -767,6 +899,21 @@ export const zSuiteRunRequest = z.object({
     environment_revision: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     profile_id: z.uuid(),
     suite_version_id: z.uuid()
+});
+
+export const zCommercialRunIntent = z.union([
+    z.object({
+        kind: z.enum(['release_plan']),
+        request: zCreateRunRequest
+    }),
+    z.object({
+        kind: z.enum(['saved_suite']),
+        request: zSuiteRunRequest
+    })
+]);
+
+export const zCommercialQuoteRequest = z.object({
+    intent: zCommercialRunIntent
 });
 
 export const zSwipeDirection = z.enum([
@@ -1427,6 +1574,59 @@ export const zPreviewCaseRunPath = z.object({
  */
 export const zPreviewCaseRunResponse = zCaseRunPreview;
 
+export const zGetCommercialAccessPath = z.object({
+    app_id: z.uuid()
+});
+
+/**
+ * Commercial access
+ */
+export const zGetCommercialAccessResponse = zCommercialAccessResponse;
+
+export const zCreateCommercialCheckQuoteBody = zCommercialQuoteRequest;
+
+export const zCreateCommercialCheckQuotePath = z.object({
+    app_id: z.uuid()
+});
+
+/**
+ * Run quote
+ */
+export const zCreateCommercialCheckQuoteResponse = zCommercialQuoteResponse;
+
+export const zRequestCommercialPilotBody = zCommercialPilotRequest;
+
+export const zRequestCommercialPilotPath = z.object({
+    app_id: z.uuid()
+});
+
+/**
+ * Pilot request saved for manual review
+ */
+export const zRequestCommercialPilotResponse = zCommercialPilotResponse;
+
+export const zCreateCreditCheckoutBody = zCreditCheckoutRequest;
+
+export const zCreateCreditCheckoutPath = z.object({
+    app_id: z.uuid()
+});
+
+/**
+ * Hosted payment URL
+ */
+export const zCreateCreditCheckoutResponse = zCreditCheckoutResponse;
+
+export const zChangeCreditPlanBody = zCreditPlanChangeRequest;
+
+export const zChangeCreditPlanPath = z.object({
+    app_id: z.uuid()
+});
+
+/**
+ * Updated plan schedule and current access
+ */
+export const zChangeCreditPlanResponse = zCommercialAccessResponse;
+
 export const zGetDefaultTestPlanPath = z.object({
     app_id: z.uuid()
 });
@@ -1530,7 +1730,8 @@ export const zListRunsResponse = zRunListResponse;
 export const zCreateRunBody = zCreateRunRequest;
 
 export const zCreateRunHeaders = z.object({
-    'Idempotency-Key': z.string()
+    'Idempotency-Key': z.string(),
+    'X-Commercial-Quote-Id': z.uuid().nullish()
 });
 
 export const zCreateRunPath = z.object({
@@ -1545,7 +1746,8 @@ export const zCreateRunResponse = zRunResponse;
 export const zCreateSuiteRunBody = zSuiteRunRequest;
 
 export const zCreateSuiteRunHeaders = z.object({
-    'Idempotency-Key': z.string()
+    'Idempotency-Key': z.string(),
+    'X-Commercial-Quote-Id': z.uuid().nullish()
 });
 
 export const zCreateSuiteRunPath = z.object({

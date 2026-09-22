@@ -22,7 +22,7 @@ export function SavedCaseRun({
   dirty: boolean
   save: () => Promise<LibraryDraftResponse>
 }) {
-  const { workspaceId = '' } = useWorkspace(),
+  const { workspaceId = '', href } = useWorkspace(),
     client = useQueryClient()
   const choices = useQuery(phoneOptionsQuery(appId))
   const [build, setBuild] = useState<string | null>(null),
@@ -107,6 +107,11 @@ export function SavedCaseRun({
       <Card withBorder padding="sm">
         <Stack gap="xs">
           <Text fw={600}>Run saved test</Text>
+          <Alert color="blue">
+            Standalone case execution needs separately agreed operator scope. For a priced check,
+            add this case to an agreed suite or release plan.{' '}
+            <a href={href(`/settings/commercial?app=${appId}`)}>View pricing & usage</a>.
+          </Alert>
           <Group grow align="flex-start">
             <Select
               label="Build to test"

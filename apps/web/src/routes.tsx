@@ -5,6 +5,7 @@ import { Apps } from './pages/Apps'
 import { AppDetail } from './pages/AppDetail'
 import { SignIn } from './pages/SignIn'
 import { Settings } from './pages/Settings'
+import { CommercialAccess } from './pages/CommercialAccess'
 import { Protected } from './components/app/session'
 import { Placeholder } from './pages/Placeholder'
 import { WorkspaceGate, WorkspaceIndex } from './components/app/workspace'
@@ -40,6 +41,7 @@ export const routes: RouteObject[] = [
           { path: 'runs', element: <Runs /> },
           { path: 'runs/:run_id', element: <RunDetail /> },
           { path: 'settings', element: <Settings /> },
+          { path: 'settings/commercial', element: <CommercialAccess /> },
         ],
       },
       // scaffold:routes

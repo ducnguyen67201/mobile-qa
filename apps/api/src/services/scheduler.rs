@@ -234,7 +234,7 @@ pub async fn claim(
         }
         exec(
             &tx,
-            "UPDATE execution_attempts SET worker_id=$2,claim_id=$3,state='leased' WHERE id=$1",
+            "UPDATE execution_attempts SET worker_id=$2,claim_id=$3,state='leased',claimed_at=COALESCE(claimed_at,now()) WHERE id=$1",
             vec![id.into(), worker.id.into(), input.claim_id.into()],
         )
         .await?;
@@ -493,7 +493,7 @@ pub async fn cleanup(
     exec(
         &tx,
         "UPDATE execution_attempts SET state=$2,cleanup=$3,cleanup_hash=$4,\
-            cleanup_receipt=$5 WHERE id=$1",
+            cleanup_receipt=$5,released_at=CASE WHEN $6 THEN now() ELSE released_at END WHERE id=$1",
         vec![
             id.into(),
             if clean {
@@ -510,6 +510,7 @@ pub async fn cleanup(
             .into(),
             digest.into(),
             json(&input)?.into(),
+            clean.into(),
         ],
     )
     .await?;
@@ -579,7 +580,7 @@ pub async fn recover(
         vec![Uuid::new_v4().into(),id.into(),actor.into(),evidence.into()]).await?;
     exec(
         &tx,
-        "UPDATE execution_attempts SET state='finished',cleanup='verified_clean' WHERE id=$1",
+        "UPDATE execution_attempts SET state='finished',cleanup='verified_clean',released_at=now() WHERE id=$1",
         vec![id.into()],
     )
     .await?;

@@ -8,7 +8,7 @@ responses((status=200,description="Success",body=PlanPreviewResponse),(status=40
 #[allow(dead_code)]
 fn endpoint_0() {}
 #[utoipa::path(post,path="/api/apps/{app_id}/runs",operation_id="createRun",security(("session_cookie"=[])),
-params(("app_id" = Uuid, Path),("Idempotency-Key" = String, Header)),
+    params(("app_id" = Uuid, Path),("Idempotency-Key" = String, Header),("X-Commercial-Quote-Id" = Option<Uuid>, Header)),
 request_body=CreateRunRequest,
 responses((status=201,description="Success",body=RunResponse), (status=200,description="Idempotent replay",body=RunResponse),(status=400,description="API error",body=ApiError),(status=401,description="API error",body=ApiError),(status=403,description="API error",body=ApiError),(status=404,description="API error",body=ApiError),(status=409,description="API error",body=ApiError),(status=413,description="API error",body=ApiError),(status=422,description="API error",body=ApiError),(status=429,description="API error",body=ApiError),(status=500,description="API error",body=ApiError),(status=503,description="API error",body=ApiError),(status="default",description="API error",body=ApiError)))]
 #[allow(dead_code)]

@@ -46,12 +46,16 @@ export const runsQuery = (workspace: string, appId: string, cursor?: string) =>
         z.zRunListResponse,
       ),
   })
-export function createRun(appId: string, body: CreateRunRequest, key: string) {
+export function createRun(appId: string, body: CreateRunRequest, key: string, quoteId?: string) {
   return checked(
     sdk.createRun({
       ...options,
       path: { app_id: appId },
-      headers: { ...headers(), 'Idempotency-Key': key },
+      headers: {
+        ...headers(),
+        'Idempotency-Key': key,
+        ...(quoteId ? { 'X-Commercial-Quote-Id': quoteId } : {}),
+      },
       body: z.zCreateRunRequest.parse(body),
     }),
     z.zRunResponse,

@@ -132,6 +132,7 @@ pub async fn open(
     app: Uuid,
     input: OpenPhoneRequest,
 ) -> ApiResult<PhoneSession> {
+    super::commercial::require_separate_scope(ctx, user, app).await?;
     let choices = options(ctx, user, app).await?;
     let fingerprint = hash(serde_json::to_vec(&input).map_err(|_| ApiFailure::internal())?);
     let tx = ctx.db.begin().await?;
@@ -257,7 +258,8 @@ pub async fn task(
     id: Uuid,
     input: PhoneTaskRequest,
 ) -> ApiResult<PhoneSession> {
-    authorized(ctx, user, id).await?;
+    let session = authorized(ctx, user, id).await?;
+    super::commercial::require_separate_scope(ctx, user, session.app_id).await?;
     if input.goal.trim().is_empty() || input.goal.len() > 4000 {
         return Err(ApiFailure::invalid(
             "Describe a task using 1–4000 characters",

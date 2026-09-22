@@ -762,6 +762,7 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
     api.merge(crate::task_sessions_api::TaskSessionsApi::openapi());
     api.merge(crate::automation_api::AutomationApi::openapi());
     api.merge(crate::test_library_api::TestLibraryApi::openapi());
+    api.merge(crate::commercial_api::CommercialApi::openapi());
     if let Some(components) = api.components.as_mut() {
         components.add_security_scheme(
             "session_cookie",

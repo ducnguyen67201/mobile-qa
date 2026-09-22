@@ -231,6 +231,89 @@ export type CleanupState = 'pending' | 'verified_clean' | 'quarantined';
 
 export type CommandPurpose = 'trial' | 'manual';
 
+export type CommercialAccessResponse = {
+    agreement?: null | CommercialAgreementView;
+    app_id: string;
+    credit?: null | CreditAccessView;
+    credited_checks: number;
+    delivered_check_cents: number;
+    delivered_checks: number;
+    pilot_request_id?: string | null;
+    plans: Array<CreditPlanView>;
+    reserved_checks: number;
+    state: CommercialState;
+    usage: Array<CommercialUsageView>;
+};
+
+export type CommercialAgreementView = {
+    base_cents: number;
+    check_cap: number;
+    check_cents: number;
+    currency: string;
+    ends_at: string;
+    first_source_version_id: string;
+    id: string;
+    offer: CommercialOffer;
+    price_revision: number;
+    profile_id: string;
+    second_source_version_id?: string | null;
+    second_suite_cents: number;
+    starts_at: string;
+};
+
+export type CommercialOffer = 'pilot' | 'recurring';
+
+export type CommercialPilotRequest = {
+    coverage_note: string;
+};
+
+export type CommercialPilotResponse = {
+    app_id: string;
+    id: string;
+};
+
+export type CommercialQuoteRequest = {
+    intent: CommercialRunIntent;
+};
+
+export type CommercialQuoteResponse = {
+    amount_cents: number;
+    app_id: string;
+    build_id: string;
+    case_count: number;
+    check_cap: number;
+    checks_after_authorization: number;
+    credits_after_authorization?: number | null;
+    currency: string;
+    expires_at: string;
+    id: string;
+    kind: string;
+    maximum_credits?: number | null;
+    profile_id: string;
+    source_version_id: string;
+};
+
+export type CommercialRunIntent = {
+    kind: 'release_plan';
+    request: CreateRunRequest;
+} | {
+    kind: 'saved_suite';
+    request: SuiteRunRequest;
+};
+
+export type CommercialState = 'uncontracted' | 'active' | 'paused' | 'expired';
+
+export type CommercialUsageState = 'reserved' | 'delivered' | 'credited';
+
+export type CommercialUsageView = {
+    amount_cents: number;
+    created_at: string;
+    reason?: string | null;
+    reviewed_at?: string | null;
+    run_id: string;
+    state: CommercialUsageState;
+};
+
 export type ComparisonKind = 'regression' | 'still_failing' | 'recovered' | 'unchanged' | 'new_failure' | 'no_baseline' | 'not_comparable' | 'added' | 'removed';
 
 export type CompleteRequest = {
@@ -273,6 +356,54 @@ export type CreateRunRequest = {
 export type CreateWorkspaceRequest = {
     id: string;
     name: string;
+};
+
+export type CreditAccessView = {
+    available_credits: number;
+    charged_credits: number;
+    granted_credits: number;
+    held_credits: number;
+    pending_effective_at?: string | null;
+    pending_plan?: null | CreditPlan;
+    period_end: string;
+    period_start: string;
+    plan: CreditPlan;
+    rate_revision: number;
+    usage: Array<CreditUsageView>;
+};
+
+export type CreditCheckoutRequest = {
+    plan: CreditPlan;
+};
+
+export type CreditCheckoutResponse = {
+    url: string;
+};
+
+export type CreditPlan = 'starter' | 'plus' | 'business';
+
+export type CreditPlanChangeRequest = {
+    plan: CreditPlan;
+};
+
+export type CreditPlanView = {
+    currency: string;
+    monthly_cents: number;
+    monthly_credits: number;
+    plan: CreditPlan;
+};
+
+export type CreditUsageView = {
+    charged_credits: number;
+    device_seconds?: number | null;
+    held_credits: number;
+    input_tokens?: string | null;
+    measured_credits?: string | null;
+    output_tokens?: string | null;
+    reason?: string | null;
+    run_id: string;
+    state: string;
+    stored_bytes?: string | null;
 };
 
 export type DefaultPlanResponse = {
@@ -2025,6 +2156,213 @@ export type PreviewCaseRunResponses = {
 
 export type PreviewCaseRunResponse = PreviewCaseRunResponses[keyof PreviewCaseRunResponses];
 
+export type GetCommercialAccessData = {
+    body?: never;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/commercial-access';
+};
+
+export type GetCommercialAccessErrors = {
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetCommercialAccessError = GetCommercialAccessErrors[keyof GetCommercialAccessErrors];
+
+export type GetCommercialAccessResponses = {
+    /**
+     * Commercial access
+     */
+    200: CommercialAccessResponse;
+};
+
+export type GetCommercialAccessResponse = GetCommercialAccessResponses[keyof GetCommercialAccessResponses];
+
+export type CreateCommercialCheckQuoteData = {
+    body: CommercialQuoteRequest;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/commercial-check-quotes';
+};
+
+export type CreateCommercialCheckQuoteErrors = {
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type CreateCommercialCheckQuoteError = CreateCommercialCheckQuoteErrors[keyof CreateCommercialCheckQuoteErrors];
+
+export type CreateCommercialCheckQuoteResponses = {
+    /**
+     * Run quote
+     */
+    201: CommercialQuoteResponse;
+};
+
+export type CreateCommercialCheckQuoteResponse = CreateCommercialCheckQuoteResponses[keyof CreateCommercialCheckQuoteResponses];
+
+export type RequestCommercialPilotData = {
+    body: CommercialPilotRequest;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/commercial-pilot-requests';
+};
+
+export type RequestCommercialPilotErrors = {
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type RequestCommercialPilotError = RequestCommercialPilotErrors[keyof RequestCommercialPilotErrors];
+
+export type RequestCommercialPilotResponses = {
+    /**
+     * Pilot request saved for manual review
+     */
+    201: CommercialPilotResponse;
+};
+
+export type RequestCommercialPilotResponse = RequestCommercialPilotResponses[keyof RequestCommercialPilotResponses];
+
+export type CreateCreditCheckoutData = {
+    body: CreditCheckoutRequest;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/credit-checkout';
+};
+
+export type CreateCreditCheckoutErrors = {
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type CreateCreditCheckoutError = CreateCreditCheckoutErrors[keyof CreateCreditCheckoutErrors];
+
+export type CreateCreditCheckoutResponses = {
+    /**
+     * Hosted payment URL
+     */
+    201: CreditCheckoutResponse;
+};
+
+export type CreateCreditCheckoutResponse = CreateCreditCheckoutResponses[keyof CreateCreditCheckoutResponses];
+
+export type ChangeCreditPlanData = {
+    body: CreditPlanChangeRequest;
+    path: {
+        app_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/credit-plan-change';
+};
+
+export type ChangeCreditPlanErrors = {
+    /**
+     * API error
+     */
+    401: ApiError;
+    /**
+     * API error
+     */
+    404: ApiError;
+    /**
+     * API error
+     */
+    409: ApiError;
+    /**
+     * API error
+     */
+    503: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type ChangeCreditPlanError = ChangeCreditPlanErrors[keyof ChangeCreditPlanErrors];
+
+export type ChangeCreditPlanResponses = {
+    /**
+     * Updated plan schedule and current access
+     */
+    200: CommercialAccessResponse;
+};
+
+export type ChangeCreditPlanResponse = ChangeCreditPlanResponses[keyof ChangeCreditPlanResponses];
+
 export type GetDefaultTestPlanData = {
     body?: never;
     path: {
@@ -2591,6 +2929,7 @@ export type CreateRunData = {
     body: CreateRunRequest;
     headers: {
         'Idempotency-Key': string;
+        'X-Commercial-Quote-Id'?: string | null;
     };
     path: {
         app_id: string;
@@ -2665,6 +3004,7 @@ export type CreateSuiteRunData = {
     body: SuiteRunRequest;
     headers: {
         'Idempotency-Key': string;
+        'X-Commercial-Quote-Id'?: string | null;
     };
     path: {
         app_id: string;

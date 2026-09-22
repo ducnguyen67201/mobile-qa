@@ -17,6 +17,8 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
 import { appQuery } from '@/api/setup'
+import { commercialAccessQuery } from '@/api/commercial'
+import { dollars } from '@/components/commercial/RunAuthorization'
 import { cancelRun, runQuery } from '@/api/runs'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { ErrorNotice, LoadingPanel, PageHeading } from '@/components/app/feedback'
@@ -28,6 +30,7 @@ export function RunDetail() {
   const client = useQueryClient()
   const run = useQuery(runQuery(workspaceId, id))
   const app = useQuery({ ...appQuery(run.data?.manifest.app_id ?? ''), enabled: !!run.data })
+  const commercial = useQuery(commercialAccessQuery(workspaceId, run.data?.manifest.app_id ?? ''))
   const cancel = useMutation({
     mutationFn: () => cancelRun(id),
     onSuccess: (value) => client.setQueryData(['run', workspaceId, id], value),
@@ -60,6 +63,37 @@ export function RunDetail() {
         <Alert color="yellow">Simulated execution. No real phone or model was used.</Alert>
       )}
       <RunResult run={r} />
+      {commercial.data?.credit?.usage
+        .filter((item) => item.run_id === r.id)
+        .map((item) => (
+          <Alert
+            key={item.run_id}
+            color={item.state === 'released' ? 'green' : 'indigo'}
+            title="Credit usage"
+          >
+            {item.state === 'held'
+              ? `${item.held_credits.toLocaleString()} credits held, pending report review.`
+              : item.state === 'settled'
+                ? `${item.charged_credits.toLocaleString()} measured credits used. ${Math.max(0, item.held_credits - item.charged_credits).toLocaleString()} returned to the allowance.`
+                : `Hold released · ${item.reason ?? 'Reviewed credit'}.`}
+          </Alert>
+        ))}
+      {commercial.data?.usage
+        .filter((item) => item.run_id === r.id)
+        .map((item) => (
+          <Alert
+            key={item.run_id}
+            color={item.state === 'credited' ? 'green' : 'blue'}
+            title="Commercial check"
+          >
+            {item.state === 'reserved'
+              ? `Authorized ${dollars(item.amount_cents)} check, pending human report review.`
+              : item.state === 'delivered'
+                ? `Reviewed and delivered · ${dollars(item.amount_cents)}.`
+                : `Credited · ${item.reason ?? 'Reviewed credit'}.`}{' '}
+            Execution result and billing review are separate.
+          </Alert>
+        ))}
       <Group>
         <Badge>{r.state}</Badge>
         <Text>

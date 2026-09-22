@@ -41,7 +41,15 @@ async fn create(
         .get("idempotency-key")
         .and_then(|v| v.to_str().ok())
         .ok_or_else(|| ApiFailure::invalid("Idempotency-Key is required"))?;
-    let (run, new) = runs::create(&ctx, session.user.id, app, key, input).await?;
+    let quote = headers
+        .get("x-commercial-quote-id")
+        .and_then(|value| value.to_str().ok())
+        .map(|value| {
+            Uuid::parse_str(value)
+                .map_err(|_| ApiFailure::invalid("X-Commercial-Quote-Id must be a UUID"))
+        })
+        .transpose()?;
+    let (run, new) = runs::create_with_quote(&ctx, session.user.id, app, key, input, quote).await?;
     Ok((
         if new {
             StatusCode::CREATED
@@ -165,8 +173,23 @@ async fn suite_create(
         .get("idempotency-key")
         .and_then(|value| value.to_str().ok())
         .ok_or_else(|| ApiFailure::invalid("Idempotency-Key is required"))?;
-    let (run, new) =
-        crate::services::suite_runs::create(&ctx, session.user.id, app, key, input).await?;
+    let quote = headers
+        .get("x-commercial-quote-id")
+        .and_then(|value| value.to_str().ok())
+        .map(|value| {
+            Uuid::parse_str(value)
+                .map_err(|_| ApiFailure::invalid("X-Commercial-Quote-Id must be a UUID"))
+        })
+        .transpose()?;
+    let (run, new) = crate::services::suite_runs::create_with_quote(
+        &ctx,
+        session.user.id,
+        app,
+        key,
+        input,
+        quote,
+    )
+    .await?;
     Ok((
         if new {
             StatusCode::CREATED

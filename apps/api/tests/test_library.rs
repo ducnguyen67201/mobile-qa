@@ -81,6 +81,66 @@ async fn save(
     response.assert_status_ok();
     response.json()
 }
+
+#[tokio::test]
+async fn newer_saved_formats_do_not_break_the_catalog() {
+    let _guard = DATABASE_BOOT.lock().await;
+    request::<App, _, _>(|server, ctx| async move {
+        let (owner, app, _) = setup(&server, &ctx).await;
+        let suite = create(&server, &owner, app, DefinitionKind::Suite, None).await;
+        exec(
+            &ctx.db,
+            "UPDATE test_library_drafts SET payload=jsonb_set(payload,'{content,members}','[]'::jsonb,true) WHERE entry_id=$1",
+            vec![suite.entry.id.into()],
+        )
+        .await
+        .unwrap();
+
+        let definition: TestDefinition = serde_json::from_str(include_str!(
+            "../../../contracts/fixtures/execution/persistence-case.json"
+        ))
+        .unwrap();
+        let imported = defs::import(
+            &ctx,
+            owner.user,
+            DefinitionImport {
+                app_id: app,
+                definition,
+            },
+        )
+        .await
+        .unwrap();
+        exec(
+            &ctx.db,
+            "UPDATE execution_definitions SET payload=jsonb_set(payload,'{content,schema_version}','2'::jsonb,true) WHERE id=$1",
+            vec![imported.id.into()],
+        )
+        .await
+        .unwrap();
+
+        let listed = owner
+            .read(server.get(&format!("{}?kind=suite&archived=false", base(app))))
+            .await;
+        listed.assert_status_ok();
+        let listed = listed.json::<LibraryListResponse>();
+        let entry = listed.items.iter().find(|item| item.id == suite.entry.id).unwrap();
+        assert!(entry.needs_setup);
+        assert!(!entry.capabilities.can_edit);
+
+        let options = owner
+            .read(server.get(&format!("{}/options", base(app))))
+            .await;
+        options.assert_status_ok();
+        assert!(options.json::<LibraryOptionsResponse>().saved_versions.is_empty());
+
+        let draft = owner
+            .read(server.get(&format!("{}/{}/draft", base(app), suite.entry.id)))
+            .await;
+        assert_eq!(failure(&draft, 409).code, "unsupported_test_schema");
+    })
+    .await;
+}
+
 #[tokio::test]
 async fn save_is_atomic_editable_idempotent_and_preserves_versions() {
     let _guard = DATABASE_BOOT.lock().await;

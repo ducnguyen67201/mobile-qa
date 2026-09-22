@@ -21,6 +21,7 @@ import type {
   LibraryVersionResponse,
   SetDefaultPlanRequest,
 } from '@/api/generated/types.gen'
+import { ApiClientError } from '@/api/runtime'
 import { buildsQuery } from '@/api/setup'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { useMounted } from '@/hooks/use-mounted'
@@ -203,7 +204,8 @@ function DraftWorkspace({
   return (
     <Stack>
       {draft.isPending && <LoadingPanel label="Loading saved draft…" />}
-      {draft.isError && (
+      {draft.isError && isUnsupportedSavedFormat(draft.error) && <UnsupportedSavedFormat />}
+      {draft.isError && !isUnsupportedSavedFormat(draft.error) && (
         <ErrorNotice
           title={
             draft.data
@@ -242,7 +244,10 @@ function VersionHistory({ appId, entryId }: { appId: string; entryId: string }) 
           Saved versions are preserved. Editing and saving creates a new version automatically.
         </Text>
         {history.isPending && <LoadingPanel label="Loading version history…" />}
-        {history.isError && (
+        {history.isError && isUnsupportedSavedFormat(history.error) && (
+          <UnsupportedSavedFormat history />
+        )}
+        {history.isError && !isUnsupportedSavedFormat(history.error) && (
           <ErrorNotice error={history.error} retry={() => void history.refetch()} />
         )}
         {history.data && (
@@ -302,9 +307,27 @@ function VersionWorkspace({
   return version.isPending ? (
     <LoadingPanel label="Loading frozen version…" />
   ) : version.isError ? (
-    <ErrorNotice error={version.error} retry={() => void version.refetch()} />
+    isUnsupportedSavedFormat(version.error) ? (
+      <UnsupportedSavedFormat history />
+    ) : (
+      <ErrorNotice error={version.error} retry={() => void version.refetch()} />
+    )
   ) : (
     <FrozenVersion value={version.data} />
+  )
+}
+
+function isUnsupportedSavedFormat(error: unknown): boolean {
+  return error instanceof ApiClientError && error.body?.code === 'unsupported_test_schema'
+}
+
+function UnsupportedSavedFormat({ history = false }: { history?: boolean }) {
+  return (
+    <Alert color="yellow" title="Saved in a newer format">
+      {history
+        ? 'These saved versions remain in the database, but this checkout cannot display their newer format.'
+        : 'This draft uses test fields this checkout cannot edit. Its saved versions and run reports remain intact. Open a saved version below to inspect it; archive only if you no longer need this coverage.'}
+    </Alert>
   )
 }
 function SavedPlan({

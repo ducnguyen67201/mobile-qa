@@ -33,6 +33,32 @@ pub async fn capabilities(
         can_set_default: operator,
     })
 }
+
+fn unsupported_saved_definition() -> ApiFailure {
+    ApiFailure::new(
+        409,
+        "unsupported_test_schema",
+        "This saved test uses a format this checkout cannot read",
+    )
+}
+
+async fn require_supported_version(
+    db: &impl ConnectionTrait,
+    app: Uuid,
+    version_id: Uuid,
+) -> ApiResult<()> {
+    let row = one(
+        db,
+        "SELECT payload FROM execution_definitions WHERE id=$1 AND app_id=$2",
+        vec![version_id.into(), app.into()],
+    )
+    .await?;
+    let payload: serde_json::Value = field(&row, "payload")?;
+    serde_json::from_value::<TestDefinition>(payload)
+        .map(|_| ())
+        .map_err(|_| unsupported_saved_definition())
+}
+
 pub async fn entry(
     db: &impl ConnectionTrait,
     actor: Uuid,
@@ -62,10 +88,16 @@ pub async fn entry(
     }
     let current: Option<serde_json::Value> = field(&row, "draft_payload")?;
     let needs_setup = match current {
-        Some(payload) => !content_issues(db, app, &decode(payload)?)
-            .await?
-            .0
-            .is_empty(),
+        Some(payload) => match serde_json::from_value::<LibraryDraftDefinition>(payload) {
+            Ok(definition) => !content_issues(db, app, &definition).await?.0.is_empty(),
+            Err(_) => {
+                // Forward-schema records stay visible and intact, but cannot be
+                // edited or chosen as the default by this older checkout.
+                capabilities.can_edit = false;
+                capabilities.can_set_default = false;
+                true
+            }
+        },
         None => false,
     };
     Ok(LibraryEntryResponse {
@@ -101,7 +133,8 @@ pub async fn list(
     let ids = rows(
         db,
         "SELECT e.id FROM test_library_entries e
-        WHERE e.app_id=$1 AND ($2::text IS NULL OR e.kind=$2) AND (e.archived_at IS NOT NULL)=$3
+        WHERE e.app_id=$1 AND e.kind IN ('case','suite','plan')
+        AND ($2::text IS NULL OR e.kind=$2) AND (e.archived_at IS NOT NULL)=$3
         AND ($4::uuid IS NULL OR e.id>$4) ORDER BY e.id LIMIT 51",
         vec![
             app.into(),
@@ -289,11 +322,13 @@ pub async fn draft(
     let (definition, source_version_id): (LibraryDraftDefinition, Option<Uuid>) =
         if let Some(row) = stored.first() {
             (
-                decode(field(row, "payload")?)?,
+                serde_json::from_value(field(row, "payload")?)
+                    .map_err(|_| unsupported_saved_definition())?,
                 field(row, "source_version_id")?,
             )
         } else {
             let version_id = entry.latest_version_id.ok_or_else(ApiFailure::missing)?;
+            require_supported_version(db, app, version_id).await?;
             (
                 definitions::get(db, app, version_id)
                     .await?
@@ -337,6 +372,7 @@ pub async fn version(
         vec![id.into(), version_id.into()],
     )
     .await?;
+    require_supported_version(db, app, version_id).await?;
     let version = definitions::get(db, app, version_id).await?;
     let (mut issues, coverage) =
         content_issues(db, app, &version.definition.clone().into()).await?;
@@ -429,11 +465,22 @@ pub async fn options(
             model_available,
         });
     }
-    let ids=rows(db,"SELECT v.entry_id, v.definition_id FROM test_library_versions v JOIN test_library_entries e
-        ON e.id=v.entry_id WHERE e.app_id=$1 AND e.archived_at IS NULL
-        ORDER BY e.logical_key, v.created_at DESC, v.definition_id",vec![app.into()]).await?;
+    let ids = rows(
+        db,
+        "SELECT v.entry_id, v.definition_id, d.payload FROM test_library_versions v
+        JOIN test_library_entries e ON e.id=v.entry_id
+        JOIN execution_definitions d ON d.id=v.definition_id
+        WHERE e.app_id=$1 AND e.archived_at IS NULL AND e.kind IN ('case','suite','plan')
+        ORDER BY e.logical_key, v.created_at DESC, v.definition_id",
+        vec![app.into()],
+    )
+    .await?;
     let mut saved_versions = Vec::new();
     for r in ids {
+        let payload: serde_json::Value = field(&r, "payload")?;
+        if serde_json::from_value::<TestDefinition>(payload).is_err() {
+            continue;
+        }
         saved_versions.push(
             version(
                 db,

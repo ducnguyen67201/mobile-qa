@@ -1,5 +1,155 @@
 # Implementation status and evidence
 
+## PR #16 review hardening — local verification (2026-09-22)
+
+Review fixes keep one checkout intent and Stripe idempotency key after an
+uncertain response, and require Stripe-confirmed session expiry before another
+checkout can be created for the app. A checkout with no known session after 24
+hours now needs billing review. The invoice path locks the app before the
+checkout intent, matching plan changes; unexpected one-phase Stripe schedules
+are left for billing review. Webhook signature timestamp validation no longer
+overflows on extreme untrusted values. Legacy agreement totals include all
+usage rows while the visible activity list remains limited to 100. Saving an
+edited suite preserves its quote when the editor updates its saved-version
+props; obsolete pilot copy and an unused browser helper were removed.
+
+Generated contract drift, Rust Clippy, the API binary build, web formatting,
+typecheck, lint, all 167 web tests, and the web bundle passed. Six commercial
+integration tests passed on a disposable database with the configured JDK 17;
+the webhook timestamp unit test passed. The signed-in Stripe plan-change click
+path and an actual paid renewal remain unverified.
+
+## Next-renewal plan changes — local implementation (2026-09-22)
+
+The source adds an app-scoped plan-change endpoint, a Stripe subscription schedule
+for the next period, pending-plan display and cancellation, and paid-invoice
+validation that grants the new allowance only on confirmed renewal. The current
+paid period and its usage ledger remain unchanged. Six commercial route/fixture
+tests passed against a disposable PostgreSQL database, including the pending
+renewal, underpayment, replay and access paths; all 166 web tests, generated
+contract checks, Clippy and the web bundle passed. Stripe test mode accepted
+a future-phase schedule and a separate Plus-named product/price request. The
+temporary schedules were released and the test product was archived; a
+read-only follow-up confirmed the existing Starter subscription retained its
+price and has no schedule. The local API loaded migration 000016 and serves the
+new authenticated endpoint. Restarting the API invalidated the browser session;
+the signed-in plan-change click path awaits reauthentication. The full API test
+command remains blocked by an older unrelated migration in the shared test
+database. An actual paid renewal under a test clock, hosted plan change and
+production deployment remain unverified.
+
+## Paid suite execution and credit settlement — local verification (2026-09-22)
+
+The current-format saved suite `ecfe8f15-5dff-44df-87d9-e6b5071e82ed`
+ran against the validated demo APK in local Stripe test mode. Run
+`09e56244-5679-433f-931c-b21dc601609e` passed all three required checks:
+entering "Buy milk", saving it, and finding it after an app restart. The run
+report exposes six sealed evidence artifacts and records verified clean device
+cleanup. Operator review marked the report delivered. The 3,302-credit maximum
+hold settled at 118 measured credits (117 device seconds, 288,140 sealed
+evidence bytes, zero provider tokens), returning 3,184 credits. The Starter
+period and Settings page both show 50,000 granted, zero held, 118 used, and
+49,882 available. Two earlier pre-delivery attempts, one with a missing build
+artifact and one missing the worker's optional device dependency, were released
+at zero charge after recovery review. This verifies the local execution and
+settlement path; hosted delivery, renewal, and unit economics remain open.
+
+## Test-library catalog compatibility — local fix (2026-09-22)
+
+The paid-preview local database contains five suites, including two drafts with
+newer membership fields that this checkout does not parse. Those records caused
+the Suites list to return 500; newer saved versions and an unsupported sequence
+also caused the options request to return 500. The catalog now keeps incompatible
+entries visible and read-only, excludes incompatible versions from selection,
+and returns an explicit unsupported-format error on a detail read. It does not
+rewrite or delete the saved records. Six test-library integration tests and all
+164 web tests passed; Rust Clippy, web typecheck and lint passed. A read-only
+probe against the actual local app database loaded all five suites, marked the
+two newer-format drafts read-only and returned usable version options. API and
+web are running locally; the newer-format notice and both saved-version links
+were confirmed in the signed-in browser. The phone worker reported
+`worker_claim_recovery_required`; its recovery journal was preserved. A
+separately started execution worker later completed the suite run above.
+The newer-format "Demo sequential smoke suite" has two compatible saved versions
+referenced by 12 historical runs, so it is retained as useful history. Its
+current draft cannot be edited in this checkout; the detail page now presents
+a specific newer-format notice while retaining its saved-version links.
+
+## Monthly credit plans — local implementation (2026-09-22)
+
+The local source now defines Starter (US$500/50,000), Plus (US$750/75,000)
+and Business (US$1,500/150,000) monthly cards, with one direct Checkout action
+each and no pilot questionnaire. New database tables record Stripe checkout
+intents, paid invoice grants, credit quotes and run holds. A signed
+`invoice.paid` event is required to create a grant. The rate card uses measured
+provider tokens, server-recorded device occupancy and sealed evidence bytes.
+After operator report review, the service settles measured credits up to the
+held cap and returns unused credits; a queued pre-claim cancellation releases
+the hold. The monthly allowance resets without rollover.
+
+Stripe test-mode Checkout credentials and local CLI webhook forwarding are
+configured through Doppler in this environment. One sandbox Starter checkout
+completed on 2026-09-22. The first `invoice.paid` delivery was acknowledged
+without a grant because the current Stripe Invoice payload supplies
+`status: paid` rather than the older `paid: true` field. After correcting that
+parser, replay of the signed Stripe event marked the checkout intent paid and
+created a 50,000-credit period for the selected app in the local database.
+Hosted webhook registration, a live payment, renewal event, customer-app meter,
+unit economics and hosted deployment remain unverified. Existing fixed-check
+agreements remain as legacy records.
+
+`just types` and `just check-contracts` passed with zero generated drift.
+`just check-web` passed formatting, TypeScript and lint; its only test failure
+was an ambiguous text selector, and the corrected paywall test passed. The
+Rust workspace check passed on a fresh disposable PostgreSQL database with
+process-scoped JDK 17, including five commercial route tests. A later focused
+commercial campaign passed the measured 1,061-credit settlement, duplicate
+invoice, underpayment, hold and cancellation cases after the final meter
+change. The web production bundle also built. Those initial checks did not
+include a device run; the later local execution is recorded above.
+A focused regression test now covers the current
+Stripe Invoice shape, duplicate delivery, underpayment and out-of-band payment
+rejection. The later full API check compiled and passed Clippy, but its shared
+test database contained a migration from another branch. With an isolated
+database and the JDK 17 `Contents/Home` path, all seven app setup tests passed.
+The combined workspace test run then hit cumulative sign-in rate limits; on a
+fresh isolated database, all five commercial tests passed.
+
+## Commercial access and usage — local implementation (2026-09-21)
+
+The proposed operated-service pricing is represented locally by app-scoped pilot and
+recurring agreements, one qualified profile and saved coverage allowlist, short-lived
+server quotes, atomic per-run check reservations, a customer usage ledger, manual
+operator review/credit commands, and a pilot-request record. New release-plan and
+saved-suite runs require explicit quote authorization. A queued run canceled before
+device claim is credited. Standalone saved-case execution and interactive phone/model
+entry points require separately agreed scope. The Settings pricing page distinguishes
+proposed terms, agreement state, reserved checks, delivered charges and credits.
+The legacy API still retains manual pilot-request and fixed-check routes for
+existing agreements. The customer page now presents the three monthly plans,
+the paid allowance, and a credit activity table; it no longer asks for a pilot
+coverage note or shows the per-check estimate. New credit runs still require
+an exact quote authorization on a run screen.
+
+`just types`, `just check-contracts`, `just check-web` (164 tests), `just check-api`
+(including three new real-route commercial tests), and `just build` passed in the
+isolated worktree. API tests used a fresh disposable PostgreSQL database, locally
+available signed synthetic APK fixtures and process-scoped JDK 17. The retained
+shared test database still has a stale migration ledger; it was not modified for
+this work. The tests cover pilot inclusion and cap, concurrent last-slot requests,
+idempotent replay, pre-claim cancellation credit, foreign access, resource bypass
+denial, recurring quote/base and closing an expired period. They do not establish
+real-device quality, a usable customer report or sustainable unit economics.
+
+Hosted enforcement has not been deployed. Existing hosted-app backfill, customer
+agreement, real-device/report review, measured operator and provider costs, and the
+pilot gates below remain open. Rendered visual inspection remains blocked by the
+recorded browser admin-policy denial; no alternate browser path was used.
+
+The refreshed commercial page passed web formatting, typecheck, lint, all 164 web
+tests and a production web build on 2026-09-22. Its pilot dialog and estimate
+were verified in component tests; rendered visual acceptance remains open.
+
 ## Reliable smoke suite — local implementation (2026-09-21)
 
 Saved-suite run setup now requires an explicit build and qualified device,

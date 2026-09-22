@@ -244,7 +244,11 @@ function WorkspaceTests() {
                       <Stack gap={6} miw={0}>
                         <Group gap="xs">
                           <Badge color={entry.needs_setup ? 'orange' : 'gray'}>
-                            {entry.needs_setup ? 'Needs setup' : 'Saved'}
+                            {entry.needs_setup && !entry.capabilities.can_edit && !entry.archived_at
+                              ? 'Unavailable in this checkout'
+                              : entry.needs_setup
+                                ? 'Needs setup'
+                                : 'Saved'}
                           </Badge>
                           {entry.ai_generated && (
                             <Badge color="grape" variant="light">

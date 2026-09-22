@@ -1,5 +1,24 @@
 # Implementation status and evidence
 
+## PR #16 review hardening — local verification (2026-09-22)
+
+Review fixes keep one checkout intent and Stripe idempotency key after an
+uncertain response, and require Stripe-confirmed session expiry before another
+checkout can be created for the app. A checkout with no known session after 24
+hours now needs billing review. The invoice path locks the app before the
+checkout intent, matching plan changes; unexpected one-phase Stripe schedules
+are left for billing review. Webhook signature timestamp validation no longer
+overflows on extreme untrusted values. Legacy agreement totals include all
+usage rows while the visible activity list remains limited to 100. Saving an
+edited suite preserves its quote when the editor updates its saved-version
+props; obsolete pilot copy and an unused browser helper were removed.
+
+Generated contract drift, Rust Clippy, the API binary build, web formatting,
+typecheck, lint, all 167 web tests, and the web bundle passed. Six commercial
+integration tests passed on a disposable database with the configured JDK 17;
+the webhook timestamp unit test passed. The signed-in Stripe plan-change click
+path and an actual paid renewal remain unverified.
+
 ## Next-renewal plan changes — local implementation (2026-09-22)
 
 The source adds an app-scoped plan-change endpoint, a Stripe subscription schedule

@@ -306,7 +306,8 @@ pub async fn change_plan(
         return Ok(());
     }
     let price_id = stripe_id(&price["id"], "price_")?;
-    let schedule = if subscription["schedule"].is_null() {
+    let already_scheduled = !subscription["schedule"].is_null();
+    let schedule = if !already_scheduled {
         stripe_post(
             &client,
             &secret,
@@ -357,7 +358,9 @@ pub async fn change_plan(
             return Ok(());
         }
     }
-    if phases.len() != 1 || phases[0]["items"][0]["price"] != price_id {
+    // A one-phase schedule already attached to the subscription might have
+    // been created outside this app. Only recover a completed, tagged change.
+    if already_scheduled || phases.len() != 1 || phases[0]["items"][0]["price"] != price_id {
         return Err(conflict("An existing schedule needs billing review"));
     }
     let start = schedule["current_phase"]["start_date"]
@@ -447,6 +450,11 @@ pub async fn checkout(
     {
         return Err(unavailable());
     }
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|_| unavailable())?;
+    let (cents, _, word) = terms(plan);
     let origin = Setup::get(ctx).origin;
     let tx = ctx.db.begin().await?;
     let app_row = one(
@@ -474,24 +482,58 @@ pub async fn checkout(
     if !rows(&tx,"SELECT id FROM commercial_agreements WHERE app_id=$1 AND status='active' AND ends_at>now()",vec![app.into()]).await?.is_empty() {
         return Err(conflict("This app already has an active check agreement"));
     }
-    // A pending checkout is retained for 24 hours so two clicks cannot create two subscriptions.
-    exec(&tx, "UPDATE billing_checkout_intents SET state='expired' WHERE app_id=$1 AND state IN ('pending','checkout') AND created_at<now()-interval '24 hours'", vec![app.into()]).await?;
-    let open = rows(&tx, "SELECT stripe_session_url FROM billing_checkout_intents WHERE app_id=$1 AND state IN ('pending','checkout')", vec![app.into()]).await?;
-    if let Some(r) = open.first() {
-        if let Some(url) = field::<Option<String>>(r, "stripe_session_url")? {
-            tx.commit().await?;
-            return Ok(CreditCheckoutResponse { url });
+    let open = rows(&tx, "SELECT id,plan,stripe_session_id,stripe_session_url,created_at FROM billing_checkout_intents WHERE app_id=$1 AND state IN ('pending','checkout')", vec![app.into()]).await?;
+    let reusable = if let Some(r) = open.first() {
+        let existing_id: Uuid = field(r, "id")?;
+        let session_id: Option<String> = field(r, "stripe_session_id")?;
+        if Utc::now() - field::<DateTime<Utc>>(r, "created_at")? >= chrono::Duration::hours(24) {
+            // An overdue local intent may have completed payment while its
+            // webhook is delayed. Only Stripe-confirmed expiry frees the app.
+            let session_id = session_id.ok_or_else(|| conflict("Checkout needs billing review"))?;
+            stripe_id(&Value::String(session_id.clone()), "cs_")?;
+            let remote =
+                stripe_get(&client, &secret, &format!("checkout/sessions/{session_id}")).await?;
+            if remote["id"] != session_id {
+                return Err(unavailable());
+            }
+            if remote["status"] == "expired" {
+                exec(
+                    &tx,
+                    "UPDATE billing_checkout_intents SET state='expired' WHERE id=$1",
+                    vec![existing_id.into()],
+                )
+                .await?;
+                None
+            } else {
+                return Err(conflict("Checkout or payment is still being confirmed"));
+            }
+        } else {
+            if field::<String>(r, "plan")? != word {
+                return Err(conflict(
+                    "Finish the existing checkout before choosing another plan",
+                ));
+            }
+            if let Some(url) = field::<Option<String>>(r, "stripe_session_url")? {
+                tx.commit().await?;
+                return Ok(CreditCheckoutResponse { url });
+            }
+            Some(existing_id)
         }
-        return Err(conflict("Checkout is being prepared. Try again shortly"));
-    }
-    let id = Uuid::new_v4();
-    let (cents, _, word) = terms(plan);
-    exec(
-        &tx,
-        "INSERT INTO billing_checkout_intents(id,app_id,actor_id,plan) VALUES($1,$2,$3,$4)",
-        vec![id.into(), app.into(), actor.into(), word.into()],
-    )
-    .await?;
+    } else {
+        None
+    };
+    let id = if let Some(id) = reusable {
+        id
+    } else {
+        let id = Uuid::new_v4();
+        exec(
+            &tx,
+            "INSERT INTO billing_checkout_intents(id,app_id,actor_id,plan) VALUES($1,$2,$3,$4)",
+            vec![id.into(), app.into(), actor.into(), word.into()],
+        )
+        .await?;
+        id
+    };
     tx.commit().await?;
     let success =
         format!("{origin}/settings/commercial?workspace={workspace}&app={app}&checkout=return");
@@ -518,38 +560,17 @@ pub async fn checkout(
             id.to_string(),
         ),
     ];
-    let result = reqwest::Client::new()
-        .post("https://api.stripe.com/v1/checkout/sessions")
-        .bearer_auth(secret)
-        .header("Idempotency-Key", id.to_string())
-        .form(&form)
-        .send()
-        .await;
-    let result = match result {
-        Ok(result) => result,
-        Err(_) => {
-            exec(
-                &ctx.db,
-                "UPDATE billing_checkout_intents SET state='expired' WHERE id=$1",
-                vec![id.into()],
-            )
-            .await?;
-            return Err(unavailable());
-        }
-    };
-    let ok = result.status().is_success();
-    let body: Value = result.json().await.map_err(|_| unavailable())?;
-    if !ok {
-        tracing::warn!(app_id=%app, "Stripe checkout session creation failed");
-        exec(
-            &ctx.db,
-            "UPDATE billing_checkout_intents SET state='expired' WHERE id=$1",
-            vec![id.into()],
-        )
-        .await?;
-        return Err(unavailable());
-    }
-    let session = body["id"].as_str().ok_or_else(unavailable)?;
+    // Reuse the same intent and idempotency key after an uncertain network or
+    // database failure; a new key could create a second payable session.
+    let body = stripe_post(
+        &client,
+        &secret,
+        "checkout/sessions",
+        &id.to_string(),
+        &form,
+    )
+    .await?;
+    let session = stripe_id(&body["id"], "cs_")?;
     let url = body["url"].as_str().ok_or_else(unavailable)?;
     if !url.starts_with("https://checkout.stripe.com/") {
         return Err(unavailable());
@@ -577,7 +598,7 @@ fn verify_signature(body: &[u8], signature: &str, secret: &str) -> ApiResult<()>
         }
     }
     let stamp = stamp.ok_or_else(ApiFailure::unauthorized)?;
-    if (Utc::now().timestamp() - stamp).abs() > 300 {
+    if (i128::from(Utc::now().timestamp()) - i128::from(stamp)).abs() > 300 {
         return Err(ApiFailure::unauthorized());
     }
     let mut signed = stamp.to_string().into_bytes();
@@ -686,13 +707,30 @@ pub async fn apply_verified_invoice(
         return Err(ApiFailure::internal());
     }
     let tx = ctx.db.begin().await?;
+    let app_row = one(
+        &tx,
+        "SELECT app_id FROM billing_checkout_intents WHERE id=$1",
+        vec![intent_id.into()],
+    )
+    .await?;
+    let app: Uuid = field(&app_row, "app_id")?;
+    // All billing mutations lock the app before the intent, including checkout
+    // and plan changes. Keeping the same order avoids renewal deadlocks.
+    one(
+        &tx,
+        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
+        vec![app.into()],
+    )
+    .await?;
     let row = one(
         &tx,
         "SELECT app_id,plan,pending_plan,pending_effective_at,stripe_subscription_id FROM billing_checkout_intents WHERE id=$1 FOR UPDATE",
         vec![intent_id.into()],
     )
     .await?;
-    let app: Uuid = field(&row, "app_id")?;
+    if field::<Uuid>(&row, "app_id")? != app {
+        return Err(ApiFailure::internal());
+    }
     let recorded_subscription: Option<String> = field(&row, "stripe_subscription_id")?;
     if recorded_subscription
         .as_deref()
@@ -751,12 +789,6 @@ pub async fn apply_verified_invoice(
     if line_price != price_id {
         return Err(ApiFailure::internal());
     }
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![app.into()],
-    )
-    .await?;
     exec(&tx, "INSERT INTO billing_credit_periods(id,app_id,checkout_intent_id,stripe_subscription_id,stripe_invoice_id,plan,granted_credits,starts_at,ends_at,rate_revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)", vec![Uuid::new_v4().into(),app.into(),intent_id.into(),subscription_id.into(),invoice_id.into(),word.into(),credits.into(),start.into(),end.into(),RATE_REVISION.into()]).await?;
     exec(
         &tx,
@@ -1056,5 +1088,6 @@ mod tests {
             verify_signature(br#"{"type":"invoice.failed"}"#, &signature, "whsec_test").is_err()
         );
         assert!(verify_signature(payload, &signature, "whsec_other").is_err());
+        assert!(verify_signature(payload, "t=-9223372036854775808,v1=00", "whsec_test").is_err());
     }
 }

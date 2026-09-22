@@ -51,7 +51,7 @@ export function Settings() {
                     Pricing & usage
                   </Title>
                   <Text size="sm" c="dimmed">
-                    See proposed pilot terms, your agreed period, and reviewed check usage.
+                    Compare monthly plans, see your credit balance, and review usage.
                   </Text>
                 </Box>
                 <Button component={Link} to={href('/settings/commercial')} variant="light">

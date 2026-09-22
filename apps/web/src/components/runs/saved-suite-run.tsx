@@ -42,6 +42,9 @@ export function SavedSuiteRun({
   const pending = useRef<{ body: SuiteRunRequest; key: string } | null>(null)
   const [quote, setQuote] = useState<CommercialQuoteResponse | null>(null)
   useEffect(() => {
+    // Saving a dirty suite updates both props. Keep the just-priced version;
+    // a new edit or a different saved version still invalidates the quote.
+    if (!dirty && pending.current?.body.suite_version_id === versionId) return
     pending.current = null
     setQuote(null)
   }, [versionId, dirty])

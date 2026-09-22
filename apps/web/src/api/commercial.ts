@@ -4,7 +4,6 @@ import * as sdk from './generated/sdk.gen'
 import * as z from './generated/zod.gen'
 import type {
   CommercialQuoteRequest,
-  CommercialPilotRequest,
   CreditCheckoutRequest,
   CreditPlanChangeRequest,
 } from './generated/types.gen'
@@ -30,19 +29,6 @@ export function createCommercialCheckQuote(appId: string, body: CommercialQuoteR
       body: z.zCommercialQuoteRequest.parse(body),
     }),
     z.zCommercialQuoteResponse,
-    [201],
-  )
-}
-
-export function requestCommercialPilot(appId: string, body: CommercialPilotRequest) {
-  return checked(
-    sdk.requestCommercialPilot({
-      ...options,
-      path: { app_id: appId },
-      headers: headers(),
-      body: z.zCommercialPilotRequest.parse(body),
-    }),
-    z.zCommercialPilotResponse,
     [201],
   )
 }

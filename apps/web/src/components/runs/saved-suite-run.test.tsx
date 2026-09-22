@@ -1,4 +1,5 @@
 import { MantineProvider } from '@mantine/core'
+import { useState } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -154,6 +155,54 @@ it('saves a changed sequence and retries the exact queued request after a lost r
   await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2))
   expect(mocks.create.mock.calls[1]).toEqual(first)
   expect(save).toHaveBeenCalledTimes(1)
+})
+
+it('keeps the priced saved version when the editor updates its props after saving', async () => {
+  mocks.create.mockResolvedValue(zRunResponse.parse(fixture))
+  function UpdatingEditor() {
+    const [versionId, setVersionId] = useState('suite-version')
+    const [dirty, setDirty] = useState(true)
+    const save = vi.fn().mockImplementation(async () => {
+      setVersionId('new-suite-version')
+      setDirty(false)
+      return { saved_version_id: 'new-suite-version', issues: [] }
+    })
+    return (
+      <SavedSuiteRun
+        appId="app"
+        versionId={versionId}
+        dirty={dirty}
+        save={save}
+        profiles={[
+          {
+            id: 'profile',
+            name: 'Device',
+            qualified: true,
+            driver: 'fake',
+            package: 'ai.mobileqa.demo',
+            adapter: 'demo_persistence_v1',
+            model_available: true,
+          },
+        ]}
+      />
+    )
+  }
+  render(
+    <MantineProvider env="test">
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MemoryRouter>
+          <UpdatingEditor />
+        </MemoryRouter>
+      </QueryClientProvider>
+    </MantineProvider>,
+  )
+  await chooseSetup()
+  await userEvent.click(screen.getByRole('button', { name: 'Save & review check price' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Authorize check and run' }))
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
+  expect(mocks.create.mock.calls[0]![1].suite_version_id).toBe('new-suite-version')
 })
 
 it('offers a suggestion without selecting a baseline for the tester', async () => {

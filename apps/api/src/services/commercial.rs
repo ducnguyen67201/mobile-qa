@@ -109,25 +109,33 @@ pub async fn status(
     .map(|row| field(row, "id"))
     .transpose()?;
     let mut usage = Vec::new();
-    let mut reserved_checks = 0;
-    let mut delivered_checks = 0;
-    let mut credited_checks = 0;
-    let mut delivered_check_cents = 0;
-    if let Some(a) = &agreement {
+    let (reserved_checks, delivered_checks, credited_checks, delivered_check_cents) = if let Some(
+        a,
+    ) =
+        &agreement
+    {
+        let totals = one(&ctx.db, "SELECT COUNT(*) FILTER (WHERE state='reserved')::integer AS reserved, COUNT(*) FILTER (WHERE state='delivered')::integer AS delivered, COUNT(*) FILTER (WHERE state='credited')::integer AS credited, COALESCE(SUM(amount_cents) FILTER (WHERE state='delivered'),0)::integer AS delivered_cents FROM commercial_usage WHERE agreement_id=$1", vec![a.id.into()]).await?;
         for row in rows(&ctx.db,"SELECT run_id,state,amount_cents,reason,created_at,reviewed_at FROM commercial_usage WHERE agreement_id=$1 ORDER BY created_at DESC,run_id DESC LIMIT 100",vec![a.id.into()]).await? {
             let word: String = field(&row,"state")?;
             let current = match word.as_str() {
-                "reserved" => { reserved_checks += 1; CommercialUsageState::Reserved },
-                "delivered" => { delivered_checks += 1; CommercialUsageState::Delivered },
-                "credited" => { credited_checks += 1; CommercialUsageState::Credited },
+                "reserved" => CommercialUsageState::Reserved,
+                "delivered" => CommercialUsageState::Delivered,
+                "credited" => CommercialUsageState::Credited,
                 _ => return Err(ApiFailure::internal()),
             };
             let amount: i32 = field(&row,"amount_cents")?;
-            if current == CommercialUsageState::Delivered { delivered_check_cents += amount; }
             usage.push(CommercialUsageView { run_id:field(&row,"run_id")?, state:current, amount_cents:amount,
                 reason:field(&row,"reason")?, created_at:field(&row,"created_at")?, reviewed_at:field(&row,"reviewed_at")? });
         }
-    }
+        (
+            field(&totals, "reserved")?,
+            field(&totals, "delivered")?,
+            field(&totals, "credited")?,
+            field(&totals, "delivered_cents")?,
+        )
+    } else {
+        (0, 0, 0, 0)
+    };
     let current_state = state(agreement.as_ref(), Utc::now());
     let credit = credit_billing::status(&ctx.db, app).await?;
     Ok(CommercialAccessResponse {

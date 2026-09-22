@@ -14,6 +14,9 @@ mod m20260920_000009_regression;
 mod m20260921_000010_model_registry;
 mod m20260921_000011_model_assignment;
 mod m20260921_000012_worker_poll_eligibility;
+mod m20260921_000014_commercial_access;
+mod m20260922_000015_credit_billing;
+mod m20260922_000016_credit_plan_changes;
 pub struct Migrator;
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
@@ -31,6 +34,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20260921_000010_model_registry::Migration),
             Box::new(m20260921_000011_model_assignment::Migration),
             Box::new(m20260921_000012_worker_poll_eligibility::Migration),
+            Box::new(m20260921_000014_commercial_access::Migration),
+            Box::new(m20260922_000015_credit_billing::Migration),
+            Box::new(m20260922_000016_credit_plan_changes::Migration),
             // inject-above (do not remove this comment)
         ]
     }

@@ -18,6 +18,7 @@ async fn registered_handler_agrees_with_openapi_and_database() {
         .chain(mobile_qa_contracts::test_library_api::OPERATIONS)
         .chain(mobile_qa_contracts::task_sessions_api::OPERATIONS)
         .chain(mobile_qa_contracts::automation_api::OPERATIONS)
+        .chain(mobile_qa_contracts::commercial_api::OPERATIONS)
         .map(|(_, path, _, _)| *path)
         .collect();
     assert_eq!(

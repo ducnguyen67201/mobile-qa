@@ -120,6 +120,7 @@ pub async fn create(
         tx.commit().await?;
         return Ok((r, false));
     }
+    super::commercial::require_separate_scope(ctx, actor, app).await?;
     one(
         &tx,
         "SELECT id FROM environments WHERE app_id=$1 FOR SHARE",

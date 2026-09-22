@@ -63,8 +63,14 @@ result remains blocked. Picking a new result preserves an explicitly selected re
 The server allocates versions. AI provenance stays on editor content and the catalog;
 the executable case uses the permitted user-authored representation.
 
-The current entry always opens editable, including entries previously In review,
-Rejected or Needs input. Historical version links remain read-only. Reads hydrate
+The current entry opens editable, including entries previously In review,
+Rejected or Needs input. A saved record written by a newer, unsupported schema
+remains visible in the catalog but is read-only in this checkout; incompatible
+versions are excluded from selection and a detail read returns an explicit
+unsupported-format error. The detail page explains the limitation and retains
+links to compatible saved versions without a retry loop. The API preserves those
+records without rewriting them.
+Historical version links remain read-only. Reads hydrate
 from the last immutable version if no working content exists, without writing on GET.
 The internal draft DTO/storage names and GET/PUT /draft routes are retained.
 

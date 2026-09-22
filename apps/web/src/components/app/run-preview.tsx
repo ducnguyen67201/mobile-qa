@@ -1,4 +1,5 @@
 import { actionLabel } from '@/lib/action-label'
+import { useEffect, useState } from 'react'
 import {
   Accordion,
   Alert,
@@ -15,6 +16,9 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router'
 import { useMounted } from '@/hooks/use-mounted'
 import { createRun, planQuery } from '@/api/runs'
+import { createCommercialCheckQuote } from '@/api/commercial'
+import type { CommercialQuoteResponse, CreateRunRequest } from '@/api/generated/types.gen'
+import { RunAuthorization } from '@/components/commercial/RunAuthorization'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { useSession } from './session'
 import { ErrorNotice, LoadingPanel } from './feedback'
@@ -35,26 +39,40 @@ export function RunPreview({
   const session = useSession()
   const navigate = useNavigate()
   const query = useQuery(planQuery(workspaceId, appId, buildId, planVersionId))
-  const start = useMutation({
+  const [quote, setQuote] = useState<CommercialQuoteResponse | null>(null)
+  const [quotedRequest, setQuotedRequest] = useState<CreateRunRequest | null>(null)
+  useEffect(() => {
+    setQuote(null)
+    setQuotedRequest(null)
+  }, [appId, buildId, planVersionId])
+  const price = useMutation({
     mutationFn: async () => {
       const manifest = query.data?.manifest
       if (!manifest?.plan_version_id || query.data?.blockers.length)
-        throw new Error('Refresh the release check before running')
-      const storageKey = `mobile-qa:run:${session.user.id}:${workspaceId}:${appId}:${buildId}:${manifest.plan_version_id}:${manifest.environment_revision}`
+        throw new Error('Refresh the release check before requesting a price')
+      const request = {
+        build_id: buildId,
+        plan_version_id: manifest.plan_version_id,
+        environment_revision: manifest.environment_revision,
+      }
+      const result = await createCommercialCheckQuote(appId, {
+        intent: { kind: 'release_plan', request },
+      })
+      setQuotedRequest(request)
+      setQuote(result)
+      return result
+    },
+  })
+  const start = useMutation({
+    mutationFn: async () => {
+      if (!quote || !quotedRequest) throw new Error('Review this check price first')
+      const storageKey = `mobile-qa:run:${session.user.id}:${workspaceId}:${appId}:${buildId}:${quotedRequest.plan_version_id}:${quotedRequest.environment_revision}:${quote.id}`
       let key = sessionStorage.getItem(storageKey)
       if (!key) {
         key = crypto.randomUUID()
         sessionStorage.setItem(storageKey, key)
       }
-      const run = await createRun(
-        appId,
-        {
-          build_id: buildId,
-          plan_version_id: manifest.plan_version_id,
-          environment_revision: manifest.environment_revision,
-        },
-        key,
-      )
+      const run = await createRun(appId, quotedRequest, key, quote.id)
       sessionStorage.removeItem(storageKey)
       return run
     },
@@ -132,15 +150,29 @@ export function RunPreview({
           </>
         )}
         {start.isError && <ErrorNotice error={start.error} retry={() => start.mutate()} />}
-        {!readOnly && (
-          <Button
-            disabled={!query.data?.manifest || !!query.data.blockers.length || query.isError}
-            loading={start.isPending}
-            onClick={() => start.mutate()}
-          >
-            Run release check
-          </Button>
-        )}
+        {price.isError && <ErrorNotice error={price.error} retry={() => price.mutate()} />}
+        {!readOnly &&
+          (quote ? (
+            <RunAuthorization
+              appId={appId}
+              quote={quote}
+              pending={start.isPending}
+              onConfirm={() => start.mutate()}
+              onRefresh={() => {
+                setQuote(null)
+                setQuotedRequest(null)
+                price.mutate()
+              }}
+            />
+          ) : (
+            <Button
+              disabled={!query.data?.manifest || !!query.data.blockers.length || query.isError}
+              loading={price.isPending}
+              onClick={() => price.mutate()}
+            >
+              Review check price
+            </Button>
+          ))}
       </Stack>
     </Card>
   )

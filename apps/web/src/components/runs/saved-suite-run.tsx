@@ -1,14 +1,17 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Group, Select, Stack, Text } from '@mantine/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Play } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import type {
+  CommercialQuoteResponse,
   LibraryDraftResponse,
   LibraryProfileChoice,
   SuiteRunRequest,
 } from '@/api/generated/types.gen'
 import { createSuiteRun, suiteRunPreviewQuery } from '@/api/regression'
+import { createCommercialCheckQuote } from '@/api/commercial'
+import { RunAuthorization } from '@/components/commercial/RunAuthorization'
 import { buildQuery } from '@/api/setup'
 import { phoneOptionsQuery, phoneQuery, stopPhone } from '@/api/task-sessions'
 import { useWorkspace } from '@/hooks/use-workspace'
@@ -37,6 +40,11 @@ export function SavedSuiteRun({
   const [profileId, setProfileId] = useState<string | null>(null)
   const [baselineId, setBaselineId] = useState<string | undefined>()
   const pending = useRef<{ body: SuiteRunRequest; key: string } | null>(null)
+  const [quote, setQuote] = useState<CommercialQuoteResponse | null>(null)
+  useEffect(() => {
+    pending.current = null
+    setQuote(null)
+  }, [versionId, dirty])
   const build = choices.data?.builds.find((value) => value.id === buildId)
   const profile = profiles.find((value) => value.id === profileId && value.qualified)
   const selectedBuild = useQuery({ ...buildQuery(appId, buildId ?? ''), enabled: !!buildId })
@@ -56,7 +64,7 @@ export function SavedSuiteRun({
     (value) => value.id === readiness.data?.suggested_baseline_id,
   )
 
-  const submit = useMutation({
+  const prepare = useMutation({
     mutationFn: async (displayedBaseline: string) => {
       if (!pending.current) {
         let selectedVersion = versionId
@@ -88,6 +96,20 @@ export function SavedSuiteRun({
           key: crypto.randomUUID(),
         }
       }
+      setStage('Getting exact check price…')
+      const priced = await createCommercialCheckQuote(appId, {
+        intent: { kind: 'saved_suite', request: pending.current.body },
+      })
+      setQuote(priced)
+      return priced
+    },
+    onSettled: () => setStage(''),
+  })
+
+  const submit = useMutation({
+    mutationFn: async () => {
+      if (!pending.current || !quote)
+        throw new SuiteRunSetupError('Review the exact check price first.')
 
       setStage('Preparing a clean test session…')
       const latest = await client.fetchQuery({ ...phoneOptionsQuery(appId), staleTime: 0 })
@@ -116,7 +138,7 @@ export function SavedSuiteRun({
       }
 
       setStage('Queuing suite…')
-      return createSuiteRun(appId, pending.current.body, pending.current.key)
+      return createSuiteRun(appId, pending.current.body, pending.current.key, quote.id)
     },
     onSuccess: (run) => {
       pending.current = null
@@ -127,6 +149,8 @@ export function SavedSuiteRun({
   })
   const change = () => {
     pending.current = null
+    setQuote(null)
+    prepare.reset()
     submit.reset()
   }
 
@@ -141,7 +165,7 @@ export function SavedSuiteRun({
           label="Build to test"
           placeholder="Choose a build"
           value={buildId}
-          disabled={submit.isPending}
+          disabled={submit.isPending || prepare.isPending}
           data={choices.data?.builds.map((value) => ({ value: value.id, label: value.name })) ?? []}
           onChange={(value) => {
             setBuildId(value)
@@ -153,7 +177,7 @@ export function SavedSuiteRun({
           label="Test device"
           placeholder="Choose a qualified device"
           value={profileId}
-          disabled={submit.isPending}
+          disabled={submit.isPending || prepare.isPending}
           data={profiles
             .filter((value) => value.qualified)
             .map((value) => ({ value: value.id, label: value.name }))}
@@ -173,7 +197,7 @@ export function SavedSuiteRun({
       <Select
         label="Compare with"
         value={selectedBaseline}
-        disabled={submit.isPending}
+        disabled={submit.isPending || prepare.isPending}
         data={[
           { value: '', label: 'None — establish a first result' },
           ...(readiness.data?.baselines.map((value) => ({
@@ -207,20 +231,34 @@ export function SavedSuiteRun({
           Unable to load run readiness. Retry the run setup.
         </Text>
       )}
-      <Button
-        size="sm"
-        leftSection={<Play size={15} aria-hidden />}
-        disabled={
-          unavailable ||
-          choices.isError ||
-          (!pending.current &&
-            (!selectedBuild.data || !!(!dirty && readiness.data?.blockers.length)))
-        }
-        loading={submit.isPending}
-        onClick={() => submit.mutate(selectedBaseline)}
-      >
-        {pending.current ? 'Retry run' : dirty ? 'Save & run suite' : 'Run suite'}
-      </Button>
+      {!quote && (
+        <Button
+          size="sm"
+          leftSection={<Play size={15} aria-hidden />}
+          disabled={
+            unavailable ||
+            choices.isError ||
+            (!pending.current &&
+              (!selectedBuild.data || !!(!dirty && readiness.data?.blockers.length)))
+          }
+          loading={prepare.isPending}
+          onClick={() => prepare.mutate(selectedBaseline)}
+        >
+          {dirty ? 'Save & review check price' : 'Review check price'}
+        </Button>
+      )}
+      {quote && (
+        <RunAuthorization
+          appId={appId}
+          quote={quote}
+          pending={submit.isPending}
+          onConfirm={() => submit.mutate()}
+          onRefresh={() => {
+            setQuote(null)
+            prepare.mutate(selectedBaseline)
+          }}
+        />
+      )}
       <Text size="xs" c="dimmed" ta="right">
         {choices.isPending
           ? 'Loading run setup…'
@@ -238,6 +276,13 @@ export function SavedSuiteRun({
           {submit.error instanceof SuiteRunSetupError
             ? submit.error.message
             : 'The suite could not be queued. Retry with the same run request.'}
+        </Text>
+      )}
+      {prepare.isError && (
+        <Text size="xs" c="red" role="alert">
+          {prepare.error instanceof SuiteRunSetupError
+            ? prepare.error.message
+            : 'Could not quote this check. Review the agreement and retry.'}
         </Text>
       )}
     </Stack>

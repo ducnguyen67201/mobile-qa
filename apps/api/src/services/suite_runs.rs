@@ -11,7 +11,7 @@ use mobile_qa_contracts::{execution::*, regression::*};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use uuid::Uuid;
 
-async fn manifest(
+pub(crate) async fn commercial_manifest(
     db: &impl ConnectionTrait,
     app: Uuid,
     input: &SuiteRunRequest,
@@ -82,7 +82,7 @@ pub async fn preview(
     input: SuiteRunRequest,
 ) -> ApiResult<SuiteRunPreview> {
     apps::authorized(ctx, actor, app).await?;
-    let preview = manifest(&ctx.db, app, &input).await?;
+    let preview = commercial_manifest(&ctx.db, app, &input).await?;
     let manifest = preview.manifest.ok_or_else(ApiFailure::internal)?;
     let (baselines, suggested_baseline_id) = run_baselines::choices(
         &ctx.db,
@@ -106,16 +106,34 @@ pub async fn create(
     key: &str,
     input: SuiteRunRequest,
 ) -> ApiResult<(RunResponse, bool)> {
+    create_with_quote(ctx, actor, app, key, input, None).await
+}
+
+pub async fn create_with_quote(
+    ctx: &AppContext,
+    actor: Uuid,
+    app: Uuid,
+    key: &str,
+    input: SuiteRunRequest,
+    quote_id: Option<Uuid>,
+) -> ApiResult<(RunResponse, bool)> {
     apps::authorized(ctx, actor, app).await?;
     if !bounded(key, 128) {
         return Err(ApiFailure::invalid(
             "Idempotency-Key must contain 1–128 printable bytes",
         ));
     }
-    let fingerprint = hash(
-        serde_json::to_vec(&("saved_suite_v1", actor, &input))
-            .map_err(|_| ApiFailure::internal())?,
-    );
+    let fingerprint = if let Some(id) = quote_id {
+        hash(
+            serde_json::to_vec(&("saved_suite_v1", actor, &input, id))
+                .map_err(|_| ApiFailure::internal())?,
+        )
+    } else {
+        hash(
+            serde_json::to_vec(&("saved_suite_v1", actor, &input))
+                .map_err(|_| ApiFailure::internal())?,
+        )
+    };
     let tx = ctx.db.begin().await?;
     one(
         &tx,
@@ -144,7 +162,7 @@ pub async fn create(
         vec![app.into()],
     )
     .await?;
-    let preview = manifest(&tx, app, &input).await?;
+    let preview = commercial_manifest(&tx, app, &input).await?;
     if !preview.blockers.is_empty() {
         return Err(ApiFailure::invalid(preview.blockers.join("; ")));
     }
@@ -178,6 +196,18 @@ pub async fn create(
             json(&manifest)?.into(),
             input.baseline_run_id.into(),
         ],
+    )
+    .await?;
+    super::commercial::reserve_or_test_fixture(
+        ctx,
+        &tx,
+        actor,
+        app,
+        quote_id,
+        "saved_suite",
+        &super::commercial::suite_hash(actor, &input)?,
+        &manifest,
+        id,
     )
     .await?;
     for (index, _) in manifest.cases.iter().enumerate() {

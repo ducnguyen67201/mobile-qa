@@ -39,11 +39,13 @@ Doppler scope, while the qualified host profile chooses worker/model scope.
 
 ## Current variables
 
-| Variable                       | Consumer and use                                                                                        |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `HOST`                         | Production API public origin, required by production Loco config                                        |
-| `DATABASE_URL`                 | Production PostgreSQL connection, required by production Loco config                                    |
-| `MOBILE_USE_TELEMETRY_ENABLED` | Set to `false` before future real Minitap execution; explicit import smoke already sets this internally |
+| Variable                       | Consumer and use                                                                                            |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `HOST`                         | Production API public origin, required by production Loco config                                            |
+| `DATABASE_URL`                 | Production PostgreSQL connection, required by production Loco config                                        |
+| `MOBILE_USE_TELEMETRY_ENABLED` | Set to `false` before future real Minitap execution; explicit import smoke already sets this internally     |
+| `STRIPE_SECRET_KEY`            | API-only Stripe Checkout session creation and subscription verification; optional until checkout is enabled |
+| `STRIPE_WEBHOOK_SECRET`        | API-only signed paid-invoice webhook verification; must be present together with the secret key             |
 
 Development/test databases keep their isolated loopback configuration. They ignore
 production DATABASE_URL, so selecting a production secret set cannot redirect a local
@@ -51,10 +53,16 @@ test at a customer database. Local Compose credentials are disposable developmen
 configuration, not deployment credentials. Model/provider credentials will be specified
 with the real worker implementation; no placeholder secret names or values are added.
 
-The web app currently needs no secrets or public environment variables: it calls the
+The web app needs no secrets or public environment variables: it calls the
 same-origin API. Any future `VITE_*` variable is public browser-build input; never store
 server credentials under that prefix. Launch `just dev` normally, not under a parent
 Doppler wrapper that would also pass server secrets to Vite.
+
+To enable monthly checkout in an environment, inject both Stripe variables into
+the API process through Doppler and register the environment's
+`/api/billing/stripe-webhook` endpoint for `invoice.paid`. The app returns a
+service-unavailable error when either variable is absent; selecting a card does
+not grant credits. Use provider test mode before live activation.
 
 ## CI and deployment
 

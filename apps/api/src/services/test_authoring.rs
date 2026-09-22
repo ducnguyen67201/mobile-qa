@@ -14,6 +14,7 @@ pub async fn command(
     input: PhoneCommandRequest,
 ) -> ApiResult<PhoneSession> {
     let session = phones::authorized(ctx, user, id).await?;
+    super::commercial::require_separate_scope(ctx, user, session.app_id).await?;
     input
         .sequence
         .validate(&session.profile.package)
@@ -163,6 +164,7 @@ pub async fn generate(
     input: GenerateTestsRequest,
 ) -> ApiResult<PhoneSession> {
     let s = phones::authorized(ctx, user, input.session_id).await?;
+    super::commercial::require_separate_scope(ctx, user, app).await?;
     if s.app_id != app {
         return Err(ApiFailure::unauthorized());
     }

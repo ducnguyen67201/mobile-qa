@@ -1,5 +1,17 @@
-import { Badge, Box, Card, Divider, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core'
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  Divider,
+  Group,
+  SimpleGrid,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router'
 import { Database, ShieldCheck, SlidersHorizontal } from 'lucide-react'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { settingsQuery } from '@/api/setup'
@@ -16,7 +28,7 @@ import {
 export function Settings() {
   const settings = useQuery(settingsQuery)
   const session = useSession()
-  const { workspace } = useWorkspace()
+  const { workspace, href } = useWorkspace()
   return (
     <>
       <PageHeading
@@ -32,6 +44,21 @@ export function Settings() {
       ) : (
         settings.data && (
           <Stack gap="lg">
+            <Card withBorder>
+              <Group justify="space-between" align="flex-start">
+                <Box>
+                  <Title order={2} size="h5">
+                    Pricing & usage
+                  </Title>
+                  <Text size="sm" c="dimmed">
+                    See proposed pilot terms, your agreed period, and reviewed check usage.
+                  </Text>
+                </Box>
+                <Button component={Link} to={href('/settings/commercial')} variant="light">
+                  Open pricing & usage
+                </Button>
+              </Group>
+            </Card>
             <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="lg">
               <Card>
                 <Group gap="xs" mb="lg">

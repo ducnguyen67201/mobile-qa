@@ -69,10 +69,59 @@ function fixtureFetch(override?: (request: Request) => Promise<Response | undefi
     if (path.endsWith('/versions')) return Response.json({ items: [], next_cursor: null })
     if (path.endsWith(`/versions/${versionId}`)) return Response.json(libraryVersion)
     if (path.endsWith('/runs')) return Response.json({ items: [], next_cursor: null })
+    if (path.endsWith('/commercial-access'))
+      return Response.json({
+        app_id: appId,
+        state: 'uncontracted',
+        plans: [],
+        credit: null,
+        agreement: null,
+        pilot_request_id: null,
+        reserved_checks: 0,
+        delivered_checks: 0,
+        credited_checks: 0,
+        delivered_check_cents: 0,
+        usage: [],
+      })
     throw new Error(`Unexpected fixture request ${request.method} ${path}`)
   })
 }
 afterEach(() => vi.unstubAllGlobals())
+it('explains an unreadable saved draft while keeping version history available', async () => {
+  vi.stubGlobal(
+    'fetch',
+    fixtureFetch(async (request) => {
+      const path = new URL(request.url).pathname
+      if (path.endsWith(`/test-library/${entryId}`)) {
+        return Response.json({
+          ...libraryEntry,
+          needs_setup: true,
+          capabilities: { ...libraryEntry.capabilities, can_edit: false },
+        })
+      }
+      if (path.endsWith('/draft')) {
+        return Response.json(
+          {
+            code: 'unsupported_test_schema',
+            message: 'This saved test uses a format this checkout cannot read',
+            details: null,
+            request_id: mutationId,
+          },
+          { status: 409 },
+        )
+      }
+      if (path.endsWith('/versions')) {
+        return Response.json({ items: [libraryVersion], next_cursor: null })
+      }
+    }),
+  )
+  show(`/tests/${appId}/${entryId}`)
+  expect(await screen.findByText('Saved in a newer format')).toBeInTheDocument()
+  expect(screen.getByText(/Its saved versions and run reports remain intact/)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: /v1 ·/ })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
+})
+
 it('creates without a manual key and reuses the same generated identity after a lost response', async () => {
   const bodies: CreateLibraryEntryRequest[] = []
   vi.stubGlobal(
@@ -453,6 +502,26 @@ it('runs the selected saved plan and follows its simulated report', async () => 
         expect(new URL(request.url).searchParams.get('plan_version_id')).toBe(versionId)
         return Response.json({ plan: plan.version, manifest: run.manifest, blockers: [] })
       }
+      if (path.endsWith('/commercial-check-quotes'))
+        return Response.json(
+          {
+            id: mutationId,
+            app_id: appId,
+            kind: 'release_plan',
+            build_id: buildId,
+            source_version_id: versionId,
+            profile_id: mutationId,
+            case_count: 1,
+            amount_cents: 12500,
+            maximum_credits: null,
+            credits_after_authorization: null,
+            currency: 'USD',
+            checks_after_authorization: 1,
+            check_cap: 8,
+            expires_at: new Date(Date.now() + 600_000).toISOString(),
+          },
+          { status: 201 },
+        )
       if (path.endsWith('/runs') && request.method === 'POST') {
         submissions.push(zCreateRunRequest.parse(await request.json()))
         return Response.json(run, { status: 201 })
@@ -462,7 +531,9 @@ it('runs the selected saved plan and follows its simulated report', async () => 
   )
   const { router } = show(`/tests/${appId}/${entryId}/versions/${versionId}`)
   expect(await screen.findByText(/Simulated worker/)).toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: 'Run release check' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Review check price' }))
+  expect(submissions).toHaveLength(0)
+  await userEvent.click(await screen.findByRole('button', { name: 'Authorize check and run' }))
   expect(await screen.findByText(/Simulated execution/)).toBeInTheDocument()
   expect(router.state.location.pathname).toBe(`/runs/${mutationId}`)
   expect(submissions).toEqual([

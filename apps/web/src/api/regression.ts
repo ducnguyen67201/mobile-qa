@@ -45,12 +45,21 @@ export const suiteRunPreviewQuery = (appId: string, body: SuiteRunRequest) =>
         z.zSuiteRunPreview,
       ),
   })
-export const createSuiteRun = (appId: string, body: SuiteRunRequest, key: string) =>
+export const createSuiteRun = (
+  appId: string,
+  body: SuiteRunRequest,
+  key: string,
+  quoteId?: string,
+) =>
   checked(
     sdk.createSuiteRun({
       ...options,
       path: { app_id: appId },
-      headers: { ...headers(), 'Idempotency-Key': key },
+      headers: {
+        ...headers(),
+        'Idempotency-Key': key,
+        ...(quoteId ? { 'X-Commercial-Quote-Id': quoteId } : {}),
+      },
       body: z.zSuiteRunRequest.parse(body),
     }),
     z.zRunResponse,

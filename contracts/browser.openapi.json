@@ -2034,6 +2034,446 @@
         ]
       }
     },
+    "/api/apps/{app_id}/commercial-access": {
+      "get": {
+        "tags": [],
+        "operationId": "getCommercialAccess",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Commercial access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommercialAccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
+    "/api/apps/{app_id}/commercial-check-quotes": {
+      "post": {
+        "tags": [],
+        "operationId": "createCommercialCheckQuote",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommercialQuoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Run quote",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommercialQuoteResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
+    "/api/apps/{app_id}/commercial-pilot-requests": {
+      "post": {
+        "tags": [],
+        "operationId": "requestCommercialPilot",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommercialPilotRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Pilot request saved for manual review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommercialPilotResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
+    "/api/apps/{app_id}/credit-checkout": {
+      "post": {
+        "tags": [],
+        "operationId": "createCreditCheckout",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreditCheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Hosted payment URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditCheckoutResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
+    "/api/apps/{app_id}/credit-plan-change": {
+      "post": {
+        "tags": [],
+        "operationId": "changeCreditPlan",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreditPlanChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated plan schedule and current access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommercialAccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
     "/api/apps/{app_id}/default-test-plan": {
       "get": {
         "tags": [],
@@ -3322,6 +3762,18 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-Commercial-Quote-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
           }
         ],
         "requestBody": {
@@ -3493,6 +3945,18 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Commercial-Quote-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
             }
           }
         ],
@@ -9285,6 +9749,383 @@
           "manual"
         ]
       },
+      "CommercialAccessResponse": {
+        "type": "object",
+        "required": [
+          "app_id",
+          "state",
+          "plans",
+          "reserved_checks",
+          "delivered_checks",
+          "credited_checks",
+          "delivered_check_cents",
+          "usage"
+        ],
+        "properties": {
+          "agreement": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommercialAgreementView"
+              }
+            ]
+          },
+          "app_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "credit": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CreditAccessView"
+              }
+            ]
+          },
+          "credited_checks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "delivered_check_cents": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "delivered_checks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pilot_request_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "plans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreditPlanView"
+            }
+          },
+          "reserved_checks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CommercialState"
+          },
+          "usage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommercialUsageView"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommercialAgreementView": {
+        "type": "object",
+        "required": [
+          "id",
+          "offer",
+          "starts_at",
+          "ends_at",
+          "first_source_version_id",
+          "profile_id",
+          "base_cents",
+          "second_suite_cents",
+          "check_cents",
+          "check_cap",
+          "currency",
+          "price_revision"
+        ],
+        "properties": {
+          "base_cents": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "check_cap": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "check_cents": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "first_source_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "offer": {
+            "$ref": "#/components/schemas/CommercialOffer"
+          },
+          "price_revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "profile_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "second_source_version_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "second_suite_cents": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommercialOffer": {
+        "type": "string",
+        "enum": [
+          "pilot",
+          "recurring"
+        ]
+      },
+      "CommercialPilotRequest": {
+        "type": "object",
+        "required": [
+          "coverage_note"
+        ],
+        "properties": {
+          "coverage_note": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommercialPilotResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "app_id"
+        ],
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommercialQuoteRequest": {
+        "type": "object",
+        "required": [
+          "intent"
+        ],
+        "properties": {
+          "intent": {
+            "$ref": "#/components/schemas/CommercialRunIntent"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommercialQuoteResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "app_id",
+          "kind",
+          "build_id",
+          "source_version_id",
+          "profile_id",
+          "case_count",
+          "amount_cents",
+          "currency",
+          "checks_after_authorization",
+          "check_cap",
+          "expires_at"
+        ],
+        "properties": {
+          "amount_cents": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "app_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "build_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "case_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "check_cap": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "checks_after_authorization": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "credits_after_authorization": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "maximum_credits": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "profile_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_version_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommercialRunIntent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "request",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "release_plan"
+                ]
+              },
+              "request": {
+                "$ref": "#/components/schemas/CreateRunRequest"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "request",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "saved_suite"
+                ]
+              },
+              "request": {
+                "$ref": "#/components/schemas/SuiteRunRequest"
+              }
+            }
+          }
+        ]
+      },
+      "CommercialState": {
+        "type": "string",
+        "enum": [
+          "uncontracted",
+          "active",
+          "paused",
+          "expired"
+        ]
+      },
+      "CommercialUsageState": {
+        "type": "string",
+        "enum": [
+          "reserved",
+          "delivered",
+          "credited"
+        ]
+      },
+      "CommercialUsageView": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "state",
+          "amount_cents",
+          "created_at"
+        ],
+        "properties": {
+          "amount_cents": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CommercialUsageState"
+          }
+        },
+        "additionalProperties": false
+      },
       "ComparisonKind": {
         "type": "string",
         "enum": [
@@ -9465,6 +10306,211 @@
             "type": "string",
             "maxLength": 100,
             "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreditAccessView": {
+        "type": "object",
+        "required": [
+          "plan",
+          "period_start",
+          "period_end",
+          "granted_credits",
+          "charged_credits",
+          "held_credits",
+          "available_credits",
+          "rate_revision",
+          "usage"
+        ],
+        "properties": {
+          "available_credits": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "charged_credits": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "granted_credits": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "held_credits": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pending_effective_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "pending_plan": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CreditPlan"
+              }
+            ]
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/CreditPlan"
+          },
+          "rate_revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "usage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreditUsageView"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreditCheckoutRequest": {
+        "type": "object",
+        "required": [
+          "plan"
+        ],
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/CreditPlan"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreditCheckoutResponse": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreditPlan": {
+        "type": "string",
+        "enum": [
+          "starter",
+          "plus",
+          "business"
+        ]
+      },
+      "CreditPlanChangeRequest": {
+        "type": "object",
+        "required": [
+          "plan"
+        ],
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/CreditPlan"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreditPlanView": {
+        "type": "object",
+        "required": [
+          "plan",
+          "monthly_cents",
+          "monthly_credits",
+          "currency"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "monthly_cents": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "monthly_credits": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/CreditPlan"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreditUsageView": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "state",
+          "held_credits",
+          "charged_credits"
+        ],
+        "properties": {
+          "charged_credits": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "device_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "held_credits": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "input_tokens": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "measured_credits": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "output_tokens": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "stored_bytes": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "additionalProperties": false

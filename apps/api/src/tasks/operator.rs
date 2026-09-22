@@ -4,9 +4,10 @@ use crate::{
     models::_entities::{
         app_memberships, environment_checks, environments, memberships, secret_references, users,
     },
-    services::{apps, auth},
+    services::{apps, auth, commercial},
 };
 use async_trait::async_trait;
+use chrono::DateTime;
 use chrono::Utc;
 use loco_rs::{
     app::AppContext,
@@ -27,6 +28,11 @@ fn arg<'a>(vars: &'a Vars, name: &str) -> ApiResult<&'a str> {
 }
 fn secret(name: &str) -> ApiResult<String> {
     std::env::var(name).map_err(|_| ApiFailure::invalid(format!("Inject {name} into this process")))
+}
+fn timestamp(vars: &Vars, name: &str) -> ApiResult<chrono::DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(arg(vars, name)?)
+        .map(|value| value.with_timezone(&Utc))
+        .map_err(|_| ApiFailure::invalid(format!("{name} must be an RFC3339 timestamp")))
 }
 pub async fn execute(ctx: &AppContext, vars: &Vars) -> ApiResult<()> {
     let action = arg(vars, "action")?;
@@ -75,6 +81,53 @@ pub async fn execute(ctx: &AppContext, vars: &Vars) -> ApiResult<()> {
         ));
     }
     match action {
+        "commercial-activate" => {
+            let app=apps::authorized(ctx,actor,id(vars,"app")?).await?;
+            if app.organization_id!=org { return Err(ApiFailure::missing()); }
+            let offer=match arg(vars,"offer")? {
+                "pilot"=>mobile_qa_contracts::commercial::CommercialOffer::Pilot,
+                "recurring"=>mobile_qa_contracts::commercial::CommercialOffer::Recurring,
+                _=>return Err(ApiFailure::invalid("Offer must be pilot or recurring")),
+            };
+            let second=vars.cli.get("second-source").map(|value|Uuid::parse_str(value)
+                .map_err(|_|ApiFailure::invalid("second-source must be a UUID"))).transpose()?;
+            let agreement=commercial::activate(ctx,actor,app.id,offer,timestamp(vars,"starts")?,timestamp(vars,"ends")?,
+                id(vars,"first-source")?,second,id(vars,"profile")?,arg(vars,"reference")?,arg(vars,"reason")?).await?;
+            println!("agreement_id={agreement}");
+        }
+        "commercial-pause" | "commercial-end" => {
+            let app=apps::authorized(ctx,actor,id(vars,"app")?).await?;
+            if app.organization_id!=org { return Err(ApiFailure::missing()); }
+            commercial::set_status(ctx,actor,app.id,if action=="commercial-pause"{"paused"}else{"ended"},arg(vars,"reason")?).await?;
+        }
+        "commercial-review" => {
+            let app=apps::authorized(ctx,actor,id(vars,"app")?).await?;
+            if app.organization_id!=org { return Err(ApiFailure::missing()); }
+            let run=id(vars,"run")?;
+            let row=crate::services::execution_store::one(&ctx.db,"SELECT app_id FROM execution_runs WHERE id=$1",vec![run.into()]).await?;
+            if crate::services::execution_store::field::<Uuid>(&row,"app_id")?!=app.id { return Err(ApiFailure::missing()); }
+            let decision=match arg(vars,"decision")? {
+                "delivered"=>mobile_qa_contracts::commercial::CommercialUsageState::Delivered,
+                "credited"=>mobile_qa_contracts::commercial::CommercialUsageState::Credited,
+                _=>return Err(ApiFailure::invalid("Decision must be delivered or credited")),
+            };
+            commercial::review(ctx,actor,run,decision,arg(vars,"reason")?).await?;
+        }
+        "commercial-reconcile" => {
+            let app=apps::authorized(ctx,actor,id(vars,"app")?).await?;
+            if app.organization_id!=org { return Err(ApiFailure::missing()); }
+            let summary=commercial::status(ctx,actor,app.id).await?;
+            let base=summary.agreement.as_ref().map_or(0,|agreement|agreement.base_cents);
+            let add_on=summary.agreement.as_ref().map_or(0,|agreement|agreement.second_suite_cents);
+            println!("app_id={},state={:?},base_cents={},second_suite_cents={},delivered_check_cents={},subtotal_cents={},delivered_checks={},reserved_checks={},credited_checks={}",app.id,summary.state,base,add_on,summary.delivered_check_cents,base+add_on+summary.delivered_check_cents,summary.delivered_checks,summary.reserved_checks,summary.credited_checks);
+            for item in summary.usage { println!("run_id={},state={:?},amount_cents={},reason={:?}",item.run_id,item.state,item.amount_cents,item.reason); }
+        }
+        "commercial-pilot-requests" => {
+            for row in crate::services::execution_store::rows(&ctx.db,"SELECT p.id,p.app_id,p.actor_id,p.coverage_note,p.created_at FROM commercial_pilot_requests p JOIN apps a ON a.id=p.app_id WHERE a.organization_id=$1 ORDER BY p.created_at DESC",vec![org.into()]).await? {
+                use crate::services::execution_store::field;
+                println!("request_id={},app_id={},actor_id={},created_at={},coverage_note={}",field::<Uuid>(&row,"id")?,field::<Uuid>(&row,"app_id")?,field::<Uuid>(&row,"actor_id")?,field::<DateTime<Utc>>(&row,"created_at")?,field::<String>(&row,"coverage_note")?);
+            }
+        }
         "link-google" => {
             let user = id(vars, "user")?;
             apps::membership(ctx, user, org).await?;
@@ -252,7 +305,7 @@ impl Task for Operator {
     fn task(&self) -> TaskInfo {
         TaskInfo {
             name: "operator".into(),
-            detail: "Explicit approval/provision/link-google/membership/grant/reference/observe operations"
+            detail: "Explicit approval/provision/link-google/membership/grant/reference/observe/commercial operations"
                 .into(),
         }
     }

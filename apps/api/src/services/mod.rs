@@ -39,6 +39,8 @@ pub mod execution_readiness;
 pub mod test_library_save;
 
 pub mod case_runs;
+pub mod commercial;
+pub mod credit_billing;
 pub mod model_registry;
 pub mod run_baselines;
 pub mod run_comparisons;

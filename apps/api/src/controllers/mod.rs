@@ -11,4 +11,5 @@ pub mod test_library;
 
 pub mod task_sessions;
 
+pub mod commercial;
 pub mod test_authoring;

@@ -96,6 +96,7 @@ it('queues the default release plan resolved by the preview', async () => {
     manifest,
   }
   const submissions: CreateRunRequest[] = []
+  let quoteRequested = false
   const base = fixtureFetch()
   vi.stubGlobal(
     'fetch',
@@ -105,7 +106,33 @@ it('queues the default release plan resolved by the preview', async () => {
         expect(url.searchParams.has('plan_version_id')).toBe(false)
         return Response.json({ plan: null, manifest, blockers: [] })
       }
+      if (url.pathname.endsWith('/commercial-check-quotes')) {
+        quoteRequested = true
+        return Response.json(
+          {
+            id: '33333333-3333-4333-8333-333333333333',
+            app_id: appId,
+            kind: 'release_plan',
+            build_id: buildId,
+            source_version_id: planVersionId,
+            profile_id: runId,
+            case_count: 1,
+            amount_cents: 12500,
+            maximum_credits: null,
+            credits_after_authorization: null,
+            currency: 'USD',
+            checks_after_authorization: 1,
+            check_cap: 8,
+            expires_at: new Date(Date.now() + 600_000).toISOString(),
+          },
+          { status: 201 },
+        )
+      }
       if (url.pathname.endsWith('/runs') && request.method === 'POST') {
+        expect(quoteRequested).toBe(true)
+        expect(request.headers.get('X-Commercial-Quote-Id')).toBe(
+          '33333333-3333-4333-8333-333333333333',
+        )
         submissions.push(zCreateRunRequest.parse(await request.json()))
         return Response.json(run, { status: 201 })
       }
@@ -114,7 +141,9 @@ it('queues the default release plan resolved by the preview', async () => {
     }),
   )
   show(`/apps/${appId}?build=${buildId}`)
-  await userEvent.click(await screen.findByRole('button', { name: 'Run release check' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Review check price' }))
+  expect(submissions).toHaveLength(0)
+  await userEvent.click(await screen.findByRole('button', { name: 'Authorize check and run' }))
   await waitFor(() => expect(submissions).toHaveLength(1))
   expect(submissions[0]).toEqual({
     build_id: buildId,

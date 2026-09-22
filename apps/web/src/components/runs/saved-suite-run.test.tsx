@@ -9,7 +9,8 @@ import type { LibraryDraftResponse } from '@/api/generated/types.gen'
 import fixture from '../../../../api/tests/fixtures/execution/comparison.json'
 import { SavedSuiteRun } from './saved-suite-run'
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), preview: vi.fn() }))
+const mocks = vi.hoisted(() => ({ create: vi.fn(), preview: vi.fn(), quote: vi.fn() }))
+vi.mock('@/api/commercial', () => ({ createCommercialCheckQuote: mocks.quote }))
 vi.mock('@/hooks/use-workspace', () => ({
   useWorkspace: () => ({ workspaceId: 'workspace', href: (path: string) => path }),
 }))
@@ -42,6 +43,23 @@ vi.mock('@/api/task-sessions', () => ({
 beforeEach(() => {
   mocks.create.mockReset()
   mocks.preview.mockReset()
+  mocks.quote.mockReset()
+  mocks.quote.mockResolvedValue({
+    id: 'quote',
+    app_id: 'app',
+    kind: 'saved_suite',
+    build_id: 'build',
+    source_version_id: 'suite-version',
+    profile_id: 'profile',
+    case_count: 1,
+    amount_cents: 12500,
+    maximum_credits: null,
+    credits_after_authorization: null,
+    currency: 'USD',
+    checks_after_authorization: 1,
+    check_cap: 8,
+    expires_at: new Date(Date.now() + 600_000).toISOString(),
+  })
   mocks.preview.mockResolvedValue({
     blockers: [],
     environment_revision: 7,
@@ -100,13 +118,15 @@ async function chooseSetup() {
   expect(await screen.findByText(/Build checksum:/)).toBeInTheDocument()
 }
 
-it('queues the saved suite in one click and opens its live run map', async () => {
+it('quotes the saved suite before authorization and opens its live run map', async () => {
   const run = zRunResponse.parse(fixture)
   mocks.create.mockResolvedValue(run)
   show()
-  expect(screen.getByRole('button', { name: 'Run suite' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Review check price' })).toBeDisabled()
   await chooseSetup()
-  await userEvent.click(screen.getByRole('button', { name: 'Run suite' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Review check price' }))
+  expect(mocks.create).not.toHaveBeenCalled()
+  await userEvent.click(await screen.findByRole('button', { name: 'Authorize check and run' }))
   await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
   expect(mocks.create.mock.calls[0]![1]).toEqual({
     suite_version_id: 'suite-version',
@@ -125,11 +145,12 @@ it('saves a changed sequence and retries the exact queued request after a lost r
     .mockResolvedValueOnce(zRunResponse.parse(fixture))
   show({ dirty: true, save })
   await chooseSetup()
-  await userEvent.click(await screen.findByRole('button', { name: 'Save & run suite' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Save & review check price' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Authorize check and run' }))
   await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
   const first = mocks.create.mock.calls[0]!
   expect(first[1]).toMatchObject({ suite_version_id: 'new-suite-version' })
-  await userEvent.click(await screen.findByRole('button', { name: 'Retry run' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Authorize check and run' }))
   await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2))
   expect(mocks.create.mock.calls[1]).toEqual(first)
   expect(save).toHaveBeenCalledTimes(1)
@@ -158,7 +179,8 @@ it('offers a suggestion without selecting a baseline for the tester', async () =
   expect(screen.getByRole('combobox', { name: 'Compare with' })).toHaveValue(
     'None — establish a first result',
   )
-  await userEvent.click(screen.getByRole('button', { name: 'Run suite' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Review check price' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Authorize check and run' }))
   await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
   expect(mocks.create.mock.calls[0]![1].baseline_run_id).toBeNull()
 })
@@ -194,7 +216,8 @@ it('pins the explicitly selected suite baseline even when the readiness suggesti
     baselines: [],
     suggested_baseline_id: 'newer-run',
   })
-  await userEvent.click(screen.getByRole('button', { name: 'Run suite' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Review check price' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Authorize check and run' }))
   await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
   expect(mocks.create.mock.calls[0]![1].baseline_run_id).toBe('shown-run')
 })

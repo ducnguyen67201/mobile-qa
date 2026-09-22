@@ -41,6 +41,8 @@ Record queue wait, boot/install/run/reset time, device minutes, retries, model u
 
 Calculate cost per delivered report from allocated host idle time + active execution + model calls + storage/transfer + human review. Measure successful and failed attempts. Price the pilot against observed costs and coverage; defer “unlimited” plans and automated billing.
 
+Commercial access may be recorded and run authorization enforced before automated billing exists. The proposed terms and credit rules are in [product section 27](../product.md#27-proposed-commercial-access-and-usage-authorization). A manual invoice must reconcile to one immutable reservation per accepted run and a human-reviewed delivered or credited decision. Do not treat a passing run as a billing signal or mark an inconclusive result billable without review. Hosted paid acceptance still requires this spec's device, isolation, recovery and evidence gates.
+
 ## Scale only at observed bottlenecks
 
 | Signal                                                       | Smallest next change                                                                    |

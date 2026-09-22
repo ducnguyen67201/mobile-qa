@@ -142,3 +142,37 @@ Stable run IDs make equal timestamps
 deterministic; an incompatible older run does not block eligible work. The
 [focused spec](implementation/10-reliable-smoke-suite.md) defines the business
 rules and acceptance boundary.
+
+## 2026-09-21 — Manual commercial access before automated billing
+
+The operated pilot needs a transparent agreement and per-run authorization while
+customer-app cost and willingness to pay remain unmeasured. Keep proposed USD prices
+and periods in an audited app-scoped agreement; reserve each accepted check atomically
+against a bounded period; require the customer to approve the server quote for the
+exact run. A human settles delivered versus credited reports. Trusted internal CLI
+activation is distinct from the customer workspace operator role. Do not add payment
+credentials, checkout or automatic invoicing in this increment. [Product section 27](product.md#27-proposed-commercial-access-and-usage-authorization)
+owns the commercial terms and limitations.
+
+## 2026-09-22 — Paid monthly credits supersede the proposed per-check offer
+
+The user selected three direct-purchase monthly plans and a resetting allowance
+instead of asking each customer for pilot coverage and pricing each reviewed
+check. A signed Stripe paid-invoice event grants the monthly period; a browser
+redirect never does. The API holds a bounded maximum for each run, settles
+measured provider tokens, server-recorded device occupancy and sealed evidence
+bytes after report review, and releases unused credit. Existing check
+agreements remain auditable legacy records. The revision-1 rates are provisional
+until actual customer-app cost and support data validate them. See
+[Product section 28](product.md#28-monthly-credit-plans--local-implementation).
+
+## 2026-09-22 — Plan changes begin at a paid renewal
+
+A customer may move among the three monthly allowances without creating a second
+subscription. Schedule the next price at the current period end with no proration;
+keep the existing balance and price until Stripe confirms the renewal invoice.
+The paid invoice then grants exactly one period at the new allowance. A pending
+change is cancellable before renewal; choosing a different plan requires canceling
+the existing change first. Fail closed on an unsupported Stripe schedule or a
+subscription that diverges from the app's paid period. See
+[Product section 28](product.md#28-monthly-credit-plans--local-implementation).

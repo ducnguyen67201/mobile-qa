@@ -132,6 +132,8 @@ pub struct PhoneLease {
     pub session: PhoneSession,
     pub lease_token: String,
     pub build_sha256: String,
+    #[schema(schema_with = crate::artifacts_api::apk_byte_schema)]
+    #[schemars(range(min = 1, max = 2147483648_u32))]
     pub build_bytes: u32,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, ToSchema)]

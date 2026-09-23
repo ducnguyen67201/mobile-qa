@@ -11,8 +11,8 @@ use std::{
 };
 use tokio::{io::AsyncReadExt, process::Command};
 
-pub const POLICY: &str = "candidate-api35-x86_64-v1";
-pub const TOOL_VERSION: &str = "android-build-tools-36.0.0/intake-v1";
+pub const POLICY: &str = "candidate-api35-x86_64-large-v2";
+pub const TOOL_VERSION: &str = "android-build-tools-36.0.0/intake-v2";
 #[derive(Debug)]
 pub struct Inspection {
     pub state: ValidationState,
@@ -78,6 +78,19 @@ fn directory(file: &mut std::fs::File, size: u64) -> Result<(), Inspection> {
             return Err(invalid("APK directory entry is invalid"));
         }
         let read16 = |i| u16::from_le_bytes([header[i], header[i + 1]]);
+        let read32 = |i| {
+            u32::from_le_bytes(
+                header[i..i + 4]
+                    .try_into()
+                    .expect("bounded directory field"),
+            )
+        };
+        if [20, 24, 42]
+            .into_iter()
+            .any(|offset| read32(offset) == u32::MAX)
+        {
+            return Err(invalid("ZIP64 APK entries are not supported"));
+        }
         let name_len = read16(28) as usize;
         let extra = read16(30) as u64 + read16(32) as u64;
         if name_len == 0 || name_len > 4096 || read16(8) & 1 != 0 || read16(34) != 0 {
@@ -177,8 +190,7 @@ fn archive(
                 "APK contains unsafe, duplicate or encrypted entries",
             ));
         }
-        if entry.size() > 250 * 1024 * 1024 || entry.size() > entry.compressed_size().max(1) * 1000
-        {
+        if entry.size() > u32::MAX as u64 || entry.size() > entry.compressed_size().max(1) * 1000 {
             return Err(invalid("APK archive exceeds expansion limits"));
         }
         if !matches!(
@@ -208,7 +220,7 @@ fn archive(
                 break;
             }
             total += n as u64;
-            if total > 1024 * 1024 * 1024 {
+            if total > 8 * 1024 * 1024 * 1024 {
                 return Err(invalid("APK expanded content exceeds the limit"));
             }
         }
@@ -350,8 +362,8 @@ pub async fn inspect(
     hash: &str,
     expected_package: &str,
 ) -> Inspection {
-    let deadline = Instant::now() + Duration::from_secs(60);
-    let async_deadline = tokio::time::Instant::now() + Duration::from_secs(60);
+    let deadline = Instant::now() + Duration::from_secs(1200);
+    let async_deadline = tokio::time::Instant::now() + Duration::from_secs(1200);
     let owned = path.to_owned();
     let expected_hash = hash.to_owned();
     // Keep a separate CPU permit inside the blocking work even if HTTP is cancelled.

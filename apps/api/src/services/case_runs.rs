@@ -5,10 +5,14 @@ use super::{
 use crate::{
     domain::regression,
     errors::{ApiFailure, ApiResult},
+    models::_entities::{apps as app_rows, environments, execution_attempts, execution_runs},
 };
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::{execution::*, regression::*};
-use sea_orm::{ConnectionTrait, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set,
+    TransactionTrait,
+};
 use uuid::Uuid;
 
 async fn manifest(
@@ -99,34 +103,31 @@ pub async fn create(
             .map_err(|_| ApiFailure::internal())?,
     );
     let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![app.into()],
-    )
-    .await?;
-    if let Some(row) = rows(
-        &tx,
-        "SELECT id,fingerprint FROM execution_runs WHERE app_id=$1 AND idempotency_key=$2",
-        vec![app.into(), key.into()],
-    )
-    .await?
-    .first()
+    app_rows::Entity::find_by_id(app)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    if let Some(row) = execution_runs::Entity::find()
+        .filter(execution_runs::Column::AppId.eq(app))
+        .filter(execution_runs::Column::IdempotencyKey.eq(key))
+        .one(&tx)
+        .await?
     {
-        if field::<String>(row, "fingerprint")? != fingerprint {
+        if row.fingerprint != fingerprint {
             return Err(conflict("Idempotency key belongs to another submission"));
         }
-        let r = runs::detail(&tx, field(row, "id")?).await?;
+        let r = runs::detail(&tx, row.id).await?;
         tx.commit().await?;
         return Ok((r, false));
     }
     super::commercial::require_separate_scope(ctx, actor, app).await?;
-    one(
-        &tx,
-        "SELECT id FROM environments WHERE app_id=$1 FOR SHARE",
-        vec![app.into()],
-    )
-    .await?;
+    environments::Entity::find()
+        .filter(environments::Column::AppId.eq(app))
+        .lock_shared()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
     let p = manifest(&tx, app, &input).await?;
     if !p.blockers.is_empty() {
         return Err(ApiFailure::invalid(p.blockers.join("; ")));
@@ -136,12 +137,11 @@ pub async fn create(
         return Err(conflict("Environment changed; refresh the run setup"));
     }
     if let Some(id) = input.baseline_run_id {
-        one(
-            &tx,
-            "SELECT id FROM execution_runs WHERE id=$1 AND app_id=$2",
-            vec![id.into(), app.into()],
-        )
-        .await?;
+        execution_runs::Entity::find_by_id(id)
+            .filter(execution_runs::Column::AppId.eq(app))
+            .one(&tx)
+            .await?
+            .ok_or_else(ApiFailure::missing)?;
         let baseline = runs::detail(&tx, id).await?;
         if baseline.state != JobState::Finished {
             return Err(conflict("Baseline must be a completed run"));
@@ -149,13 +149,29 @@ pub async fn create(
         // An explicit incompatible baseline is retained and explained, never silently replaced.
     }
     let id = Uuid::new_v4();
-    exec(&tx,"INSERT INTO execution_runs(id,app_id,creator_id,build_id,plan_id,idempotency_key,fingerprint,manifest,baseline_run_id) VALUES($1,$2,$3,$4,NULL,$5,$6,$7,$8)",vec![id.into(),app.into(),actor.into(),input.build_id.into(),key.into(),fingerprint.into(),json(&m)?.into(),input.baseline_run_id.into()]).await?;
-    exec(
-        &tx,
-        "INSERT INTO execution_attempts(id,run_id,case_index) VALUES($1,$2,0)",
-        vec![Uuid::new_v4().into(), id.into()],
-    )
+    execution_runs::ActiveModel {
+        id: Set(id),
+        app_id: Set(app),
+        creator_id: Set(actor),
+        build_id: Set(input.build_id),
+        plan_id: Set(None),
+        idempotency_key: Set(key.to_owned()),
+        fingerprint: Set(fingerprint),
+        manifest: Set(json(&m)?),
+        baseline_run_id: Set(input.baseline_run_id),
+        ..Default::default()
+    }
+    .insert(&tx)
     .await?;
+    execution_attempts::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        run_id: Set(id),
+        case_index: Set(0),
+        ..Default::default()
+    }
+    .insert(&tx)
+    .await?;
+    super::capacity_control::enqueue(&tx, app, m.profile.id).await?;
     let r = runs::detail(&tx, id).await?;
     tx.commit().await?;
     super::execution_wakeup::notify(ctx);

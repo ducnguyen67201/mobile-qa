@@ -139,10 +139,11 @@ export function createUpload(appId: string, file: File, signal?: AbortSignal) {
     [201],
   )
 }
-export function getUpload(appId: string, uploadId: string) {
+export function getUpload(appId: string, uploadId: string, signal?: AbortSignal) {
   return checked(
     sdk.getBuildUpload({
       ...options,
+      signal,
       path: { app_id: appId, upload_id: uploadId },
     }),
     schemas.zUploadResponse,

@@ -109,6 +109,10 @@ uses private Railway Buckets with the logical backend `pilot`; an AWS S3 migrati
 copies immutable object keys/bytes and verifies stored SHA-256 before switching that
 backend's endpoint/credentials. PostgreSQL stores metadata; APK bytes stay in storage.
 
+Multipart uploads are enabled automatically for remote object storage; no separate
+environment flag is required. Verify hosted signing and browser CORS before
+customer rollout. Local storage retains the streaming upload path.
+
 Development/test always use private local disk and ephemeral JWT keys, even if the
 parent has production credentials. Restart requires a new login and retains app/build
 records. Dev artifacts live in ignored `.private/artifacts`; production scratch uses
@@ -144,6 +148,27 @@ Real navigation uses the qualified host profile's explicit Doppler project/confi
 for the SDK child, matching phase 02. The child environment excludes API/lease/DB
 credentials. The fake HTTP smoke supplies isolated synthetic tokens and never calls
 Doppler, starts an emulator or calls a model. No .env files are introduced.
+
+## Device capacity runtime scopes
+
+The API operator registration task consumes `MOBILE_QA_HOST_TOKEN` and
+`MOBILE_QA_CAPACITY_CONTROL_TOKEN` from its injected process. Only hashes are stored.
+The host receives only its host credential, obtains app/profile-scoped worker grants,
+and never receives database or object-store credentials. The controller receives
+its separate control credential and `MOBILE_QA_CAPACITY_WAKE_SECRET`; the API's
+outbox dispatcher receives that same wake secret and `MOBILE_QA_CAPACITY_WAKE_URL`.
+The wake secret signs a request; it cannot substitute for host or controller access.
+
+AWS Secrets Manager stores scoped Doppler bootstrap tokens selected by ARN. The
+bootstrap process fetches a token into memory and execs Doppler with no fallback
+file. OpenTofu passes only ARN and nonsecret scope identifiers. Host/API/Lambda
+images contain no runtime secrets. Local validation removes AWS and Doppler
+credentials and disables EC2 metadata lookup.
+
+`PORT` is a nonsecret platform setting used by production routing (the application
+image defaults to 5150). `MOBILE_QA_APK_CACHE_ROOT` selects a private retained disk
+cache; it is not a credential or a durable artifact store. Slot socket/token values
+are ephemeral process capabilities and must not appear in profiles, logs or images.
 
 ## Direct-only device profiles
 

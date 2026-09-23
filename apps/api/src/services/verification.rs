@@ -1,9 +1,10 @@
 //! Deterministic checks read retained evidence. SDK prose and exit status are not assertions.
-use super::{execution_store::*, run_artifacts};
-use crate::errors::ApiResult;
+use super::run_artifacts;
+use crate::{errors::ApiResult, models::_entities::execution_artifacts};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::execution::*;
 use quick_xml::{events::Event, Reader};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
@@ -172,15 +173,14 @@ pub async fn evaluate(
     id: Uuid,
     case: &CaseDefinition,
 ) -> ApiResult<(Vec<CheckResult>, Outcome)> {
-    let artifacts = rows(
-        &ctx.db,
-        "SELECT * FROM execution_artifacts WHERE attempt_id=$1 AND state='sealed'",
-        vec![id.into()],
-    )
-    .await?
-    .iter()
-    .map(run_artifacts::record)
-    .collect::<ApiResult<Vec<_>>>()?;
+    let artifacts = execution_artifacts::Entity::find()
+        .filter(execution_artifacts::Column::AttemptId.eq(id))
+        .filter(execution_artifacts::Column::State.eq("sealed"))
+        .all(&ctx.db)
+        .await?
+        .iter()
+        .map(run_artifacts::record)
+        .collect::<ApiResult<Vec<_>>>()?;
     let task = format!("qa-{id}");
     let mut results: Vec<CheckResult> = vec![];
     for check in &case.checks {

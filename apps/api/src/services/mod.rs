@@ -46,3 +46,11 @@ pub mod run_baselines;
 pub mod run_comparisons;
 pub mod run_history;
 pub mod suite_runs;
+
+pub mod build_delivery;
+pub mod multipart_uploads;
+pub mod upload_validation;
+
+pub mod capacity_control;
+pub mod capacity_wake;
+pub mod device_hosts;

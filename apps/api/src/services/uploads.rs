@@ -2,7 +2,7 @@
 use crate::{
     config::{Setup, MAX_APK, UPLOAD_SECONDS},
     errors::{ApiFailure, ApiResult},
-    models::_entities::{apps, build_uploads, builds},
+    models::_entities::{apps, artifact_jobs, build_uploads, builds},
     services::{apk_validation, apps as app_service},
 };
 use axum::extract::Multipart;
@@ -10,8 +10,8 @@ use chrono::{Duration, Utc};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::browser::*;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
-    Set, TransactionTrait,
+    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, Condition, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
@@ -82,7 +82,7 @@ pub async fn create(
         return Err(ApiFailure::new(
             413,
             "file_too_large",
-            "Choose a nonempty APK up to 250 MiB",
+            "Choose a nonempty APK up to 2 GiB",
         ));
     }
     let tx = ctx.db.begin().await?;
@@ -173,12 +173,12 @@ pub async fn transfer(
     let mut active: build_uploads::ActiveModel = row.into();
     active.state = Set("receiving".into());
     active.attempt_id = Set(Some(attempt));
-    active.lease_until = Set(Some(Utc::now() + Duration::minutes(6)));
+    active.lease_until = Set(Some(Utc::now() + Duration::minutes(31)));
     active.update(&tx).await?;
     tx.commit().await?;
     let key = format!("{}/{}/{}/{}", app.organization_id, app.id, id, attempt);
     let work = async {
-        let (scratch, mut file) = setup.store.scratch().await?;
+        let (scratch, mut file) = setup.store.scratch_with_budget(expected).await?;
         let mut field = multipart
             .next_field()
             .await
@@ -269,7 +269,7 @@ pub async fn transfer(
         }
         Ok::<(), ApiFailure>(())
     };
-    let result = tokio::time::timeout(std::time::Duration::from_secs(300), work)
+    let result = tokio::time::timeout(std::time::Duration::from_secs(1800), work)
         .await
         .unwrap_or_else(|_| {
             Err(ApiFailure::new(
@@ -366,6 +366,9 @@ pub async fn complete(
         .one(&tx)
         .await?
         .ok_or_else(ApiFailure::missing)?;
+    // Local small fixtures retain synchronous behavior; hosted and large work uses the durable queue.
+    let inline = !setup.store.is_remote()
+        && upload.expected_size <= i64::from(crate::services::multipart_uploads::PART_SIZE);
     let existing = builds::Entity::find()
         .filter(builds::Column::UploadId.eq(id))
         .one(&tx)
@@ -408,7 +411,7 @@ pub async fn complete(
         )
     })?;
     let attempt = Uuid::new_v4();
-    let lease = now + Duration::seconds(if setup.store.is_remote() { 240 } else { 90 });
+    let lease = now + Duration::seconds(90);
     let row = if let Some(row) = existing {
         let mut a: builds::ActiveModel = row.into();
         a.validation_state = Set("validating".into());
@@ -448,74 +451,57 @@ pub async fn complete(
         .insert(&tx)
         .await?
     };
+    artifact_jobs::Entity::insert(artifact_jobs::ActiveModel {
+        upload_id: Set(id),
+        phase: Set("validate".into()),
+        state: Set("processing".into()),
+        attempt_id: Set(Some(attempt)),
+        lease_until: Set(Some(lease)),
+        attempts: Set(1),
+        reason_code: Set(None),
+        updated_at: Set(now),
+    })
+    .on_conflict(
+        OnConflict::columns([
+            artifact_jobs::Column::UploadId,
+            artifact_jobs::Column::Phase,
+        ])
+        .update_columns([
+            artifact_jobs::Column::State,
+            artifact_jobs::Column::AttemptId,
+            artifact_jobs::Column::LeaseUntil,
+            artifact_jobs::Column::Attempts,
+            artifact_jobs::Column::ReasonCode,
+            artifact_jobs::Column::UpdatedAt,
+        ])
+        .to_owned(),
+    )
+    .exec(&tx)
+    .await?;
     let mut u: build_uploads::ActiveModel = upload.into();
     u.state = Set("finalized".into());
     u.update(&tx).await?;
-    tx.commit().await?;
-    let materialized = tokio::time::timeout(
-        std::time::Duration::from_secs(if setup.store.is_remote() { 120 } else { 20 }),
-        setup
-            .store
-            .materialize(&row.storage_key, &row.storage_backend),
-    )
-    .await;
-    let outcome = match materialized {
-        Ok(Ok(scratch)) => {
-            apk_validation::inspect(
-                &setup,
-                &scratch.0,
-                row.byte_size,
-                &row.sha256,
-                &app.android_package,
+    if !inline {
+        artifact_jobs::Entity::update_many()
+            .col_expr(
+                artifact_jobs::Column::State,
+                sea_orm::sea_query::Expr::value("pending"),
             )
-            .await
-        }
-        _ => apk_validation::Inspection::infrastructure(
-            "artifact_unavailable",
-            "Stored APK is unavailable. Retry validation",
-        ),
-    };
-    let status = serde_json::to_value(outcome.state)
-        .map_err(|_| ApiFailure::internal())?
-        .as_str()
-        .ok_or_else(ApiFailure::internal)?
-        .to_owned();
-    let metadata = outcome
-        .metadata
-        .map(serde_json::to_value)
-        .transpose()
-        .map_err(|_| ApiFailure::internal())?;
-    builds::Entity::update_many()
-        .col_expr(
-            builds::Column::ValidationState,
-            sea_orm::sea_query::Expr::value(status.clone()),
-        )
-        .col_expr(
-            builds::Column::ReasonCode,
-            sea_orm::sea_query::Expr::value(outcome.code),
-        )
-        .col_expr(
-            builds::Column::Message,
-            sea_orm::sea_query::Expr::value(outcome.message),
-        )
-        .col_expr(
-            builds::Column::Metadata,
-            sea_orm::sea_query::Expr::value(metadata),
-        )
-        .col_expr(
-            builds::Column::ValidatedAt,
-            sea_orm::sea_query::Expr::value(Utc::now()),
-        )
-        .col_expr(
-            builds::Column::LeaseUntil,
-            sea_orm::sea_query::Expr::value(None::<chrono::DateTime<Utc>>),
-        )
-        .filter(builds::Column::Id.eq(row.id))
-        .filter(builds::Column::AttemptId.eq(attempt))
-        .filter(builds::Column::ValidationState.eq("validating"))
-        .exec(&ctx.db)
-        .await?;
-    tracing::info!(app_id=%app.id,build_id=%row.id,phase=%status,"APK validation finished");
+            .col_expr(
+                artifact_jobs::Column::LeaseUntil,
+                sea_orm::sea_query::Expr::value(None::<chrono::DateTime<Utc>>),
+            )
+            .filter(artifact_jobs::Column::UploadId.eq(id))
+            .filter(artifact_jobs::Column::Phase.eq("validate"))
+            .filter(artifact_jobs::Column::AttemptId.eq(attempt))
+            .exec(&tx)
+            .await?;
+    }
+    tx.commit().await?;
+    if !inline {
+        return Ok((202, build_response(ctx, app, &row).await?));
+    }
+    crate::services::upload_validation::validate_claimed(ctx, app, &row, attempt).await?;
     let row = build(ctx, app, row.id).await?;
     Ok((
         if row.validation_state == "validating" {

@@ -2,10 +2,12 @@
 use crate::{
     config::Setup,
     errors::{ApiFailure, ApiResult},
-    services::{auth::Session, execution_store::*, task_sessions as phones, worker_auth::Worker},
+    models::_entities::builds,
+    services::{
+        auth::Session, execution_store::conflict, task_sessions as phones, worker_auth::Worker,
+    },
 };
 use axum::{
-    body::Body,
     extract::{DefaultBodyLimit, Path, State},
     http::HeaderMap,
     response::Response,
@@ -13,6 +15,7 @@ use axum::{
 };
 use loco_rs::{app::AppContext, controller::Routes};
 use mobile_qa_contracts::task_sessions::*;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
 async fn options(
     State(ctx): State<AppContext>,
@@ -58,13 +61,7 @@ async fn claim(
 ) -> ApiResult<Json<PhoneClaimResponse>> {
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(30);
     loop {
-        one(
-            &ctx.db,
-            "SELECT id FROM execution_workers WHERE id=$1 AND revoked=false",
-            vec![w.id.into()],
-        )
-        .await
-        .map_err(|_| ApiFailure::unauthorized())?;
+        crate::services::worker_auth::lease_authority(&ctx.db, &w).await?;
         let reply = phones::claim(&ctx, &w, input.clone()).await?;
         if reply.lease.is_some() || tokio::time::Instant::now() >= deadline {
             return Ok(Json(reply));
@@ -93,30 +90,55 @@ async fn build(
     h: HeaderMap,
 ) -> ApiResult<Response> {
     let r = phones::lease(&ctx.db, &w, id, token(&h)?).await?;
-    let b = one(
-        &ctx.db,
-        "SELECT storage_key,storage_backend FROM builds WHERE id=$1 AND app_id=$2",
-        vec![field::<Uuid>(&r, "build_id")?.into(), w.app_id.into()],
+    let b = builds::Entity::find_by_id(r.build_id)
+        .filter(builds::Column::AppId.eq(w.app_id))
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    crate::services::build_delivery::stream(
+        &Setup::get(&ctx),
+        &b.storage_key,
+        &b.storage_backend,
+        r.build_bytes,
+        &r.build_sha256,
     )
-    .await?;
-    let file = Setup::get(&ctx)
-        .store
-        .materialize(
-            &field::<String>(&b, "storage_key")?,
-            &field::<String>(&b, "storage_backend")?,
-        )
-        .await?;
-    let bytes = tokio::fs::read(&file.0).await?;
-    if hash(&bytes) != field::<String>(&r, "build_sha256")?
-        || bytes.len() != field::<i32>(&r, "build_bytes")? as usize
-    {
-        return Err(conflict("Stored build changed"));
-    }
-    Ok(Response::new(Body::from(bytes)))
+    .await
 }
+async fn delivery(
+    State(ctx): State<AppContext>,
+    w: Worker,
+    Path(id): Path<Uuid>,
+    h: HeaderMap,
+) -> ApiResult<Json<mobile_qa_contracts::artifacts_api::BuildDelivery>> {
+    let r = phones::lease(&ctx.db, &w, id, token(&h)?).await?;
+    let b = builds::Entity::find_by_id(r.build_id)
+        .filter(builds::Column::AppId.eq(w.app_id))
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let sha = r.build_sha256;
+    let size = r.build_bytes;
+    if b.sha256 != sha || b.byte_size != size {
+        return Err(conflict("Build identity changed"));
+    }
+    Ok(Json(crate::services::build_delivery::grant(
+        &Setup::get(&ctx),
+        &b.storage_key,
+        &b.storage_backend,
+        w.app_id,
+        size,
+        sha,
+        format!("/api/worker/phones/{id}/build"),
+    )?))
+}
+
 pub fn routes() -> Routes {
     use axum::routing::{get, post};
     Routes::new()
+        .add(
+            "/api/worker/phones/{session_id}/build/delivery",
+            get(delivery),
+        )
         .add("/api/apps/{app_id}/phone-options", get(options))
         .add("/api/apps/{app_id}/phones", post(open))
         .add("/api/phones/{session_id}", get(detail))

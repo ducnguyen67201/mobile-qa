@@ -43,6 +43,11 @@ impl Hooks for App {
         ctx.shared_store.insert(crate::config::Setup::new(&ctx)?);
         ctx.shared_store
             .insert(crate::services::execution_wakeup::ExecutionWakeup::default());
+        if !matches!(ctx.environment, Environment::Test) {
+            crate::services::capacity_wake::start(&ctx)
+                .map_err(|e| loco_rs::Error::string(&e.message))?;
+            crate::services::upload_validation::start(&ctx);
+        }
         Ok(ctx)
     }
     async fn after_routes(router: axum::Router, _ctx: &AppContext) -> Result<axum::Router> {
@@ -64,6 +69,7 @@ impl Hooks for App {
             .add_route(controllers::task_sessions::routes())
             .add_route(controllers::test_authoring::routes())
             .add_route(controllers::commercial::routes())
+            .add_route(controllers::device_hosts::routes())
         // routes-inject (do not remove)
     }
     // No Rust background jobs are registered yet. This hook will not launch the

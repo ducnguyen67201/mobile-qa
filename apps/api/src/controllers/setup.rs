@@ -5,7 +5,7 @@ use crate::{
     services::{
         apps,
         auth::{self, LoginGuard, Session},
-        google, uploads, workspaces,
+        google, multipart_uploads, uploads, workspaces,
     },
 };
 use axum::{
@@ -15,7 +15,7 @@ use axum::{
 };
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use loco_rs::{app::AppContext, controller::Routes};
-use mobile_qa_contracts::browser::*;
+use mobile_qa_contracts::{artifacts_api::*, browser::*};
 use uuid::Uuid;
 
 async fn google_challenge(
@@ -214,7 +214,79 @@ async fn settings(
     State(ctx): State<AppContext>,
     session: Session,
 ) -> ApiResult<Json<SettingsResponse>> {
-    Ok(Json(SettingsResponse{memberships:auth::organization_memberships(&ctx,session.user.id).await?,max_apk_bytes:MAX_APK,upload_ttl_seconds:UPLOAD_SECONDS as u32,session_ttl_seconds:SESSION_SECONDS as u32,max_active_uploads:4,storage:if Setup::get(&ctx).store.is_remote(){"Private object storage"}else{"Private local storage"}.into(),accepted_build_retention:"Accepted builds are retained until an explicit operator deletion; automatic retention is not configured".into()}))
+    let setup = Setup::get(&ctx);
+    Ok(Json(SettingsResponse {
+        multipart: setup.store.is_remote().then(multipart_uploads::policy),
+        memberships: auth::organization_memberships(&ctx, session.user.id).await?,
+        max_apk_bytes: MAX_APK,
+        upload_ttl_seconds: UPLOAD_SECONDS as u32,
+        session_ttl_seconds: SESSION_SECONDS as u32,
+        max_active_uploads: 4,
+        storage: if setup.store.is_remote() {
+            "Private object storage"
+        } else {
+            "Private local storage"
+        }
+        .into(),
+        accepted_build_retention: "Accepted builds are retained until an explicit operator deletion; automatic retention is not configured".into(),
+    }))
+}
+async fn start_multipart(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path((app, id)): Path<(Uuid, Uuid)>,
+) -> ApiResult<Json<MultipartUpload>> {
+    let app = apps::authorized(&ctx, session.user.id, app).await?;
+    Ok(Json(multipart_uploads::start(&ctx, &app, id).await?))
+}
+async fn get_multipart(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path((app, id)): Path<(Uuid, Uuid)>,
+) -> ApiResult<Json<MultipartUpload>> {
+    let app = apps::authorized(&ctx, session.user.id, app).await?;
+    Ok(Json(multipart_uploads::detail(&ctx, &app, id).await?))
+}
+async fn authorize_part(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path((app, id)): Path<(Uuid, Uuid)>,
+    Json(input): Json<AuthorizeUploadPartRequest>,
+) -> ApiResult<Json<UploadPartAuthorization>> {
+    let app = apps::authorized(&ctx, session.user.id, app).await?;
+    Ok(Json(
+        multipart_uploads::authorize(&ctx, &app, id, input).await?,
+    ))
+}
+async fn confirm_part(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path((app, id, number)): Path<(Uuid, Uuid, u16)>,
+    Json(input): Json<ConfirmUploadPartRequest>,
+) -> ApiResult<Json<MultipartUpload>> {
+    let app = apps::authorized(&ctx, session.user.id, app).await?;
+    Ok(Json(
+        multipart_uploads::confirm(&ctx, &app, id, number, input).await?,
+    ))
+}
+async fn complete_multipart(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path((app, id)): Path<(Uuid, Uuid)>,
+) -> ApiResult<(StatusCode, Json<UploadResponse>)> {
+    let app = apps::authorized(&ctx, session.user.id, app).await?;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(multipart_uploads::complete(&ctx, &app, id).await?),
+    ))
+}
+async fn abort_multipart(
+    State(ctx): State<AppContext>,
+    session: Session,
+    Path((app, id)): Path<(Uuid, Uuid)>,
+) -> ApiResult<Json<MultipartUpload>> {
+    let app = apps::authorized(&ctx, session.user.id, app).await?;
+    Ok(Json(multipart_uploads::abort(&ctx, &app, id).await?))
 }
 pub fn routes() -> Routes {
     use axum::routing::{get, patch, post, put};
@@ -243,4 +315,22 @@ pub fn routes() -> Routes {
         .add("/api/apps/{app_id}/builds", get(list_builds))
         .add("/api/apps/{app_id}/builds/{build_id}", get(get_build))
         .add("/api/settings", get(settings))
+        .add(
+            "/api/apps/{app_id}/build-uploads/{upload_id}/multipart",
+            get(get_multipart)
+                .post(start_multipart)
+                .delete(abort_multipart),
+        )
+        .add(
+            "/api/apps/{app_id}/build-uploads/{upload_id}/multipart/parts",
+            post(authorize_part),
+        )
+        .add(
+            "/api/apps/{app_id}/build-uploads/{upload_id}/multipart/parts/{part_number}",
+            put(confirm_part),
+        )
+        .add(
+            "/api/apps/{app_id}/build-uploads/{upload_id}/multipart/complete",
+            post(complete_multipart),
+        )
 }

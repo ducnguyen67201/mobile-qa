@@ -5,10 +5,14 @@ use super::{
 use crate::{
     domain::regression,
     errors::{ApiFailure, ApiResult},
+    models::_entities::{apps as app_rows, environments, execution_attempts, execution_runs},
 };
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::{execution::*, regression::*};
-use sea_orm::{ConnectionTrait, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set,
+    TransactionTrait,
+};
 use uuid::Uuid;
 
 pub(crate) async fn commercial_manifest(
@@ -135,33 +139,30 @@ pub async fn create_with_quote(
         )
     };
     let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![app.into()],
-    )
-    .await?;
-    if let Some(row) = rows(
-        &tx,
-        "SELECT id,fingerprint FROM execution_runs WHERE app_id=$1 AND idempotency_key=$2",
-        vec![app.into(), key.into()],
-    )
-    .await?
-    .first()
+    app_rows::Entity::find_by_id(app)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    if let Some(row) = execution_runs::Entity::find()
+        .filter(execution_runs::Column::AppId.eq(app))
+        .filter(execution_runs::Column::IdempotencyKey.eq(key))
+        .one(&tx)
+        .await?
     {
-        if field::<String>(row, "fingerprint")? != fingerprint {
+        if row.fingerprint != fingerprint {
             return Err(conflict("Idempotency key belongs to another submission"));
         }
-        let run = runs::detail(&tx, field(row, "id")?).await?;
+        let run = runs::detail(&tx, row.id).await?;
         tx.commit().await?;
         return Ok((run, false));
     }
-    one(
-        &tx,
-        "SELECT id FROM environments WHERE app_id=$1 FOR SHARE",
-        vec![app.into()],
-    )
-    .await?;
+    environments::Entity::find()
+        .filter(environments::Column::AppId.eq(app))
+        .lock_shared()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
     let preview = commercial_manifest(&tx, app, &input).await?;
     if !preview.blockers.is_empty() {
         return Err(ApiFailure::invalid(preview.blockers.join("; ")));
@@ -171,32 +172,29 @@ pub async fn create_with_quote(
         return Err(conflict("Environment changed; refresh the run setup"));
     }
     if let Some(baseline_id) = input.baseline_run_id {
-        one(
-            &tx,
-            "SELECT id FROM execution_runs WHERE id=$1 AND app_id=$2",
-            vec![baseline_id.into(), app.into()],
-        )
-        .await?;
+        execution_runs::Entity::find_by_id(baseline_id)
+            .filter(execution_runs::Column::AppId.eq(app))
+            .one(&tx)
+            .await?
+            .ok_or_else(ApiFailure::missing)?;
         if runs::detail(&tx, baseline_id).await?.state != JobState::Finished {
             return Err(conflict("Baseline must be a completed run"));
         }
     }
     let id = Uuid::new_v4();
-    exec(
-        &tx,
-        "INSERT INTO execution_runs(id,app_id,creator_id,build_id,plan_id,idempotency_key,\
-            fingerprint,manifest,baseline_run_id) VALUES($1,$2,$3,$4,NULL,$5,$6,$7,$8)",
-        vec![
-            id.into(),
-            app.into(),
-            actor.into(),
-            input.build_id.into(),
-            key.into(),
-            fingerprint.into(),
-            json(&manifest)?.into(),
-            input.baseline_run_id.into(),
-        ],
-    )
+    execution_runs::ActiveModel {
+        id: Set(id),
+        app_id: Set(app),
+        creator_id: Set(actor),
+        build_id: Set(input.build_id),
+        plan_id: Set(None),
+        idempotency_key: Set(key.to_owned()),
+        fingerprint: Set(fingerprint),
+        manifest: Set(json(&manifest)?),
+        baseline_run_id: Set(input.baseline_run_id),
+        ..Default::default()
+    }
+    .insert(&tx)
     .await?;
     super::commercial::reserve_or_test_fixture(
         ctx,
@@ -211,13 +209,16 @@ pub async fn create_with_quote(
     )
     .await?;
     for (index, _) in manifest.cases.iter().enumerate() {
-        exec(
-            &tx,
-            "INSERT INTO execution_attempts(id,run_id,case_index) VALUES($1,$2,$3)",
-            vec![Uuid::new_v4().into(), id.into(), (index as i32).into()],
-        )
+        execution_attempts::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            run_id: Set(id),
+            case_index: Set(index as i32),
+            ..Default::default()
+        }
+        .insert(&tx)
         .await?;
     }
+    super::capacity_control::enqueue(&tx, app, manifest.profile.id).await?;
     let run = runs::detail(&tx, id).await?;
     tx.commit().await?;
     super::execution_wakeup::notify(ctx);

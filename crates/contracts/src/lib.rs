@@ -25,3 +25,8 @@ pub mod regression_api;
 
 pub mod commercial;
 pub mod commercial_api;
+
+pub mod artifacts_api;
+
+pub mod device_hosts;
+pub mod device_hosts_api;

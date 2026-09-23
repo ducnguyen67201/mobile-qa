@@ -10,6 +10,17 @@ ROOT = Path(__file__).resolve().parents[1]
 workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yaml").read_text())
 filters = yaml.safe_load(workflow["jobs"]["scope"]["steps"][1]["with"]["filters"])
 cases = [
+    (["infra/aws/device-pool/host.tf"], ["infra"]),
+    (["infra/aws/capacity-controller/capacity_controller/handler.py"], ["infra"]),
+    (["infra/device-host/ami/provision.sh"], ["infra", "worker"]),
+    (["infra/device-host/network/launcher.c"], ["infra", "worker"]),
+    (["crates/contracts/src/device_hosts.rs"], ["infra", "api", "worker", "contracts"]),
+    (["crates/contracts/src/device_hosts_api.rs"], ["infra", "api", "contracts"]),
+    (
+        ["crates/contracts/src/artifacts_api.rs"],
+        ["infra", "api", "web", "worker", "contracts"],
+    ),
+    (["Dockerfile.api"], ["infra"]),
     (["scripts/dev_stack.py", "scripts/test_dev_stack.py"], ["scope_tests"]),
     (["scripts/runtime.py"], ["scope_tests", "api"]),
     (["crates/contracts/src/automation.rs"], ["api", "web", "worker", "contracts"]),

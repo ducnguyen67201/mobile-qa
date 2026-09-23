@@ -99,6 +99,12 @@ export type AuthoringUsage = {
     unknown_calls: number;
 };
 
+export type AuthorizeUploadPartRequest = {
+    byte_size: number;
+    part_number: number;
+    sha256: string;
+};
+
 export type AutomationSequence = {
     actions: Array<TestAction>;
     checks: Array<ExpectedCheck>;
@@ -111,6 +117,18 @@ export type BaselineChoice = {
     created_at: string;
     id: string;
     reason: string;
+};
+
+export type BuildDelivery = {
+    app_id: string;
+    authentication: DeliveryAuthentication;
+    byte_size: number;
+    expires_at: string;
+    headers: {
+        [key: string]: string;
+    };
+    sha256: string;
+    url: string;
 };
 
 export type BuildListResponse = {
@@ -140,6 +158,46 @@ export type BuildValidation = {
     started_at: string;
     state: ValidationState;
     validator_version: string;
+};
+
+export type CapacityAction = 'observe' | 'start' | 'drain' | 'commit_stop' | 'record_power' | 'quarantine';
+
+export type CapacityActionRequest = {
+    action: CapacityAction;
+    expected_control_version: number;
+    host_id: string;
+    observed_power?: null | ObservedPower;
+    operation_id?: string | null;
+    reason?: string | null;
+    request_id: string;
+};
+
+export type CapacityOperation = {
+    action: CapacityAction;
+    created_at: string;
+    id: string;
+};
+
+export type CapacitySnapshot = {
+    active_work: number;
+    boot_id?: string | null;
+    cache_bytes: number;
+    clean_at?: string | null;
+    control_version: number;
+    current_operation?: null | CapacityOperation;
+    desired_online: boolean;
+    generation: number;
+    heartbeat_at?: string | null;
+    host_id: string;
+    instance_id: string;
+    last_demand_at: string;
+    observed_power: ObservedPower;
+    policy: PoolPolicy;
+    pool_id: string;
+    queued_jobs: number;
+    reason?: string | null;
+    startup_started_at?: string | null;
+    state: HostState;
 };
 
 export type CaseComparison = {
@@ -323,6 +381,15 @@ export type CompleteRequest = {
     usage: Array<ModelUsage>;
 };
 
+export type ConfirmUploadPartRequest = {
+    etag: string;
+};
+
+export type ConsumeHintRequest = {
+    request_id: string;
+    timestamp: number;
+};
+
 export type CoverageKind = 'smoke' | 'happy_path' | 'validation' | 'persistence';
 
 export type CreateAppRequest = {
@@ -433,6 +500,8 @@ export type DefinitionResponse = {
     definition: TestDefinition;
     id: string;
 };
+
+export type DeliveryAuthentication = 'signed_url' | 'worker_lease';
 
 export type DirectCommand = {
     operation: 'tap';
@@ -646,6 +715,51 @@ export type HealthResponse = {
 
 export type HealthStatus = 'ok';
 
+export type HintReceipt = {
+    accepted: boolean;
+};
+
+export type HostCleanupRequest = {
+    boot_id: string;
+    generation: number;
+    journals_resolved: boolean;
+    ports_released: boolean;
+    processes_stopped: boolean;
+};
+
+export type HostHeartbeatRequest = {
+    boot_id: string;
+    cache_bytes: number;
+    generation: number;
+    slots: Array<SlotHeartbeat>;
+};
+
+export type HostRegisterRequest = {
+    boot_id: string;
+    toolchain_digest: string;
+    version: number;
+};
+
+export type HostSlotStatus = {
+    definition: SlotDefinition;
+    emulator_boot_id?: string | null;
+    state: SlotState;
+};
+
+export type HostState = 'stopped' | 'starting' | 'ready' | 'draining' | 'stop_committed' | 'stopping' | 'quarantined';
+
+export type HostStatus = {
+    bindings: Array<SlotBinding>;
+    boot_id?: string | null;
+    generation: number;
+    heartbeat_seconds: number;
+    host_id: string;
+    policy: PoolPolicy;
+    pool_id: string;
+    slots: Array<HostSlotStatus>;
+    state: HostState;
+};
+
 export type JobState = 'queued' | 'leased' | 'running' | 'finalizing' | 'finished' | 'cancel_requested' | 'recovery_required';
 
 export type LeaseRequest = {
@@ -824,7 +938,25 @@ export type ModelUsage = {
     unknown_calls: number;
 };
 
+export type MultipartPolicy = {
+    max_parallel_parts: number;
+    part_size: number;
+};
+
+export type MultipartState = 'uploading' | 'completing' | 'sealed' | 'aborted';
+
+export type MultipartUpload = {
+    expires_at: string;
+    max_parallel_parts: number;
+    part_size: number;
+    parts: Array<UploadedPart>;
+    state: MultipartState;
+    upload_id: string;
+};
+
 export type ObservationKind = 'present_value' | 'absent';
+
+export type ObservedPower = 'unknown' | 'stopped' | 'pending' | 'running' | 'stopping';
 
 export type OpenPhoneRequest = {
     build_id?: string | null;
@@ -956,6 +1088,14 @@ export type PlanPreviewResponse = {
     plan?: null | DefinitionResponse;
 };
 
+export type PoolPolicy = {
+    enabled: boolean;
+    idle_seconds: number;
+    timezone: string;
+    warm_target: number;
+    warm_windows: Array<WarmWindow>;
+};
+
 export type PreflightAcknowledgement = {
     accepted: boolean;
     attempt_id: string;
@@ -978,7 +1118,7 @@ export type PreflightRequest = {
     receipt: PreflightReceipt;
 };
 
-export type QueueReason = 'worker_offline' | 'model_unavailable' | 'worker_upgrade_required' | 'capacity_busy' | 'device_recovery_required' | 'awaiting_worker_claim';
+export type QueueReason = 'host_starting' | 'host_draining' | 'pool_paused' | 'waiting_for_slot' | 'profile_incompatible' | 'worker_offline' | 'model_unavailable' | 'worker_upgrade_required' | 'capacity_busy' | 'device_recovery_required' | 'awaiting_worker_claim';
 
 export type QueueStatus = {
     /**
@@ -1158,10 +1298,53 @@ export type SettingsResponse = {
     max_active_uploads: number;
     max_apk_bytes: number;
     memberships: Array<OrganizationMembership>;
+    multipart?: null | MultipartPolicy;
     session_ttl_seconds: number;
     storage: string;
     upload_ttl_seconds: number;
 };
+
+export type SlotBinding = {
+    app_id: string;
+    profile_id: string;
+    slot_id: string;
+};
+
+export type SlotDefinition = {
+    adb_server_port: number;
+    console_port: number;
+    cpu_cores: number;
+    device_identity: string;
+    id: string;
+    index: number;
+    memory_mb: number;
+    qualification_reference: string;
+    qualified: boolean;
+    system_image: string;
+    warm_qualified: boolean;
+};
+
+export type SlotGrantRequest = {
+    app_id: string;
+    boot_id: string;
+    generation: number;
+    profile_id: string;
+};
+
+export type SlotGrantResponse = {
+    app_id: string;
+    profile_id: string;
+    worker_id: string;
+    worker_token: string;
+};
+
+export type SlotHeartbeat = {
+    emulator_boot_id?: string | null;
+    slot_id: string;
+    state: SlotState;
+};
+
+export type SlotState = 'offline' | 'preparing' | 'idle' | 'leased' | 'cleaning' | 'quarantined';
 
 export type StageBudgets = {
     boot_seconds: number;
@@ -1249,6 +1432,15 @@ export type UploadContentRequest = {
     file: Blob | File;
 };
 
+export type UploadPartAuthorization = {
+    expires_at: string;
+    headers: {
+        [key: string]: string;
+    };
+    part_number: number;
+    url: string;
+};
+
 export type UploadResponse = {
     actual_size?: number | null;
     app_id: string;
@@ -1263,6 +1455,13 @@ export type UploadResponse = {
 
 export type UploadState = 'pending' | 'receiving' | 'uploaded' | 'finalized' | 'expired';
 
+export type UploadedPart = {
+    byte_size: number;
+    etag?: string | null;
+    part_number: number;
+    sha256: string;
+};
+
 export type UserIdentity = {
     approval_status: ApprovalStatus;
     display_name: string;
@@ -1271,6 +1470,12 @@ export type UserIdentity = {
 };
 
 export type ValidationState = 'validating' | 'validated' | 'invalid' | 'unsupported' | 'error';
+
+export type WarmWindow = {
+    end: string;
+    start: string;
+    weekdays: Array<number>;
+};
 
 export type WorkerModelCapabilities = {
     model?: null | ModelReference;
@@ -1852,6 +2057,175 @@ export type UploadBuildContentResponses = {
 };
 
 export type UploadBuildContentResponse = UploadBuildContentResponses[keyof UploadBuildContentResponses];
+
+export type AbortMultipartUploadData = {
+    body?: never;
+    path: {
+        app_id: string;
+        upload_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/build-uploads/{upload_id}/multipart';
+};
+
+export type AbortMultipartUploadErrors = {
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type AbortMultipartUploadError = AbortMultipartUploadErrors[keyof AbortMultipartUploadErrors];
+
+export type AbortMultipartUploadResponses = {
+    /**
+     * Multipart session aborted
+     */
+    200: MultipartUpload;
+};
+
+export type AbortMultipartUploadResponse = AbortMultipartUploadResponses[keyof AbortMultipartUploadResponses];
+
+export type GetMultipartUploadData = {
+    body?: never;
+    path: {
+        app_id: string;
+        upload_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/build-uploads/{upload_id}/multipart';
+};
+
+export type GetMultipartUploadErrors = {
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetMultipartUploadError = GetMultipartUploadErrors[keyof GetMultipartUploadErrors];
+
+export type GetMultipartUploadResponses = {
+    /**
+     * Multipart session
+     */
+    200: MultipartUpload;
+};
+
+export type GetMultipartUploadResponse = GetMultipartUploadResponses[keyof GetMultipartUploadResponses];
+
+export type StartMultipartUploadData = {
+    body?: never;
+    path: {
+        app_id: string;
+        upload_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/build-uploads/{upload_id}/multipart';
+};
+
+export type StartMultipartUploadErrors = {
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type StartMultipartUploadError = StartMultipartUploadErrors[keyof StartMultipartUploadErrors];
+
+export type StartMultipartUploadResponses = {
+    /**
+     * Multipart session
+     */
+    200: MultipartUpload;
+};
+
+export type StartMultipartUploadResponse = StartMultipartUploadResponses[keyof StartMultipartUploadResponses];
+
+export type CompleteMultipartUploadData = {
+    body?: never;
+    path: {
+        app_id: string;
+        upload_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/build-uploads/{upload_id}/multipart/complete';
+};
+
+export type CompleteMultipartUploadErrors = {
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type CompleteMultipartUploadError = CompleteMultipartUploadErrors[keyof CompleteMultipartUploadErrors];
+
+export type CompleteMultipartUploadResponses = {
+    /**
+     * Durable sealing queued
+     */
+    202: UploadResponse;
+};
+
+export type CompleteMultipartUploadResponse = CompleteMultipartUploadResponses[keyof CompleteMultipartUploadResponses];
+
+export type AuthorizeUploadPartData = {
+    body: AuthorizeUploadPartRequest;
+    path: {
+        app_id: string;
+        upload_id: string;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/build-uploads/{upload_id}/multipart/parts';
+};
+
+export type AuthorizeUploadPartErrors = {
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type AuthorizeUploadPartError = AuthorizeUploadPartErrors[keyof AuthorizeUploadPartErrors];
+
+export type AuthorizeUploadPartResponses = {
+    /**
+     * Temporary capability for one immutable part
+     */
+    200: UploadPartAuthorization;
+};
+
+export type AuthorizeUploadPartResponse = AuthorizeUploadPartResponses[keyof AuthorizeUploadPartResponses];
+
+export type ConfirmUploadPartData = {
+    body: ConfirmUploadPartRequest;
+    path: {
+        app_id: string;
+        upload_id: string;
+        part_number: number;
+    };
+    query?: never;
+    url: '/api/apps/{app_id}/build-uploads/{upload_id}/multipart/parts/{part_number}';
+};
+
+export type ConfirmUploadPartErrors = {
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type ConfirmUploadPartError = ConfirmUploadPartErrors[keyof ConfirmUploadPartErrors];
+
+export type ConfirmUploadPartResponses = {
+    /**
+     * Part receipt persisted
+     */
+    200: MultipartUpload;
+};
+
+export type ConfirmUploadPartResponse = ConfirmUploadPartResponses[keyof ConfirmUploadPartResponses];
 
 export type ListBuildsData = {
     body?: never;
@@ -4482,6 +4856,329 @@ export type GetHealthResponses = {
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
 
+export type GetCapacitySnapshotData = {
+    body?: never;
+    headers: {
+        Authorization: string;
+    };
+    path: {
+        pool_id: string;
+    };
+    query?: never;
+    url: '/api/internal/capacity/pools/{pool_id}';
+};
+
+export type GetCapacitySnapshotErrors = {
+    /**
+     * Scoped bearer required
+     */
+    401: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Stale authority or state
+     */
+    409: ApiError;
+    /**
+     * Invalid request
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetCapacitySnapshotError = GetCapacitySnapshotErrors[keyof GetCapacitySnapshotErrors];
+
+export type GetCapacitySnapshotResponses = {
+    /**
+     * Success
+     */
+    200: CapacitySnapshot;
+};
+
+export type GetCapacitySnapshotResponse = GetCapacitySnapshotResponses[keyof GetCapacitySnapshotResponses];
+
+export type ApplyCapacityActionData = {
+    body: CapacityActionRequest;
+    headers: {
+        Authorization: string;
+    };
+    path: {
+        pool_id: string;
+    };
+    query?: never;
+    url: '/api/internal/capacity/pools/{pool_id}/actions';
+};
+
+export type ApplyCapacityActionErrors = {
+    /**
+     * Scoped bearer required
+     */
+    401: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Stale authority or state
+     */
+    409: ApiError;
+    /**
+     * Invalid request
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type ApplyCapacityActionError = ApplyCapacityActionErrors[keyof ApplyCapacityActionErrors];
+
+export type ApplyCapacityActionResponses = {
+    /**
+     * Success
+     */
+    200: CapacitySnapshot;
+};
+
+export type ApplyCapacityActionResponse = ApplyCapacityActionResponses[keyof ApplyCapacityActionResponses];
+
+export type ConsumeCapacityHintData = {
+    body: ConsumeHintRequest;
+    headers: {
+        Authorization: string;
+    };
+    path: {
+        pool_id: string;
+    };
+    query?: never;
+    url: '/api/internal/capacity/pools/{pool_id}/hints';
+};
+
+export type ConsumeCapacityHintErrors = {
+    /**
+     * Scoped bearer required
+     */
+    401: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Stale authority or state
+     */
+    409: ApiError;
+    /**
+     * Invalid request
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type ConsumeCapacityHintError = ConsumeCapacityHintErrors[keyof ConsumeCapacityHintErrors];
+
+export type ConsumeCapacityHintResponses = {
+    /**
+     * Success
+     */
+    200: HintReceipt;
+};
+
+export type ConsumeCapacityHintResponse = ConsumeCapacityHintResponses[keyof ConsumeCapacityHintResponses];
+
+export type AcknowledgeHostCleanupData = {
+    body: HostCleanupRequest;
+    headers: {
+        Authorization: string;
+    };
+    path: {
+        host_id: string;
+    };
+    query?: never;
+    url: '/api/internal/hosts/{host_id}/cleanup';
+};
+
+export type AcknowledgeHostCleanupErrors = {
+    /**
+     * Scoped bearer required
+     */
+    401: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Stale authority or state
+     */
+    409: ApiError;
+    /**
+     * Invalid request
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type AcknowledgeHostCleanupError = AcknowledgeHostCleanupErrors[keyof AcknowledgeHostCleanupErrors];
+
+export type AcknowledgeHostCleanupResponses = {
+    /**
+     * Success
+     */
+    200: HostStatus;
+};
+
+export type AcknowledgeHostCleanupResponse = AcknowledgeHostCleanupResponses[keyof AcknowledgeHostCleanupResponses];
+
+export type HeartbeatDeviceHostData = {
+    body: HostHeartbeatRequest;
+    headers: {
+        Authorization: string;
+    };
+    path: {
+        host_id: string;
+    };
+    query?: never;
+    url: '/api/internal/hosts/{host_id}/heartbeat';
+};
+
+export type HeartbeatDeviceHostErrors = {
+    /**
+     * Scoped bearer required
+     */
+    401: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Stale authority or state
+     */
+    409: ApiError;
+    /**
+     * Invalid request
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type HeartbeatDeviceHostError = HeartbeatDeviceHostErrors[keyof HeartbeatDeviceHostErrors];
+
+export type HeartbeatDeviceHostResponses = {
+    /**
+     * Success
+     */
+    200: HostStatus;
+};
+
+export type HeartbeatDeviceHostResponse = HeartbeatDeviceHostResponses[keyof HeartbeatDeviceHostResponses];
+
+export type RegisterDeviceHostData = {
+    body: HostRegisterRequest;
+    headers: {
+        Authorization: string;
+    };
+    path: {
+        host_id: string;
+    };
+    query?: never;
+    url: '/api/internal/hosts/{host_id}/register';
+};
+
+export type RegisterDeviceHostErrors = {
+    /**
+     * Scoped bearer required
+     */
+    401: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Stale authority or state
+     */
+    409: ApiError;
+    /**
+     * Invalid request
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type RegisterDeviceHostError = RegisterDeviceHostErrors[keyof RegisterDeviceHostErrors];
+
+export type RegisterDeviceHostResponses = {
+    /**
+     * Success
+     */
+    200: HostStatus;
+};
+
+export type RegisterDeviceHostResponse = RegisterDeviceHostResponses[keyof RegisterDeviceHostResponses];
+
+export type CreateSlotGrantData = {
+    body: SlotGrantRequest;
+    headers: {
+        Authorization: string;
+    };
+    path: {
+        host_id: string;
+        slot_id: string;
+    };
+    query?: never;
+    url: '/api/internal/hosts/{host_id}/slots/{slot_id}/grant';
+};
+
+export type CreateSlotGrantErrors = {
+    /**
+     * Scoped bearer required
+     */
+    401: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Stale authority or state
+     */
+    409: ApiError;
+    /**
+     * Invalid request
+     */
+    422: ApiError;
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type CreateSlotGrantError = CreateSlotGrantErrors[keyof CreateSlotGrantErrors];
+
+export type CreateSlotGrantResponses = {
+    /**
+     * Success
+     */
+    200: SlotGrantResponse;
+};
+
+export type CreateSlotGrantResponse = CreateSlotGrantResponses[keyof CreateSlotGrantResponses];
+
 export type GetPhoneData = {
     body?: never;
     path: {
@@ -5025,6 +5722,38 @@ export type GetSettingsResponses = {
 
 export type GetSettingsResponse = GetSettingsResponses[keyof GetSettingsResponses];
 
+export type GetAttemptBuildDeliveryData = {
+    body?: never;
+    headers: {
+        'X-Lease-Token': string;
+    };
+    path: {
+        attempt_id: string;
+    };
+    query: {
+        generation: number;
+    };
+    url: '/api/worker/attempts/{attempt_id}/build/delivery';
+};
+
+export type GetAttemptBuildDeliveryErrors = {
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetAttemptBuildDeliveryError = GetAttemptBuildDeliveryErrors[keyof GetAttemptBuildDeliveryErrors];
+
+export type GetAttemptBuildDeliveryResponses = {
+    /**
+     * Lease-scoped build capability
+     */
+    200: BuildDelivery;
+};
+
+export type GetAttemptBuildDeliveryResponse = GetAttemptBuildDeliveryResponses[keyof GetAttemptBuildDeliveryResponses];
+
 export type AcknowledgeExecutionStartData = {
     body: PreflightRequest;
     headers: {
@@ -5075,6 +5804,36 @@ export type AcknowledgeExecutionStartResponses = {
 };
 
 export type AcknowledgeExecutionStartResponse = AcknowledgeExecutionStartResponses[keyof AcknowledgeExecutionStartResponses];
+
+export type GetPhoneBuildDeliveryData = {
+    body?: never;
+    headers: {
+        'X-Lease-Token': string;
+    };
+    path: {
+        session_id: string;
+    };
+    query?: never;
+    url: '/api/worker/phones/{session_id}/build/delivery';
+};
+
+export type GetPhoneBuildDeliveryErrors = {
+    /**
+     * API error
+     */
+    default: ApiError;
+};
+
+export type GetPhoneBuildDeliveryError = GetPhoneBuildDeliveryErrors[keyof GetPhoneBuildDeliveryErrors];
+
+export type GetPhoneBuildDeliveryResponses = {
+    /**
+     * Lease-scoped build capability
+     */
+    200: BuildDelivery;
+};
+
+export type GetPhoneBuildDeliveryResponse = GetPhoneBuildDeliveryResponses[keyof GetPhoneBuildDeliveryResponses];
 
 export type CreateWorkspaceData = {
     body: CreateWorkspaceRequest;

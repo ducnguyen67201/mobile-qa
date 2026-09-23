@@ -13,3 +13,5 @@ pub mod task_sessions;
 
 pub mod commercial;
 pub mod test_authoring;
+
+pub mod device_hosts;

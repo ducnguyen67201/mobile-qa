@@ -45,7 +45,7 @@ async fn persisted_workflow_auth_scope_and_real_validation() {
             .read(server.get("/api/settings"))
             .await
             .json::<SettingsResponse>();
-        assert_eq!(settings.upload_ttl_seconds, 1800);
+        assert_eq!(settings.upload_ttl_seconds, 7200);
         let metadata: serde_json::Value = serde_json::from_slice(
             &std::fs::read(
                 std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

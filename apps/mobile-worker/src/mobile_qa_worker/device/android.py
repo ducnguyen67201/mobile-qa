@@ -8,10 +8,12 @@ import subprocess
 import time
 import zipfile
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from mobile_qa_worker.generated.models import DirectCommand
 
 from mobile_qa_worker.qualification.config import (
-    SERIAL,
     Profile,
     QualificationError,
     json_object,
@@ -92,7 +94,38 @@ def doctor(profile: Profile) -> dict[str, str]:
 
 
 class AndroidDevice:
-    def __init__(self, profile: Profile, evidence: Evidence, package: str, launch_component: str):
+    def __init__(
+        self,
+        profile: Profile,
+        evidence: Evidence,
+        package: str,
+        launch_component: str,
+        *,
+        console_port: int = 5554,
+        adb_server_port: int = 5037,
+        memory_mib: int = 4096,
+        cores: int = 2,
+        rendering: str | None = None,
+        emulator_prefix: tuple[str, ...] = (),
+        dns_servers: tuple[str, ...] = (),
+    ):
+        if console_port % 2 or not 5554 <= console_port <= 5680:
+            raise QualificationError("invalid_emulator_port")
+        if not 1024 <= adb_server_port <= 65535 or not 1024 <= memory_mib <= 16384:
+            raise QualificationError("invalid_slot_resources")
+        if not 1 <= cores <= 8:
+            raise QualificationError("invalid_slot_resources")
+        self.emulator_prefix = emulator_prefix
+        self.dns_servers = dns_servers
+        self.console_port = console_port
+        self.adb_server_port = adb_server_port
+        self.serial = f"emulator-{console_port}"
+        self.memory_mib = memory_mib
+        self.cores = cores
+        self.rendering = rendering or (
+            "auto" if platform.system() == "Darwin" else "swiftshader_indirect"
+        )
+        self.remote_commands = False
         self.package = package
         self.launch_component = launch_component
         self.installed = False
@@ -100,6 +133,7 @@ class AndroidDevice:
         self.evidence = evidence
         self.child: subprocess.Popen[bytes] | None = None
         self.env = host_environment(profile)
+        self.env["ANDROID_ADB_SERVER_PORT"] = str(adb_server_port)
         self.current = profile.state_root / "current"
         self.owns_current = False
         self.ever_launched = False
@@ -109,14 +143,33 @@ class AndroidDevice:
 
     def adb(self, *args: str, timeout: float | None = None) -> bytes:
         return command(
-            [str(self.profile.sdk_root / "platform-tools/adb"), "-s", SERIAL, *args],
+            [
+                str(self.profile.sdk_root / "platform-tools/adb"),
+                "-P",
+                str(self.adb_server_port),
+                "-s",
+                self.serial,
+                *args,
+            ],
             timeout or self.profile.command_seconds,
             self.env,
         )
 
+    def hierarchy(self) -> bytes:
+        raise QualificationError("remote_device_operation_unavailable")
+
+    def execute_direct(self, command: "DirectCommand") -> None:
+        raise QualificationError("remote_device_operation_unavailable")
+
+    def assert_ports_released(self) -> None:
+        if self.console_port == 5554:
+            assert_ports_available()
+        else:
+            assert_ports_available((self.console_port, self.console_port + 1))
+
     def boot(self, timeout: int | None = None) -> None:
         try:
-            assert_ports_available()
+            self.assert_ports_released()
         except OSError as exc:
             raise QualificationError("emulator_port_owned_elsewhere") from exc
         if self.current.exists():
@@ -149,7 +202,8 @@ class AndroidDevice:
                 "hw.lcd.width": "1080",
                 "hw.lcd.height": "1920",
                 "hw.lcd.density": "420",
-                "hw.ramSize": "4096",
+                "hw.ramSize": str(self.memory_mib),
+                "hw.cpu.ncore": str(self.cores),
                 "hw.sdCard": "no",
                 "showDeviceFrame": "no",
             }
@@ -159,22 +213,24 @@ class AndroidDevice:
         try:
             self.child = subprocess.Popen(
                 [
+                    *self.emulator_prefix,
                     str(self.profile.sdk_root / "emulator/emulator"),
                     "-avd",
                     "mobile-qa-owned",
                     "-port",
-                    "5554",
+                    str(self.console_port),
                     *(["-no-window"] if self.profile.headless else []),
                     "-accel",
                     "on",
                     "-no-audio",
                     "-no-metrics",
+                    *(["-dns-server", ",".join(self.dns_servers)] if self.dns_servers else []),
                     "-crash-report-mode",
                     "disabled",
                     "-no-snapshot",
                     "-wipe-data",
                     "-gpu",
-                    "auto" if platform.system() == "Darwin" else "swiftshader_indirect",
+                    self.rendering,
                     "-timezone",
                     "Etc/UTC",
                 ],
@@ -199,7 +255,7 @@ class AndroidDevice:
                     self.adb("shell", "settings", "put", "system", "user_rotation", "0")
                     self.inventory.update(
                         {
-                            "serial": SERIAL,
+                            "serial": self.serial,
                             "api": self.adb("shell", "getprop", "ro.build.version.sdk")
                             .decode()
                             .strip(),
@@ -235,7 +291,7 @@ class AndroidDevice:
         raise QualificationError("boot_timeout")
 
     def install(self, apk: Path, expected: str) -> str:
-        if not apk.is_file() or not 1 <= apk.stat().st_size <= 104857600:
+        if not apk.is_file() or not 1 <= apk.stat().st_size <= 2147483648:
             raise QualificationError("apk_size_invalid")
         digest = sha256(apk)
         if digest != expected:
@@ -366,7 +422,7 @@ class AndroidDevice:
         deadline = time.monotonic() + 5
         while True:
             try:
-                assert_ports_available()
+                self.assert_ports_released()
                 return
             except OSError as exc:
                 if time.monotonic() >= deadline:

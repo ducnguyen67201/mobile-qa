@@ -17,6 +17,8 @@ mod m20260921_000012_worker_poll_eligibility;
 mod m20260921_000014_commercial_access;
 mod m20260922_000015_credit_billing;
 mod m20260922_000016_credit_plan_changes;
+mod m20260922_000017_large_artifacts;
+mod m20260922_000018_device_hosts;
 pub struct Migrator;
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
@@ -37,6 +39,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260921_000014_commercial_access::Migration),
             Box::new(m20260922_000015_credit_billing::Migration),
             Box::new(m20260922_000016_credit_plan_changes::Migration),
+            Box::new(m20260922_000017_large_artifacts::Migration),
+            Box::new(m20260922_000018_device_hosts::Migration),
             // inject-above (do not remove this comment)
         ]
     }

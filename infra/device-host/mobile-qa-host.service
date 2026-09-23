@@ -1,0 +1,52 @@
+[Unit]
+Description=Mobile QA device host supervisor
+After=network-online.target cloud-final.service
+Wants=network-online.target
+Requires=mobile-qa-network.service
+After=mobile-qa-network.service
+StartLimitIntervalSec=600
+StartLimitBurst=3
+ConditionPathExists=/etc/mobile-qa/host.toml
+ConditionPathExists=/etc/mobile-qa/bootstrap.json
+
+[Service]
+Type=exec
+User=mobile-qa
+Group=mobile-qa
+SupplementaryGroups=kvm
+WorkingDirectory=/opt/mobile-qa/repo
+# Fixed root-owned policy commands also recover emulators after a supervisor crash.
+ExecStartPre=+/usr/bin/python3 -I /opt/mobile-qa/repo/infra/device-host/network/policy.py start
+ExecStopPost=+/usr/bin/python3 -I /opt/mobile-qa/repo/infra/device-host/network/policy.py stop
+ExecStartPre=/opt/mobile-qa/bootstrap/.venv/bin/python /opt/mobile-qa/repo/infra/device-host/ami/verify_image.py
+ExecStart=/opt/mobile-qa/bootstrap/.venv/bin/python -m capacity_controller.bootstrap host
+Environment=PYTHONPATH=/opt/mobile-qa/repo/infra/aws/capacity-controller
+Environment=JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHON_DOTENV_DISABLED=1
+Restart=on-failure
+RestartSec=30
+KillMode=control-group
+TimeoutStopSec=600
+UMask=0077
+# The narrow root-owned launcher moves emulator children into the protected
+# network cgroup, then drops UID/GID before exec. It requires this one setuid path.
+NoNewPrivileges=false
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mobile-qa /run/mobile-qa /run/mobile-qa-network /sys/fs/cgroup/mobile-qa-emulators
+RuntimeDirectory=mobile-qa
+RuntimeDirectoryMode=0700
+StateDirectory=mobile-qa
+StateDirectoryMode=0700
+# These seccomp options imply no_new_privs for User= and would disable the
+# launcher. The launcher itself locks no_new_privs before emulator exec.
+RestrictSUIDSGID=false
+LockPersonality=false
+# KVM/JIT need executable anonymous memory. Do not use MemoryDenyWriteExecute.
+# No PrivateDevices: the dedicated service requires /dev/kvm.
+
+[Install]
+WantedBy=multi-user.target

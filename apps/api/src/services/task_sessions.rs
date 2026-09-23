@@ -1,63 +1,104 @@
 //! Durable interactive sessions. A lost lease quarantines the phone instead of replaying effects.
 use super::{apps, execution_store::*, model_registry, test_definitions, worker_auth::Worker};
-use crate::errors::{ApiFailure, ApiResult};
+use crate::{
+    errors::{ApiFailure, ApiResult},
+    models::_entities::{
+        apps as app_rows, builds, device_slot_bindings, environments, execution_profiles,
+        execution_reservations, execution_workers, phone_sessions as phone_rows, phone_tasks,
+    },
+};
 use base64::{engine::general_purpose::STANDARD, Engine};
+use chrono::{Duration, Utc};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::{
     execution::{Driver, ExecutionProfile},
     model_registry::{ModelCapability, ModelPurpose},
     task_sessions::*,
 };
-use sea_orm::{ConnectionTrait, QueryResult, TransactionTrait};
+use sea_orm::{
+    sea_query::{LockBehavior, LockType, OnConflict},
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
+};
 use uuid::Uuid;
 
 async fn reconcile(ctx: &AppContext) -> ApiResult<()> {
-    exec(&ctx.db,"UPDATE phone_sessions SET payload=jsonb_set(jsonb_set(payload,'{state}','\"quarantined\"'),'{message}','\"Connection lost. The operator must recover this device.\"') WHERE worker_id IS NOT NULL AND expires_at<now() AND payload->>'state' NOT IN ('closed','quarantined')",vec![]).await?;
-    exec(&ctx.db,"UPDATE phone_sessions SET payload=jsonb_set(payload,'{state}','\"closed\"') WHERE worker_id IS NULL AND deadline<now()",vec![]).await?;
+    let now = Utc::now();
+    let expired = phone_rows::Entity::find()
+        .filter(
+            Condition::any()
+                .add(
+                    Condition::all()
+                        .add(phone_rows::Column::WorkerId.is_not_null())
+                        .add(phone_rows::Column::ExpiresAt.lt(now)),
+                )
+                .add(
+                    Condition::all()
+                        .add(phone_rows::Column::WorkerId.is_null())
+                        .add(phone_rows::Column::Deadline.lt(now)),
+                ),
+        )
+        .all(&ctx.db)
+        .await?;
+    for row in expired {
+        let mut session: PhoneSession = decode(row.payload.clone())?;
+        if row.worker_id.is_some()
+            && !matches!(session.state, PhoneState::Closed | PhoneState::Quarantined)
+        {
+            session.state = PhoneState::Quarantined;
+            session.message = "Connection lost. The operator must recover this device.".into();
+        } else if row.worker_id.is_none() && row.deadline < now {
+            session.state = PhoneState::Closed;
+        } else {
+            continue;
+        }
+        let mut active = row.into_active_model();
+        active.payload = Set(json(&session)?);
+        active.update(&ctx.db).await?;
+    }
     Ok(())
 }
-async fn read(db: &impl ConnectionTrait, id: Uuid, lock: bool) -> ApiResult<QueryResult> {
-    one(
-        db,
-        if lock {
-            "SELECT * FROM phone_sessions WHERE id=$1 FOR UPDATE"
-        } else {
-            "SELECT * FROM phone_sessions WHERE id=$1"
-        },
-        vec![id.into()],
-    )
-    .await
+async fn read(db: &impl ConnectionTrait, id: Uuid, lock: bool) -> ApiResult<phone_rows::Model> {
+    let query = phone_rows::Entity::find_by_id(id);
+    let row = if lock {
+        query.lock_exclusive().one(db).await?
+    } else {
+        query.one(db).await?
+    };
+    row.ok_or_else(ApiFailure::missing)
 }
 async fn store(db: &impl ConnectionTrait, s: &PhoneSession) -> ApiResult<()> {
     let mut snapshot = s.clone();
     snapshot.tasks.clear();
-    exec(
-        db,
-        "UPDATE phone_sessions SET payload=$2 WHERE id=$1",
-        vec![s.id.into(), json(&snapshot)?.into()],
-    )
-    .await?;
+    phone_rows::Entity::update_many()
+        .col_expr(
+            phone_rows::Column::Payload,
+            sea_orm::sea_query::Expr::value(json(&snapshot)?),
+        )
+        .filter(phone_rows::Column::Id.eq(s.id))
+        .exec(db)
+        .await?;
     Ok(())
 }
 pub async fn detail(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<PhoneSession> {
-    let mut s: PhoneSession = decode(field(&read(db, id, false).await?, "payload")?)?;
-    s.tasks = rows(
-        db,
-        "SELECT payload FROM phone_tasks WHERE session_id=$1 ORDER BY created_at,id",
-        vec![id.into()],
-    )
-    .await?
-    .iter()
-    .map(|r| decode(field(r, "payload")?))
-    .collect::<ApiResult<_>>()?;
+    let mut s: PhoneSession = decode(read(db, id, false).await?.payload)?;
+    s.tasks = phone_tasks::Entity::find()
+        .filter(phone_tasks::Column::SessionId.eq(id))
+        .order_by_asc(phone_tasks::Column::CreatedAt)
+        .order_by_asc(phone_tasks::Column::Id)
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|row| decode(row.payload))
+        .collect::<ApiResult<_>>()?;
     Ok(s)
 }
 pub async fn authorized(ctx: &AppContext, user: Uuid, id: Uuid) -> ApiResult<PhoneSession> {
     reconcile(ctx).await?;
     let r = read(&ctx.db, id, false).await?;
-    apps::authorized(ctx, user, field(&r, "app_id")?).await?;
+    apps::authorized(ctx, user, r.app_id).await?;
     // Only the session creator controls or views the disposable account state.
-    if field::<Uuid>(&r, "creator_id")? != user {
+    if r.creator_id != user {
         return Err(ApiFailure::new(
             403,
             "session_owner_required",
@@ -69,8 +110,43 @@ pub async fn authorized(ctx: &AppContext, user: Uuid, id: Uuid) -> ApiResult<Pho
 pub async fn options(ctx: &AppContext, user: Uuid, app: Uuid) -> ApiResult<PhoneOptions> {
     let a = apps::authorized(ctx, user, app).await?;
     reconcile(ctx).await?;
-    let builds=rows(&ctx.db,"SELECT id,original_filename FROM builds WHERE app_id=$1 AND validation_state='validated' ORDER BY created_at DESC,id DESC LIMIT 50",vec![app.into()]).await?.iter().map(|r|Ok(PhoneBuildChoice{id:field(r,"id")?,name:field(r,"original_filename")?})).collect::<ApiResult<Vec<_>>>()?;
-    let candidates=rows(&ctx.db,"SELECT p.payload FROM execution_profiles p WHERE p.app_id=$1 AND EXISTS(SELECT 1 FROM execution_workers w WHERE w.profile_id=p.id AND w.revoked=false)",vec![app.into()]).await?.iter().map(|r|decode::<ExecutionProfile>(field(r,"payload")?)).collect::<ApiResult<Vec<_>>>()?;
+    let builds: Vec<PhoneBuildChoice> = builds::Entity::find()
+        .filter(builds::Column::AppId.eq(app))
+        .filter(builds::Column::ValidationState.eq("validated"))
+        .order_by_desc(builds::Column::CreatedAt)
+        .order_by_desc(builds::Column::Id)
+        .limit(50)
+        .all(&ctx.db)
+        .await?
+        .into_iter()
+        .map(|row| PhoneBuildChoice {
+            id: row.id,
+            name: row.original_filename,
+        })
+        .collect();
+    let worker_profiles = execution_workers::Entity::find()
+        .filter(execution_workers::Column::AppId.eq(app))
+        .filter(execution_workers::Column::Revoked.eq(false))
+        .all(&ctx.db)
+        .await?
+        .into_iter()
+        .map(|row| row.profile_id)
+        .collect::<std::collections::HashSet<_>>();
+    let bound_profiles = device_slot_bindings::Entity::find()
+        .filter(device_slot_bindings::Column::AppId.eq(app))
+        .all(&ctx.db)
+        .await?
+        .into_iter()
+        .map(|row| row.profile_id)
+        .collect::<std::collections::HashSet<_>>();
+    let candidates = execution_profiles::Entity::find()
+        .filter(execution_profiles::Column::AppId.eq(app))
+        .all(&ctx.db)
+        .await?
+        .into_iter()
+        .filter(|row| worker_profiles.contains(&row.id) || bound_profiles.contains(&row.id))
+        .map(|row| decode::<ExecutionProfile>(row.payload))
+        .collect::<ApiResult<Vec<_>>>()?;
     let mut profiles = Vec::new();
     for profile in candidates.into_iter().filter(|profile| {
         profile.qualified
@@ -102,12 +178,28 @@ pub async fn options(ctx: &AppContext, user: Uuid, app: Uuid) -> ApiResult<Phone
         };
         profiles.push(profile);
     }
-    let active_session=rows(&ctx.db,"SELECT id FROM phone_sessions WHERE app_id=$1 AND creator_id=$2 AND payload->>'state' NOT IN ('closed','quarantined') ORDER BY created_at DESC LIMIT 1",vec![app.into(),user.into()]).await?.first().map(|r|field(r,"id")).transpose()?;
+    let active_session = phone_rows::Entity::find()
+        .filter(phone_rows::Column::AppId.eq(app))
+        .filter(phone_rows::Column::CreatorId.eq(user))
+        .order_by_desc(phone_rows::Column::CreatedAt)
+        .all(&ctx.db)
+        .await?
+        .into_iter()
+        .find_map(|row| {
+            decode::<PhoneSession>(row.payload)
+                .ok()
+                .filter(|session| {
+                    !matches!(session.state, PhoneState::Closed | PhoneState::Quarantined)
+                })
+                .map(|session| session.id)
+        });
     let mut blockers = vec![];
-    let env = one(&ctx.db,"SELECT account_secret_reference_id,reset_secret_reference_id FROM environments WHERE app_id=$1",vec![app.into()]).await?;
-    if field::<Option<Uuid>>(&env, "account_secret_reference_id")?.is_some()
-        || field::<Option<Uuid>>(&env, "reset_secret_reference_id")?.is_some()
-    {
+    let env = environments::Entity::find()
+        .filter(environments::Column::AppId.eq(app))
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    if env.account_secret_reference_id.is_some() || env.reset_secret_reference_id.is_some() {
         blockers
             .push("This app needs a verified account and reset setup before connecting.".into());
     }
@@ -136,31 +228,30 @@ pub async fn open(
     let choices = options(ctx, user, app).await?;
     let fingerprint = hash(serde_json::to_vec(&input).map_err(|_| ApiFailure::internal())?);
     let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![app.into()],
-    )
-    .await?;
-    if let Some(r) = rows(
-        &tx,
-        "SELECT * FROM phone_sessions WHERE id=$1",
-        vec![input.id.into()],
-    )
-    .await?
-    .first()
-    {
-        if field::<Uuid>(r, "app_id")? != app
-            || field::<Uuid>(r, "creator_id")? != user
-            || field::<String>(r, "fingerprint")? != fingerprint
-        {
+    app_rows::Entity::find_by_id(app)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    if let Some(row) = phone_rows::Entity::find_by_id(input.id).one(&tx).await? {
+        if row.app_id != app || row.creator_id != user || row.fingerprint != fingerprint {
             return Err(conflict("Session request identity was already used"));
         }
         return detail(&tx, input.id).await;
     }
-    let active=rows(&tx,"SELECT id FROM phone_sessions WHERE app_id=$1 AND creator_id=$2 AND payload->>'state' NOT IN ('closed','quarantined')",vec![app.into(),user.into()]).await?;
-    if let Some(r) = active.first() {
-        return detail(&tx, field(r, "id")?).await;
+    let active = phone_rows::Entity::find()
+        .filter(phone_rows::Column::AppId.eq(app))
+        .filter(phone_rows::Column::CreatorId.eq(user))
+        .all(&tx)
+        .await?
+        .into_iter()
+        .find(|row| {
+            decode::<PhoneSession>(row.payload.clone()).is_ok_and(|session| {
+                !matches!(session.state, PhoneState::Closed | PhoneState::Quarantined)
+            })
+        });
+    if let Some(row) = active {
+        return detail(&tx, row.id).await;
     }
     let build = input
         .build_id
@@ -175,25 +266,22 @@ pub async fn open(
         .into_iter()
         .find(|p| p.id == profile_id)
         .ok_or_else(|| ApiFailure::invalid("Device is not available for this app"))?;
-    let b = one(
-        &tx,
-        "SELECT * FROM builds WHERE id=$1 AND app_id=$2 AND validation_state='validated'",
-        vec![build.into(), app.into()],
-    )
-    .await?;
-    let bytes: i64 = field(&b, "byte_size")?;
-    if bytes < 1 || bytes > i64::from(profile.max_apk_bytes.min(104857600)) {
+    let b = builds::Entity::find_by_id(build)
+        .filter(builds::Column::AppId.eq(app))
+        .filter(builds::Column::ValidationState.eq("validated"))
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let bytes = b.byte_size;
+    if bytes < 1 || bytes > i64::from(profile.max_apk_bytes) {
         return Err(ApiFailure::invalid("Build is too large for this device"));
     }
-    let environment_revision: i32 = field(
-        &one(
-            &tx,
-            "SELECT revision FROM environments WHERE app_id=$1",
-            vec![app.into()],
-        )
-        .await?,
-        "revision",
-    )?;
+    let environment_revision = environments::Entity::find()
+        .filter(environments::Column::AppId.eq(app))
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?
+        .revision;
     let assignment = if profile.driver == Driver::Minitap {
         model_registry::active_assignment(&tx, app, profile.id, ModelPurpose::Navigation).await?
     } else {
@@ -248,8 +336,23 @@ pub async fn open(
         frame: None,
         tasks: vec![],
     };
-    exec(&tx,"INSERT INTO phone_sessions(id,app_id,creator_id,build_id,profile_id,payload,fingerprint,build_sha256,build_bytes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",vec![s.id.into(),app.into(),user.into(),build.into(),profile.id.into(),json(&s)?.into(),fingerprint.into(),field::<String>(&b,"sha256")?.into(),(bytes as i32).into()]).await?;
+    phone_rows::ActiveModel {
+        id: Set(s.id),
+        app_id: Set(app),
+        creator_id: Set(user),
+        build_id: Set(build),
+        profile_id: Set(profile.id),
+        payload: Set(json(&s)?),
+        fingerprint: Set(fingerprint),
+        build_sha256: Set(b.sha256),
+        build_bytes: Set(bytes),
+        ..Default::default()
+    }
+    .insert(&tx)
+    .await?;
+    super::capacity_control::enqueue(&tx, app, profile.id).await?;
     tx.commit().await?;
+    super::execution_wakeup::notify(ctx);
     Ok(s)
 }
 pub async fn task(
@@ -267,19 +370,10 @@ pub async fn task(
     }
     let tx = ctx.db.begin().await?;
     let r = read(&tx, id, true).await?;
-    let mut s: PhoneSession = decode(field(&r, "payload")?)?;
+    let mut s: PhoneSession = decode(r.payload)?;
     let fingerprint = hash(serde_json::to_vec(&input).map_err(|_| ApiFailure::internal())?);
-    if let Some(prior) = rows(
-        &tx,
-        "SELECT session_id,fingerprint FROM phone_tasks WHERE id=$1",
-        vec![input.id.into()],
-    )
-    .await?
-    .first()
-    {
-        if field::<Uuid>(prior, "session_id")? != id
-            || field::<String>(prior, "fingerprint")? != fingerprint
-        {
+    if let Some(prior) = phone_tasks::Entity::find_by_id(input.id).one(&tx).await? {
+        if prior.session_id != id || prior.fingerprint != fingerprint {
             return Err(conflict("Task request identity was already used"));
         }
         return detail(&tx, id).await;
@@ -295,13 +389,11 @@ pub async fn task(
     if s.state != PhoneState::Ready {
         return Err(conflict("Wait for the phone to be ready"));
     }
-    let tasks = rows(
-        &tx,
-        "SELECT id FROM phone_tasks WHERE session_id=$1",
-        vec![id.into()],
-    )
-    .await?;
-    if tasks.len() >= 20 {
+    let task_count = phone_tasks::Entity::find()
+        .filter(phone_tasks::Column::SessionId.eq(id))
+        .count(&tx)
+        .await?;
+    if task_count >= 20 {
         return Err(ApiFailure::invalid("Start a new session after 20 tasks"));
     }
     let control = if let Some(selection) = input.selection {
@@ -331,16 +423,14 @@ pub async fn task(
         state: PhoneTaskState::Queued,
         message: "Waiting for AI".into(),
     };
-    exec(
-        &tx,
-        "INSERT INTO phone_tasks(id,session_id,fingerprint,payload) VALUES($1,$2,$3,$4)",
-        vec![
-            task.id.into(),
-            id.into(),
-            fingerprint.into(),
-            json(&task)?.into(),
-        ],
-    )
+    phone_tasks::ActiveModel {
+        id: Set(task.id),
+        session_id: Set(id),
+        fingerprint: Set(fingerprint),
+        payload: Set(json(&task)?),
+        ..Default::default()
+    }
+    .insert(&tx)
     .await?;
     s.state = PhoneState::Acting;
     s.message = "Planning your task".into();
@@ -352,9 +442,10 @@ pub async fn stop(ctx: &AppContext, user: Uuid, id: Uuid) -> ApiResult<PhoneSess
     authorized(ctx, user, id).await?;
     let tx = ctx.db.begin().await?;
     let r = read(&tx, id, true).await?;
-    let mut s: PhoneSession = decode(field(&r, "payload")?)?;
+    let worker_id = r.worker_id;
+    let mut s: PhoneSession = decode(r.payload)?;
     if !matches!(s.state, PhoneState::Closed | PhoneState::Quarantined) {
-        s.state = if field::<Option<Uuid>>(&r, "worker_id")?.is_none() {
+        s.state = if worker_id.is_none() {
             PhoneState::Closed
         } else {
             PhoneState::Stopping
@@ -380,12 +471,14 @@ pub async fn claim(
     }
     reconcile(ctx).await?;
     let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![w.app_id.into()],
-    )
-    .await?;
+    app_rows::Entity::find_by_id(w.app_id)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    if !super::device_hosts::claim_fence(&tx, w, input.claim_id).await? {
+        return Ok(PhoneClaimResponse { lease: None });
+    }
     let p = test_definitions::profile(&tx, w.app_id, w.profile_id).await?;
     p.validate().map_err(ApiFailure::invalid)?;
     model_registry::advertise_phone(
@@ -401,36 +494,64 @@ pub async fn claim(
     if !p.qualified || !matches!(p.driver, Driver::Minitap | Driver::Direct) {
         return Err(conflict("A qualified real device profile is required"));
     }
-    if !rows(
-        &tx,
-        "SELECT id FROM phone_sessions WHERE worker_id=$1 AND claim_id=$2",
-        vec![w.id.into(), input.claim_id.into()],
-    )
-    .await?
-    .is_empty()
+    if phone_rows::Entity::find()
+        .filter(phone_rows::Column::WorkerId.eq(w.id))
+        .filter(phone_rows::Column::ClaimId.eq(input.claim_id))
+        .one(&tx)
+        .await?
+        .is_some()
     {
         return Err(conflict(
             "Claim was already delivered; do not replay device work",
         ));
     }
-    if !rows(
-        &tx,
-        "SELECT resource FROM execution_reservations WHERE resource=$1 OR resource=$2",
-        vec![
-            format!("app:{}", w.app_id).into(),
-            format!("device:{}", p.device_identity).into(),
-        ],
-    )
-    .await?
-    .is_empty()
+    let resources = [
+        format!("app:{}", w.app_id),
+        format!("device:{}", p.device_identity),
+    ];
+    if execution_reservations::Entity::find()
+        .filter(execution_reservations::Column::Resource.is_in(resources.clone()))
+        .one(&tx)
+        .await?
+        .is_some()
     {
         return Ok(PhoneClaimResponse { lease: None });
     }
-    let pending=rows(&tx,"SELECT * FROM phone_sessions WHERE app_id=$1 AND profile_id=$2 AND payload->>'state'='queued' AND deadline>now() AND (payload->'resolved_model' IS NULL OR payload->'resolved_model'='null'::jsonb OR EXISTS (SELECT 1 FROM jsonb_array_elements($3::jsonb) compatible WHERE compatible->'reference'=payload->'resolved_model'->'reference' AND compatible->'provider'=payload->'resolved_model'->'provider')) AND (payload->'authoring_model' IS NULL OR payload->'authoring_model'='null'::jsonb OR EXISTS (SELECT 1 FROM jsonb_array_elements($3::jsonb) compatible WHERE compatible->'reference'=payload->'authoring_model'->'reference' AND compatible->'provider'=payload->'authoring_model'->'provider')) ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED",vec![w.app_id.into(),w.profile_id.into(),model_registry::eligible_models(input.model_capabilities.as_ref()).into()]).await?;
-    let Some(r) = pending.first() else {
+    let pending = phone_rows::Entity::find()
+        .filter(phone_rows::Column::AppId.eq(w.app_id))
+        .filter(phone_rows::Column::ProfileId.eq(w.profile_id))
+        .filter(phone_rows::Column::Deadline.gt(Utc::now()))
+        .order_by_asc(phone_rows::Column::CreatedAt)
+        .all(&tx)
+        .await?;
+    let mut selected = None;
+    for candidate in pending {
+        let session: PhoneSession = decode(candidate.payload.clone())?;
+        if session.state != PhoneState::Queued
+            || session.resolved_model.as_ref().is_some_and(|resolved| {
+                input.protocol_version < 5
+                    || !model_registry::worker_matches(resolved, input.model_capabilities.as_ref())
+            })
+            || session.authoring_model.as_ref().is_some_and(|resolved| {
+                input.protocol_version < 5
+                    || !model_registry::worker_matches(resolved, input.model_capabilities.as_ref())
+            })
+        {
+            continue;
+        }
+        if let Some(locked) = phone_rows::Entity::find_by_id(candidate.id)
+            .lock_with_behavior(LockType::Update, LockBehavior::SkipLocked)
+            .one(&tx)
+            .await?
+        {
+            selected = Some(locked);
+            break;
+        }
+    }
+    let Some(row) = selected else {
         return Ok(PhoneClaimResponse { lease: None });
     };
-    let mut s: PhoneSession = decode(field(r, "payload")?)?;
+    let mut s: PhoneSession = decode(row.payload.clone())?;
     if let Some(resolved) = s.resolved_model.as_ref() {
         if input.protocol_version < 5
             || !model_registry::worker_matches(resolved, input.model_capabilities.as_ref())
@@ -447,12 +568,7 @@ pub async fn claim(
             return Ok(PhoneClaimResponse { lease: None });
         }
     }
-    rows(
-        &tx,
-        "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
-        vec![p.device_identity.clone().into()],
-    )
-    .await?;
+    super::device_hosts::mark_leased(&tx, w.id).await?;
     s.protocol_version = input.protocol_version;
     if p.driver == Driver::Direct && ![2, 3, 4, 5, 6].contains(&input.protocol_version) {
         return Err(conflict("Update this worker for direct execution"));
@@ -464,25 +580,56 @@ pub async fn claim(
         return Err(conflict("Device profile changed; open a new session"));
     }
     let token = loco_rs::hash::random_string(64);
-    exec(&tx,"UPDATE phone_sessions SET worker_id=$2,claim_id=$3,lease_hash=$4,expires_at=now()+interval '60 seconds' WHERE id=$1",vec![s.id.into(),w.id.into(),input.claim_id.into(),hash(&token).into()]).await?;
-    for resource in [
-        format!("app:{}", w.app_id),
-        format!("device:{}", p.device_identity),
-    ] {
-        exec(
-            &tx,
-            "INSERT INTO execution_reservations(resource,session_id) VALUES($1,$2)",
-            vec![resource.into(), s.id.into()],
+    let now = Utc::now();
+    phone_rows::Entity::update_many()
+        .col_expr(
+            phone_rows::Column::WorkerId,
+            sea_orm::sea_query::Expr::value(Some(w.id)),
         )
+        .col_expr(
+            phone_rows::Column::ClaimId,
+            sea_orm::sea_query::Expr::value(Some(input.claim_id)),
+        )
+        .col_expr(
+            phone_rows::Column::LeaseHash,
+            sea_orm::sea_query::Expr::value(Some(hash(&token))),
+        )
+        .col_expr(
+            phone_rows::Column::ExpiresAt,
+            sea_orm::sea_query::Expr::value(Some(now + Duration::seconds(60))),
+        )
+        .col_expr(
+            phone_rows::Column::Deadline,
+            sea_orm::sea_query::Expr::value(now + Duration::minutes(40)),
+        )
+        .filter(phone_rows::Column::Id.eq(s.id))
+        .exec(&tx)
         .await?;
+    for resource in resources {
+        let inserted =
+            execution_reservations::Entity::insert(execution_reservations::ActiveModel {
+                resource: Set(resource),
+                attempt_id: Set(None),
+                session_id: Set(Some(s.id)),
+            })
+            .on_conflict(
+                OnConflict::column(execution_reservations::Column::Resource)
+                    .do_nothing()
+                    .to_owned(),
+            )
+            .exec_without_returning(&tx)
+            .await?;
+        if inserted != 1 {
+            return Ok(PhoneClaimResponse { lease: None });
+        }
     }
     store(&tx, &s).await?;
     let out = PhoneClaimResponse {
         lease: Some(PhoneLease {
             session: s,
             lease_token: token,
-            build_sha256: field(r, "build_sha256")?,
-            build_bytes: field::<i32>(r, "build_bytes")? as u32,
+            build_sha256: row.build_sha256,
+            build_bytes: u32::try_from(row.build_bytes).map_err(|_| ApiFailure::internal())?,
         }),
     };
     tx.commit().await?;
@@ -493,15 +640,22 @@ pub async fn lease(
     w: &Worker,
     id: Uuid,
     token: &str,
-) -> ApiResult<QueryResult> {
-    let r=one(db,"SELECT *, expires_at>now() AS alive FROM phone_sessions WHERE id=$1 AND worker_id=$2 AND app_id=$3 FOR UPDATE",vec![id.into(),w.id.into(),w.app_id.into()]).await?;
+) -> ApiResult<phone_rows::Model> {
+    super::worker_auth::lease_authority(db, w).await?;
+    let r = phone_rows::Entity::find_by_id(id)
+        .filter(phone_rows::Column::WorkerId.eq(w.id))
+        .filter(phone_rows::Column::AppId.eq(w.app_id))
+        .lock_exclusive()
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
     if token.len() != 64
-        || field::<Option<String>>(&r, "lease_hash")? != Some(hash(token))
-        || !field::<bool>(&r, "alive")?
+        || r.lease_hash.as_deref() != Some(hash(token).as_str())
+        || r.expires_at.is_none_or(|expires| expires <= Utc::now())
     {
         return Err(conflict("Session lease expired or changed"));
     }
-    let s: PhoneSession = decode(field(&r, "payload")?)?;
+    let s: PhoneSession = decode(r.payload.clone())?;
     if matches!(s.state, PhoneState::Quarantined | PhoneState::Closed) {
         return Err(conflict("Session ended"));
     }
@@ -553,16 +707,8 @@ pub async fn update(
     }
     let tx = ctx.db.begin().await?;
     let r = lease(&tx, w, id, token).await?;
-    let mut s: PhoneSession = decode(field(&r, "payload")?)?;
-    let expired: bool = field(
-        &one(
-            &tx,
-            "SELECT deadline<now() AS expired FROM phone_sessions WHERE id=$1",
-            vec![id.into()],
-        )
-        .await?,
-        "expired",
-    )?;
+    let expired = r.deadline < Utc::now();
+    let mut s: PhoneSession = decode(r.payload)?;
     if expired {
         s.state = PhoneState::Stopping;
     }
@@ -572,45 +718,60 @@ pub async fn update(
         }
         s.state = PhoneState::Closed;
         s.message = "Session closed".into();
-        exec(
-            &tx,
-            "DELETE FROM execution_reservations WHERE session_id=$1",
-            vec![id.into()],
-        )
-        .await?;
-        for row in rows(&tx,"SELECT id,payload FROM phone_tasks WHERE session_id=$1 AND payload->>'state' IN ('queued','acting') FOR UPDATE",vec![id.into()]).await? {
-            let mut task:PhoneTask=decode(field(&row,"payload")?)?;
-            task.state=PhoneTaskState::Stopped;
-            task.message="Session stopped".into();
-            if let Some(progress)=&mut task.progress {
-                progress.state=mobile_qa_contracts::automation::GenerationState::Canceled;
+        execution_reservations::Entity::delete_many()
+            .filter(execution_reservations::Column::SessionId.eq(id))
+            .exec(&tx)
+            .await?;
+        let task_rows = phone_tasks::Entity::find()
+            .filter(phone_tasks::Column::SessionId.eq(id))
+            .lock_exclusive()
+            .all(&tx)
+            .await?;
+        for row in task_rows {
+            let mut task: PhoneTask = decode(row.payload.clone())?;
+            if !matches!(task.state, PhoneTaskState::Queued | PhoneTaskState::Acting) {
+                continue;
+            }
+            task.state = PhoneTaskState::Stopped;
+            task.message = "Session stopped".into();
+            if let Some(progress) = &mut task.progress {
+                progress.state = mobile_qa_contracts::automation::GenerationState::Canceled;
                 for receipt in &mut progress.journal {
-                    if receipt.outcome==mobile_qa_contracts::automation::DiscoveryOutcome::Pending {
-                        receipt.outcome=mobile_qa_contracts::automation::DiscoveryOutcome::Uncertain;
+                    if receipt.outcome == mobile_qa_contracts::automation::DiscoveryOutcome::Pending
+                    {
+                        receipt.outcome =
+                            mobile_qa_contracts::automation::DiscoveryOutcome::Uncertain;
                     }
                 }
             }
-            for step in &mut task.steps {if step.state==mobile_qa_contracts::automation::StepState::Started {step.state=mobile_qa_contracts::automation::StepState::Inconclusive;step.message="Session stopped before the result was acknowledged".into();}}
-            exec(&tx,"UPDATE phone_tasks SET payload=$2 WHERE id=$1",vec![task.id.into(),json(&task)?.into()]).await?;
+            for step in &mut task.steps {
+                if step.state == mobile_qa_contracts::automation::StepState::Started {
+                    step.state = mobile_qa_contracts::automation::StepState::Inconclusive;
+                    step.message = "Session stopped before the result was acknowledged".into();
+                }
+            }
+            let mut active = row.into_active_model();
+            active.payload = Set(json(&task)?);
+            active.update(&tx).await?;
         }
     } else {
         if let Some(mut task) = input.task {
-            let old: PhoneTask = decode(field(
-                &one(
-                    &tx,
-                    "SELECT payload FROM phone_tasks WHERE id=$1 AND session_id=$2 FOR UPDATE",
-                    vec![task.id.into(), id.into()],
-                )
-                .await?,
-                "payload",
-            )?)?;
+            let task_row = phone_tasks::Entity::find_by_id(task.id)
+                .filter(phone_tasks::Column::SessionId.eq(id))
+                .lock_exclusive()
+                .one(&tx)
+                .await?
+                .ok_or_else(ApiFailure::missing)?;
+            let old: PhoneTask = decode(task_row.payload.clone())?;
             if serde_json::to_value(&old).ok() == serde_json::to_value(&task).ok() {
-                exec(
-                    &tx,
-                    "UPDATE phone_sessions SET expires_at=now()+interval '60 seconds' WHERE id=$1",
-                    vec![id.into()],
-                )
-                .await?;
+                phone_rows::Entity::update_many()
+                    .col_expr(
+                        phone_rows::Column::ExpiresAt,
+                        sea_orm::sea_query::Expr::value(Some(Utc::now() + Duration::seconds(60))),
+                    )
+                    .filter(phone_rows::Column::Id.eq(id))
+                    .exec(&tx)
+                    .await?;
                 tx.commit().await?;
                 return detail(&ctx.db, id).await;
             }
@@ -631,12 +792,9 @@ pub async fn update(
                 task.state,
                 PhoneTaskState::Completed | PhoneTaskState::Failed | PhoneTaskState::Stopped
             );
-            exec(
-                &tx,
-                "UPDATE phone_tasks SET payload=$2 WHERE id=$1",
-                vec![task.id.into(), json(&task)?.into()],
-            )
-            .await?;
+            let mut active = task_row.into_active_model();
+            active.payload = Set(json(&task)?);
+            active.update(&tx).await?;
             if s.state != PhoneState::Stopping {
                 s.state = if ended {
                     PhoneState::Ready
@@ -649,6 +807,15 @@ pub async fn update(
             && input.state == PhoneState::Ready
             && input.frame.is_some()
         {
+            // Preparation has its own bounded allowance; only the first Ready starts interactive time.
+            phone_rows::Entity::update_many()
+                .col_expr(
+                    phone_rows::Column::Deadline,
+                    sea_orm::sea_query::Expr::value(Utc::now() + Duration::minutes(20)),
+                )
+                .filter(phone_rows::Column::Id.eq(id))
+                .exec(&tx)
+                .await?;
             s.state = PhoneState::Ready;
         }
         if let Some(f) = input.frame {
@@ -661,12 +828,14 @@ pub async fn update(
         };
     }
     store(&tx, &s).await?;
-    exec(
-        &tx,
-        "UPDATE phone_sessions SET expires_at=now()+interval '60 seconds' WHERE id=$1",
-        vec![id.into()],
-    )
-    .await?;
+    phone_rows::Entity::update_many()
+        .col_expr(
+            phone_rows::Column::ExpiresAt,
+            sea_orm::sea_query::Expr::value(Some(Utc::now() + Duration::seconds(60))),
+        )
+        .filter(phone_rows::Column::Id.eq(id))
+        .exec(&tx)
+        .await?;
     tx.commit().await?;
     detail(&ctx.db, id).await
 }

@@ -1,5 +1,7 @@
 """Explicit app policies. Generic direct execution never uses the demo's backend or reset oracle."""
 
+import os
+
 from mobile_qa_worker.device.android import AndroidDevice
 from mobile_qa_worker.generated.models import ExecutionProfile
 from mobile_qa_worker.qualification.config import Profile, QualificationError
@@ -40,4 +42,8 @@ def device_for(assignment: ExecutionProfile, host: Profile, evidence: Evidence) 
         or not c.launch_component.startswith(c.package + "/")
     ):
         raise QualificationError("unsupported_device_adapter")
+    if "MOBILE_QA_SLOT_SOCKET" in os.environ:
+        from mobile_qa_worker.host.proxy import SupervisedDevice
+
+        return SupervisedDevice(host, evidence, assignment.package, c.launch_component)
     return AndroidDevice(host, evidence, assignment.package, c.launch_component)

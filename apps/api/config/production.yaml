@@ -1,5 +1,5 @@
 # Future deployment configuration, not proof that a production service exists.
-# HOST and DATABASE_URL come from Doppler process injection; never add values here.
+# HOST and DATABASE_URL come from Doppler process injection; PORT is a platform setting.
 # Relative web asset paths assume the API process runs from apps/api.
 logger:
   enable: true
@@ -7,8 +7,8 @@ logger:
   level: info
   format: json
 server:
-  port: 5150
-  binding: 127.0.0.1
+  port: <%= get_env(name="PORT") %>
+  binding: 0.0.0.0
   host: <%= get_env(name="HOST") %>
   middlewares:
     fallback:

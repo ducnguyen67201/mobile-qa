@@ -128,7 +128,12 @@ function AppDetailContent({ appId }: { appId: string }) {
       <div className="detail-layout">
         <Stack gap="xl" miw={0}>
           {settings.data ? (
-            <ApkUpload key={appId} appId={appId} maxBytes={settings.data.max_apk_bytes} />
+            <ApkUpload
+              key={appId}
+              appId={appId}
+              maxBytes={settings.data.max_apk_bytes}
+              multipartEnabled={!!settings.data.multipart}
+            />
           ) : settings.isError ? (
             <ErrorNotice
               error={settings.error}

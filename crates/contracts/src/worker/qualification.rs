@@ -73,7 +73,7 @@ pub enum QualificationArtifact {
         name: String,
         path: String,
         mime: String,
-        #[schemars(range(min = 1, max = 262144000))]
+        #[schemars(range(min = 1, max = 2147483648_u32))]
         bytes: u32,
         #[schemars(regex(pattern = "^[0-9a-f]{64}$"))]
         sha256: String,
@@ -144,7 +144,7 @@ impl QualificationResult {
             } = a
             {
                 if *bytes == 0
-                    || *bytes > 262144000
+                    || *bytes > 2147483648
                     || !hash_valid(sha256)
                     || path.is_empty()
                     || path.starts_with('/')

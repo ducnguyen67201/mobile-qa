@@ -44,6 +44,7 @@ jobs:
       contracts: ${{ steps.paths.outputs.contracts }}
       demo: ${{ steps.paths.outputs.demo }}
       scope_tests: ${{ steps.paths.outputs.scope_tests }}
+      infra: ${{ steps.paths.outputs.infra }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -62,6 +63,22 @@ jobs:
               - 'scripts/dev_stack.py'
               - 'scripts/test_dev_stack.py'
               - 'scripts/runtime.py'
+            infra:
+              - '.github/workflows/**'
+              - 'infra/aws/**'
+              - 'infra/deployment/**'
+              - 'infra/device-host/ami/**'
+              - 'infra/device-host/network/**'
+              - 'infra/device-host/mobile-qa-host.service'
+              - 'Dockerfile.api'
+              - '.dockerignore'
+              - 'railway.toml'
+              - 'scripts/check_deployment.py'
+              - 'scripts/test_check_deployment.py'
+              - 'crates/contracts/src/device_hosts.rs'
+              - 'crates/contracts/src/device_hosts_api.rs'
+              - 'crates/contracts/src/artifacts_api.rs'
+              - 'contracts/worker.schema.json'
             api:
               - '.github/workflows/**'
               - 'Cargo.toml'
@@ -87,6 +104,7 @@ jobs:
               - 'apps/web/**'
               - '.node-version'
               - 'crates/contracts/src/browser.rs'
+              - 'crates/contracts/src/artifacts_api.rs'
               - 'crates/contracts/src/execution.rs'
               - 'crates/contracts/src/execution_api.rs'
               - 'crates/contracts/src/test_library.rs'
@@ -102,6 +120,8 @@ jobs:
               - '.github/workflows/**'
               - 'apps/mobile-worker/**'
               - 'crates/contracts/src/worker.rs'
+              - 'crates/contracts/src/device_hosts.rs'
+              - 'crates/contracts/src/artifacts_api.rs'
               - 'crates/contracts/src/execution.rs'
               - 'crates/contracts/src/task_sessions.rs'
               - 'crates/contracts/src/automation.rs'
@@ -235,6 +255,34 @@ jobs:
       - run: cargo test --package mobile-qa-contracts --locked
       - run: python3 scripts/contracts.py --check
       - run: python3 -m unittest scripts.test_contracts
+
+  # Offline provider/device fakes only. No AWS identity, plan, apply or paid image build.
+  infra:
+    needs: scope
+    if: needs.scope.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.12.1
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2
+        with:
+          tofu_version: 1.12.6
+          tofu_wrapper: false
+      - uses: hashicorp/setup-packer@c4e4b2636b98ce7566f9ec9c309e26821f695bd2
+        with:
+          version: 1.16.1
+      - run: uv sync --project infra/aws/capacity-controller --frozen
+      - run: uv run --project infra/aws/capacity-controller --frozen ruff check infra/aws/capacity-controller
+      - run: cd infra/aws/capacity-controller && uv run --frozen pyright
+      - run: cd infra/aws/capacity-controller && uv run --frozen pytest
+      - run: python3 -m unittest scripts.test_check_deployment
+      - run: python3 scripts/check_deployment.py
+      # Package builds catch missing compile-time assets and runtime dependencies.
+      # These images stay on the runner; no registry push or cloud deployment.
+      - run: docker build --platform linux/amd64 --provenance=false -f Dockerfile.api -t mobile-qa-api:check .
+      - run: docker build --platform linux/amd64 --provenance=false -f infra/aws/capacity-controller/Dockerfile -t mobile-qa-capacity:check .
 
   demo:
     needs: scope

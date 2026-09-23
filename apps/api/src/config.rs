@@ -21,9 +21,9 @@ pub struct Setup {
     pub validators: Arc<Semaphore>,
     pub archives: Arc<Semaphore>,
 }
-pub const MAX_APK: i64 = 250 * 1024 * 1024;
+pub const MAX_APK: i64 = 2 * 1024 * 1024 * 1024; // 2 GiB
 pub const SESSION_SECONDS: i64 = 3600;
-pub const UPLOAD_SECONDS: i64 = 1800;
+pub const UPLOAD_SECONDS: i64 = 7200; // 2 hours, to allow for slow uploads of large artifacts
 impl Setup {
     pub fn get(ctx: &AppContext) -> Self {
         ctx.shared_store.get::<Self>().expect("setup initialized")

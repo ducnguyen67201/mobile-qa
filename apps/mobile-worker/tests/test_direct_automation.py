@@ -23,6 +23,9 @@ TARGET = DirectTarget.model_validate({"by": "resource_id", "value": PACKAGE + ":
 
 class Device:
     direct_automation = False
+    remote_commands = False
+    serial = "emulator-5554"
+    adb_server_port = 5037
 
     def adb(self, *args):
         return XML

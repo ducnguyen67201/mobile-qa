@@ -1,10 +1,16 @@
 //! Real routes/database. Synthetic worker evidence is not Android acceptance.
 mod support;
+use mobile_qa::models::_entities::{
+    execution_artifacts, execution_attempts, execution_preflight_receipts, execution_reservations,
+    execution_runs, execution_workers, test_library_versions,
+};
 use mobile_qa::services::{
     execution_store::*, runs, scheduler, test_definitions as defs, verification, worker_auth,
 };
 use mobile_qa_contracts::execution::*;
-use sea_orm::TransactionTrait;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set, TransactionTrait,
+};
 use support::*;
 
 fn definition() -> TestDefinition {
@@ -141,17 +147,13 @@ async fn route_manifest_idempotency_and_worker_fencing() {
         .await
         .unwrap();
         assert!(idle.lease.is_none());
-        assert!(field::<bool>(
-            &one(
-                &ctx.db,
-                "SELECT model_last_seen_at IS NOT NULL AS seen FROM execution_workers WHERE id=$1",
-                vec![w.id.into()]
-            )
+        assert!(execution_workers::Entity::find_by_id(w.id)
+            .one(&ctx.db)
             .await
-            .unwrap(),
-            "seen"
-        )
-        .unwrap());
+            .unwrap()
+            .unwrap()
+            .model_last_seen_at
+            .is_some());
         let input = CreateRunRequest {
             build_id: build,
             plan_version_id: plan,
@@ -188,21 +190,15 @@ async fn route_manifest_idempotency_and_worker_fencing() {
         );
         let frozen = run.manifest.clone();
         let case_id = frozen.cases[0].definition_id;
-        let row = one(
-            &ctx.db,
-            "SELECT entry_id FROM test_library_versions WHERE definition_id=$1",
-            vec![case_id.into()],
-        )
-        .await
-        .unwrap();
-        let entry = mobile_qa::services::test_library::entry(
-            &ctx.db,
-            owner.user,
-            app,
-            field(&row, "entry_id").unwrap(),
-        )
-        .await
-        .unwrap();
+        let row = test_library_versions::Entity::find_by_id(case_id)
+            .one(&ctx.db)
+            .await
+            .unwrap()
+            .unwrap();
+        let entry =
+            mobile_qa::services::test_library::entry(&ctx.db, owner.user, app, row.entry_id)
+                .await
+                .unwrap();
         mobile_qa::services::test_library_mutations::apply(
             &ctx,
             owner.user,
@@ -280,6 +276,41 @@ async fn route_manifest_idempotency_and_worker_fencing() {
         .await
         .is_err());
         let lease = again;
+        let delivery_path = format!(
+            "/api/worker/attempts/{}/build/delivery?generation={}",
+            lease.attempt_id, lease.generation
+        );
+        error(&server.get(&delivery_path).await, 401);
+        error(
+            &server
+                .get(&delivery_path)
+                .add_header("authorization", format!("Bearer {token}"))
+                .await,
+            401,
+        );
+        let delivery = server
+            .get(&delivery_path)
+            .add_header("authorization", format!("Bearer {token}"))
+            .add_header("x-lease-token", &lease.lease_token)
+            .await;
+        delivery.assert_status_ok();
+        let delivery = delivery.json::<mobile_qa_contracts::artifacts_api::BuildDelivery>();
+        assert_eq!(delivery.app_id, app);
+        assert_eq!(delivery.sha256, lease.manifest.build_sha256);
+        assert_eq!(delivery.byte_size, lease.manifest.build_bytes);
+        assert_eq!(
+            delivery.authentication,
+            mobile_qa_contracts::artifacts_api::DeliveryAuthentication::WorkerLease
+        );
+        assert!(delivery.headers.is_empty());
+        let bytes = server
+            .get(&delivery.url)
+            .add_header("authorization", format!("Bearer {token}"))
+            .add_header("x-lease-token", &lease.lease_token)
+            .await;
+        bytes.assert_status_ok();
+        assert_eq!(hash(bytes.as_bytes()), lease.manifest.build_sha256);
+
         let ev = ExecutionEvent {
             id: Uuid::new_v4(),
             sequence: 1,
@@ -336,24 +367,23 @@ async fn route_manifest_idempotency_and_worker_fencing() {
                 .await
                 .unwrap();
         assert_eq!(receipt.attempt.outcome, Some(Outcome::Canceled));
-        exec(
-            &ctx.db,
-            "UPDATE execution_attempts SET expires_at=now()-interval '1 second' WHERE id=$1",
-            vec![lease.attempt_id.into()],
-        )
-        .await
-        .unwrap();
+        let attempt = execution_attempts::Entity::find_by_id(lease.attempt_id)
+            .one(&ctx.db)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut active = attempt.into_active_model();
+        active.expires_at = Set(Some(chrono::Utc::now() - chrono::Duration::seconds(1)));
+        active.update(&ctx.db).await.unwrap();
         scheduler::reconcile(&ctx).await.unwrap();
         let r = runs::detail(&ctx.db, run.id).await.unwrap();
         assert_eq!(r.state, JobState::RecoveryRequired);
-        assert!(!rows(
-            &ctx.db,
-            "SELECT * FROM execution_reservations WHERE attempt_id=$1",
-            vec![lease.attempt_id.into()]
-        )
-        .await
-        .unwrap()
-        .is_empty());
+        assert!(execution_reservations::Entity::find()
+            .filter(execution_reservations::Column::AttemptId.eq(lease.attempt_id))
+            .one(&ctx.db)
+            .await
+            .unwrap()
+            .is_some());
         assert!(scheduler::cleanup(
             &ctx,
             &w,
@@ -411,13 +441,19 @@ async fn real_database_competing_claims_and_immutable_definition_boundaries() {
             .unwrap();
             run_ids.push(run.id);
         }
-        exec(
-            &ctx.db,
-            "UPDATE execution_runs SET created_at='2026-01-01T00:00:00Z' WHERE id=$1 OR id=$2",
-            vec![run_ids[0].into(), run_ids[1].into()],
-        )
-        .await
-        .unwrap();
+        let created_at = chrono::DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        for run_id in &run_ids {
+            let run = execution_runs::Entity::find_by_id(*run_id)
+                .one(&ctx.db)
+                .await
+                .unwrap()
+                .unwrap();
+            let mut active = run.into_active_model();
+            active.created_at = Set(created_at);
+            active.update(&ctx.db).await.unwrap();
+        }
         let (a, b) = tokio::join!(
             scheduler::claim(
                 &ctx,
@@ -448,13 +484,10 @@ async fn real_database_competing_claims_and_immutable_definition_boundaries() {
         assert_eq!(claimed[0].run_id, *run_ids.iter().min().unwrap());
         // Independent transactions see the same unreleased app reservation.
         let tx = ctx.db.begin().await.unwrap();
-        let reservations = rows(
-            &tx,
-            "SELECT resource FROM execution_reservations WHERE resource=$1",
-            vec![format!("app:{app}").into()],
-        )
-        .await
-        .unwrap();
+        let reservations = execution_reservations::Entity::find_by_id(format!("app:{app}"))
+            .all(&tx)
+            .await
+            .unwrap();
         assert_eq!(reservations.len(), 1);
         tx.rollback().await.unwrap();
     })
@@ -568,14 +601,13 @@ async fn long_poll_wakes_on_committed_run_and_times_out_without_reserving() {
         assert!(idle.lease.is_none());
         assert_eq!(idle.poll_after_seconds, 0);
         assert!(start.elapsed() >= Duration::from_millis(100));
-        assert!(rows(
-            &ctx.db,
-            "SELECT resource FROM execution_reservations WHERE resource=$1",
-            vec![format!("app:{app}").into()]
-        )
-        .await
-        .unwrap()
-        .is_empty());
+        assert!(
+            execution_reservations::Entity::find_by_id(format!("app:{app}"))
+                .one(&ctx.db)
+                .await
+                .unwrap()
+                .is_none()
+        );
         // Start the actual HTTP request first. Submission must wake it before the
         // five-second fallback, and only after the run transaction commits.
         let claim = async {
@@ -637,13 +669,14 @@ async fn long_poll_rechecks_revocation_after_waking() {
         );
         let revoke = async {
             tokio::time::sleep(Duration::from_millis(100)).await;
-            exec(
-                &ctx.db,
-                "UPDATE execution_workers SET revoked=true WHERE id=$1",
-                vec![worker.id.into()],
-            )
-            .await
-            .unwrap();
+            let row = execution_workers::Entity::find_by_id(worker.id)
+                .one(&ctx.db)
+                .await
+                .unwrap()
+                .unwrap();
+            let mut active = row.into_active_model();
+            active.revoked = Set(true);
+            active.update(&ctx.db).await.unwrap();
             mobile_qa::services::execution_wakeup::notify(&ctx);
         };
         let (result, ()) = tokio::join!(waiting, revoke);
@@ -929,13 +962,16 @@ async fn saved_suite_route_queues_each_numbered_case_in_one_immutable_run() {
             (0, Uuid::from_u128(u128::MAX)),
             (1, Uuid::from_u128(u128::MAX - 1)),
         ] {
-            exec(
-                &ctx.db,
-                "UPDATE execution_attempts SET id=$3 WHERE run_id=$1 AND case_index=$2",
-                vec![run.id.into(), case_index.into(), attempt_id.into()],
-            )
-            .await
-            .unwrap();
+            execution_attempts::Entity::update_many()
+                .col_expr(
+                    execution_attempts::Column::Id,
+                    sea_orm::sea_query::Expr::value(attempt_id),
+                )
+                .filter(execution_attempts::Column::RunId.eq(run.id))
+                .filter(execution_attempts::Column::CaseIndex.eq(case_index))
+                .exec(&ctx.db)
+                .await
+                .unwrap();
         }
         let claim = scheduler::claim(
             &ctx,
@@ -975,13 +1011,14 @@ async fn saved_suite_route_queues_each_numbered_case_in_one_immutable_run() {
             .json(&with_baseline)
             .await;
         denied.assert_status(axum::http::StatusCode::CONFLICT);
-        exec(
-            &ctx.db,
-            "UPDATE execution_attempts SET expires_at=now()-interval '1 second' WHERE id=$1",
-            vec![claim.attempt_id.into()],
-        )
-        .await
-        .unwrap();
+        let attempt = execution_attempts::Entity::find_by_id(claim.attempt_id)
+            .one(&ctx.db)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut active = attempt.into_active_model();
+        active.expires_at = Set(Some(chrono::Utc::now() - chrono::Duration::seconds(1)));
+        active.update(&ctx.db).await.unwrap();
         scheduler::reconcile(&ctx).await.unwrap();
         assert!(
             scheduler::claim(
@@ -1053,87 +1090,196 @@ async fn comparison_finalization_is_durable_idempotent_and_baseline_is_pinned() 
     use mobile_qa::services::{case_runs, run_comparisons};
     use mobile_qa_contracts::regression::*;
     let _guard = DATABASE_BOOT.lock().await;
-    request::<App,_,_>(|server,ctx|async move {
-        let owner=login(&server,&ctx).await;
-        let(app,build,_,_,_)=prepared(&server,&ctx,&owner).await;
-        let TestDefinition::Case(mut case)=definition() else {panic!()};
-        case.key="comparison-direct".into();case.adapter="android_direct_v1".into();
-        for action in &mut case.actions {if action.kind==ActionKind::Navigate {action.kind=ActionKind::Checkpoint;action.instruction.clear();}}
-        case.checks.truncate(1);case.checks[0].required=true;
-        let case=saved_definition(&ctx,&owner,app,TestDefinition::Case(case)).await;
-        let fixture:RunResponse=serde_json::from_str(include_str!("fixtures/execution/comparison.json")).unwrap();
-        let mut profile=fixture.manifest.profile;
-        profile.id=Uuid::new_v4();
+    request::<App, _, _>(|server, ctx| async move {
+        let owner = login(&server, &ctx).await;
+        let (app, build, _, _, _) = prepared(&server, &ctx, &owner).await;
+        let TestDefinition::Case(mut case) = definition() else {
+            panic!()
+        };
+        case.key = "comparison-direct".into();
+        case.adapter = "android_direct_v1".into();
+        for action in &mut case.actions {
+            if action.kind == ActionKind::Navigate {
+                action.kind = ActionKind::Checkpoint;
+                action.instruction.clear();
+            }
+        }
+        case.checks.truncate(1);
+        case.checks[0].required = true;
+        let case = saved_definition(&ctx, &owner, app, TestDefinition::Case(case)).await;
+        let fixture: RunResponse =
+            serde_json::from_str(include_str!("fixtures/execution/comparison.json")).unwrap();
+        let mut profile = fixture.manifest.profile;
+        profile.id = Uuid::new_v4();
         // The serialized fixture is historical; a newly registered direct profile uses null.
-        profile.model=None;
-        let context=profile.execution_context.as_mut().unwrap();
-        context.qualified_profile_id=profile.id;
-        let starting_check=&mut context.starting_checks[0];
-        starting_check.id="ready".into();starting_check.checkpoint_id="preflight".into();
-        starting_check.text_filter.clear();starting_check.expected="true".into();
-        starting_check.prerequisite_check_ids.clear();starting_check.required=true;
-        defs::register_profile(&ctx,owner.user,app,profile.clone()).await.unwrap();
-        let input=CaseRunRequest{case_version_id:case.id,build_id:build,profile_id:profile.id,environment_revision:1,baseline_run_id:None};
-        let (base,_)=case_runs::create(&ctx,owner.user,app,"baseline",input.clone()).await.unwrap();
+        profile.model = None;
+        let context = profile.execution_context.as_mut().unwrap();
+        context.qualified_profile_id = profile.id;
+        let starting_check = &mut context.starting_checks[0];
+        starting_check.id = "ready".into();
+        starting_check.checkpoint_id = "preflight".into();
+        starting_check.text_filter.clear();
+        starting_check.expected = "true".into();
+        starting_check.prerequisite_check_ids.clear();
+        starting_check.required = true;
+        defs::register_profile(&ctx, owner.user, app, profile.clone())
+            .await
+            .unwrap();
+        let input = CaseRunRequest {
+            case_version_id: case.id,
+            build_id: build,
+            profile_id: profile.id,
+            environment_revision: 1,
+            baseline_run_id: None,
+        };
+        let (base, _) = case_runs::create(&ctx, owner.user, app, "baseline", input.clone())
+            .await
+            .unwrap();
         // Seed retained synthetic facts to isolate persistence/finalization from worker transport.
         // Device/check publication and fencing are exercised by the route tests above.
-        async fn finish(ctx:&AppContext,run:&RunResponse,failed:bool) {
-            let mut fixture:RunResponse=serde_json::from_str(include_str!("fixtures/execution/comparison.json")).unwrap();
-            fixture.manifest=run.manifest.clone();
-            if failed {fixture.manifest.build_sha256="f".repeat(64);}
-            let attempt=&mut fixture.attempts[0];attempt.id=run.attempts[0].id;attempt.case_version_id=run.manifest.cases[0].definition_id;
-            let receipt=attempt.preflight.as_mut().unwrap();receipt.attempt_id=attempt.id;receipt.build_sha256=fixture.manifest.build_sha256.clone();receipt.context=fixture.manifest.profile.execution_context.clone().unwrap();
-            let artifact=Uuid::new_v4();attempt.checks[0].artifact_ids=vec![artifact];
-            if failed {attempt.checks[0].outcome=Outcome::Failed;attempt.checks[0].observed=Some("".into());}
-            exec(&ctx.db,"UPDATE execution_runs SET manifest=$2 WHERE id=$1",vec![run.id.into(),json(&fixture.manifest).unwrap().into()]).await.unwrap();
-            exec(&ctx.db,"UPDATE execution_attempts SET state='finished',outcome=$2,cleanup='verified_clean',checks=$3,cleanup_receipt=$4 WHERE id=$1",vec![attempt.id.into(),(if failed {"failed"}else{"passed"}).into(),json(&attempt.checks).unwrap().into(),json(&attempt.original_cleanup).unwrap().into()]).await.unwrap();
-            exec(&ctx.db,"INSERT INTO execution_preflight_receipts(attempt_id,generation,digest,payload) VALUES($1,1,'fixture',$2)",vec![attempt.id.into(),json(receipt).unwrap().into()]).await.unwrap();
-            exec(&ctx.db,"INSERT INTO execution_artifacts(id,attempt_id,checkpoint_id,name,mime,byte_size,sha256,state,storage_key,storage_backend) VALUES($1,$2,'created','created.xml','application/xml',1,'fixture','sealed',$3,'local')",vec![artifact.into(),attempt.id.into(),artifact.to_string().into()]).await.unwrap();
+        async fn finish(ctx: &AppContext, run: &RunResponse, failed: bool) {
+            let mut fixture: RunResponse =
+                serde_json::from_str(include_str!("fixtures/execution/comparison.json")).unwrap();
+            fixture.manifest = run.manifest.clone();
+            if failed {
+                fixture.manifest.build_sha256 = "f".repeat(64);
+            }
+            let attempt = &mut fixture.attempts[0];
+            attempt.id = run.attempts[0].id;
+            attempt.case_version_id = run.manifest.cases[0].definition_id;
+            let receipt = attempt.preflight.as_mut().unwrap();
+            receipt.attempt_id = attempt.id;
+            receipt.build_sha256 = fixture.manifest.build_sha256.clone();
+            receipt.context = fixture.manifest.profile.execution_context.clone().unwrap();
+            let artifact = Uuid::new_v4();
+            attempt.checks[0].artifact_ids = vec![artifact];
+            if failed {
+                attempt.checks[0].outcome = Outcome::Failed;
+                attempt.checks[0].observed = Some("".into());
+            }
+            let run_row = execution_runs::Entity::find_by_id(run.id)
+                .one(&ctx.db)
+                .await
+                .unwrap()
+                .unwrap();
+            let mut run_active = run_row.into_active_model();
+            run_active.manifest = Set(json(&fixture.manifest).unwrap());
+            run_active.update(&ctx.db).await.unwrap();
+            let attempt_row = execution_attempts::Entity::find_by_id(attempt.id)
+                .one(&ctx.db)
+                .await
+                .unwrap()
+                .unwrap();
+            let mut attempt_active = attempt_row.into_active_model();
+            attempt_active.state = Set("finished".into());
+            attempt_active.outcome = Set(Some((if failed { "failed" } else { "passed" }).into()));
+            attempt_active.cleanup = Set("verified_clean".into());
+            attempt_active.checks = Set(json(&attempt.checks).unwrap());
+            attempt_active.cleanup_receipt = Set(Some(json(&attempt.original_cleanup).unwrap()));
+            attempt_active.update(&ctx.db).await.unwrap();
+            execution_preflight_receipts::ActiveModel {
+                attempt_id: Set(attempt.id),
+                generation: Set(1),
+                digest: Set("fixture".into()),
+                payload: Set(json(receipt).unwrap()),
+                ..Default::default()
+            }
+            .insert(&ctx.db)
+            .await
+            .unwrap();
+            execution_artifacts::ActiveModel {
+                id: Set(artifact),
+                attempt_id: Set(attempt.id),
+                checkpoint_id: Set("created".into()),
+                name: Set("created.xml".into()),
+                mime: Set("application/xml".into()),
+                byte_size: Set(1),
+                sha256: Set("fixture".into()),
+                state: Set("sealed".into()),
+                storage_key: Set(artifact.to_string()),
+                storage_backend: Set("local".into()),
+                ..Default::default()
+            }
+            .insert(&ctx.db)
+            .await
+            .unwrap();
         }
-        finish(&ctx,&base,false).await;
+        finish(&ctx, &base, false).await;
         // More than one page of newer, completed but incompatible runs must not hide the
         // latest eligible baseline. This guards the keyset scan in case-run previews.
-        let noise_namespace = Uuid::new_v4().to_string();
-        exec(
-            &ctx.db,
-            "INSERT INTO execution_runs(id,app_id,creator_id,build_id,plan_id,idempotency_key,fingerprint,manifest,cancel_requested,created_at)
-             SELECT md5($2 || ':run:' || generated.position::text)::uuid,
-                 app_id,creator_id,build_id,plan_id,$2 || ':key:' || generated.position::text,
-                 fingerprint,jsonb_set(manifest,'{environment_revision}',to_jsonb(2::integer)),
-                 cancel_requested,created_at + generated.position * interval '1 second'
-             FROM execution_runs
-             CROSS JOIN generate_series(1,101) AS generated(position)
-             WHERE id=$1",
-            vec![base.id.into(), noise_namespace.clone().into()],
+        let source_run = execution_runs::Entity::find_by_id(base.id)
+            .one(&ctx.db)
+            .await
+            .unwrap()
+            .unwrap();
+        let source_attempt = execution_attempts::Entity::find()
+            .filter(execution_attempts::Column::RunId.eq(base.id))
+            .one(&ctx.db)
+            .await
+            .unwrap()
+            .unwrap();
+        for position in 1..=101 {
+            let run_id = Uuid::new_v4();
+            let mut manifest: RunManifest = decode(source_run.manifest.clone()).unwrap();
+            manifest.environment_revision = 2;
+            execution_runs::ActiveModel {
+                id: Set(run_id),
+                app_id: Set(source_run.app_id),
+                creator_id: Set(source_run.creator_id),
+                build_id: Set(source_run.build_id),
+                plan_id: Set(source_run.plan_id),
+                idempotency_key: Set(format!("noise-{position}-{run_id}")),
+                fingerprint: Set(source_run.fingerprint.clone()),
+                manifest: Set(json(&manifest).unwrap()),
+                cancel_requested: Set(source_run.cancel_requested),
+                created_at: Set(source_run.created_at + chrono::Duration::seconds(position)),
+                baseline_run_id: Set(source_run.baseline_run_id),
+                comparison: Set(source_run.comparison.clone()),
+            }
+            .insert(&ctx.db)
+            .await
+            .unwrap();
+            let mut active = source_attempt.clone().into_active_model();
+            active.id = Set(Uuid::new_v4());
+            active.run_id = Set(run_id);
+            active.insert(&ctx.db).await.unwrap();
+        }
+        let preview = case_runs::preview(&ctx, owner.user, app, input.clone())
+            .await
+            .unwrap();
+        assert_eq!(preview.suggested_baseline_id, Some(base.id));
+        let (current, _) = case_runs::create(
+            &ctx,
+            owner.user,
+            app,
+            "current",
+            CaseRunRequest {
+                baseline_run_id: Some(base.id),
+                ..input
+            },
         )
         .await
         .unwrap();
-        exec(
-            &ctx.db,
-            "INSERT INTO execution_attempts(id,run_id,case_index,number,generation,state,outcome,cleanup,reason,checks,usage,completion_hash,cleanup_hash,cleanup_receipt)
-             SELECT md5($2 || ':attempt:' || generated.position::text)::uuid,
-                 md5($2 || ':run:' || generated.position::text)::uuid,
-                 case_index,number,generation,state,outcome,cleanup,reason,checks,usage,
-                 completion_hash,cleanup_hash,cleanup_receipt
-             FROM execution_attempts
-             CROSS JOIN generate_series(1,101) AS generated(position)
-             WHERE run_id=$1",
-            vec![base.id.into(), noise_namespace.into()],
-        )
-        .await
-        .unwrap();
-        let preview=case_runs::preview(&ctx,owner.user,app,input.clone()).await.unwrap();
-        assert_eq!(preview.suggested_baseline_id,Some(base.id));
-        let (current,_)=case_runs::create(&ctx,owner.user,app,"current",CaseRunRequest{baseline_run_id:Some(base.id),..input}).await.unwrap();
-        finish(&ctx,&current,true).await;
-        assert!(runs::detail(&ctx.db,current.id).await.unwrap().comparison.is_none());
+        finish(&ctx, &current, true).await;
+        assert!(runs::detail(&ctx.db, current.id)
+            .await
+            .unwrap()
+            .comparison
+            .is_none());
         run_comparisons::finalize_pending(&ctx).await.unwrap();
-        let snapshot=runs::detail(&ctx.db,current.id).await.unwrap();
-        assert_eq!(snapshot.comparison.as_ref().unwrap().cases[0].kind,ComparisonKind::Regression);
-        assert_eq!(snapshot.baseline_run_id,Some(base.id));
+        let snapshot = runs::detail(&ctx.db, current.id).await.unwrap();
+        assert_eq!(
+            snapshot.comparison.as_ref().unwrap().cases[0].kind,
+            ComparisonKind::Regression
+        );
+        assert_eq!(snapshot.baseline_run_id, Some(base.id));
         run_comparisons::finalize_pending(&ctx).await.unwrap();
-        let reloaded=owner.read(server.get(&format!("/api/runs/{}",current.id))).await.json::<RunResponse>();
-        assert_eq!(reloaded.comparison,snapshot.comparison);
-        assert_eq!(reloaded.baseline_run_id,snapshot.baseline_run_id);
-    }).await;
+        let reloaded = owner
+            .read(server.get(&format!("/api/runs/{}", current.id)))
+            .await
+            .json::<RunResponse>();
+        assert_eq!(reloaded.comparison, snapshot.comparison);
+        assert_eq!(reloaded.baseline_run_id, snapshot.baseline_run_id);
+    })
+    .await;
 }

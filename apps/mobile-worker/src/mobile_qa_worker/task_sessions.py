@@ -9,10 +9,14 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import ExitStack
 from pathlib import Path
 from uuid import uuid4
 from xml.etree import ElementTree
 
+from mobile_qa_worker.artifacts.cache import Cache
+from mobile_qa_worker.artifacts.delivery import prepared_build
+from mobile_qa_worker.artifacts.preparation import PreparationStopped
 from mobile_qa_worker.device.android import AndroidDevice as Device
 from mobile_qa_worker.device.android import doctor
 from mobile_qa_worker.execution.adapters import device_for
@@ -37,7 +41,7 @@ from mobile_qa_worker.model_runtime import (
     worker_capabilities,
 )
 from mobile_qa_worker.qualification.config import Profile, QualificationError
-from mobile_qa_worker.qualification.evidence import Evidence, sha256
+from mobile_qa_worker.qualification.evidence import Evidence
 from mobile_qa_worker.qualification.process import host_lock, stop_group
 
 
@@ -144,6 +148,12 @@ class SessionConnection:
             ):
                 self.stopped.set()
             return self.session
+
+    def check_authority(self) -> None:
+        if self.failed.is_set():
+            raise PreparationStopped("lease_lost_during_preparation")
+        if self.stopped.is_set() or (self.shutdown is not None and self.shutdown.is_set()):
+            raise PreparationStopped("build_preparation_canceled")
 
     def heartbeat(self) -> None:
         while not self.done.wait(5):
@@ -265,82 +275,96 @@ def run_session(
         connection = SessionConnection(client, lease, shutdown)
         heart = threading.Thread(target=connection.heartbeat, daemon=True)
         heart.start()
-        try:
-            apk = root / "build.apk"
-            apk.write_bytes(
-                client.raw(
-                    "GET",
-                    f"/api/worker/phones/{lease.session.id}/build",
-                    lease_token=lease.lease_token,
-                    limit=lease.build_bytes,
+        with ExitStack() as artifacts:
+            try:
+                connection.update(message="Retrieving application build")
+                apk = artifacts.enter_context(
+                    prepared_build(
+                        client,
+                        endpoint=f"/api/worker/phones/{lease.session.id}/build/delivery",
+                        lease_token=lease.lease_token,
+                        app_id=lease.session.app_id,
+                        digest=lease.build_sha256,
+                        size=lease.build_bytes,
+                        state=state,
+                        target=root / "build.apk",
+                        check=connection.check_authority,
+                    )
                 )
-            )
-            apk.chmod(0o600)
-            if apk.stat().st_size != lease.build_bytes or sha256(apk) != lease.build_sha256:
-                raise QualificationError("build_checksum_mismatch")
-            doctor(profile)
-            device.boot()
-            if connection.stopped.is_set():
-                return
-            device.install(apk, lease.build_sha256)
-            device.launch()
-            connection.update(
-                state=PhoneState.ready, frame=capture(device), message="Ready for your task"
-            )
-            deadline = time.monotonic() + 1100
-            while not connection.stopped.wait(0.5) and time.monotonic() < deadline:
-                pending = next(
-                    (t for t in connection.session.tasks if t.state == PhoneTaskState.queued), None
+                connection.check_authority()
+                doctor(profile)
+                connection.check_authority()
+                device.boot()
+                if connection.stopped.is_set():
+                    return
+                device.install(apk, lease.build_sha256)
+                connection.check_authority()
+                device.launch()
+                connection.update(
+                    state=PhoneState.ready, frame=capture(device), message="Ready for your task"
                 )
-                if pending is None:
-                    continue
-                try:
-                    from mobile_qa_worker.authoring.generation import run as generate
-                    from mobile_qa_worker.automation.session import run as run_steps
+                deadline = time.monotonic() + 1100
+                while not connection.stopped.wait(0.5) and time.monotonic() < deadline:
+                    pending = next(
+                        (t for t in connection.session.tasks if t.state == PhoneTaskState.queued),
+                        None,
+                    )
+                    if pending is None:
+                        continue
+                    try:
+                        from mobile_qa_worker.authoring.generation import run as generate
+                        from mobile_qa_worker.automation.session import run as run_steps
 
-                    if lease.session.profile.execution_context is not None and (
-                        pending.generation
-                        or not pending.sequence
-                        or any(a.kind.value == "navigate" for a in pending.sequence.actions)
-                    ):
-                        raise QualificationError("app_exploration_not_qualified")
-                    runner = (
-                        generate if pending.generation else run_steps if pending.sequence else act
-                    )
-                    runner(
-                        connection,
-                        device,
-                        pending.model_copy(deep=True),
-                        profile,
-                        profile_path,
-                        root / str(pending.id),
-                    )
-                except (QualificationError, OSError, ValueError) as exc:
-                    if connection.stopped.is_set():
-                        break
-                    task = next(
-                        (t for t in connection.session.tasks if t.id == pending.id), pending
-                    ).model_copy(deep=True)
-                    task.state = PhoneTaskState.failed
-                    task.message = (
-                        "The selected control changed. Select it again."
-                        if str(exc) == "selected_control_changed"
-                        else "The task could not finish. Inspect the screen and try a new task."
-                    )
-                    connection.update(
-                        state=PhoneState.ready,
-                        task=task,
-                        frame=capture(device),
-                        message=task.message,
-                    )
-        finally:
-            connection.done.set()
-            heart.join(timeout=10)
-            # Failed cleanup leaves both the dirty marker and server reservation in place.
-            device.stop()
-            device.discard()
-            connection.update(state=PhoneState.closed, message="Session closed", clean=True)
-            dirty.unlink()
+                        if lease.session.profile.execution_context is not None and (
+                            pending.generation
+                            or not pending.sequence
+                            or any(a.kind.value == "navigate" for a in pending.sequence.actions)
+                        ):
+                            raise QualificationError("app_exploration_not_qualified")
+                        runner = (
+                            generate
+                            if pending.generation
+                            else run_steps
+                            if pending.sequence
+                            else act
+                        )
+                        runner(
+                            connection,
+                            device,
+                            pending.model_copy(deep=True),
+                            profile,
+                            profile_path,
+                            root / str(pending.id),
+                        )
+                    except (QualificationError, OSError, ValueError) as exc:
+                        if connection.stopped.is_set():
+                            break
+                        task = next(
+                            (t for t in connection.session.tasks if t.id == pending.id), pending
+                        ).model_copy(deep=True)
+                        task.state = PhoneTaskState.failed
+                        task.message = (
+                            "The selected control changed. Select it again."
+                            if str(exc) == "selected_control_changed"
+                            else "The task could not finish. Inspect the screen and try a new task."
+                        )
+                        connection.update(
+                            state=PhoneState.ready,
+                            task=task,
+                            frame=capture(device),
+                            message=task.message,
+                        )
+            finally:
+                try:
+                    # Cleanup still owns a live lease. Loss of cleanup proof retains
+                    # both the dirty marker and the API reservation for recovery.
+                    device.stop()
+                    device.discard()
+                    connection.update(state=PhoneState.closed, message="Session closed", clean=True)
+                    dirty.unlink()
+                finally:
+                    connection.done.set()
+                    heart.join(timeout=10)
 
 
 def serve(origin: str, state: Path, profile_path: Path, once: bool = False) -> None:
@@ -362,6 +386,7 @@ def serve(origin: str, state: Path, profile_path: Path, once: bool = False) -> N
             raise QualificationError("worker_claim_recovery_required")
         connected = False
         while not shutdown.is_set():
+            Cache.from_environment(state).admit()
             claim_id = uuid4()
             write(pending, {"claim_id": str(claim_id)})
             response = client.send(

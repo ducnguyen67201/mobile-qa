@@ -241,6 +241,8 @@ pub struct ExecutionProfile {
     pub model: Option<crate::model_registry::ModelBinding>,
     pub qualified: bool,
     pub qualification_reference: String,
+    #[schema(schema_with = crate::artifacts_api::apk_byte_schema)]
+    #[schemars(range(min = 1, max = 2147483648_u32))]
     pub max_apk_bytes: u32,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, ToSchema)]
@@ -258,6 +260,8 @@ pub struct RunManifest {
     pub app_id: Uuid,
     pub build_id: Uuid,
     pub build_sha256: String,
+    #[schema(schema_with = crate::artifacts_api::apk_byte_schema)]
+    #[schemars(range(min = 1, max = 2147483648_u32))]
     pub build_bytes: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<crate::regression::RunSource>,
@@ -362,6 +366,11 @@ pub struct RunResponse {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueueReason {
+    HostStarting,
+    HostDraining,
+    PoolPaused,
+    WaitingForSlot,
+    ProfileIncompatible,
     WorkerOffline,
     ModelUnavailable,
     WorkerUpgradeRequired,
@@ -669,9 +678,8 @@ impl ExecutionProfile {
             || !bounded(&self.device_identity, 200)
             || !bounded(&self.image, 200)
             || !bounded(&self.package, 255)
-            || !(1..=262144000).contains(&self.max_apk_bytes)
+            || !(1..=2147483648).contains(&self.max_apk_bytes)
             || (self.qualified && !bounded(&self.qualification_reference, 1000))
-            || (self.driver == Driver::Minitap && self.max_apk_bytes > 104857600)
         {
             return Err("invalid or unsupported execution profile");
         }
@@ -679,10 +687,7 @@ impl ExecutionProfile {
             "demo_persistence_v1"
                 if self.package == "ai.mobileqa.demo" && self.execution_context.is_none() => {}
             "android_direct_v1"
-                if self.driver == Driver::Direct
-                    && self.qualified
-                    && self.is_model_free()
-                    && self.max_apk_bytes <= 104857600 =>
+                if self.driver == Driver::Direct && self.qualified && self.is_model_free() =>
             {
                 self.execution_context
                     .as_ref()

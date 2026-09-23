@@ -60,6 +60,45 @@ function show() {
   )
 }
 afterEach(() => vi.unstubAllGlobals())
+it.each([
+  ['host_starting', 'Starting a device host for this run.'],
+  [
+    'host_draining',
+    'The device host is finishing cleanup. Your run will start when a clean device is available.',
+  ],
+  [
+    'pool_paused',
+    'Device capacity is paused. An operator must resume it before this run can start.',
+  ],
+  ['waiting_for_slot', 'Waiting for a free, qualified device.'],
+  ['profile_incompatible', 'No device slot is qualified for this run’s device profile.'],
+] as const)('explains %s without implying execution has started', async (reason, message) => {
+  const current = report()
+  current.state = 'queued'
+  current.queue_status = {
+    reason,
+    blocking_run_id: null,
+    last_compatible_worker_at: null,
+    wait_seconds: 15,
+  }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      const path = new URL(request.url).pathname
+      if (path.endsWith('/session')) return Response.json(session)
+      if (path.endsWith('/settings')) return Response.json(settings)
+      if (path === `/api/apps/${appId}`) return Response.json(app)
+      if (path.endsWith(runId)) return Response.json(current)
+      return Response.json(
+        { code: 'not_found', message: 'No fixture', request_id: runId },
+        { status: 404 },
+      )
+    }),
+  )
+  show()
+  expect(await screen.findByText(message)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Cancel run' })).toBeEnabled()
+})
 it('shows simulated run and pending cancellation without claiming physical stop', async () => {
   let current = report()
   vi.stubGlobal(

@@ -212,15 +212,21 @@ pub async fn claim(
         }
         // Suite cases have no claim dependency on their displayed membership order.
         // Keep plan order, then use stable IDs for ties; reservations serialize the app.
-        let candidate_runs = execution_runs::Entity::find()
+        let candidates = execution_attempts::Entity::find()
+            .find_both_related(execution_runs::Entity)
+            .filter(execution_attempts::Column::State.eq("queued"))
             .filter(execution_runs::Column::AppId.eq(worker.app_id))
             .filter(execution_runs::Column::CancelRequested.eq(false))
             .order_by_asc(execution_runs::Column::CreatedAt)
             .order_by_asc(execution_runs::Column::Id)
+            .order_by_asc(execution_attempts::Column::CaseIndex)
+            .order_by_asc(execution_attempts::Column::Number)
+            .order_by_asc(execution_attempts::Column::Id)
             .all(&tx)
             .await?;
         let mut selected = None;
-        for run in candidate_runs {
+        for group in candidates.chunk_by(|left, right| left.1.id == right.1.id) {
+            let run = &group[0].1;
             let manifest: RunManifest = decode(run.manifest.clone())?;
             let has_direct = manifest.cases.iter().any(|case| {
                 case.case
@@ -241,11 +247,7 @@ pub async fn claim(
             {
                 continue;
             }
-            let mut attempts = execution_attempts::Entity::find()
-                .filter(execution_attempts::Column::RunId.eq(run.id))
-                .filter(execution_attempts::Column::State.eq("queued"))
-                .all(&tx)
-                .await?;
+            let mut attempts = group.iter().map(|(attempt, _)| attempt).collect::<Vec<_>>();
             attempts.sort_by_key(|attempt| {
                 (
                     if manifest.source.as_ref().is_some_and(|source| {

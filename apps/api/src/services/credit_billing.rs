@@ -20,6 +20,7 @@ use mobile_qa_contracts::{
     execution::{JobState, ModelUsage, RunManifest},
 };
 use sea_orm::{
+    sea_query::{Alias, Func},
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel,
     QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
@@ -115,18 +116,31 @@ async fn period(db: &impl ConnectionTrait, app: Uuid, lock: bool) -> ApiResult<O
 }
 
 async fn balance(db: &impl ConnectionTrait, p: &Period) -> ApiResult<(i64, i64, i64)> {
-    let usage = billing_credit_usage::Entity::find()
-        .filter(billing_credit_usage::Column::PeriodId.eq(p.id))
-        .all(db)
-        .await?;
-    let charged = usage
-        .iter()
-        .filter(|row| row.state == "settled")
-        .fold(0_i64, |sum, row| sum.saturating_add(row.charged_credits));
-    let held = usage
-        .iter()
-        .filter(|row| row.state == "held")
-        .fold(0_i64, |sum, row| sum.saturating_add(row.held_credits));
+    async fn usage_sum(
+        db: &impl ConnectionTrait,
+        period_id: Uuid,
+        state: &str,
+        column: billing_credit_usage::Column,
+    ) -> ApiResult<i64> {
+        Ok(billing_credit_usage::Entity::find()
+            .filter(billing_credit_usage::Column::PeriodId.eq(period_id))
+            .filter(billing_credit_usage::Column::State.eq(state))
+            .select_only()
+            .expr_as(Func::cast_as(column.sum(), Alias::new("bigint")), "total")
+            .into_tuple::<Option<i64>>()
+            .one(db)
+            .await?
+            .flatten()
+            .unwrap_or_default())
+    }
+    let charged = usage_sum(
+        db,
+        p.id,
+        "settled",
+        billing_credit_usage::Column::ChargedCredits,
+    )
+    .await?;
+    let held = usage_sum(db, p.id, "held", billing_credit_usage::Column::HeldCredits).await?;
     Ok((
         charged,
         held,

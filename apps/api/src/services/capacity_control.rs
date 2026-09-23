@@ -92,46 +92,41 @@ pub async fn demand(db: &impl ConnectionTrait, host: Uuid) -> ApiResult<i64> {
         .into_iter()
         .map(|binding| (binding.app_id, binding.profile_id))
         .collect::<std::collections::HashSet<_>>();
+    if bindings.is_empty() {
+        return Ok(0);
+    }
+    let app_ids = bindings
+        .iter()
+        .map(|(app_id, _)| *app_id)
+        .collect::<std::collections::HashSet<_>>();
     let reserved_apps = execution_reservations::Entity::find()
+        .filter(
+            execution_reservations::Column::Resource
+                .is_in(app_ids.iter().map(|app_id| format!("app:{app_id}"))),
+        )
         .all(db)
         .await?
         .into_iter()
         .map(|reservation| reservation.resource)
         .collect::<std::collections::HashSet<_>>();
     let attempts = execution_attempts::Entity::find()
+        .find_both_related(execution_runs::Entity)
         .filter(execution_attempts::Column::State.eq("queued"))
+        .filter(execution_runs::Column::AppId.is_in(app_ids.clone()))
+        .filter(execution_runs::Column::CancelRequested.eq(false))
         .all(db)
         .await?;
-    let run_ids = attempts
-        .iter()
-        .map(|attempt| attempt.run_id)
-        .collect::<Vec<_>>();
-    let runs = if run_ids.is_empty() {
-        Vec::new()
-    } else {
-        execution_runs::Entity::find()
-            .filter(execution_runs::Column::Id.is_in(run_ids))
-            .all(db)
-            .await?
-    };
-    let runs = runs
-        .into_iter()
-        .map(|run| (run.id, run))
-        .collect::<std::collections::HashMap<_, _>>();
     let mut count = 0i64;
-    for attempt in attempts {
-        let Some(run) = runs.get(&attempt.run_id) else {
-            continue;
-        };
+    for (_, run) in attempts {
         let manifest: mobile_qa_contracts::execution::RunManifest = decode(run.manifest.clone())?;
-        if !run.cancel_requested
-            && !reserved_apps.contains(&format!("app:{}", run.app_id))
+        if !reserved_apps.contains(&format!("app:{}", run.app_id))
             && bindings.contains(&(run.app_id, manifest.profile.id))
         {
             count += 1;
         }
     }
     for session in phone_sessions::Entity::find()
+        .filter(phone_sessions::Column::AppId.is_in(app_ids))
         .filter(phone_sessions::Column::Deadline.gt(Utc::now()))
         .all(db)
         .await?

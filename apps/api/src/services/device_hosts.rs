@@ -16,8 +16,8 @@ use chrono::Utc;
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::device_hosts::*;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel,
-    QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition, ConnectionTrait, EntityTrait,
+    IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
 };
 use uuid::Uuid;
 
@@ -641,12 +641,12 @@ async fn active_for_slots(
     if slots.is_empty() {
         return Ok(0);
     }
-    let mut resources = std::collections::HashSet::new();
+    let mut resources = Vec::new();
     let slot_ids = slots
         .into_iter()
         .map(|slot| {
             let definition: SlotDefinition = decode(slot.definition)?;
-            resources.insert(format!("device:{}", definition.device_identity));
+            resources.push(format!("device:{}", definition.device_identity));
             Ok(slot.id)
         })
         .collect::<ApiResult<Vec<_>>>()?;
@@ -662,6 +662,13 @@ async fn active_for_slots(
     } else {
         execution_attempts::Entity::find()
             .filter(execution_attempts::Column::WorkerId.is_in(worker_ids.clone()))
+            .filter(execution_attempts::Column::State.is_in([
+                "leased",
+                "running",
+                "finalizing",
+                "cancel_requested",
+                "recovery_required",
+            ]))
             .all(db)
             .await?
             .into_iter()
@@ -673,24 +680,27 @@ async fn active_for_slots(
     } else {
         phone_sessions::Entity::find()
             .filter(phone_sessions::Column::WorkerId.is_in(worker_ids))
+            .filter(phone_sessions::Column::Deadline.gt(Utc::now()))
             .all(db)
             .await?
             .into_iter()
             .map(|session| session.id)
             .collect()
     };
-    let reservations = execution_reservations::Entity::find().all(db).await?;
+    let mut matching =
+        Condition::any().add(execution_reservations::Column::Resource.is_in(resources));
+    if !attempt_ids.is_empty() {
+        matching = matching.add(execution_reservations::Column::AttemptId.is_in(attempt_ids));
+    }
+    if !session_ids.is_empty() {
+        matching = matching.add(execution_reservations::Column::SessionId.is_in(session_ids));
+    }
+    let reservations = execution_reservations::Entity::find()
+        .filter(matching)
+        .all(db)
+        .await?;
     let owners = reservations
         .into_iter()
-        .filter(|reservation| {
-            resources.contains(&reservation.resource)
-                || reservation
-                    .attempt_id
-                    .is_some_and(|id| attempt_ids.contains(&id))
-                || reservation
-                    .session_id
-                    .is_some_and(|id| session_ids.contains(&id))
-        })
         .map(|reservation| (reservation.attempt_id, reservation.session_id))
         .collect::<std::collections::HashSet<_>>();
     Ok(owners.len() as i64)

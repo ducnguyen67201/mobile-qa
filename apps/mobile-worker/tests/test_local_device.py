@@ -251,8 +251,8 @@ def test_mac_boot_uses_effective_locale_and_unattended_flags(tmp_path, monkeypat
         headless=False,
     )
     p.state_root.mkdir()
-    d = Device(p, Evidence(tmp_path / "attempt"))
     monkeypatch.setattr(device.platform, "system", lambda: "Darwin")
+    d = Device(p, Evidence(tmp_path / "attempt"))
     monkeypatch.setattr(device, "assert_ports_available", lambda: None)
 
     def create(args, *rest):

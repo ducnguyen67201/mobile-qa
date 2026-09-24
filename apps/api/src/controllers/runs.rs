@@ -1,7 +1,8 @@
 //! Authenticated browser execution routes. Binary evidence remains private.
 use crate::{
     errors::{ApiFailure, ApiResult},
-    services::{apps, auth::Session, execution_store::*, run_artifacts, runs},
+    models::_entities::{execution_artifacts, execution_attempts},
+    services::{apps, auth::Session, run_artifacts, runs},
 };
 use axum::{
     body::Body,
@@ -13,6 +14,7 @@ use axum::{
 use loco_rs::{app::AppContext, controller::Routes};
 use mobile_qa_contracts::execution::*;
 use mobile_qa_contracts::test_library::ExecutionPlanQuery;
+use sea_orm::EntityTrait;
 use serde::Deserialize;
 use uuid::Uuid;
 #[derive(Deserialize)]
@@ -90,7 +92,17 @@ async fn artifact(
     Path((run, id)): Path<(Uuid, Uuid)>,
 ) -> ApiResult<Response> {
     runs::authorize(&ctx, session.user.id, run).await?;
-    one(&ctx.db,"SELECT f.id FROM execution_artifacts f JOIN execution_attempts a ON a.id=f.attempt_id WHERE f.id=$1 AND a.run_id=$2",vec![id.into(),run.into()]).await?;
+    let artifact = execution_artifacts::Entity::find_by_id(id)
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let belongs_to_run = execution_attempts::Entity::find_by_id(artifact.attempt_id)
+        .one(&ctx.db)
+        .await?
+        .is_some_and(|attempt| attempt.run_id == run);
+    if !belongs_to_run {
+        return Err(ApiFailure::missing());
+    }
     let (metadata, file) = run_artifacts::content(&ctx, id).await?;
     let bytes = tokio::fs::read(&file.0).await?;
     let mut response = Response::new(Body::from(bytes));

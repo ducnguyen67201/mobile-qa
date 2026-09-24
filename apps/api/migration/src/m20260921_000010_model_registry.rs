@@ -1,5 +1,8 @@
 //! Immutable nonsecret model definitions and worker capability heartbeats.
-use sea_orm_migration::prelude::*;
+use sea_orm_migration::{
+    prelude::*,
+    sea_query::extension::postgres::{PgBinOper, PgExpr},
+};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -8,40 +11,81 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .get_connection()
-            .execute_unprepared(
-                r#"
-CREATE TABLE model_definitions(
-  key TEXT NOT NULL,
-  revision INTEGER NOT NULL CHECK(revision > 0),
-  payload JSONB NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  retired_at TIMESTAMPTZ,
-  PRIMARY KEY(key,revision),
-  CONSTRAINT model_definition_key CHECK(key ~ '^[a-z0-9][a-z0-9._-]{0,99}$')
-);
-CREATE INDEX model_definitions_active_provider_model
-  ON model_definitions((payload->>'provider'),(payload->>'provider_model'))
-  WHERE retired_at IS NULL;
-ALTER TABLE execution_workers ADD COLUMN model_capabilities JSONB;
-ALTER TABLE execution_workers ADD COLUMN model_last_seen_at TIMESTAMPTZ;
-"#,
+            .create_table(
+                Table::create()
+                    .table(Alias::new("model_definitions"))
+                    .col(
+                        ColumnDef::new(Alias::new("key")).text().not_null().check(
+                            Expr::col(Alias::new("key"))
+                                .binary(PgBinOper::Regex, "^[a-z0-9][a-z0-9._-]{0,99}$"),
+                        ),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("revision"))
+                            .integer()
+                            .not_null()
+                            .check(Expr::col(Alias::new("revision")).gt(0)),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("payload"))
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("created_at"))
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(ColumnDef::new(Alias::new("retired_at")).timestamp_with_time_zone())
+                    .primary_key(
+                        Index::create()
+                            .col(Alias::new("key"))
+                            .col(Alias::new("revision")),
+                    )
+                    .to_owned(),
             )
             .await?;
-        Ok(())
+        manager
+            .create_index(
+                Index::create()
+                    .name("model_definitions_active_provider_model")
+                    .table(Alias::new("model_definitions"))
+                    .col(Expr::col(Alias::new("payload")).cast_json_field("provider"))
+                    .col(Expr::col(Alias::new("payload")).cast_json_field("provider_model"))
+                    .and_where(Expr::col(Alias::new("retired_at")).is_null())
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alias::new("execution_workers"))
+                    .add_column(ColumnDef::new(Alias::new("model_capabilities")).json_binary())
+                    .add_column(
+                        ColumnDef::new(Alias::new("model_last_seen_at")).timestamp_with_time_zone(),
+                    )
+                    .to_owned(),
+            )
+            .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .get_connection()
-            .execute_unprepared(
-                r#"
-ALTER TABLE execution_workers DROP COLUMN model_last_seen_at;
-ALTER TABLE execution_workers DROP COLUMN model_capabilities;
-DROP TABLE model_definitions;
-"#,
+            .alter_table(
+                Table::alter()
+                    .table(Alias::new("execution_workers"))
+                    .drop_column(Alias::new("model_last_seen_at"))
+                    .drop_column(Alias::new("model_capabilities"))
+                    .to_owned(),
             )
             .await?;
-        Ok(())
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(Alias::new("model_definitions"))
+                    .to_owned(),
+            )
+            .await
     }
 }

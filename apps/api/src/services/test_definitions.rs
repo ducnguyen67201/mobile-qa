@@ -1,13 +1,21 @@
 //! Immutable saved versions and technical execution resolution.
-use super::{apps, execution_store::*};
+use super::{
+    apps,
+    execution_store::{conflict, decode, hash, json, word},
+};
 use crate::{
     errors::{ApiFailure, ApiResult},
-    models::_entities::users,
+    models::_entities::{
+        apps as app_rows, execution_approvals, execution_definitions, execution_profiles, users,
+    },
 };
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::execution::*;
 use mobile_qa_contracts::model_registry::{ModelBinding, ModelCapability};
-use sea_orm::{ConnectionTrait, EntityTrait, TransactionTrait};
+use sea_orm::{
+    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait,
+    QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
+};
 use uuid::Uuid;
 
 pub async fn operator(ctx: &AppContext, actor: Uuid, app: Uuid) -> ApiResult<()> {
@@ -32,33 +40,31 @@ pub async fn operator(ctx: &AppContext, actor: Uuid, app: Uuid) -> ApiResult<()>
 }
 
 pub async fn get(db: &impl ConnectionTrait, app: Uuid, id: Uuid) -> ApiResult<DefinitionResponse> {
-    let r = one(
-        db,
-        "SELECT * FROM execution_definitions WHERE id=$1 AND app_id=$2",
-        vec![id.into(), app.into()],
-    )
-    .await?;
-    let approvals = rows(
-        db,
-        "SELECT * FROM execution_approvals WHERE definition_id=$1 ORDER BY purpose",
-        vec![id.into()],
-    )
-    .await?
-    .iter()
-    .map(|r| {
-        Ok(DefinitionApproval {
-            purpose: decode(serde_json::Value::String(field(r, "purpose")?))?,
-            actor_id: field(r, "actor_id")?,
-            content_hash: field(r, "content_hash")?,
-            approved_at: field(r, "approved_at")?,
+    let row = execution_definitions::Entity::find_by_id(id)
+        .filter(execution_definitions::Column::AppId.eq(app))
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let approvals = execution_approvals::Entity::find()
+        .filter(execution_approvals::Column::DefinitionId.eq(id))
+        .order_by_asc(execution_approvals::Column::Purpose)
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|approval| {
+            Ok(DefinitionApproval {
+                purpose: decode(serde_json::Value::String(approval.purpose))?,
+                actor_id: approval.actor_id,
+                content_hash: approval.content_hash,
+                approved_at: approval.approved_at,
+            })
         })
-    })
-    .collect::<ApiResult<Vec<_>>>()?;
+        .collect::<ApiResult<Vec<_>>>()?;
     Ok(DefinitionResponse {
         id,
         app_id: app,
-        content_hash: field(&r, "content_hash")?,
-        definition: decode(field(&r, "payload")?)?,
+        content_hash: row.content_hash,
+        definition: decode(row.payload)?,
         approvals,
     })
 }
@@ -82,12 +88,11 @@ pub async fn import(
     }
     let tx = ctx.db.begin().await?;
     // Parent app lock serializes imports/saves against run resolution.
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![input.app_id.into()],
-    )
-    .await?;
+    app_rows::Entity::find_by_id(input.app_id)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
     match &input.definition {
         TestDefinition::Suite(s) => {
             for c in &s.cases {
@@ -111,41 +116,44 @@ pub async fn import(
         _ => {}
     }
     let id = Uuid::new_v4();
-    exec(
-        &tx,
-        "INSERT INTO execution_definitions(id,app_id,kind,logical_key,version,content_hash,\
-            payload,author_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(app_id,kind,\
-            logical_key,version) DO NOTHING",
-        vec![
-            id.into(),
-            input.app_id.into(),
-            word(&kind).into(),
-            key.into(),
-            (version as i32).into(),
-            digest.clone().into(),
-            payload.into(),
-            actor.into(),
-        ],
+    let kind_word = word(&kind);
+    execution_definitions::Entity::insert(execution_definitions::ActiveModel {
+        id: Set(id),
+        app_id: Set(input.app_id),
+        kind: Set(kind_word.clone()),
+        logical_key: Set(key.to_owned()),
+        version: Set(version as i32),
+        content_hash: Set(digest.clone()),
+        payload: Set(payload),
+        author_id: Set(actor),
+        ..Default::default()
+    })
+    .on_conflict(
+        OnConflict::columns([
+            execution_definitions::Column::AppId,
+            execution_definitions::Column::Kind,
+            execution_definitions::Column::LogicalKey,
+            execution_definitions::Column::Version,
+        ])
+        .do_nothing()
+        .to_owned(),
     )
+    .exec_without_returning(&tx)
     .await?;
-    let r = one(
-        &tx,
-        "SELECT id,content_hash FROM execution_definitions WHERE app_id=$1 AND kind=$2 AND \
-            logical_key=$3 AND version=$4",
-        vec![
-            input.app_id.into(),
-            word(&kind).into(),
-            key.into(),
-            (version as i32).into(),
-        ],
-    )
-    .await?;
-    if field::<String>(&r, "content_hash")? != digest {
+    let row = execution_definitions::Entity::find()
+        .filter(execution_definitions::Column::AppId.eq(input.app_id))
+        .filter(execution_definitions::Column::Kind.eq(kind_word))
+        .filter(execution_definitions::Column::LogicalKey.eq(key))
+        .filter(execution_definitions::Column::Version.eq(version as i32))
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    if row.content_hash != digest {
         return Err(conflict(
             "Version content is immutable; import a new version",
         ));
     }
-    let result = get(&tx, input.app_id, field(&r, "id")?).await?;
+    let result = get(&tx, input.app_id, row.id).await?;
     super::test_library_mutations::link_import(&tx, actor, input.app_id, &result).await?;
     tx.commit().await?;
     Ok(result)
@@ -172,15 +180,12 @@ pub async fn profile(
     app: Uuid,
     id: Uuid,
 ) -> ApiResult<ExecutionProfile> {
-    decode(field(
-        &one(
-            db,
-            "SELECT payload FROM execution_profiles WHERE id=$1 AND app_id=$2",
-            vec![id.into(), app.into()],
-        )
-        .await?,
-        "payload",
-    )?)
+    let row = execution_profiles::Entity::find_by_id(id)
+        .filter(execution_profiles::Column::AppId.eq(app))
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    decode(row.payload)
 }
 
 pub async fn register_profile(
@@ -212,26 +217,23 @@ pub async fn register_profile(
         }
     }
     let value = json(&p)?;
-    let r = rows(
-        &ctx.db,
-        "SELECT payload,app_id FROM execution_profiles WHERE id=$1",
-        vec![p.id.into()],
-    )
-    .await?;
-    if let Some(r) = r.first() {
-        if field::<Uuid>(r, "app_id")? != app || field::<serde_json::Value>(r, "payload")? != value
-        {
+    if let Some(row) = execution_profiles::Entity::find_by_id(p.id)
+        .one(&ctx.db)
+        .await?
+    {
+        if row.app_id != app || row.payload != value {
             return Err(conflict(
                 "Profile revisions are immutable; use a new profile ID",
             ));
         }
         return Ok(());
     }
-    exec(
-        &ctx.db,
-        "INSERT INTO execution_profiles(id,app_id,payload) VALUES($1,$2,$3)",
-        vec![p.id.into(), app.into(), value.into()],
-    )
+    execution_profiles::ActiveModel {
+        id: Set(p.id),
+        app_id: Set(app),
+        payload: Set(value),
+    }
+    .insert(&ctx.db)
     .await?;
     Ok(())
 }

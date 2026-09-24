@@ -1,10 +1,23 @@
 //! One app lock serializes authoring with run admission. Receipts commit alongside
 //! changes, so a lost response never creates another version.
-use super::{execution_store::*, test_definitions as definitions, test_library as library};
-use crate::errors::{ApiFailure, ApiResult};
+use super::{
+    execution_store::{conflict, decode, hash, json, word},
+    test_definitions as definitions, test_library as library,
+};
+use crate::{
+    errors::{ApiFailure, ApiResult},
+    models::_entities::{
+        apps as app_rows, test_library_defaults, test_library_drafts, test_library_entries,
+        test_library_mutations, test_library_versions,
+    },
+};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::{execution::*, test_library::*};
-use sea_orm::{ConnectionTrait, TransactionTrait};
+use sea_orm::{
+    sea_query::{Expr, OnConflict},
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, ExprTrait,
+    IntoActiveModel, QueryFilter, QuerySelect, Set, TransactionTrait,
+};
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -47,14 +60,21 @@ pub fn stale(id: Option<Uuid>, revision: i32) -> ApiFailure {
     })
 }
 async fn bump(db: &impl ConnectionTrait, id: Uuid, actor: Uuid) -> ApiResult<()> {
-    let count = exec(
-        db,
-        "UPDATE test_library_entries SET revision=revision+1, actor_id=$2, updated_at=now() WHERE
-        id=$1 AND revision<2147483647",
-        vec![id.into(), actor.into()],
-    )
-    .await?;
-    if count != 1 {
+    let result = test_library_entries::Entity::update_many()
+        .col_expr(
+            test_library_entries::Column::Revision,
+            Expr::col(test_library_entries::Column::Revision).add(1),
+        )
+        .col_expr(test_library_entries::Column::ActorId, Expr::value(actor))
+        .col_expr(
+            test_library_entries::Column::UpdatedAt,
+            Expr::value(chrono::Utc::now()),
+        )
+        .filter(test_library_entries::Column::Id.eq(id))
+        .filter(test_library_entries::Column::Revision.lt(i32::MAX))
+        .exec(db)
+        .await?;
+    if result.rows_affected != 1 {
         return Err(conflict("Entry revision limit reached"));
     }
     Ok(())
@@ -67,12 +87,11 @@ pub async fn apply(
 ) -> ApiResult<(LibraryMutationReceipt, bool)> {
     library::authorize(ctx, actor, app).await?;
     let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![app.into()],
-    )
-    .await?;
+    app_rows::Entity::find_by_id(app)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
     // Rights are checked even for a replay; a receipt never grants access.
     let caps = library::capabilities(&tx, actor, app).await?;
     match &mutation {
@@ -90,10 +109,11 @@ pub async fn apply(
         serde_json::to_vec(&("save_lifecycle_v2", &mutation))
             .map_err(|_| ApiFailure::internal())?,
     );
-    let previous=rows(&tx,"SELECT fingerprint, response FROM test_library_mutations WHERE app_id=$1 AND actor_id=$2 AND
-        mutation_id=$3",vec![app.into(),actor.into(),mutation_id.into()]).await?;
-    if let Some(row) = previous.first() {
-        if field::<String>(row, "fingerprint")? != fingerprint {
+    let previous = test_library_mutations::Entity::find_by_id((app, actor, mutation_id))
+        .one(&tx)
+        .await?;
+    if let Some(row) = previous {
+        if row.fingerprint != fingerprint {
             return Err(ApiFailure::new(
                 409,
                 "idempotency_conflict",
@@ -101,7 +121,7 @@ pub async fn apply(
             )
             .with_library_details(LibraryErrorDetails::IdempotencyConflict { mutation_id }));
         }
-        return Ok((decode(field(row, "response")?)?, false));
+        return Ok((decode(row.response)?, false));
     }
     if let Some((id, expected)) = mutation.entry_revision() {
         let entry = library::entry(&tx, actor, app, id).await?;
@@ -122,16 +142,27 @@ pub async fn apply(
                     "Key must contain 1–100 printable bytes",
                 ));
             }
-            if !rows(&tx,"SELECT id FROM test_library_entries WHERE id=$1 OR (app_id=$2 AND kind=$3 AND logical_key=$4)",vec![r.entry_id.into(),app.into(),word(&r.kind).into(),r.key.clone().into()]).await?.is_empty() {return Err(conflict("Entry identity already exists"));}
-            let package: String = field(
-                &one(
-                    &tx,
-                    "SELECT android_package FROM apps WHERE id=$1",
-                    vec![app.into()],
+            let duplicate = test_library_entries::Entity::find()
+                .filter(
+                    Condition::any()
+                        .add(test_library_entries::Column::Id.eq(r.entry_id))
+                        .add(
+                            Condition::all()
+                                .add(test_library_entries::Column::AppId.eq(app))
+                                .add(test_library_entries::Column::Kind.eq(word(&r.kind)))
+                                .add(test_library_entries::Column::LogicalKey.eq(&r.key)),
+                        ),
                 )
-                .await?,
-                "android_package",
-            )?;
+                .one(&tx)
+                .await?;
+            if duplicate.is_some() {
+                return Err(conflict("Entry identity already exists"));
+            }
+            let package = app_rows::Entity::find_by_id(app)
+                .one(&tx)
+                .await?
+                .ok_or_else(ApiFailure::missing)?
+                .android_package;
             let profile = if let Some(id) = r.template_profile_id {
                 Some(definitions::profile(&tx, app, id).await?)
             } else {
@@ -201,9 +232,26 @@ pub async fn apply(
                     exclusions: vec![],
                 }),
             };
-            exec(&tx,"INSERT INTO test_library_entries(id, app_id, kind, logical_key, next_version, actor_id)
-        VALUES($1, $2, $3, $4,2, $5)",vec![r.entry_id.into(),app.into(),word(&r.kind).into(),r.key.into(),actor.into()]).await?;
-            exec(&tx,"INSERT INTO test_library_drafts(entry_id,version,payload,editor_id) VALUES($1,1,$2,$3)",vec![r.entry_id.into(),json(&definition)?.into(),actor.into()]).await?;
+            test_library_entries::ActiveModel {
+                id: Set(r.entry_id),
+                app_id: Set(app),
+                kind: Set(word(&r.kind)),
+                logical_key: Set(r.key),
+                next_version: Set(2),
+                actor_id: Set(actor),
+                ..Default::default()
+            }
+            .insert(&tx)
+            .await?;
+            test_library_drafts::ActiveModel {
+                entry_id: Set(r.entry_id),
+                version: Set(1),
+                payload: Set(json(&definition)?),
+                editor_id: Set(actor),
+                ..Default::default()
+            }
+            .insert(&tx)
+            .await?;
             LibraryMutationReceipt::Draft(Box::new(
                 library::draft(&tx, actor, app, r.entry_id).await?,
             ))
@@ -214,8 +262,18 @@ pub async fn apply(
             LibraryMutationReceipt::Draft(Box::new(library::draft(&tx, actor, app, id).await?))
         }
         Mutation::Archive(id, r) => {
-            exec(&tx,"UPDATE test_library_entries SET archived_at=CASE WHEN $2 THEN COALESCE(archived_at, now())
-        ELSE NULL END WHERE id=$1",vec![id.into(),r.archived.into()]).await?;
+            let entry = test_library_entries::Entity::find_by_id(id)
+                .one(&tx)
+                .await?
+                .ok_or_else(ApiFailure::missing)?;
+            let archived_at = if r.archived {
+                entry.archived_at.or_else(|| Some(chrono::Utc::now()))
+            } else {
+                None
+            };
+            let mut active = entry.into_active_model();
+            active.archived_at = Set(archived_at);
+            active.update(&tx).await?;
             bump(&tx, id, actor).await?;
             LibraryMutationReceipt::Entry(library::entry(&tx, actor, app, id).await?)
         }
@@ -234,24 +292,37 @@ pub async fn apply(
                 .revision
                 .checked_add(1)
                 .ok_or_else(|| conflict("Default revision limit reached"))?;
-            exec(&tx,"INSERT INTO test_library_defaults(app_id, plan_version_id, revision, actor_id) VALUES($1,
-        $2, $3, $4) ON CONFLICT(app_id) DO UPDATE SET plan_version_id=EXCLUDED.plan_version_id,
-        revision=EXCLUDED.revision, actor_id=EXCLUDED.actor_id, updated_at=now()",vec![app.into(),r.plan_version_id.into(),next.into(),actor.into()]).await?;
+            test_library_defaults::Entity::insert(test_library_defaults::ActiveModel {
+                app_id: Set(app),
+                plan_version_id: Set(r.plan_version_id),
+                revision: Set(next),
+                actor_id: Set(actor),
+                ..Default::default()
+            })
+            .on_conflict(
+                OnConflict::column(test_library_defaults::Column::AppId)
+                    .update_columns([
+                        test_library_defaults::Column::PlanVersionId,
+                        test_library_defaults::Column::Revision,
+                        test_library_defaults::Column::ActorId,
+                        test_library_defaults::Column::UpdatedAt,
+                    ])
+                    .to_owned(),
+            )
+            .exec_without_returning(&tx)
+            .await?;
             LibraryMutationReceipt::Default(library::default_plan(&tx, app).await?)
         }
     };
-    exec(
-        &tx,
-        "INSERT INTO test_library_mutations(app_id, actor_id, mutation_id, fingerprint, response)
-        VALUES($1, $2, $3, $4, $5)",
-        vec![
-            app.into(),
-            actor.into(),
-            mutation_id.into(),
-            fingerprint.into(),
-            json(&response)?.into(),
-        ],
-    )
+    test_library_mutations::ActiveModel {
+        app_id: Set(app),
+        actor_id: Set(actor),
+        mutation_id: Set(mutation_id),
+        fingerprint: Set(fingerprint),
+        response: Set(json(&response)?),
+        ..Default::default()
+    }
+    .insert(&tx)
     .await?;
     tx.commit().await?;
     Ok((response, true))
@@ -270,56 +341,64 @@ pub async fn link_import(
         .checked_add(1)
         .filter(|v| *v <= i32::MAX as u32)
         .ok_or_else(|| conflict("Version limit reached"))? as i32;
-    exec(
-        db,
-        "INSERT INTO test_library_entries(id, app_id, kind, logical_key, next_version, actor_id)
-        VALUES($1, $2, $3, $4, $5, $6) ON CONFLICT(app_id, kind, logical_key) DO NOTHING",
-        vec![
-            Uuid::new_v4().into(),
-            app.into(),
-            word(&kind).into(),
-            key.into(),
-            next.into(),
-            actor.into(),
-        ],
+    let kind_word = word(&kind);
+    test_library_entries::Entity::insert(test_library_entries::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        app_id: Set(app),
+        kind: Set(kind_word.clone()),
+        logical_key: Set(key.to_owned()),
+        next_version: Set(next),
+        actor_id: Set(actor),
+        ..Default::default()
+    })
+    .on_conflict(
+        OnConflict::columns([
+            test_library_entries::Column::AppId,
+            test_library_entries::Column::Kind,
+            test_library_entries::Column::LogicalKey,
+        ])
+        .do_nothing()
+        .to_owned(),
     )
+    .exec_without_returning(db)
     .await?;
-    let entry=one(db,"SELECT id,archived_at FROM test_library_entries WHERE app_id=$1 AND kind=$2 AND logical_key=$3",vec![app.into(),word(&kind).into(),key.into()]).await?;
-    let id: Uuid = field(&entry, "id")?;
-    if !rows(
-        db,
-        "SELECT definition_id FROM test_library_versions WHERE definition_id=$1",
-        vec![definition.id.into()],
-    )
-    .await?
-    .is_empty()
+    let entry = test_library_entries::Entity::find()
+        .filter(test_library_entries::Column::AppId.eq(app))
+        .filter(test_library_entries::Column::Kind.eq(kind_word))
+        .filter(test_library_entries::Column::LogicalKey.eq(key))
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let id = entry.id;
+    if test_library_versions::Entity::find_by_id(definition.id)
+        .one(db)
+        .await?
+        .is_some()
     {
         return Ok(());
     }
-    if field::<Option<chrono::DateTime<chrono::Utc>>>(&entry, "archived_at")?.is_some() {
+    if entry.archived_at.is_some() {
         return Err(conflict("Entry is archived"));
     }
-    if !rows(
-        db,
-        "SELECT entry_id FROM test_library_drafts WHERE entry_id=$1 AND version=$2",
-        vec![id.into(), (version as i32).into()],
-    )
-    .await?
-    .is_empty()
+    if test_library_drafts::Entity::find_by_id(id)
+        .filter(test_library_drafts::Column::Version.eq(version as i32))
+        .one(db)
+        .await?
+        .is_some()
     {
         return Err(conflict("Version is reserved by an editable draft"));
     }
-    exec(
-        db,
-        "INSERT INTO test_library_versions(definition_id,entry_id) VALUES($1,$2)",
-        vec![definition.id.into(), id.into()],
-    )
+    test_library_versions::ActiveModel {
+        definition_id: Set(definition.id),
+        entry_id: Set(id),
+        ..Default::default()
+    }
+    .insert(db)
     .await?;
-    exec(
-        db,
-        "UPDATE test_library_entries SET next_version=GREATEST(next_version,$2) WHERE id=$1",
-        vec![id.into(), next.into()],
-    )
-    .await?;
+    if entry.next_version < next {
+        let mut active = entry.into_active_model();
+        active.next_version = Set(next);
+        active.update(db).await?;
+    }
     bump(db, id, actor).await
 }

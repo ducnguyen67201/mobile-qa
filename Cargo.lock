@@ -2904,6 +2904,8 @@ dependencies = [
 name = "migration"
 version = "0.1.0"
 dependencies = [
+ "md-5",
+ "sea-orm",
  "sea-orm-migration",
 ]
 

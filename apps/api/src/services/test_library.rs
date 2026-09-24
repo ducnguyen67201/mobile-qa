@@ -1,21 +1,31 @@
 //! App-scoped catalog reads and shared lifecycle admission. Historical report reads
 //! intentionally bypass admission: their manifests have already been frozen.
-use super::{apps, execution_store::*, test_definitions as definitions};
-use crate::errors::{ApiFailure, ApiResult};
+use super::{
+    apps,
+    execution_store::{conflict, decode, json, word},
+    test_definitions as definitions,
+};
+use crate::{
+    errors::{ApiFailure, ApiResult},
+    models::_entities::{
+        apps as app_rows, execution_definitions, execution_profiles, memberships,
+        test_library_defaults, test_library_drafts, test_library_entries, test_library_versions,
+        users,
+    },
+};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::{execution::*, test_library::*};
-use sea_orm::ConnectionTrait;
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 pub async fn authorize(ctx: &AppContext, actor: Uuid, app: Uuid) -> ApiResult<()> {
     apps::authorized(ctx, actor, app).await?;
-    one(
-        &ctx.db,
-        "SELECT id FROM users WHERE id=$1 AND disabled_at IS NULL",
-        vec![actor.into()],
-    )
-    .await
-    .map_err(|_| ApiFailure::unauthorized())?;
+    users::Entity::find_by_id(actor)
+        .filter(users::Column::DisabledAt.is_null())
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(ApiFailure::unauthorized)?;
     Ok(())
 }
 pub async fn capabilities(
@@ -23,10 +33,18 @@ pub async fn capabilities(
     actor: Uuid,
     app: Uuid,
 ) -> ApiResult<LibraryCapabilities> {
-    let operator: bool=field(&one(db,
-        "SELECT EXISTS(SELECT 1 FROM memberships m JOIN apps a ON a.organization_id=m.organization_id
-         WHERE a.id=$1 AND m.user_id=$2 AND m.active AND m.role='operator') AS allowed",
-        vec![app.into(),actor.into()]).await?, "allowed")?;
+    let app_row = app_rows::Entity::find_by_id(app)
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let operator = memberships::Entity::find()
+        .filter(memberships::Column::OrganizationId.eq(app_row.organization_id))
+        .filter(memberships::Column::UserId.eq(actor))
+        .filter(memberships::Column::Active.eq(true))
+        .filter(memberships::Column::Role.eq("operator"))
+        .one(db)
+        .await?
+        .is_some();
     Ok(LibraryCapabilities {
         can_edit: true,
         can_archive: operator,
@@ -47,14 +65,12 @@ async fn require_supported_version(
     app: Uuid,
     version_id: Uuid,
 ) -> ApiResult<()> {
-    let row = one(
-        db,
-        "SELECT payload FROM execution_definitions WHERE id=$1 AND app_id=$2",
-        vec![version_id.into(), app.into()],
-    )
-    .await?;
-    let payload: serde_json::Value = field(&row, "payload")?;
-    serde_json::from_value::<TestDefinition>(payload)
+    let row = execution_definitions::Entity::find_by_id(version_id)
+        .filter(execution_definitions::Column::AppId.eq(app))
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    serde_json::from_value::<TestDefinition>(row.payload)
         .map(|_| ())
         .map_err(|_| unsupported_saved_definition())
 }
@@ -65,29 +81,37 @@ pub async fn entry(
     app: Uuid,
     id: Uuid,
 ) -> ApiResult<LibraryEntryResponse> {
-    let row = one(
-        db,
-        "SELECT e.*, d.version AS draft_version, d.payload AS draft_payload,
-        COALESCE(d.payload->'content'->>'title',v.title,e.logical_key) AS title,
-        COALESCE(d.payload->'content'->>'provenance',v.provenance,'') AS provenance,
-        v.definition_id AS latest_version_id
-        FROM test_library_entries e LEFT JOIN test_library_drafts d ON d.entry_id=e.id
-        LEFT JOIN LATERAL (SELECT lv.definition_id,ed.payload->'content'->>'title' AS title,
-          ed.payload->'content'->>'provenance' AS provenance
-          FROM test_library_versions lv JOIN execution_definitions ed ON ed.id=lv.definition_id
-          WHERE lv.entry_id=e.id ORDER BY ed.version DESC LIMIT 1) v ON true
-        WHERE e.id=$1 AND e.app_id=$2",
-        vec![id.into(), app.into()],
-    )
-    .await?;
-    let archived_at: Option<chrono::DateTime<chrono::Utc>> = field(&row, "archived_at")?;
+    let row = test_library_entries::Entity::find_by_id(id)
+        .filter(test_library_entries::Column::AppId.eq(app))
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let draft = test_library_drafts::Entity::find_by_id(id).one(db).await?;
+    let mappings = test_library_versions::Entity::find()
+        .filter(test_library_versions::Column::EntryId.eq(id))
+        .all(db)
+        .await?;
+    let definition_ids = mappings
+        .iter()
+        .map(|mapping| mapping.definition_id)
+        .collect::<Vec<_>>();
+    let latest = if definition_ids.is_empty() {
+        None
+    } else {
+        execution_definitions::Entity::find()
+            .filter(execution_definitions::Column::Id.is_in(definition_ids))
+            .order_by_desc(execution_definitions::Column::Version)
+            .one(db)
+            .await?
+    };
+    let archived_at = row.archived_at;
     let mut capabilities = capabilities(db, actor, app).await?;
     if archived_at.is_some() {
         capabilities.can_edit = false;
         capabilities.can_set_default = false;
     }
-    let current: Option<serde_json::Value> = field(&row, "draft_payload")?;
-    let needs_setup = match current {
+    let current = draft.as_ref().map(|draft| draft.payload.clone());
+    let needs_setup = match current.clone() {
         Some(payload) => match serde_json::from_value::<LibraryDraftDefinition>(payload) {
             Ok(definition) => !content_issues(db, app, &definition).await?.0.is_empty(),
             Err(_) => {
@@ -100,24 +124,48 @@ pub async fn entry(
         },
         None => false,
     };
+    let content_text = |payload: &serde_json::Value, key: &str| {
+        payload
+            .get("content")
+            .and_then(|content| content.get(key))
+            .and_then(serde_json::Value::as_str)
+            .map(ToOwned::to_owned)
+    };
+    let title = current
+        .as_ref()
+        .and_then(|payload| content_text(payload, "title"))
+        .or_else(|| {
+            latest
+                .as_ref()
+                .and_then(|row| content_text(&row.payload, "title"))
+        })
+        .unwrap_or_else(|| row.logical_key.clone());
+    let provenance = current
+        .as_ref()
+        .and_then(|payload| content_text(payload, "provenance"))
+        .or_else(|| {
+            latest
+                .as_ref()
+                .and_then(|row| content_text(&row.payload, "provenance"))
+        })
+        .unwrap_or_default();
     Ok(LibraryEntryResponse {
         id,
         app_id: app,
-        kind: decode(json(&field::<String>(&row, "kind")?)?)?,
-        key: field(&row, "logical_key")?,
-        title: field(&row, "title")?,
+        kind: decode(json(&row.kind)?)?,
+        key: row.logical_key,
+        title,
         // Proposal provenance is server-owned and already exists on older saved AI tests.
         ai_generated: {
-            let provenance: String = field(&row, "provenance")?;
             provenance.starts_with("authored-task:")
                 && (provenance.contains(":p:") || provenance.contains(":proposal:"))
         },
         needs_setup,
-        revision: field(&row, "revision")?,
+        revision: row.revision,
         archived_at,
-        draft_version: field::<Option<i32>>(&row, "draft_version")?.map(|v| v as u32),
-        latest_version_id: field(&row, "latest_version_id")?,
-        updated_at: field(&row, "updated_at")?,
+        draft_version: draft.map(|draft| draft.version as u32),
+        latest_version_id: latest.map(|version| version.id),
+        updated_at: row.updated_at,
         capabilities,
     })
 }
@@ -130,23 +178,26 @@ pub async fn list(
     if let Some(cursor) = q.cursor {
         entry(db, actor, app, cursor).await?;
     }
-    let ids = rows(
-        db,
-        "SELECT e.id FROM test_library_entries e
-        WHERE e.app_id=$1 AND e.kind IN ('case','suite','plan')
-        AND ($2::text IS NULL OR e.kind=$2) AND (e.archived_at IS NOT NULL)=$3
-        AND ($4::uuid IS NULL OR e.id>$4) ORDER BY e.id LIMIT 51",
-        vec![
-            app.into(),
-            q.kind.map(|k| word(&k)).into(),
-            q.archived.unwrap_or(false).into(),
-            q.cursor.into(),
-        ],
-    )
-    .await?;
+    let mut query = test_library_entries::Entity::find()
+        .filter(test_library_entries::Column::AppId.eq(app))
+        .filter(test_library_entries::Column::Kind.is_in(["case", "suite", "plan"]))
+        .order_by_asc(test_library_entries::Column::Id)
+        .limit(51);
+    if let Some(kind) = q.kind {
+        query = query.filter(test_library_entries::Column::Kind.eq(word(&kind)));
+    }
+    query = if q.archived.unwrap_or(false) {
+        query.filter(test_library_entries::Column::ArchivedAt.is_not_null())
+    } else {
+        query.filter(test_library_entries::Column::ArchivedAt.is_null())
+    };
+    if let Some(cursor) = q.cursor {
+        query = query.filter(test_library_entries::Column::Id.gt(cursor));
+    }
+    let ids = query.all(db).await?;
     let mut items = Vec::new();
-    for r in ids.iter().take(50) {
-        items.push(entry(db, actor, app, field(r, "id")?).await?);
+    for row in ids.iter().take(50) {
+        items.push(entry(db, actor, app, row.id).await?);
     }
     let next_cursor = if ids.len() > 50 {
         items.last().map(|e| e.id)
@@ -156,14 +207,16 @@ pub async fn list(
     Ok(LibraryListResponse { items, next_cursor })
 }
 pub async fn admitted(db: &impl ConnectionTrait, app: Uuid, id: Uuid) -> ApiResult<()> {
-    let r = one(
-        db,
-        "SELECT e.archived_at FROM test_library_versions v
-        JOIN test_library_entries e ON e.id=v.entry_id WHERE v.definition_id=$1 AND e.app_id=$2",
-        vec![id.into(), app.into()],
-    )
-    .await?;
-    if field::<Option<chrono::DateTime<chrono::Utc>>>(&r, "archived_at")?.is_some() {
+    let mapping = test_library_versions::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let entry = test_library_entries::Entity::find_by_id(mapping.entry_id)
+        .filter(test_library_entries::Column::AppId.eq(app))
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    if entry.archived_at.is_some() {
         return Err(conflict("Referenced test is archived"));
     }
     definitions::get(db, app, id)
@@ -313,18 +366,12 @@ pub async fn draft(
     id: Uuid,
 ) -> ApiResult<LibraryDraftResponse> {
     let entry = entry(db, actor, app, id).await?;
-    let stored = rows(
-        db,
-        "SELECT payload,source_version_id FROM test_library_drafts WHERE entry_id=$1",
-        vec![id.into()],
-    )
-    .await?;
+    let stored = test_library_drafts::Entity::find_by_id(id).one(db).await?;
     let (definition, source_version_id): (LibraryDraftDefinition, Option<Uuid>) =
-        if let Some(row) = stored.first() {
+        if let Some(row) = stored {
             (
-                serde_json::from_value(field(row, "payload")?)
-                    .map_err(|_| unsupported_saved_definition())?,
-                field(row, "source_version_id")?,
+                serde_json::from_value(row.payload).map_err(|_| unsupported_saved_definition())?,
+                row.source_version_id,
             )
         } else {
             let version_id = entry.latest_version_id.ok_or_else(ApiFailure::missing)?;
@@ -366,12 +413,11 @@ pub async fn version(
     version_id: Uuid,
 ) -> ApiResult<LibraryVersionResponse> {
     let entry = entry(db, actor, app, id).await?;
-    one(
-        db,
-        "SELECT definition_id FROM test_library_versions WHERE entry_id=$1 AND definition_id=$2",
-        vec![id.into(), version_id.into()],
-    )
-    .await?;
+    test_library_versions::Entity::find_by_id(version_id)
+        .filter(test_library_versions::Column::EntryId.eq(id))
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
     require_supported_version(db, app, version_id).await?;
     let version = definitions::get(db, app, version_id).await?;
     let (mut issues, coverage) =
@@ -403,21 +449,43 @@ pub async fn versions(
 ) -> ApiResult<LibraryVersionListResponse> {
     entry(db, actor, app, id).await?;
     if let Some(cursor) = cursor {
-        one(db,"SELECT definition_id FROM test_library_versions WHERE entry_id=$1 AND definition_id=$2",vec![id.into(),cursor.into()]).await?;
+        test_library_versions::Entity::find_by_id(cursor)
+            .filter(test_library_versions::Column::EntryId.eq(id))
+            .one(db)
+            .await?
+            .ok_or_else(ApiFailure::missing)?;
     }
-    let ids = rows(
-        db,
-        "SELECT v.definition_id FROM test_library_versions v JOIN execution_definitions d ON
-        d.id=v.definition_id WHERE v.entry_id=$1 AND ($2::uuid IS NULL OR d.version<(SELECT version
-        FROM execution_definitions WHERE id=$2)) ORDER BY d.version DESC LIMIT 26",
-        vec![id.into(), cursor.into()],
-    )
-    .await?;
+    let mappings = test_library_versions::Entity::find()
+        .filter(test_library_versions::Column::EntryId.eq(id))
+        .all(db)
+        .await?;
+    let definition_ids = mappings
+        .into_iter()
+        .map(|mapping| mapping.definition_id)
+        .collect::<Vec<_>>();
+    let mut definitions = if definition_ids.is_empty() {
+        vec![]
+    } else {
+        execution_definitions::Entity::find()
+            .filter(execution_definitions::Column::Id.is_in(definition_ids))
+            .all(db)
+            .await?
+    };
+    definitions.sort_by_key(|definition| std::cmp::Reverse(definition.version));
+    if let Some(cursor) = cursor {
+        let cursor_version = definitions
+            .iter()
+            .find(|definition| definition.id == cursor)
+            .map(|definition| definition.version)
+            .ok_or_else(ApiFailure::missing)?;
+        definitions.retain(|definition| definition.version < cursor_version);
+    }
+    definitions.truncate(26);
     let mut items = Vec::new();
-    for row in ids.iter().take(25) {
-        items.push(version(db, actor, app, id, field(row, "definition_id")?).await?);
+    for definition in definitions.iter().take(25) {
+        items.push(version(db, actor, app, id, definition.id).await?);
     }
-    let next_cursor = if ids.len() > 25 {
+    let next_cursor = if definitions.len() > 25 {
         items.last().map(|v| v.version.id)
     } else {
         None
@@ -430,14 +498,13 @@ pub async fn options(
     app: Uuid,
 ) -> ApiResult<LibraryOptionsResponse> {
     let mut profiles = Vec::new();
-    for row in rows(
-        db,
-        "SELECT payload FROM execution_profiles WHERE app_id=$1 ORDER BY id",
-        vec![app.into()],
-    )
-    .await?
+    for row in execution_profiles::Entity::find()
+        .filter(execution_profiles::Column::AppId.eq(app))
+        .order_by_asc(execution_profiles::Column::Id)
+        .all(db)
+        .await?
     {
-        let p: ExecutionProfile = decode(field(&row, "payload")?)?;
+        let p: ExecutionProfile = decode(row.payload)?;
         let assignment = super::model_registry::active_assignment(
             db,
             app,
@@ -465,32 +532,61 @@ pub async fn options(
             model_available,
         });
     }
-    let ids = rows(
-        db,
-        "SELECT v.entry_id, v.definition_id, d.payload FROM test_library_versions v
-        JOIN test_library_entries e ON e.id=v.entry_id
-        JOIN execution_definitions d ON d.id=v.definition_id
-        WHERE e.app_id=$1 AND e.archived_at IS NULL AND e.kind IN ('case','suite','plan')
-        ORDER BY e.logical_key, v.created_at DESC, v.definition_id",
-        vec![app.into()],
-    )
-    .await?;
+    let entries = test_library_entries::Entity::find()
+        .filter(test_library_entries::Column::AppId.eq(app))
+        .filter(test_library_entries::Column::ArchivedAt.is_null())
+        .filter(test_library_entries::Column::Kind.is_in(["case", "suite", "plan"]))
+        .order_by_asc(test_library_entries::Column::LogicalKey)
+        .all(db)
+        .await?;
+    let entry_order = entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| (entry.id, index))
+        .collect::<HashMap<_, _>>();
+    let entry_ids = entries.iter().map(|entry| entry.id).collect::<Vec<_>>();
+    let mut mappings = if entry_ids.is_empty() {
+        vec![]
+    } else {
+        test_library_versions::Entity::find()
+            .filter(test_library_versions::Column::EntryId.is_in(entry_ids))
+            .order_by_desc(test_library_versions::Column::CreatedAt)
+            .order_by_asc(test_library_versions::Column::DefinitionId)
+            .all(db)
+            .await?
+    };
+    mappings.sort_by_key(|mapping| {
+        entry_order
+            .get(&mapping.entry_id)
+            .copied()
+            .unwrap_or(usize::MAX)
+    });
+    let definition_ids = mappings
+        .iter()
+        .map(|mapping| mapping.definition_id)
+        .collect::<Vec<_>>();
+    let definitions = if definition_ids.is_empty() {
+        vec![]
+    } else {
+        execution_definitions::Entity::find()
+            .filter(execution_definitions::Column::Id.is_in(definition_ids))
+            .all(db)
+            .await?
+    };
+    let definitions = definitions
+        .into_iter()
+        .map(|definition| (definition.id, definition))
+        .collect::<HashMap<_, _>>();
     let mut saved_versions = Vec::new();
-    for r in ids {
-        let payload: serde_json::Value = field(&r, "payload")?;
-        if serde_json::from_value::<TestDefinition>(payload).is_err() {
+    for mapping in mappings {
+        let Some(definition) = definitions.get(&mapping.definition_id) else {
+            continue;
+        };
+        if serde_json::from_value::<TestDefinition>(definition.payload.clone()).is_err() {
             continue;
         }
-        saved_versions.push(
-            version(
-                db,
-                actor,
-                app,
-                field(&r, "entry_id")?,
-                field(&r, "definition_id")?,
-            )
-            .await?,
-        );
+        saved_versions
+            .push(version(db, actor, app, mapping.entry_id, mapping.definition_id).await?);
     }
     Ok(LibraryOptionsResponse {
         profiles,
@@ -499,17 +595,14 @@ pub async fn options(
     })
 }
 pub async fn default_plan(db: &impl ConnectionTrait, app: Uuid) -> ApiResult<DefaultPlanResponse> {
-    let r = rows(
-        db,
-        "SELECT revision,plan_version_id FROM test_library_defaults WHERE app_id=$1",
-        vec![app.into()],
-    )
-    .await?;
-    match r.first() {
-        Some(r) => Ok(DefaultPlanResponse {
+    match test_library_defaults::Entity::find_by_id(app)
+        .one(db)
+        .await?
+    {
+        Some(row) => Ok(DefaultPlanResponse {
             app_id: app,
-            revision: field(r, "revision")?,
-            plan_version_id: Some(field(r, "plan_version_id")?),
+            revision: row.revision,
+            plan_version_id: Some(row.plan_version_id),
         }),
         None => Ok(DefaultPlanResponse {
             app_id: app,
@@ -525,15 +618,11 @@ pub async fn executable(
 ) -> ApiResult<()> {
     match definition {
         TestDefinition::Case(c) => {
-            let package: String = field(
-                &one(
-                    db,
-                    "SELECT android_package FROM apps WHERE id=$1",
-                    vec![app.into()],
-                )
-                .await?,
-                "android_package",
-            )?;
+            let package = app_rows::Entity::find_by_id(app)
+                .one(db)
+                .await?
+                .ok_or_else(ApiFailure::missing)?
+                .android_package;
             if c.package != package {
                 return Err(ApiFailure::invalid("Test belongs to another app"));
             }

@@ -1,7 +1,11 @@
 //! Commercial authorization is exercised through real HTTP routes and PostgreSQL.
 mod support;
-use mobile_qa::services::{
-    commercial, credit_billing, execution_store::*, test_definitions as defs,
+use mobile_qa::{
+    models::_entities::{
+        billing_checkout_intents, billing_credit_periods, commercial_usage, execution_artifacts,
+        execution_attempts,
+    },
+    services::{commercial, credit_billing, test_definitions as defs},
 };
 use mobile_qa_contracts::{
     commercial::*, execution::*, regression::CaseRunRequest, task_sessions::OpenPhoneRequest,
@@ -257,18 +261,11 @@ async fn pilot_quote_authorization_replay_cancel_credit_and_tenant_isolation() {
                 .await,
             409,
         );
-        let count: i32 = field(
-            &one(
-                &ctx.db,
-                "SELECT COUNT(*)::integer AS n FROM commercial_usage WHERE run_id=$1",
-                vec![run.id.into()],
-            )
+        assert!(commercial_usage::Entity::find_by_id(run.id)
+            .one(&ctx.db)
             .await
-            .unwrap(),
-            "n",
-        )
-        .unwrap();
-        assert_eq!(count, 1);
+            .unwrap()
+            .is_some());
         owner
             .write(server.post(&format!("/api/runs/{}/cancel", run.id)))
             .await
@@ -459,61 +456,203 @@ async fn paid_period_holds_credits_atomically_and_queued_cancel_releases_them() 
         let checkout_id = Uuid::new_v4();
         let period_id = Uuid::new_v4();
         let now = Utc::now();
-        exec(&ctx.db, "INSERT INTO billing_checkout_intents(id,app_id,actor_id,plan,state,stripe_subscription_id) VALUES($1,$2,$3,'starter','paid',$4)",
-            vec![checkout_id.into(),app.into(),owner.user.into(),format!("sub_{checkout_id}").into()]).await.unwrap();
-        exec(&ctx.db, "INSERT INTO billing_credit_periods(id,app_id,checkout_intent_id,stripe_subscription_id,stripe_invoice_id,plan,granted_credits,starts_at,ends_at,rate_revision) VALUES($1,$2,$3,$4,$5,'starter',50000,$6,$7,1)",
-            vec![period_id.into(),app.into(),checkout_id.into(),format!("sub_{checkout_id}").into(),format!("in_{checkout_id}").into(),(now-Duration::minutes(1)).into(),(now+Duration::days(30)).into()]).await.unwrap();
+        billing_checkout_intents::ActiveModel {
+            id: Set(checkout_id),
+            app_id: Set(app),
+            actor_id: Set(owner.user),
+            plan: Set("starter".into()),
+            state: Set("paid".into()),
+            stripe_subscription_id: Set(Some(format!("sub_{checkout_id}"))),
+            ..Default::default()
+        }
+        .insert(&ctx.db)
+        .await
+        .unwrap();
+        billing_credit_periods::ActiveModel {
+            id: Set(period_id),
+            app_id: Set(app),
+            checkout_intent_id: Set(checkout_id),
+            stripe_subscription_id: Set(format!("sub_{checkout_id}")),
+            stripe_invoice_id: Set(format!("in_{checkout_id}")),
+            plan: Set("starter".into()),
+            granted_credits: Set(50_000),
+            starts_at: Set(now - Duration::minutes(1)),
+            ends_at: Set(now + Duration::days(30)),
+            rate_revision: Set(1),
+            ..Default::default()
+        }
+        .insert(&ctx.db)
+        .await
+        .unwrap();
         let access_url = format!("/api/apps/{app}/commercial-access");
-        error(&foreign.read(server.get(&access_url)).await,404);
-        let status = owner.read(server.get(&access_url)).await.json::<CommercialAccessResponse>();
-        assert_eq!(status.credit.unwrap().available_credits,50_000);
+        error(&foreign.read(server.get(&access_url)).await, 404);
+        let status = owner
+            .read(server.get(&access_url))
+            .await
+            .json::<CommercialAccessResponse>();
+        assert_eq!(status.credit.unwrap().available_credits, 50_000);
         let change_url = format!("/api/apps/{app}/credit-plan-change");
-        error(&foreign.write(server.post(&change_url)).json(&CreditPlanChangeRequest { plan: CreditPlan::Plus }).await,404);
-        error(&owner.write(server.post(&change_url)).json(&CreditPlanChangeRequest { plan: CreditPlan::Starter }).await,409);
-        assert_eq!(status.plans.len(),3);
-        let quote_url=format!("/api/apps/{app}/commercial-check-quotes");
-        let input=CreateRunRequest { build_id:build,plan_version_id:plan,environment_revision:1 };
-        let intent=CommercialQuoteRequest { intent:CommercialRunIntent::ReleasePlan(input.clone()) };
-        let quote=owner.write(server.post(&quote_url)).json(&intent).await.json::<CommercialQuoteResponse>();
-        let max=quote.maximum_credits.unwrap();
-        assert!(max>3_000 && max<50_000);
+        error(
+            &foreign
+                .write(server.post(&change_url))
+                .json(&CreditPlanChangeRequest {
+                    plan: CreditPlan::Plus,
+                })
+                .await,
+            404,
+        );
+        error(
+            &owner
+                .write(server.post(&change_url))
+                .json(&CreditPlanChangeRequest {
+                    plan: CreditPlan::Starter,
+                })
+                .await,
+            409,
+        );
+        assert_eq!(status.plans.len(), 3);
+        let quote_url = format!("/api/apps/{app}/commercial-check-quotes");
+        let input = CreateRunRequest {
+            build_id: build,
+            plan_version_id: plan,
+            environment_revision: 1,
+        };
+        let intent = CommercialQuoteRequest {
+            intent: CommercialRunIntent::ReleasePlan(input.clone()),
+        };
+        let quote = owner
+            .write(server.post(&quote_url))
+            .json(&intent)
+            .await
+            .json::<CommercialQuoteResponse>();
+        let max = quote.maximum_credits.unwrap();
+        assert!(max > 3_000 && max < 50_000);
         // A second quote is allowed, but only one hold can fit after the grant shrinks.
-        let second=owner.write(server.post(&quote_url)).json(&intent).await.json::<CommercialQuoteResponse>();
-        exec(&ctx.db,"UPDATE billing_credit_periods SET granted_credits=$2 WHERE id=$1",vec![period_id.into(),max.into()]).await.unwrap();
-        let run_url=format!("/api/apps/{app}/runs");
-        let run=owner.write(server.post(&run_url)).add_header("idempotency-key","credit-first")
-            .add_header("x-commercial-quote-id",quote.id.to_string()).json(&input).await.json::<RunResponse>();
-        error(&owner.write(server.post(&run_url)).add_header("idempotency-key","credit-second")
-            .add_header("x-commercial-quote-id",second.id.to_string()).json(&input).await,409);
-        let held=owner.read(server.get(&access_url)).await.json::<CommercialAccessResponse>().credit.unwrap();
-        assert_eq!(held.held_credits,max);
-        assert_eq!(held.available_credits,0);
-        owner.write(server.post(&format!("/api/runs/{}/cancel",run.id))).await.assert_status_ok();
-        let released=owner.read(server.get(&access_url)).await.json::<CommercialAccessResponse>().credit.unwrap();
-        assert_eq!(released.held_credits,0);
-        assert_eq!(released.available_credits,max);
-        assert_eq!(released.usage[0].state,"released");
-        let delivered_run=owner.write(server.post(&run_url)).add_header("idempotency-key","credit-measured")
-            .add_header("x-commercial-quote-id",second.id.to_string()).json(&input).await.json::<RunResponse>();
-        let attempt:Uuid=field(&one(&ctx.db,"SELECT id FROM execution_attempts WHERE run_id=$1",
-            vec![delivered_run.id.into()]).await.unwrap(),"id").unwrap();
-        let ended=Utc::now();
-        let usage=json!([{"model":"synthetic","calls":1,"unknown_calls":0,
+        let second = owner
+            .write(server.post(&quote_url))
+            .json(&intent)
+            .await
+            .json::<CommercialQuoteResponse>();
+        let row = billing_credit_periods::Entity::find_by_id(period_id)
+            .one(&ctx.db)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut active: billing_credit_periods::ActiveModel = row.into();
+        active.granted_credits = Set(i64::from(max));
+        active.update(&ctx.db).await.unwrap();
+        let run_url = format!("/api/apps/{app}/runs");
+        let run = owner
+            .write(server.post(&run_url))
+            .add_header("idempotency-key", "credit-first")
+            .add_header("x-commercial-quote-id", quote.id.to_string())
+            .json(&input)
+            .await
+            .json::<RunResponse>();
+        error(
+            &owner
+                .write(server.post(&run_url))
+                .add_header("idempotency-key", "credit-second")
+                .add_header("x-commercial-quote-id", second.id.to_string())
+                .json(&input)
+                .await,
+            409,
+        );
+        let held = owner
+            .read(server.get(&access_url))
+            .await
+            .json::<CommercialAccessResponse>()
+            .credit
+            .unwrap();
+        assert_eq!(held.held_credits, max);
+        assert_eq!(held.available_credits, 0);
+        owner
+            .write(server.post(&format!("/api/runs/{}/cancel", run.id)))
+            .await
+            .assert_status_ok();
+        let released = owner
+            .read(server.get(&access_url))
+            .await
+            .json::<CommercialAccessResponse>()
+            .credit
+            .unwrap();
+        assert_eq!(released.held_credits, 0);
+        assert_eq!(released.available_credits, max);
+        assert_eq!(released.usage[0].state, "released");
+        let delivered_run = owner
+            .write(server.post(&run_url))
+            .add_header("idempotency-key", "credit-measured")
+            .add_header("x-commercial-quote-id", second.id.to_string())
+            .json(&input)
+            .await
+            .json::<RunResponse>();
+        let attempt = execution_attempts::Entity::find()
+            .filter(execution_attempts::Column::RunId.eq(delivered_run.id))
+            .one(&ctx.db)
+            .await
+            .unwrap()
+            .unwrap();
+        let ended = Utc::now();
+        let usage = json!([{"model":"synthetic","calls":1,"unknown_calls":0,
             "input_tokens":1000000,"output_tokens":1000000}]);
-        exec(&ctx.db,"UPDATE execution_attempts SET state='finished',outcome='passed',cleanup='verified_clean',claim_id=$2,claimed_at=$3,released_at=$4,usage=$5 WHERE id=$1",
-            vec![attempt.into(),Uuid::new_v4().into(),(ended-Duration::seconds(60)).into(),ended.into(),usage.into()]).await.unwrap();
-        exec(&ctx.db,"INSERT INTO execution_artifacts(id,attempt_id,checkpoint_id,name,mime,byte_size,sha256,state,storage_key,storage_backend) VALUES($1,$2,'evidence','screen.png','image/png',1048576,$3,'sealed',$4,'local')",
-            vec![Uuid::new_v4().into(),attempt.into(),"0".repeat(64).into(),format!("credit-test-{attempt}").into()]).await.unwrap();
-        commercial::review(&ctx,owner.user,delivered_run.id,CommercialUsageState::Delivered,"Reviewed usable report").await.unwrap();
-        let settled=owner.read(server.get(&access_url)).await.json::<CommercialAccessResponse>().credit.unwrap();
-        assert_eq!(settled.held_credits,0);
-        assert_eq!(settled.charged_credits,1061);
-        assert_eq!(settled.available_credits,max-1061);
-        assert_eq!(settled.usage[0].measured_credits.as_deref(),Some("1061"));
-        assert_eq!(settled.usage[0].device_seconds,Some(60));
-        assert_eq!(settled.usage[0].stored_bytes.as_deref(),Some("1048576"));
-        assert!(commercial::review(&ctx,owner.user,delivered_run.id,CommercialUsageState::Delivered,"Again").await.is_err());
-    }).await;
+        let attempt_id = attempt.id;
+        let mut active: execution_attempts::ActiveModel = attempt.into();
+        active.state = Set("finished".into());
+        active.outcome = Set(Some("passed".into()));
+        active.cleanup = Set("verified_clean".into());
+        active.claim_id = Set(Some(Uuid::new_v4()));
+        active.claimed_at = Set(Some(ended - Duration::seconds(60)));
+        active.released_at = Set(Some(ended));
+        active.usage = Set(usage);
+        active.update(&ctx.db).await.unwrap();
+        execution_artifacts::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            attempt_id: Set(attempt_id),
+            checkpoint_id: Set("evidence".into()),
+            name: Set("screen.png".into()),
+            mime: Set("image/png".into()),
+            byte_size: Set(1_048_576),
+            sha256: Set("0".repeat(64)),
+            state: Set("sealed".into()),
+            storage_key: Set(format!("credit-test-{attempt_id}")),
+            storage_backend: Set("local".into()),
+            ..Default::default()
+        }
+        .insert(&ctx.db)
+        .await
+        .unwrap();
+        commercial::review(
+            &ctx,
+            owner.user,
+            delivered_run.id,
+            CommercialUsageState::Delivered,
+            "Reviewed usable report",
+        )
+        .await
+        .unwrap();
+        let settled = owner
+            .read(server.get(&access_url))
+            .await
+            .json::<CommercialAccessResponse>()
+            .credit
+            .unwrap();
+        assert_eq!(settled.held_credits, 0);
+        assert_eq!(settled.charged_credits, 1061);
+        assert_eq!(settled.available_credits, max - 1061);
+        assert_eq!(settled.usage[0].measured_credits.as_deref(), Some("1061"));
+        assert_eq!(settled.usage[0].device_seconds, Some(60));
+        assert_eq!(settled.usage[0].stored_bytes.as_deref(), Some("1048576"));
+        assert!(commercial::review(
+            &ctx,
+            owner.user,
+            delivered_run.id,
+            CommercialUsageState::Delivered,
+            "Again"
+        )
+        .await
+        .is_err());
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -524,8 +663,7 @@ async fn verified_paid_invoice_grants_once_and_underpayment_grants_nothing() {
         let app = apps::create(&ctx,owner.user,create_input(owner.org)).await.unwrap();
         let intent_id=Uuid::new_v4();
         let subscription_id=format!("sub_{intent_id}");
-        exec(&ctx.db,"INSERT INTO billing_checkout_intents(id,app_id,actor_id,plan,state) VALUES($1,$2,$3,'plus','checkout')",
-            vec![intent_id.into(),app.id.into(),owner.user.into()]).await.unwrap();
+        billing_checkout_intents::ActiveModel{id:Set(intent_id),app_id:Set(app.id),actor_id:Set(owner.user),plan:Set("plus".into()),state:Set("checkout".into()),..Default::default()}.insert(&ctx.db).await.unwrap();
         let start=Utc::now()-Duration::minutes(1);
         let end=start+Duration::days(30);
         let subscription=json!({"id":subscription_id,"metadata":{"checkout_intent_id":intent_id.to_string()},
@@ -544,9 +682,7 @@ async fn verified_paid_invoice_grants_once_and_underpayment_grants_nothing() {
         let balance=status.credit.unwrap();
         assert_eq!(balance.granted_credits,75_000);
         assert_eq!(balance.available_credits,75_000);
-        let duplicate:i32=field(&one(&ctx.db,"SELECT COUNT(*)::integer AS n FROM billing_credit_periods WHERE app_id=$1",
-            vec![app.id.into()]).await.unwrap(),"n").unwrap();
-        assert_eq!(duplicate,1);
+        assert_eq!(billing_credit_periods::Entity::find().filter(billing_credit_periods::Column::AppId.eq(app.id)).all(&ctx.db).await.unwrap().len(),1);
         let underpaid=json!({"id":"in_underpaid","status":"paid","collection_method":"charge_automatically",
             "currency":"usd","amount_paid":50000,
             "parent":{"subscription_details":{"subscription":subscription_id}},
@@ -559,9 +695,7 @@ async fn verified_paid_invoice_grants_once_and_underpayment_grants_nothing() {
             "lines":{"data":[{"pricing":{"price_details":{"price":"price_plus"}},
                 "period":{"start":end.timestamp(),"end":(end+Duration::days(30)).timestamp()}}]}});
         assert!(credit_billing::apply_verified_invoice(&ctx,&out_of_band,&subscription).await.is_err());
-        let count:i32=field(&one(&ctx.db,"SELECT COUNT(*)::integer AS n FROM billing_credit_periods WHERE app_id=$1",
-            vec![app.id.into()]).await.unwrap(),"n").unwrap();
-        assert_eq!(count,1);
+        assert_eq!(billing_credit_periods::Entity::find().filter(billing_credit_periods::Column::AppId.eq(app.id)).all(&ctx.db).await.unwrap().len(),1);
     }).await;
 }
 
@@ -577,8 +711,7 @@ async fn next_plan_grants_only_on_paid_renewal_and_old_invoice_replay_is_stable(
             - Duration::minutes(1);
         let renewal = start+Duration::days(30);
         let next_end = renewal+Duration::days(30);
-        exec(&ctx.db,"INSERT INTO billing_checkout_intents(id,app_id,actor_id,plan,state,stripe_subscription_id,pending_plan,pending_effective_at,stripe_schedule_id) VALUES($1,$2,$3,'starter','paid',$4,'plus',$5,'sub_sched_test')",
-            vec![intent.into(),app.id.into(),owner.user.into(),subscription_id.clone().into(),renewal.into()]).await.unwrap();
+        billing_checkout_intents::ActiveModel{id:Set(intent),app_id:Set(app.id),actor_id:Set(owner.user),plan:Set("starter".into()),state:Set("paid".into()),stripe_subscription_id:Set(Some(subscription_id.clone())),pending_plan:Set(Some("plus".into())),pending_effective_at:Set(Some(renewal)),stripe_schedule_id:Set(Some("sub_sched_test".into())),..Default::default()}.insert(&ctx.db).await.unwrap();
         let original = json!({"id":"in_old","status":"paid","collection_method":"charge_automatically",
             "currency":"usd","amount_paid":50000,"parent":{"subscription_details":{"subscription":subscription_id}},
             "lines":{"data":[{"pricing":{"price_details":{"price":"price_starter"}},
@@ -608,11 +741,10 @@ async fn next_plan_grants_only_on_paid_renewal_and_old_invoice_replay_is_stable(
         credit_billing::apply_verified_invoice(&ctx,&renewal_invoice,&next_sub).await.unwrap();
         credit_billing::apply_verified_invoice(&ctx,&original,&next_sub).await.unwrap();
         credit_billing::apply_verified_invoice(&ctx,&renewal_invoice,&next_sub).await.unwrap();
-        let upgraded:i64=field(&one(&ctx.db,"SELECT granted_credits FROM billing_credit_periods WHERE stripe_invoice_id='in_renewal'",vec![]).await.unwrap(),"granted_credits").unwrap();
+        let upgraded=billing_credit_periods::Entity::find().filter(billing_credit_periods::Column::StripeInvoiceId.eq("in_renewal")).one(&ctx.db).await.unwrap().unwrap().granted_credits;
         assert_eq!(upgraded,75_000);
-        let pending:Option<String>=field(&one(&ctx.db,"SELECT pending_plan FROM billing_checkout_intents WHERE id=$1",vec![intent.into()]).await.unwrap(),"pending_plan").unwrap();
+        let pending=billing_checkout_intents::Entity::find_by_id(intent).one(&ctx.db).await.unwrap().unwrap().pending_plan;
         assert_eq!(pending,None);
-        let count:i32=field(&one(&ctx.db,"SELECT COUNT(*)::integer AS n FROM billing_credit_periods WHERE app_id=$1",vec![app.id.into()]).await.unwrap(),"n").unwrap();
-        assert_eq!(count,2);
+        assert_eq!(billing_credit_periods::Entity::find().filter(billing_credit_periods::Column::AppId.eq(app.id)).all(&ctx.db).await.unwrap().len(),2);
     }).await;
 }

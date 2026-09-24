@@ -2,7 +2,8 @@
 use crate::{
     errors::{ApiFailure, ApiResult},
     models::_entities::{
-        app_memberships, environment_checks, environments, memberships, secret_references, users,
+        app_memberships, apps as app_rows, commercial_pilot_requests, environment_checks,
+        environments, execution_runs, memberships, secret_references, users,
     },
     services::{apps, auth, commercial},
 };
@@ -14,7 +15,8 @@ use loco_rs::{
     task::{Task, TaskInfo, Vars},
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    TransactionTrait,
 };
 use uuid::Uuid;
 pub struct Operator;
@@ -82,50 +84,121 @@ pub async fn execute(ctx: &AppContext, vars: &Vars) -> ApiResult<()> {
     }
     match action {
         "commercial-activate" => {
-            let app=apps::authorized(ctx,actor,id(vars,"app")?).await?;
-            if app.organization_id!=org { return Err(ApiFailure::missing()); }
-            let offer=match arg(vars,"offer")? {
-                "pilot"=>mobile_qa_contracts::commercial::CommercialOffer::Pilot,
-                "recurring"=>mobile_qa_contracts::commercial::CommercialOffer::Recurring,
-                _=>return Err(ApiFailure::invalid("Offer must be pilot or recurring")),
+            let app = apps::authorized(ctx, actor, id(vars, "app")?).await?;
+            if app.organization_id != org {
+                return Err(ApiFailure::missing());
+            }
+            let offer = match arg(vars, "offer")? {
+                "pilot" => mobile_qa_contracts::commercial::CommercialOffer::Pilot,
+                "recurring" => mobile_qa_contracts::commercial::CommercialOffer::Recurring,
+                _ => return Err(ApiFailure::invalid("Offer must be pilot or recurring")),
             };
-            let second=vars.cli.get("second-source").map(|value|Uuid::parse_str(value)
-                .map_err(|_|ApiFailure::invalid("second-source must be a UUID"))).transpose()?;
-            let agreement=commercial::activate(ctx,actor,app.id,offer,timestamp(vars,"starts")?,timestamp(vars,"ends")?,
-                id(vars,"first-source")?,second,id(vars,"profile")?,arg(vars,"reference")?,arg(vars,"reason")?).await?;
+            let second = vars
+                .cli
+                .get("second-source")
+                .map(|value| {
+                    Uuid::parse_str(value)
+                        .map_err(|_| ApiFailure::invalid("second-source must be a UUID"))
+                })
+                .transpose()?;
+            let agreement = commercial::activate(
+                ctx,
+                actor,
+                app.id,
+                offer,
+                timestamp(vars, "starts")?,
+                timestamp(vars, "ends")?,
+                id(vars, "first-source")?,
+                second,
+                id(vars, "profile")?,
+                arg(vars, "reference")?,
+                arg(vars, "reason")?,
+            )
+            .await?;
             println!("agreement_id={agreement}");
         }
         "commercial-pause" | "commercial-end" => {
-            let app=apps::authorized(ctx,actor,id(vars,"app")?).await?;
-            if app.organization_id!=org { return Err(ApiFailure::missing()); }
-            commercial::set_status(ctx,actor,app.id,if action=="commercial-pause"{"paused"}else{"ended"},arg(vars,"reason")?).await?;
+            let app = apps::authorized(ctx, actor, id(vars, "app")?).await?;
+            if app.organization_id != org {
+                return Err(ApiFailure::missing());
+            }
+            commercial::set_status(
+                ctx,
+                actor,
+                app.id,
+                if action == "commercial-pause" {
+                    "paused"
+                } else {
+                    "ended"
+                },
+                arg(vars, "reason")?,
+            )
+            .await?;
         }
         "commercial-review" => {
-            let app=apps::authorized(ctx,actor,id(vars,"app")?).await?;
-            if app.organization_id!=org { return Err(ApiFailure::missing()); }
-            let run=id(vars,"run")?;
-            let row=crate::services::execution_store::one(&ctx.db,"SELECT app_id FROM execution_runs WHERE id=$1",vec![run.into()]).await?;
-            if crate::services::execution_store::field::<Uuid>(&row,"app_id")?!=app.id { return Err(ApiFailure::missing()); }
-            let decision=match arg(vars,"decision")? {
-                "delivered"=>mobile_qa_contracts::commercial::CommercialUsageState::Delivered,
-                "credited"=>mobile_qa_contracts::commercial::CommercialUsageState::Credited,
-                _=>return Err(ApiFailure::invalid("Decision must be delivered or credited")),
+            let app = apps::authorized(ctx, actor, id(vars, "app")?).await?;
+            if app.organization_id != org {
+                return Err(ApiFailure::missing());
+            }
+            let run = id(vars, "run")?;
+            let row = execution_runs::Entity::find_by_id(run)
+                .one(&ctx.db)
+                .await?
+                .ok_or_else(ApiFailure::missing)?;
+            if row.app_id != app.id {
+                return Err(ApiFailure::missing());
+            }
+            let decision = match arg(vars, "decision")? {
+                "delivered" => mobile_qa_contracts::commercial::CommercialUsageState::Delivered,
+                "credited" => mobile_qa_contracts::commercial::CommercialUsageState::Credited,
+                _ => {
+                    return Err(ApiFailure::invalid(
+                        "Decision must be delivered or credited",
+                    ))
+                }
             };
-            commercial::review(ctx,actor,run,decision,arg(vars,"reason")?).await?;
+            commercial::review(ctx, actor, run, decision, arg(vars, "reason")?).await?;
         }
         "commercial-reconcile" => {
-            let app=apps::authorized(ctx,actor,id(vars,"app")?).await?;
-            if app.organization_id!=org { return Err(ApiFailure::missing()); }
-            let summary=commercial::status(ctx,actor,app.id).await?;
-            let base=summary.agreement.as_ref().map_or(0,|agreement|agreement.base_cents);
-            let add_on=summary.agreement.as_ref().map_or(0,|agreement|agreement.second_suite_cents);
+            let app = apps::authorized(ctx, actor, id(vars, "app")?).await?;
+            if app.organization_id != org {
+                return Err(ApiFailure::missing());
+            }
+            let summary = commercial::status(ctx, actor, app.id).await?;
+            let base = summary
+                .agreement
+                .as_ref()
+                .map_or(0, |agreement| agreement.base_cents);
+            let add_on = summary
+                .agreement
+                .as_ref()
+                .map_or(0, |agreement| agreement.second_suite_cents);
             println!("app_id={},state={:?},base_cents={},second_suite_cents={},delivered_check_cents={},subtotal_cents={},delivered_checks={},reserved_checks={},credited_checks={}",app.id,summary.state,base,add_on,summary.delivered_check_cents,base+add_on+summary.delivered_check_cents,summary.delivered_checks,summary.reserved_checks,summary.credited_checks);
-            for item in summary.usage { println!("run_id={},state={:?},amount_cents={},reason={:?}",item.run_id,item.state,item.amount_cents,item.reason); }
+            for item in summary.usage {
+                println!(
+                    "run_id={},state={:?},amount_cents={},reason={:?}",
+                    item.run_id, item.state, item.amount_cents, item.reason
+                );
+            }
         }
         "commercial-pilot-requests" => {
-            for row in crate::services::execution_store::rows(&ctx.db,"SELECT p.id,p.app_id,p.actor_id,p.coverage_note,p.created_at FROM commercial_pilot_requests p JOIN apps a ON a.id=p.app_id WHERE a.organization_id=$1 ORDER BY p.created_at DESC",vec![org.into()]).await? {
-                use crate::services::execution_store::field;
-                println!("request_id={},app_id={},actor_id={},created_at={},coverage_note={}",field::<Uuid>(&row,"id")?,field::<Uuid>(&row,"app_id")?,field::<Uuid>(&row,"actor_id")?,field::<DateTime<Utc>>(&row,"created_at")?,field::<String>(&row,"coverage_note")?);
+            let app_ids = app_rows::Entity::find()
+                .select_only()
+                .column(app_rows::Column::Id)
+                .filter(app_rows::Column::OrganizationId.eq(org))
+                .into_tuple::<Uuid>()
+                .all(&ctx.db)
+                .await?;
+            for row in commercial_pilot_requests::Entity::find()
+                .filter(commercial_pilot_requests::Column::AppId.is_in(app_ids))
+                .order_by_desc(commercial_pilot_requests::Column::CreatedAt)
+                .all(&ctx.db)
+                .await?
+            {
+                println!(
+                    "request_id={},app_id={},actor_id={},created_at={},coverage_note={}",
+                    row.id, row.app_id, row.actor_id, row.created_at, row.coverage_note
+                );
             }
         }
         "link-google" => {

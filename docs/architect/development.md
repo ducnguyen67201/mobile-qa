@@ -139,6 +139,16 @@ measured check time warrants them; a folder alone is not a compilation boundary.
 No cloud/device/model tests run in CI. Local commands retain the explicit full-final-check
 option; nothing starts checks during editing.
 
+### ORM persistence boundary
+
+Backend persistence under `apps/api` must use SeaORM entities/active models or typed
+SeaQuery migration builders. Do not add `Statement`, raw connection query/execute APIs,
+`execute_unprepared`, `Expr::cust` or SQL DDL/DML string literals. The
+`orm_boundary` integration test scans API source, tests and migrations for these escape
+hatches. PostgreSQL database bootstrap in `infra/postgres/init.sql` and the process
+supervisor's readiness probe are operational boundaries that run before or outside the
+Rust application connection and are not substitutes for application persistence.
+
 The [status record](status.md) records local and hosted evidence. Browser admin policy
 verification previously denied access: do not use alternate browser/Playwright/HTTP
 workarounds to evade it. Rendered keyboard/Retry/HMR acceptance remains explicitly

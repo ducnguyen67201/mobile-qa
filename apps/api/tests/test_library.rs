@@ -2,7 +2,13 @@
 //! app/profile/grants; every customer definition mutation goes through the router.
 mod support;
 use axum::http::StatusCode;
-use mobile_qa::services::{execution_store::*, test_definitions as defs, test_library as library};
+use mobile_qa::{
+    models::_entities::{
+        app_memberships, execution_approvals, execution_definitions, execution_reviewer_grants,
+        memberships, test_library_drafts, test_library_mutations, test_library_versions,
+    },
+    services::{execution_store::hash, test_definitions as defs, test_library as library},
+};
 use mobile_qa_contracts::{execution::*, test_library::*};
 use support::*;
 
@@ -88,13 +94,16 @@ async fn newer_saved_formats_do_not_break_the_catalog() {
     request::<App, _, _>(|server, ctx| async move {
         let (owner, app, _) = setup(&server, &ctx).await;
         let suite = create(&server, &owner, app, DefinitionKind::Suite, None).await;
-        exec(
-            &ctx.db,
-            "UPDATE test_library_drafts SET payload=jsonb_set(payload,'{content,members}','[]'::jsonb,true) WHERE entry_id=$1",
-            vec![suite.entry.id.into()],
-        )
-        .await
-        .unwrap();
+        let row = test_library_drafts::Entity::find_by_id(suite.entry.id)
+            .one(&ctx.db)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut payload = row.payload.clone();
+        payload["content"]["members"] = serde_json::json!([]);
+        let mut active: test_library_drafts::ActiveModel = row.into();
+        active.payload = Set(payload);
+        active.update(&ctx.db).await.unwrap();
 
         let definition: TestDefinition = serde_json::from_str(include_str!(
             "../../../contracts/fixtures/execution/persistence-case.json"
@@ -110,20 +119,27 @@ async fn newer_saved_formats_do_not_break_the_catalog() {
         )
         .await
         .unwrap();
-        exec(
-            &ctx.db,
-            "UPDATE execution_definitions SET payload=jsonb_set(payload,'{content,schema_version}','2'::jsonb,true) WHERE id=$1",
-            vec![imported.id.into()],
-        )
-        .await
-        .unwrap();
+        let row = execution_definitions::Entity::find_by_id(imported.id)
+            .one(&ctx.db)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut payload = row.payload.clone();
+        payload["content"]["schema_version"] = serde_json::json!("2");
+        let mut active: execution_definitions::ActiveModel = row.into();
+        active.payload = Set(payload);
+        active.update(&ctx.db).await.unwrap();
 
         let listed = owner
             .read(server.get(&format!("{}?kind=suite&archived=false", base(app))))
             .await;
         listed.assert_status_ok();
         let listed = listed.json::<LibraryListResponse>();
-        let entry = listed.items.iter().find(|item| item.id == suite.entry.id).unwrap();
+        let entry = listed
+            .items
+            .iter()
+            .find(|item| item.id == suite.entry.id)
+            .unwrap();
         assert!(entry.needs_setup);
         assert!(!entry.capabilities.can_edit);
 
@@ -131,7 +147,10 @@ async fn newer_saved_formats_do_not_break_the_catalog() {
             .read(server.get(&format!("{}/options", base(app))))
             .await;
         options.assert_status_ok();
-        assert!(options.json::<LibraryOptionsResponse>().saved_versions.is_empty());
+        assert!(options
+            .json::<LibraryOptionsResponse>()
+            .saved_versions
+            .is_empty());
 
         let draft = owner
             .read(server.get(&format!("{}/{}/draft", base(app), suite.entry.id)))
@@ -233,76 +252,214 @@ async fn save_is_atomic_editable_idempotent_and_preserves_versions() {
 #[tokio::test]
 async fn members_save_cases_suites_and_plans_without_grants_and_pins_stay_fixed() {
     let _guard = DATABASE_BOOT.lock().await;
-    request::<App,_,_>(|server,ctx| async move {
-        let (owner,app,profile)=setup(&server,&ctx).await;
-        let member=login(&server,&ctx).await;
-        exec(&ctx.db,"INSERT INTO memberships(id,user_id,organization_id,role,active) VALUES($1,$2,$3,'member',true)",vec![Uuid::new_v4().into(),member.user.into(),owner.org.into()]).await.unwrap();
-        exec(&ctx.db,"INSERT INTO app_memberships(id,user_id,organization_id,app_id) VALUES($1,$2,$3,$4)",vec![Uuid::new_v4().into(),member.user.into(),owner.org.into(),app.into()]).await.unwrap();
-        let c=create(&server,&member,app,DefinitionKind::Case,Some(profile)).await;
-        let mut c=save(&server,&member,app,&c).await;
-        let case_id=c.saved_version_id.unwrap();
-        let selection=CaseSelection{case_version_id:case_id,data_variant:"default".into(),required:true};
-        let mut suite=create(&server,&member,app,DefinitionKind::Suite,None).await;
-        if let LibraryDraftDefinition::Suite(s)=&mut suite.definition{s.title="Suite".into();s.cases=vec![selection.clone()];}
-        suite=save(&server,&member,app,&suite).await;
-        let mut plan=create(&server,&member,app,DefinitionKind::Plan,Some(profile)).await;
-        if let LibraryDraftDefinition::Plan(p)=&mut plan.definition{p.title="Plan".into();p.suite_version_ids=vec![suite.saved_version_id.unwrap()];p.cases=vec![selection.clone()];}
-        plan=save(&server,&member,app,&plan).await;
-        let first=plan.saved_version_id.unwrap();
-        let frozen=defs::get(&ctx.db,app,first).await.unwrap();
-        let TestDefinition::Plan(p)=&frozen.definition else {panic!()};
-        assert_eq!(defs::resolve(&ctx.db,app,p).await.unwrap().len(),1);
-        let default_path=format!("/api/apps/{app}/default-test-plan");
-        let default=SetDefaultPlanRequest{mutation_id:Uuid::new_v4(),expected_revision:0,plan_version_id:first};
-        failure(&member.write(server.put(&default_path)).json(&default).await,403);
-        owner.write(server.put(&default_path)).json(&default).await.assert_status_ok();
-        if let LibraryDraftDefinition::Case(c)=&mut c.definition{c.title="Changed case".into();}
-        c=save(&server,&member,app,&c).await;
-        if let LibraryDraftDefinition::Plan(p)=&mut plan.definition{p.title="Changed plan".into();}
-        plan=save(&server,&member,app,&plan).await;assert_ne!(plan.saved_version_id,Some(first));
-        assert_eq!(library::default_plan(&ctx.db,app).await.unwrap().plan_version_id,Some(first));
-        assert_eq!(defs::resolve(&ctx.db,app,p).await.unwrap()[0].definition_id,case_id);
+    request::<App, _, _>(|server, ctx| async move {
+        let (owner, app, profile) = setup(&server, &ctx).await;
+        let member = login(&server, &ctx).await;
+        memberships::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            user_id: Set(member.user),
+            organization_id: Set(owner.org),
+            role: Set("member".into()),
+            active: Set(true),
+        }
+        .insert(&ctx.db)
+        .await
+        .unwrap();
+        app_memberships::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            user_id: Set(member.user),
+            organization_id: Set(owner.org),
+            app_id: Set(app),
+        }
+        .insert(&ctx.db)
+        .await
+        .unwrap();
+        let c = create(&server, &member, app, DefinitionKind::Case, Some(profile)).await;
+        let mut c = save(&server, &member, app, &c).await;
+        let case_id = c.saved_version_id.unwrap();
+        let selection = CaseSelection {
+            case_version_id: case_id,
+            data_variant: "default".into(),
+            required: true,
+        };
+        let mut suite = create(&server, &member, app, DefinitionKind::Suite, None).await;
+        if let LibraryDraftDefinition::Suite(s) = &mut suite.definition {
+            s.title = "Suite".into();
+            s.cases = vec![selection.clone()];
+        }
+        suite = save(&server, &member, app, &suite).await;
+        let mut plan = create(&server, &member, app, DefinitionKind::Plan, Some(profile)).await;
+        if let LibraryDraftDefinition::Plan(p) = &mut plan.definition {
+            p.title = "Plan".into();
+            p.suite_version_ids = vec![suite.saved_version_id.unwrap()];
+            p.cases = vec![selection.clone()];
+        }
+        plan = save(&server, &member, app, &plan).await;
+        let first = plan.saved_version_id.unwrap();
+        let frozen = defs::get(&ctx.db, app, first).await.unwrap();
+        let TestDefinition::Plan(p) = &frozen.definition else {
+            panic!()
+        };
+        assert_eq!(defs::resolve(&ctx.db, app, p).await.unwrap().len(), 1);
+        let default_path = format!("/api/apps/{app}/default-test-plan");
+        let default = SetDefaultPlanRequest {
+            mutation_id: Uuid::new_v4(),
+            expected_revision: 0,
+            plan_version_id: first,
+        };
+        failure(
+            &member.write(server.put(&default_path)).json(&default).await,
+            403,
+        );
+        owner
+            .write(server.put(&default_path))
+            .json(&default)
+            .await
+            .assert_status_ok();
+        if let LibraryDraftDefinition::Case(c) = &mut c.definition {
+            c.title = "Changed case".into();
+        }
+        c = save(&server, &member, app, &c).await;
+        if let LibraryDraftDefinition::Plan(p) = &mut plan.definition {
+            p.title = "Changed plan".into();
+        }
+        plan = save(&server, &member, app, &plan).await;
+        assert_ne!(plan.saved_version_id, Some(first));
+        assert_eq!(
+            library::default_plan(&ctx.db, app)
+                .await
+                .unwrap()
+                .plan_version_id,
+            Some(first)
+        );
+        assert_eq!(
+            defs::resolve(&ctx.db, app, p).await.unwrap()[0].definition_id,
+            case_id
+        );
         // Technical conflicts stay visible on an incomplete saved edit.
-        if let LibraryDraftDefinition::Plan(p)=&mut plan.definition{p.cases.push(CaseSelection{required:false,..selection});}
-        plan=save(&server,&member,app,&plan).await;
-        assert!(plan.saved_version_id.is_none());assert!(plan.issues.iter().any(|i|i.code==LibraryIssueCode::ConflictingSelection));
-        owner.write(server.post(&format!("{}/{}/archive",base(app),c.entry.id))).json(&ArchiveLibraryEntryRequest{mutation_id:Uuid::new_v4(),expected_revision:c.entry.revision,archived:true}).await.assert_status_ok();
-        assert!(defs::resolve(&ctx.db,app,p).await.is_err());
-        assert_eq!(defs::get(&ctx.db,app,first).await.unwrap(),frozen);
-        assert!(rows(&ctx.db,"SELECT * FROM execution_reviewer_grants WHERE app_id=$1",vec![app.into()]).await.unwrap().is_empty());
-        assert!(rows(&ctx.db,"SELECT a.* FROM execution_approvals a JOIN execution_definitions d ON d.id=a.definition_id WHERE d.app_id=$1",vec![app.into()]).await.unwrap().is_empty());
-    }).await;
+        if let LibraryDraftDefinition::Plan(p) = &mut plan.definition {
+            p.cases.push(CaseSelection {
+                required: false,
+                ..selection
+            });
+        }
+        plan = save(&server, &member, app, &plan).await;
+        assert!(plan.saved_version_id.is_none());
+        assert!(plan
+            .issues
+            .iter()
+            .any(|i| i.code == LibraryIssueCode::ConflictingSelection));
+        owner
+            .write(server.post(&format!("{}/{}/archive", base(app), c.entry.id)))
+            .json(&ArchiveLibraryEntryRequest {
+                mutation_id: Uuid::new_v4(),
+                expected_revision: c.entry.revision,
+                archived: true,
+            })
+            .await
+            .assert_status_ok();
+        assert!(defs::resolve(&ctx.db, app, p).await.is_err());
+        assert_eq!(defs::get(&ctx.db, app, first).await.unwrap(), frozen);
+        assert!(execution_reviewer_grants::Entity::find()
+            .filter(execution_reviewer_grants::Column::AppId.eq(app))
+            .all(&ctx.db)
+            .await
+            .unwrap()
+            .is_empty());
+        let definition_ids = execution_definitions::Entity::find()
+            .filter(execution_definitions::Column::AppId.eq(app))
+            .all(&ctx.db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|definition| definition.id)
+            .collect::<Vec<_>>();
+        assert!(execution_approvals::Entity::find()
+            .filter(execution_approvals::Column::DefinitionId.is_in(definition_ids))
+            .all(&ctx.db)
+            .await
+            .unwrap()
+            .is_empty());
+    })
+    .await;
 }
 #[tokio::test]
 async fn legacy_review_states_are_editable_and_old_receipts_fail_closed() {
     let _guard = DATABASE_BOOT.lock().await;
-    request::<App,_,_>(|server,ctx| async move {
-        let (owner,app,profile)=setup(&server,&ctx).await;
-        for state in ["in_review","needs_input","rejected","approved"] {
-            let initial=create(&server,&owner,app,DefinitionKind::Case,Some(profile)).await;
-            let saved=save(&server,&owner,app,&initial).await;
-            let id=saved.saved_version_id.unwrap();
-            exec(&ctx.db,"UPDATE test_library_versions SET legacy_review_state=$2 WHERE definition_id=$1",vec![id.into(),state.into()]).await.unwrap();
-            exec(&ctx.db,"DELETE FROM test_library_drafts WHERE entry_id=$1",vec![saved.entry.id.into()]).await.unwrap();
-            library::admitted(&ctx.db,app,id).await.unwrap();
-            let current=library::draft(&ctx.db,owner.user,app,saved.entry.id).await.unwrap();
-            assert_eq!(current.saved_version_id,Some(id));
-            let again=save(&server,&owner,app,&current).await;assert_eq!(again.saved_version_id,Some(id));
+    request::<App, _, _>(|server, ctx| async move {
+        let (owner, app, profile) = setup(&server, &ctx).await;
+        for state in ["in_review", "needs_input", "rejected", "approved"] {
+            let initial = create(&server, &owner, app, DefinitionKind::Case, Some(profile)).await;
+            let saved = save(&server, &owner, app, &initial).await;
+            let id = saved.saved_version_id.unwrap();
+            let row = test_library_versions::Entity::find_by_id(id)
+                .one(&ctx.db)
+                .await
+                .unwrap()
+                .unwrap();
+            let mut active: test_library_versions::ActiveModel = row.into();
+            active.legacy_review_state = Set(Some(state.into()));
+            active.update(&ctx.db).await.unwrap();
+            test_library_drafts::Entity::delete_by_id(saved.entry.id)
+                .exec(&ctx.db)
+                .await
+                .unwrap();
+            library::admitted(&ctx.db, app, id).await.unwrap();
+            let current = library::draft(&ctx.db, owner.user, app, saved.entry.id)
+                .await
+                .unwrap();
+            assert_eq!(current.saved_version_id, Some(id));
+            let again = save(&server, &owner, app, &current).await;
+            assert_eq!(again.saved_version_id, Some(id));
         }
-        let draft=create(&server,&owner,app,DefinitionKind::Case,None).await;
-        let mutation_id=Uuid::new_v4();
-        let input=SaveLibraryDraftRequest{mutation_id,expected_revision:draft.entry.revision,definition:draft.definition.clone()};
-        let old=serde_json::json!({"operation":"save","request":[draft.entry.id,input]});
-        let fingerprint=hash(serde_json::to_vec(&old).unwrap());
-        exec(&ctx.db,"INSERT INTO test_library_mutations(app_id,actor_id,mutation_id,fingerprint,response) VALUES($1,$2,$3,$4,$5)",vec![app.into(),owner.user.into(),mutation_id.into(),fingerprint.into(),serde_json::json!({"legacy":"receipt preserved"}).into()]).await.unwrap();
-        let path=format!("{}/{}/draft",base(app),draft.entry.id);
-        assert_eq!(failure(&owner.write(server.put(&path)).json(&input).await,409).code,"idempotency_conflict");
+        let draft = create(&server, &owner, app, DefinitionKind::Case, None).await;
+        let mutation_id = Uuid::new_v4();
+        let input = SaveLibraryDraftRequest {
+            mutation_id,
+            expected_revision: draft.entry.revision,
+            definition: draft.definition.clone(),
+        };
+        let old = serde_json::json!({"operation":"save","request":[draft.entry.id,input]});
+        let fingerprint = hash(serde_json::to_vec(&old).unwrap());
+        test_library_mutations::ActiveModel {
+            app_id: Set(app),
+            actor_id: Set(owner.user),
+            mutation_id: Set(mutation_id),
+            fingerprint: Set(fingerprint),
+            response: Set(serde_json::json!({"legacy":"receipt preserved"})),
+            ..Default::default()
+        }
+        .insert(&ctx.db)
+        .await
+        .unwrap();
+        let path = format!("{}/{}/draft", base(app), draft.entry.id);
+        assert_eq!(
+            failure(&owner.write(server.put(&path)).json(&input).await, 409).code,
+            "idempotency_conflict"
+        );
         // Authorization is rechecked even for an otherwise valid replay.
-        let fresh=SaveLibraryDraftRequest{mutation_id:Uuid::new_v4(),..input};
-        owner.write(server.put(&path)).json(&fresh).await.assert_status_ok();
-        exec(&ctx.db,"UPDATE memberships SET active=false WHERE organization_id=$1 AND user_id=$2",vec![owner.org.into(),owner.user.into()]).await.unwrap();
-        failure(&owner.write(server.put(&path)).json(&fresh).await,404);
-    }).await;
+        let fresh = SaveLibraryDraftRequest {
+            mutation_id: Uuid::new_v4(),
+            ..input
+        };
+        owner
+            .write(server.put(&path))
+            .json(&fresh)
+            .await
+            .assert_status_ok();
+        let row = memberships::Entity::find()
+            .filter(memberships::Column::OrganizationId.eq(owner.org))
+            .filter(memberships::Column::UserId.eq(owner.user))
+            .one(&ctx.db)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut active: memberships::ActiveModel = row.into();
+        active.active = Set(false);
+        active.update(&ctx.db).await.unwrap();
+        failure(&owner.write(server.put(&path)).json(&fresh).await, 404);
+    })
+    .await;
 }
 #[tokio::test]
 async fn concurrent_saves_scope_csrf_and_actual_route_contracts() {
@@ -410,53 +567,4 @@ async fn concurrent_saves_scope_csrf_and_actual_route_contracts() {
             .is_empty());
     })
     .await;
-}
-
-#[tokio::test]
-async fn migration_backfill_preserves_legacy_ids_hashes_approvals_and_reports() {
-    use migration::{MigrationTrait, SchemaManager};
-    use sea_orm::{ConnectionTrait, TransactionTrait};
-    let _guard = DATABASE_BOOT.lock().await;
-    request::<App,_,_>(|_server,ctx|async move {
-        let tx=ctx.db.begin().await.unwrap();
-        // A transaction-local schema keeps upgrade fixtures away from other tests
-        // and is rolled back even if an assertion fails.
-        let schema=format!("library_upgrade_{}",Uuid::new_v4().simple());
-        tx.execute_unprepared(&format!("CREATE SCHEMA {schema}; SET LOCAL search_path TO {schema};")).await.unwrap();
-        tx.execute_unprepared("CREATE TABLE users(id UUID PRIMARY KEY); CREATE TABLE apps(id UUID PRIMARY KEY);
-          CREATE TABLE execution_definitions(id UUID PRIMARY KEY, app_id UUID, kind TEXT,logical_key TEXT,version INTEGER,content_hash TEXT,payload JSONB,author_id UUID,created_at TIMESTAMPTZ);
-          CREATE TABLE execution_approvals(definition_id UUID,purpose TEXT,actor_id UUID,content_hash TEXT,approved_at TIMESTAMPTZ);
-          CREATE TABLE execution_profiles(id UUID,app_id UUID);
-          CREATE TABLE execution_runs(id UUID,manifest JSONB);").await.unwrap();
-        let actor=Uuid::new_v4();let app=Uuid::new_v4();let case=Uuid::new_v4();let plan=Uuid::new_v4();let profile=Uuid::new_v4();
-        exec(&tx,"INSERT INTO users VALUES($1)",vec![actor.into()]).await.unwrap();
-        exec(&tx,"INSERT INTO apps VALUES($1)",vec![app.into()]).await.unwrap();
-        exec(&tx,"INSERT INTO execution_profiles VALUES($1,$2)",vec![profile.into(),app.into()]).await.unwrap();
-        let payload:serde_json::Value=serde_json::from_str(include_str!("../../../contracts/fixtures/execution/persistence-case.json")).unwrap();
-        exec(&tx,"INSERT INTO execution_definitions VALUES($1,
-        $2,'case','TASK-PERSIST',1,'unchanged-case-hash', $3, $4, now())",vec![case.into(),app.into(),payload.clone().into(),actor.into()]).await.unwrap();
-        let plan_payload=serde_json::json!({"kind":"plan","content":{"profile_id":profile,"cases":[{"case_version_id":case}],"suite_version_ids":[]}});
-        exec(&tx,"INSERT INTO execution_definitions VALUES($1,$2,'plan','release',3,'unchanged-plan-hash',$3,$4,now())",vec![plan.into(),app.into(),plan_payload.into(),actor.into()]).await.unwrap();
-        for (id,digest) in [(case,"unchanged-case-hash"),(plan,"unchanged-plan-hash")] {
-            for purpose in ["business","executability"] {exec(&tx,"INSERT INTO execution_approvals VALUES($1,$2,$3,$4,now())",vec![id.into(),purpose.into(),actor.into(),digest.into()]).await.unwrap();}
-        }
-        let manifest=serde_json::json!({"plan_version_id":plan,"case_version_id":case,"historical":"unchanged"});
-        exec(&tx,"INSERT INTO execution_runs VALUES($1,$2)",vec![Uuid::new_v4().into(),manifest.clone().into()]).await.unwrap();
-        migration::m20260912_000005_test_library::Migration.up(&SchemaManager::new(&tx)).await.unwrap();
-        migration::m20260920_000008_save_without_reviews::Migration.up(&SchemaManager::new(&tx)).await.unwrap();
-        let linked=one(&tx,"SELECT e.next_version, v.legacy_review_state, d.payload, d.content_hash FROM test_library_entries e
-        JOIN test_library_versions v ON v.entry_id=e.id JOIN execution_definitions d ON
-        d.id=v.definition_id WHERE d.id=$1",vec![case.into()]).await.unwrap();
-        assert_eq!(field::<i32>(&linked,"next_version").unwrap(),2);assert_eq!(field::<String>(&linked,"legacy_review_state").unwrap(),"approved");
-        assert_eq!(field::<String>(&linked,"content_hash").unwrap(),"unchanged-case-hash");assert_eq!(field::<serde_json::Value>(&linked,"payload").unwrap(),payload);
-        assert_eq!(library::default_plan(&tx,app).await.unwrap().plan_version_id,Some(plan));
-        assert_eq!(rows(&tx,"SELECT * FROM test_library_review_events",vec![]).await.unwrap().len(),4);
-        assert_eq!(field::<serde_json::Value>(&one(&tx,"SELECT manifest FROM execution_runs",vec![]).await.unwrap(),"manifest").unwrap(),manifest);
-        // The forward migration is reversible only while every row has legacy audit state.
-        migration::m20260920_000008_save_without_reviews::Migration.down(&SchemaManager::new(&tx)).await.unwrap();
-        migration::m20260920_000008_save_without_reviews::Migration.up(&SchemaManager::new(&tx)).await.unwrap();
-        exec(&tx,"UPDATE test_library_versions SET legacy_review_state=NULL WHERE definition_id=$1",vec![case.into()]).await.unwrap();
-        assert!(migration::m20260920_000008_save_without_reviews::Migration.down(&SchemaManager::new(&tx)).await.is_err());
-        tx.rollback().await.unwrap();
-    }).await;
 }

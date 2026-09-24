@@ -1,15 +1,15 @@
-# Graph Report - mobile-qa  (2026-09-22)
+# Graph Report - mobile-qa  (2026-09-24)
 
 ## Corpus Check
 - cluster-only mode — file stats not available
 
 ## Summary
-- 2821 nodes · 7998 edges · 164 communities (118 shown, 29 thin omitted)
-- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 598 edges (avg confidence: 0.87)
+- 3809 nodes · 10245 edges · 247 communities (168 shown, 63 thin omitted)
+- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 651 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `402e9caf`
+- Built from commit: `cd7cae7d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -131,6 +131,7 @@
 - Community 114
 - Community 115
 - Community 116
+- Community 117
 - Community 118
 - Community 119
 - Community 120
@@ -155,533 +156,816 @@
 - Community 139
 - Community 140
 - Community 141
+- Community 142
 - Community 143
 - Community 144
 - Community 145
 - Community 146
 - Community 147
+- Community 148
+- Community 149
+- Community 150
+- Community 151
+- Community 152
+- Community 153
+- Community 154
+- Community 155
+- Community 156
+- Community 157
+- Community 158
+- Community 159
+- Community 160
+- Community 161
+- Community 162
 - Community 163
+- Community 164
+- Community 165
+- Community 167
+- Community 168
+- Community 169
+- Community 170
+- Community 171
+- Community 172
+- Community 173
+- Community 174
+- Community 175
+- Community 176
+- Community 177
+- Community 178
+- Community 179
+- Community 180
+- Community 181
+- Community 182
+- Community 183
+- Community 184
+- Community 185
+- Community 186
+- Community 187
+- Community 188
+- Community 189
+- Community 190
+- Community 191
+- Community 192
+- Community 193
+- Community 194
+- Community 195
+- Community 196
+- Community 197
+- Community 198
+- Community 199
+- Community 200
+- Community 201
+- Community 202
+- Community 203
+- Community 204
+- Community 205
+- Community 206
+- Community 207
+- Community 208
+- Community 209
+- Community 210
+- Community 211
+- Community 212
+- Community 213
+- Community 214
+- Community 215
+- Community 216
+- Community 217
+- Community 218
+- Community 219
+- Community 220
+- Community 221
+- Community 222
+- Community 223
+- Community 224
+- Community 225
+- Community 226
+- Community 227
+- Community 228
+- Community 229
+- Community 230
+- Community 246
 
 ## God Nodes (most connected - your core abstractions)
-1. `QualificationError` - 179 edges
-2. `field()` - 84 edges
-3. `one()` - 76 edges
-4. `exec()` - 71 edges
-5. `Profile` - 62 edges
-6. `useWorkspace()` - 62 edges
-7. `rows()` - 61 edges
-8. `@mantine/core` - 60 edges
-9. `checked()` - 58 edges
-10. `Session` - 49 edges
+1. `QualificationError` - 255 edges
+2. `Profile` - 71 edges
+3. `checked()` - 65 edges
+4. `useWorkspace()` - 62 edges
+5. `@mantine/core` - 60 edges
+6. `Session` - 49 edges
+7. `decode()` - 48 edges
+8. `Evidence` - 47 edges
+9. `@tanstack/react-query` - 47 edges
+10. `AndroidDevice` - 43 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `qualify()` --uses--> `Evidence`  [INFERRED]
   scripts/regression_acceptance.py → apps/mobile-worker/src/mobile_qa_worker/qualification/evidence.py
 - `qualify()` --uses--> `AndroidDevice`  [INFERRED]
   scripts/regression_acceptance.py → apps/mobile-worker/src/mobile_qa_worker/device/android.py
-- `qualify()` --calls--> `host_lock()`  [INFERRED]
-  scripts/regression_acceptance.py → apps/mobile-worker/src/mobile_qa_worker/qualification/process.py
-- `qualify()` --calls--> `check()`  [INFERRED]
-  scripts/regression_acceptance.py → apps/mobile-worker/src/mobile_qa_worker/automation/direct.py
 - `create()` --indirect_call--> `profile()`  [INFERRED]
   scripts/test_library_smoke.py → apps/mobile-worker/tests/test_device.py
+- `task()` --indirect_call--> `client()`  [INFERRED]
+  apps/mobile-worker/src/mobile_qa_worker/authoring/minitap_discovery.py → scripts/app_setup_smoke.py
+- `load()` --indirect_call--> `client()`  [INFERRED]
+  apps/mobile-worker/src/mobile_qa_worker/artifacts/delivery.py → scripts/app_setup_smoke.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (164 total, 29 thin omitted)
+## Communities (247 total, 63 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.06
-Nodes (98): archive(), create(), default_plan(), draft(), entry(), list(), options(), ApiResult (+90 more)
+Cohesion: 0.05
+Nodes (122): action(), bearer(), cleanup(), grant(), heartbeat(), hint(), register(), ApiResult (+114 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.05
-Nodes (80): every_declared_route_requires_the_declared_security_and_errors(), google_identity_binding_expiry_replay_and_password_removal(), persisted_workflow_auth_scope_and_real_validation(), public_registration_approval_and_multiple_workspace_isolation(), rejection_recovery_and_infrastructure_failure(), throttles_quota_and_revision_scope(), expired_agreement_can_be_closed_before_a_new_period(), pilot_quote_authorization_replay_cancel_credit_and_tenant_isolation() (+72 more)
+Nodes (106): artifact(), cancel(), case_create(), case_preview(), create(), detail(), history(), HistoryQuery (+98 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.06
-Nodes (47): mocks, mocks, issue, attempt(), authentication, backendUnavailable, invalidPassword, options (+39 more)
+Cohesion: 0.07
+Nodes (95): build(), BuildQuery, claim(), cleanup(), complete(), delivery(), events(), heartbeat() (+87 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.07
-Nodes (53): DiscoveryBroker, explore(), Path, Parent-owned discovery effects. The SDK receives observations, never device…, Bounded pipe protocol; SDK logging goes to /dev/null, never into public…, invoke(), Path, Bounded discovery drives the same direct commands testers record and rerun. (+45 more)
+Cohesion: 0.05
+Nodes (85): every_declared_route_requires_the_declared_security_and_errors(), google_identity_binding_expiry_replay_and_password_removal(), persisted_workflow_auth_scope_and_real_validation(), public_registration_approval_and_multiple_workspace_isolation(), rejection_recovery_and_infrastructure_failure(), throttles_quota_and_revision_scope(), expired_agreement_can_be_closed_before_a_new_period(), paid_period_holds_credits_atomically_and_queued_cancel_releases_them() (+77 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.08
-Nodes (56): commercialAccessQuery(), appQuery(), appsQuery(), App(), AccountMenu(), AppForm(), parseOrigins(), EnvironmentForm() (+48 more)
+Cohesion: 0.05
+Nodes (57): Keep lease authority alive while large transfers and cache checks block the…, DiscoveryBroker, explore(), Path, Parent-owned discovery effects. The SDK receives observations, never device…, Bounded pipe protocol; SDK logging goes to /dev/null, never into public…, invoke(), Path (+49 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.04
-Nodes (62): Owned Android operations, independent of app-specific qualification oracles., device_for(), execute(), png(), Path, Synthetic HTTP-worker evidence. It is never advertised as device qualification., Durable HTTP execution client; separate from the qualification experiment., assignment() (+54 more)
+Nodes (60): assert_ports_available(), Prove we can listen, without treating a closed TCP connection as a live owner., await_start_ack(), Path, Path, SlotAndroidDevice, dispatch(), Path (+52 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.06
-Nodes (61): b64(), client(), google_fixture(), google_sign_in(), main(), provision(), Secret-free HTTP acceptance using owned test accounts/processes and a synthetic…, Ephemeral RSA fixture keys; the API accepts these only in Environment::Test. (+53 more)
+Cohesion: 0.07
+Nodes (82): change_plan(), checkout(), pilot(), quote(), ApiResult, AppContext, HeaderMap, Json (+74 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.04
-Nodes (57): BrokerClient, check_context(), compact(), configure_agent(), bounded_model(), __call__(), direct_tool(), foreground() (+49 more)
+Nodes (62): BrokerClient, check_context(), compact(), configure_agent(), bounded_model(), __call__(), direct_tool(), foreground() (+54 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.09
-Nodes (68): change_plan(), checkout(), pilot(), quote(), ApiResult, AppContext, HeaderMap, Json (+60 more)
+Cohesion: 0.06
+Nodes (49): session, issue, attempt(), authentication, backendUnavailable, invalidPassword, options, plan (+41 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.08
-Nodes (57): doctor(), execute(), Path, Sequential approved actions on the qualified demo adapter, with supervised SDK…, sdk_action(), await_start_ack(), execute(), Path (+49 more)
+Cohesion: 0.06
+Nodes (61): b64(), client(), google_fixture(), google_sign_in(), main(), provision(), Secret-free HTTP acceptance using owned test accounts/processes and a synthetic…, Ephemeral RSA fixture keys; the API accepts these only in Environment::Test. (+53 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.09
-Nodes (61): artifact(), cancel(), case_create(), case_preview(), create(), detail(), history(), HistoryQuery (+53 more)
+Cohesion: 0.08
+Nodes (53): changeCreditPlan(), commercialAccessQuery(), createCreditCheckout(), appsQuery(), createWorkspace(), App(), AccountMenu(), ErrorNotice() (+45 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.08
-Nodes (40): ApiError, ApkMetadata, AppListResponse, AppResponse, ApprovalStatus, AppSummary, BrowserApi, BuildListResponse (+32 more)
+Cohesion: 0.04
+Nodes (42): execute(), png(), Path, Synthetic HTTP-worker evidence. It is never advertised as device qualification., Path, write(), Slot, Path (+34 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.11
-Nodes (42): ApiClientError, archiveLibraryEntry(), createLibraryEntry(), defaultPlanQuery(), libraryDraftQuery(), libraryEntryQuery(), libraryErrorDetails(), libraryHistoryQuery() (+34 more)
+Cohesion: 0.05
+Nodes (38): validate_result(), One-device operator qualification; no production scheduler or customer…, Observation, observe(), Deterministic oracle for the controlled persistence demo, not arbitrary…, validate_png(), verdict(), parametrize (+30 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.06
-Nodes (33): Evidence, Path, Private immutable attempt evidence. A trace filename is never a QA verdict., safe_path(), validate_result(), test_campaign_oracle_never_reaches_runner(), run(), test_campaign_schedule_and_accounting() (+25 more)
+Cohesion: 0.07
+Nodes (42): ApiError, ApkMetadata, AppListResponse, AppResponse, ApprovalStatus, AppSummary, BrowserApi, BuildListResponse (+34 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.08
-Nodes (45): configure_auth(), MAX_APK, AppContext, Config, Environment, Option, PathBuf, Result (+37 more)
+Cohesion: 0.07
+Nodes (39): Sanitize the retained screen and hierarchy before reporting or model access., Owned Android operations, independent of app-specific qualification oracles., device_for(), Explicit app policies. Generic direct execution never uses the demo's backend…, Durable HTTP execution client; separate from the qualification experiment., Supervised direct replay: seal clean-start proof before accepting a mutation., Nonsecret host profile, validated before a command can mutate a device., Device (+31 more)
 
 ### Community 15 - "Community 15"
-Cohesion: 0.12
-Nodes (40): active_assignment(), advertise_execution(), advertise_phone(), eligible_models(), purpose_name(), register(), resolve(), resolve_for_new_work() (+32 more)
+Cohesion: 0.07
+Nodes (51): grant(), require_active_attempt(), ApiResult, Response, String, Uuid, stream(), streams_verified_bytes_and_retains_scratch_until_body_drop() (+43 more)
 
 ### Community 16 - "Community 16"
-Cohesion: 0.11
-Nodes (35): cancelTestGeneration(), generateTests(), runPhoneCommand(), saveAuthoredTests(), templatesQuery(), PhoneWorkspace(), ResizableWorkspace(), commandTarget() (+27 more)
+Cohesion: 0.10
+Nodes (51): doctor(), execute(), Path, Sequential approved actions on the qualified demo adapter, with supervised SDK…, sdk_action(), execute(), accepted(), backend() (+43 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.14
-Nodes (45): String, summary(), verified_required_pass(), ActionKind, ArtifactRequest, AttemptResponse, CaseDefinition, CaseSelection (+37 more)
+Cohesion: 0.10
+Nodes (41): openPhone(), cancelTestGeneration(), generateTests(), runPhoneCommand(), saveAuthoredTests(), templatesQuery(), PhoneWorkspace(), ResizableWorkspace() (+33 more)
 
 ### Community 18 - "Community 18"
 Cohesion: 0.13
-Nodes (43): apply_verified_invoice(), balance(), ceil(), change_plan(), checkout(), conflict(), DEVICE_PER_MINUTE, EVIDENCE_PER_GIB (+35 more)
+Nodes (51): ActionKind, ApprovalPurpose, ArtifactReceipt, ArtifactRequest, AttemptResponse, CaseDefinition, CaseSelection, CheckMethod (+43 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.09
-Nodes (33): host_environment(), Client, NoRedirect, Exception, T, Bounded, same-origin HTTP; generated Pydantic validates every JSON response., TransportError, Path (+25 more)
+Cohesion: 0.07
+Nodes (30): HostClient, UUID, Typed host control transport, distinct from app-bound executor credentials., HostConfig, Path, Operator-owned local configuration; no credentials or customer state belong…, SlotConfig, DeviceServer (+22 more)
 
 ### Community 20 - "Community 20"
-Cohesion: 0.16
-Nodes (36): changeCreditPlan(), createCommercialCheckQuote(), createCreditCheckout(), caseRunPreviewQuery(), createCaseRun(), createSuiteRun(), historyQuery(), suiteRunPreviewQuery() (+28 more)
+Cohesion: 0.11
+Nodes (30): createCommercialCheckQuote(), caseRunPreviewQuery(), createCaseRun(), createSuiteRun(), historyQuery(), suiteRunPreviewQuery(), cancelRun(), createRun() (+22 more)
 
 ### Community 21 - "Community 21"
+Cohesion: 0.12
+Nodes (24): ArtifactStore, local_storage_does_not_mint_remote_capabilities(), private_immutable_publication_and_symlink_rejection(), reserve_scratch(), ApiResult, Arc, DateTime, Drop (+16 more)
+
+### Community 22 - "Community 22"
+Cohesion: 0.13
+Nodes (37): ApiClientError, archiveLibraryEntry(), createLibraryEntry(), defaultPlanQuery(), libraryDraftQuery(), libraryEntryQuery(), libraryErrorDetails(), libraryHistoryQuery() (+29 more)
+
+### Community 23 - "Community 23"
+Cohesion: 0.13
+Nodes (38): active_assignment(), advertise_execution(), advertise_phone(), eligible_models(), purpose_name(), register(), resolve(), resolve_for_new_work() (+30 more)
+
+### Community 24 - "Community 24"
 Cohesion: 0.14
 Nodes (37): AuthoringModelEnvelope, AuthoringModelRequest, AuthoringModelResponse, AuthoringUsage, AutomationSequence, CoverageKind, DirectCommand, DirectTarget (+29 more)
 
-### Community 22 - "Community 22"
-Cohesion: 0.10
-Nodes (29): ApiFailure, DbErr, Error, From, Into, Option, Response, Self (+21 more)
-
-### Community 23 - "Community 23"
-Cohesion: 0.09
-Nodes (20): Explicit app policies. Generic direct execution never uses the demo's backend…, Device, Path, Controlled demo qualification policy layered on owned Android operations., Observation, observe(), Deterministic oracle for the controlled persistence demo, not arbitrary…, validate_png() (+12 more)
-
-### Community 24 - "Community 24"
-Cohesion: 0.10
-Nodes (28): attemptStatus(), buildLibraryCoverageFlow(), buildRunCoverageFlow(), caseCount(), caseVersion(), choiceLabel(), CoverageCanvasEditor(), CoverageFlowModel (+20 more)
-
 ### Community 25 - "Community 25"
-Cohesion: 0.16
-Nodes (27): claim(), claim_wait(), cleanup(), complete(), events(), heartbeat(), lease(), reconcile() (+19 more)
+Cohesion: 0.11
+Nodes (28): appQuery(), buildsQuery(), completeUpload(), createApp(), createUpload(), getUpload(), saveEnvironment(), settingsQuery (+20 more)
 
 ### Community 26 - "Community 26"
+Cohesion: 0.27
+Nodes (35): abort_multipart(), authorize_part(), complete_multipart(), complete_upload(), confirm_part(), create_app(), create_upload(), create_workspace() (+27 more)
+
+### Community 27 - "Community 27"
+Cohesion: 0.11
+Nodes (25): host_environment(), Client, NoRedirect, Exception, Path, T, Bounded binary transfer, with no credential forwarding to signed storage URLs.…, TransportError (+17 more)
+
+### Community 28 - "Community 28"
+Cohesion: 0.18
+Nodes (24): canonical_query(), expired(), field(), hmac(), multipart_control_lifecycle_uses_bounded_fake_provider(), MultipartClient, MultipartPartUrl, MultipartUpload (+16 more)
+
+### Community 29 - "Community 29"
+Cohesion: 0.10
+Nodes (29): attemptStatus(), buildLibraryCoverageFlow(), buildRunCoverageFlow(), caseCount(), caseVersion(), choiceLabel(), CoverageCanvasEditor(), CoverageFlowModel (+21 more)
+
+### Community 30 - "Community 30"
+Cohesion: 0.15
+Nodes (29): archive(), archive_crc_integrity_and_abi_inventory(), attr(), checksum_mismatch_is_infrastructure_not_invalid_apk(), directory(), inspect(), inspect_archive(), Inspection (+21 more)
+
+### Community 31 - "Community 31"
+Cohesion: 0.18
+Nodes (20): ArtifactError, Cache, _continue(), _digest(), installed_source(), _lock(), _lock_file(), _private_directory() (+12 more)
+
+### Community 32 - "Community 32"
+Cohesion: 0.24
+Nodes (30): activate(), active(), Agreement, CHECK_CENTS, commercial_conflict(), credit_queued_cancel(), latest(), PILOT_BASE_CENTS (+22 more)
+
+### Community 33 - "Community 33"
 Cohesion: 0.10
 Nodes (17): AppRoutes, App, AppContext, Box, Config, Environment, Path, Result (+9 more)
 
-### Community 27 - "Community 27"
-Cohesion: 0.29
-Nodes (28): complete_upload(), create_app(), create_upload(), create_workspace(), get_app(), get_build(), get_upload(), google_challenge() (+20 more)
+### Community 34 - "Community 34"
+Cohesion: 0.11
+Nodes (22): Device, parametrize, Deterministic device seam; no emulator, network or model credentials., Rpc, test_cancel_before_action_has_no_effect(), test_capture_shares_active_rpc_instead_of_starting_a_second_instrumentation(), test_literal_set_text_uses_rpc_without_model(), test_rejects_ambiguous_disabled_secret_outside_targets() (+14 more)
 
-### Community 28 - "Community 28"
-Cohesion: 0.12
-Nodes (27): exec(), hash(), json(), one(), rows(), ApiResult, ConnectionTrait, QueryResult (+19 more)
+### Community 35 - "Community 35"
+Cohesion: 0.15
+Nodes (21): cache(), identity(), Deterministic host storage tests: no cloud, Android, or multi-GiB allocation., test_cache_accepts_exact_two_gib_without_allocating_fixture(), test_cache_rejects_symlink_and_invalid_digest(), test_corrupt_entry_is_verified_and_replaced(), test_disk_safety_reserve_is_checked_before_downloading(), test_failed_download_and_bad_digest_leave_no_reusable_or_partial_file() (+13 more)
 
-### Community 29 - "Community 29"
-Cohesion: 0.12
-Nodes (26): evaluate(), observe(), png_valid(), ApiResult, AppContext, Outcome, Result, String (+18 more)
+### Community 36 - "Community 36"
+Cohesion: 0.11
+Nodes (18): capability(), download(), parametrize, Lease-scoped capabilities, bounded transfers, and cancellation without external…, Stream, test_cache_hit_is_authorized_again_and_both_consumers_share_bytes(), test_delivery_identity_mismatch_rejected_before_cache_access(), test_expired_capability_refreshes_authorization_and_bounded_retry() (+10 more)
 
-### Community 30 - "Community 30"
-Cohesion: 0.17
-Nodes (16): ArtifactStore, private_immutable_publication_and_symlink_rejection(), ApiResult, DateTime, File, Option, Path, PathBuf (+8 more)
+### Community 37 - "Community 37"
+Cohesion: 0.34
+Nodes (23): field(), admitted(), authorize(), capabilities(), content_issues(), coverage(), default_plan(), draft() (+15 more)
 
-### Community 31 - "Community 31"
-Cohesion: 0.27
-Nodes (25): build(), BuildQuery, claim(), cleanup(), complete(), events(), heartbeat(), legacy_receipt() (+17 more)
+### Community 38 - "Community 38"
+Cohesion: 0.24
+Nodes (22): assemble(), attempt(), authorize(), cancel(), create(), create_with_quote(), detail(), list() (+14 more)
 
-### Community 32 - "Community 32"
-Cohesion: 0.16
-Nodes (16): buildsQuery(), completeUpload(), getUpload(), ApkUpload(), AttemptReadiness(), BuildDetail(), colors, explanations (+8 more)
+### Community 39 - "Community 39"
+Cohesion: 0.09
+Nodes (21): name, packageManager, private, type, version, eslint, @eslint/js, globals (+13 more)
 
-### Community 33 - "Community 33"
+### Community 40 - "Community 40"
+Cohesion: 0.23
+Nodes (18): ArtifactTransferError, partSha256(), uploadPartBytes(), abortMultipartUpload(), authorizeUploadPart(), completeMultipartUpload(), confirmUploadPart(), getMultipartUpload() (+10 more)
+
+### Community 41 - "Community 41"
 Cohesion: 0.15
 Nodes (12): adapter(), assigned(), case_matches(), duration(), ApiResult, ConnectionTrait, String, Uuid (+4 more)
 
-### Community 34 - "Community 34"
-Cohesion: 0.29
-Nodes (20): field(), assemble(), attempt(), authorize(), cancel(), create(), create_with_quote(), detail() (+12 more)
+### Community 42 - "Community 42"
+Cohesion: 0.22
+Nodes (17): challenge(), cookie_name(), Google, Identity, invalid(), login(), ApiResult, AppContext (+9 more)
 
-### Community 35 - "Community 35"
-Cohesion: 0.11
-Nodes (6): One-device operator qualification; no production scheduler or customer…, UsageRecorder, model(), test_qualification_rejects_non_navigation_model_before_provider_setup(), test_sdk_exact_public_seam(), test_usage_deduplicates_and_keeps_unknown()
+### Community 43 - "Community 43"
+Cohesion: 0.18
+Nodes (13): ApiFailure, DbErr, Error, From, Into, IntoResponse, Option, Response (+5 more)
 
-### Community 36 - "Community 36"
-Cohesion: 0.10
-Nodes (20): name, packageManager, private, type, version, eslint, @eslint/js, globals (+12 more)
-
-### Community 37 - "Community 37"
+### Community 44 - "Community 44"
 Cohesion: 0.32
 Nodes (20): authorized(), create(), detail(), environment(), list(), ListQuery, membership(), origins() (+12 more)
 
-### Community 38 - "Community 38"
-Cohesion: 0.15
-Nodes (18): Explicit bounded AI authoring; ordinary device operations never enter this…, call(), parametrize, Discovery guards with synthetic device effects; the separate SDK fixture uses…, seam(), task(), test_budget_reserves_one_drafting_call_and_counts_unfinished_calls(), test_changed_foreground_and_oversized_context_fail_closed() (+10 more)
-
-### Community 39 - "Community 39"
+### Community 45 - "Community 45"
 Cohesion: 0.10
 Nodes (20): compilerOptions, allowImportingTsExtensions, baseUrl, esModuleInterop, jsx, lib, module, moduleResolution (+12 more)
 
-### Community 40 - "Community 40"
+### Community 46 - "Community 46"
 Cohesion: 0.16
 Nodes (18): ContractProbe, FakeExecutionRequest, FakeExecutionResult, nullable_string_schema(), Outcome, required_nullable(), DateTime, Error (+10 more)
 
-### Community 41 - "Community 41"
-Cohesion: 0.42
-Nodes (19): decode(), authorized(), claim(), detail(), lease(), open(), options(), read() (+11 more)
+### Community 47 - "Community 47"
+Cohesion: 0.38
+Nodes (18): build(), claim(), delivery(), detail(), open(), options(), ApiResult, AppContext (+10 more)
 
-### Community 42 - "Community 42"
-Cohesion: 0.09
-Nodes (11): binaryUpload, completeStatuses, editableDefinition, healthy, implicitDefault, persistedBuild, staleBuild, staleResponse (+3 more)
+### Community 48 - "Community 48"
+Cohesion: 0.23
+Nodes (19): DEADLINE_SECONDS, heartbeat(), LEASE_SECONDS, ApiResult, AppContext, Model, Path, String (+11 more)
 
-### Community 43 - "Community 43"
+### Community 49 - "Community 49"
+Cohesion: 0.16
+Nodes (17): Explicit bounded AI authoring; ordinary device operations never enter this…, call(), parametrize, Discovery guards with synthetic device effects; the separate SDK fixture uses…, seam(), task(), test_budget_reserves_one_drafting_call_and_counts_unfinished_calls(), test_changed_foreground_and_oversized_context_fail_closed() (+9 more)
+
+### Community 50 - "Community 50"
 Cohesion: 0.32
 Nodes (19): OpenPhoneRequest, PhoneBuildChoice, PhoneClaimRequest, PhoneClaimResponse, PhoneControl, PhoneFrame, PhoneLease, PhoneOptions (+11 more)
 
-### Community 44 - "Community 44"
-Cohesion: 0.37
-Nodes (17): build(), claim(), detail(), open(), options(), ApiResult, AppContext, HeaderMap (+9 more)
+### Community 51 - "Community 51"
+Cohesion: 0.13
+Nodes (15): configure_auth(), MAX_APK, AppContext, Arc, Config, Environment, Option, PathBuf (+7 more)
 
-### Community 45 - "Community 45"
+### Community 52 - "Community 52"
+Cohesion: 0.13
+Nodes (17): client(), completion_http_200_error_is_never_success(), CONTROL_RESPONSE_LIMIT, download_capability_has_no_upload_authority(), HASH, KEY, MAX_PARTS, MultipartStart (+9 more)
+
+### Community 53 - "Community 53"
 Cohesion: 0.21
 Nodes (16): arg(), execute(), id(), Operator, ApiResult, AppContext, DateTime, Result (+8 more)
 
-### Community 46 - "Community 46"
-Cohesion: 0.17
-Nodes (11): Device, parametrize, Deterministic device seam; no emulator, network or model credentials., Rpc, test_cancel_before_action_has_no_effect(), test_capture_shares_active_rpc_instead_of_starting_a_second_instrumentation(), test_literal_set_text_uses_rpc_without_model(), test_rejects_ambiguous_disabled_secret_outside_targets() (+3 more)
+### Community 54 - "Community 54"
+Cohesion: 0.16
+Nodes (11): PreparationStopped, PreparationWatch, ValueError, The preparation ended before any device process was launched., test_background_heartbeats_continue_while_preparation_blocks_and_cancel(), heartbeat(), test_cancellation_in_last_inflight_heartbeat_blocks_device_handoff(), test_preparation_rejects_lost_lease_before_download() (+3 more)
 
-### Community 47 - "Community 47"
+### Community 55 - "Community 55"
+Cohesion: 0.27
+Nodes (17): BaselineChoice, CaseComparison, CaseRunPreview, ComparisonKind, ObservationKind, DateTime, Option, Outcome (+9 more)
+
+### Community 56 - "Community 56"
+Cohesion: 0.20
+Nodes (16): hash_valid(), QualificationArtifact, QualificationContracts, QualificationOutcome, QualificationRequest, QualificationReset, QualificationResult, QualificationUsage (+8 more)
+
+### Community 57 - "Community 57"
 Cohesion: 0.28
 Nodes (16): compare(), compares_verified_facts_and_freezes_baseline_identity(), context_matches(), coverage_changes_remain_visible(), eligible(), failed(), manifest_legacy_serialization_is_unchanged(), outcome() (+8 more)
 
-### Community 48 - "Community 48"
+### Community 58 - "Community 58"
 Cohesion: 0.11
 Nodes (18): devDependencies, eslint, @eslint/js, globals, @hey-api/openapi-ts, jsdom, prettier, @testing-library/jest-dom (+10 more)
 
-### Community 49 - "Community 49"
-Cohesion: 0.33
-Nodes (15): action(), cancel(), command(), enqueue(), generate(), job_detail(), ApiResult, AppContext (+7 more)
+### Community 59 - "Community 59"
+Cohesion: 0.29
+Nodes (16): action(), cancel(), command(), enqueue(), generate(), job_detail(), ApiResult, AppContext (+8 more)
 
-### Community 50 - "Community 50"
+### Community 60 - "Community 60"
+Cohesion: 0.24
+Nodes (14): exec(), one(), rows(), ApiResult, ConnectionTrait, Value, Vec, finalize_pending() (+6 more)
+
+### Community 61 - "Community 61"
 Cohesion: 0.42
 Nodes (15): build(), build_response(), complete(), create(), list(), ApiResult, AppContext, ListQuery (+7 more)
 
-### Community 51 - "Community 51"
+### Community 62 - "Community 62"
 Cohesion: 0.23
 Nodes (13): arg(), execute(), Execution, id(), read(), ApiResult, AppContext, Result (+5 more)
 
-### Community 52 - "Community 52"
+### Community 63 - "Community 63"
+Cohesion: 0.16
+Nodes (14): Fixture, FixtureState, receive(), RecordedRequest, Arc, Body, Drop, IntoResponse (+6 more)
+
+### Community 64 - "Community 64"
 Cohesion: 0.25
 Nodes (12): ExecutionContextV1, PreflightAcknowledgement, PreflightReceipt, PreflightRequest, RecoveryEvent, DateTime, Result, String (+4 more)
 
-### Community 53 - "Community 53"
+### Community 65 - "Community 65"
 Cohesion: 0.48
 Nodes (12): cancel(), command(), detail(), generate(), ApiResult, AppContext, Json, Path (+4 more)
 
-### Community 54 - "Community 54"
-Cohesion: 0.21
-Nodes (10): parse_request(), Validate fixture JSON without coercing values such as string versions to…, parametrize, Python half of the shared fixture contract and local CLI checks. No device SDK…, test_cli_invalid_nonzero(), test_cli_json(), test_fake_is_deterministic(), test_invalid_request_rejected() (+2 more)
+### Community 67 - "Community 67"
+Cohesion: 0.24
+Nodes (8): assert_nested_virtualization(), check(), offline_environment(), provider_schema_configuration(), Explicit configuration validation; never apply, plan against AWS, build AMIs or…, Keep the exact version/provider requirements, excluding operational backend.…, DeploymentCheckTests, No network or tools: verify credential removal and the provider schema gate.
 
-### Community 56 - "Community 56"
+### Community 68 - "Community 68"
+Cohesion: 0.21
+Nodes (10): list(), ApiResult, AppContext, Option, String, Uuid, ApiResult, ConnectionTrait (+2 more)
+
+### Community 69 - "Community 69"
+Cohesion: 0.29
+Nodes (10): Dispatcher, ApiResult, AppContext, Option, Self, String, Uuid, sign() (+2 more)
+
+### Community 70 - "Community 70"
 Cohesion: 0.50
 Nodes (12): get(), import(), operator(), profile(), register_profile(), require_case(), resolve(), ApiResult (+4 more)
 
-### Community 57 - "Community 57"
+### Community 71 - "Community 71"
 Cohesion: 0.37
 Nodes (10): apply(), bump(), link_import(), Mutation, ApiResult, AppContext, ConnectionTrait, Option (+2 more)
 
-### Community 58 - "Community 58"
+### Community 72 - "Community 72"
 Cohesion: 0.32
 Nodes (6): android.app.Activity, android.os.Bundle, android.widget.LinearLayout, MainActivity, LinearLayout, Override
 
-### Community 59 - "Community 59"
+### Community 74 - "Community 74"
 Cohesion: 0.20
 Nodes (5): Broker, main(), Offline actual Agent.run_task graph with scripted LangChain model responses,…, ScriptedModel, BaseChatModel
 
-### Community 60 - "Community 60"
+### Community 75 - "Community 75"
+Cohesion: 0.23
+Nodes (8): parametrize, Python half of the shared fixture contract and local CLI checks. No device SDK…, test_cli_invalid_nonzero(), test_cli_json(), test_fake_is_deterministic(), test_invalid_request_rejected(), test_missing_version_rejected(), test_probe_rejects_invalid_boundary()
+
+### Community 76 - "Community 76"
+Cohesion: 0.18
+Nodes (4): Offline policy construction; never installs nft rules or runs a privileged…, test_failed_kernel_policy_check_does_not_publish_ready_marker(), run(), test_successful_policy_install_publishes_marker_only_after_atomic_apply()
+
+### Community 77 - "Community 77"
 Cohesion: 0.17
 Nodes (12): dependencies, lucide-react, @mantine/core, @mantine/form, @mantine/hooks, react, react-dom, @react-oauth/google (+4 more)
 
-### Community 61 - "Community 61"
+### Community 78 - "Community 78"
 Cohesion: 0.26
 Nodes (9): files(), main(), Path, Generate both consumer contracts from Rust without starting the application.…, Read managed output bytes keyed by repo-relative path, independent of mtimes., Compare the whole generated set, including new and removed files. Preserve…, synchronize(), ExportTests (+1 more)
 
-### Community 62 - "Community 62"
-Cohesion: 0.45
-Nodes (10): cleanup_pending(), content(), record(), reserve(), ApiResult, AppContext, Body, QueryResult (+2 more)
+### Community 79 - "Community 79"
+Cohesion: 0.47
+Nodes (10): commercial_manifest(), create(), create_with_quote(), preview(), ApiResult, AppContext, ConnectionTrait, Option (+2 more)
 
-### Community 63 - "Community 63"
+### Community 80 - "Community 80"
+Cohesion: 0.25
+Nodes (10): evaluate(), observe(), png_valid(), ApiResult, AppContext, Outcome, Result, String (+2 more)
+
+### Community 81 - "Community 81"
 Cohesion: 0.22
 Nodes (8): Cleanup, execute(), ApiResult, AppContext, Result, Task, TaskInfo, Vars
 
-### Community 64 - "Community 64"
+### Community 82 - "Community 82"
+Cohesion: 0.36
+Nodes (8): setCsrfToken(), sessionQuery, signIn(), startGoogleSignIn(), useGoogleSignIn(), safeReturnTo(), SignIn(), @react-oauth/google
+
+### Community 83 - "Community 83"
+Cohesion: 0.18
+Nodes (10): binaryUpload, completeStatuses, editableDefinition, healthy, implicitDefault, persistedBuild, staleBuild, staleResponse (+2 more)
+
+### Community 84 - "Community 84"
 Cohesion: 0.24
 Nodes (8): ExecutionWakeup, notify(), AppContext, Self, subscribe(), Default, Receiver, Sender
 
-### Community 65 - "Community 65"
+### Community 85 - "Community 85"
+Cohesion: 0.31
+Nodes (8): _authorized(), prepared_build(), check_preparation(), load(), Path, UUID, Lease-authorized immutable build delivery shared by execution and phone workers., A cache hit still requires current server authorization for this exact build.…
+
+### Community 86 - "Community 86"
+Cohesion: 0.20
+Nodes (4): OwnedDevice, Path, Protocol, UUID
+
+### Community 87 - "Community 87"
 Cohesion: 0.31
 Nodes (5): healthQuery, apiClient, requestMethods, transportClient, healthy
 
-### Community 66 - "Community 66"
-Cohesion: 0.38
-Nodes (8): BudgetFields(), moveItem(), Ordering(), CaseMembership(), choiceLabel(), countLabel(), PlanFields(), SuiteFields()
+### Community 90 - "Community 90"
+Cohesion: 0.42
+Nodes (6): create_receipt_table(), Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 68 - "Community 68"
-Cohesion: 0.31
-Nodes (7): current(), method_not_allowed(), Json, StatusCode, unknown(), HealthResponse, HealthStatus
+### Community 91 - "Community 91"
+Cohesion: 0.53
+Nodes (8): create(), manifest(), preview(), ApiResult, AppContext, ConnectionTrait, Uuid, CaseRunRequest
 
-### Community 69 - "Community 69"
+### Community 92 - "Community 92"
 Cohesion: 0.25
 Nodes (3): DeviceRpc, ElementRpc, Protocol
 
-### Community 70 - "Community 70"
+### Community 93 - "Community 93"
 Cohesion: 0.22
 Nodes (9): scripts, build, dev, format, format:check, generate:sdk, lint, test (+1 more)
 
-### Community 72 - "Community 72"
+### Community 96 - "Community 96"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 73 - "Community 73"
+### Community 97 - "Community 97"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 74 - "Community 74"
+### Community 98 - "Community 98"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 75 - "Community 75"
+### Community 99 - "Community 99"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 76 - "Community 76"
+### Community 100 - "Community 100"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 77 - "Community 77"
+### Community 101 - "Community 101"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 78 - "Community 78"
+### Community 102 - "Community 102"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 79 - "Community 79"
+### Community 103 - "Community 103"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 80 - "Community 80"
+### Community 104 - "Community 104"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 81 - "Community 81"
+### Community 105 - "Community 105"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 82 - "Community 82"
+### Community 106 - "Community 106"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 83 - "Community 83"
+### Community 107 - "Community 107"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 84 - "Community 84"
+### Community 108 - "Community 108"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 85 - "Community 85"
+### Community 109 - "Community 109"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 86 - "Community 86"
+### Community 110 - "Community 110"
 Cohesion: 0.36
 Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
 
-### Community 87 - "Community 87"
+### Community 111 - "Community 111"
+Cohesion: 0.36
+Nodes (5): Migration, DbErr, MigrationTrait, Result, SchemaManager
+
+### Community 112 - "Community 112"
 Cohesion: 0.25
 Nodes (7): Model, Relation, DateTimeUtc, Json, Option, String, Uuid
 
-### Community 88 - "Community 88"
+### Community 113 - "Community 113"
 Cohesion: 0.25
 Nodes (7): Model, Relation, DateTimeUtc, Json, Option, String, Uuid
 
-### Community 89 - "Community 89"
-Cohesion: 0.54
-Nodes (7): acknowledge(), recorded(), require(), ApiResult, AppContext, ConnectionTrait, Uuid
+### Community 114 - "Community 114"
+Cohesion: 0.25
+Nodes (7): Model, Relation, DateTimeUtc, Json, Option, String, Uuid
 
-### Community 90 - "Community 90"
+### Community 115 - "Community 115"
+Cohesion: 0.25
+Nodes (7): Model, Relation, DateTimeUtc, Json, Option, String, Uuid
+
+### Community 116 - "Community 116"
+Cohesion: 0.25
+Nodes (7): Model, Relation, DateTimeUtc, Json, Option, String, Uuid
+
+### Community 117 - "Community 117"
+Cohesion: 0.25
+Nodes (7): Model, Relation, DateTimeUtc, Json, Option, String, Uuid
+
+### Community 118 - "Community 118"
+Cohesion: 0.25
+Nodes (7): Model, Relation, DateTimeUtc, Json, Option, String, Uuid
+
+### Community 119 - "Community 119"
 Cohesion: 0.36
 Nodes (7): choices(), ApiResult, ConnectionTrait, Option, Uuid, Vec, Fn
 
-### Community 91 - "Community 91"
+### Community 120 - "Community 120"
 Cohesion: 0.36
 Nodes (5): installer(), parametrize, Exercise the pinned installer with local archives only; never contact Google., test_install_checks_archive_and_preserves_managed_metadata(), test_installer_only_selects_native_system_image()
 
-### Community 92 - "Community 92"
-Cohesion: 0.54
-Nodes (5): startGoogleSignIn(), useGoogleSignIn(), safeReturnTo(), SignIn(), @react-oauth/google
-
-### Community 94 - "Community 94"
-Cohesion: 0.32
-Nodes (8): ApprovalPurpose, DefinitionApproval, JobState, LeaseStatusResponse, QueueReason, QueueStatus, DateTime, Utc
-
-### Community 97 - "Community 97"
+### Community 124 - "Community 124"
 Cohesion: 0.39
 Nodes (5): approved_import_shape_has_separate_actions_and_checks(), case(), invalid_definition_references_and_paths_are_rejected(), manual_methods_are_defined_but_not_implicitly_executable(), unknown_fields_are_not_imported()
 
-### Community 98 - "Community 98"
-Cohesion: 0.39
-Nodes (5): case(), drafts_round_trip_and_publication_preserves_the_execution_shape(), incomplete_case_is_saveable_but_not_publishable(), oversized_unknown_and_forged_shapes_are_rejected(), snapshot_normalization_preserves_ai_editor_provenance()
-
-### Community 99 - "Community 99"
+### Community 125 - "Community 125"
 Cohesion: 0.29
 Nodes (5): Migrator, Box, MigrationTrait, Vec, MigratorTrait
 
-### Community 100 - "Community 100"
+### Community 126 - "Community 126"
+Cohesion: 0.43
+Nodes (5): current(), method_not_allowed(), Json, StatusCode, unknown()
+
+### Community 127 - "Community 127"
 Cohesion: 0.29
 Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
 
-### Community 101 - "Community 101"
+### Community 128 - "Community 128"
 Cohesion: 0.29
 Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
 
-### Community 102 - "Community 102"
+### Community 129 - "Community 129"
 Cohesion: 0.29
 Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
 
-### Community 103 - "Community 103"
+### Community 130 - "Community 130"
 Cohesion: 0.29
 Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
 
-### Community 104 - "Community 104"
+### Community 131 - "Community 131"
+Cohesion: 0.29
+Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
+
+### Community 132 - "Community 132"
+Cohesion: 0.29
+Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
+
+### Community 133 - "Community 133"
+Cohesion: 0.29
+Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
+
+### Community 134 - "Community 134"
+Cohesion: 0.29
+Nodes (6): Model, Relation, DateTimeUtc, Json, String, Uuid
+
+### Community 135 - "Community 135"
+Cohesion: 0.29
+Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
+
+### Community 136 - "Community 136"
+Cohesion: 0.29
+Nodes (6): Model, Relation, Json, Option, String, Uuid
+
+### Community 137 - "Community 137"
+Cohesion: 0.29
+Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
+
+### Community 138 - "Community 138"
+Cohesion: 0.29
+Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
+
+### Community 139 - "Community 139"
+Cohesion: 0.29
+Nodes (6): Model, Relation, DateTimeUtc, Json, String, Uuid
+
+### Community 140 - "Community 140"
+Cohesion: 0.29
+Nodes (6): Model, Relation, DateTimeUtc, Json, String, Uuid
+
+### Community 141 - "Community 141"
+Cohesion: 0.29
+Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
+
+### Community 142 - "Community 142"
+Cohesion: 0.29
+Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
+
+### Community 143 - "Community 143"
+Cohesion: 0.29
+Nodes (6): Model, Relation, DateTimeUtc, Option, String, Uuid
+
+### Community 144 - "Community 144"
 Cohesion: 0.43
 Nodes (6): discovery_progress(), ApiResult, Option, T, same(), task_update()
 
-### Community 105 - "Community 105"
-Cohesion: 0.38
-Nodes (6): list(), ApiResult, AppContext, Option, String, Uuid
-
-### Community 106 - "Community 106"
+### Community 145 - "Community 145"
 Cohesion: 0.48
 Nodes (6): fixture(), optional_null_is_accepted_then_omitted(), probe_roundtrips_without_losing_precision(), rejects_invalid_probe_boundaries(), Value, scenario_and_version_are_validated()
 
-### Community 107 - "Community 107"
+### Community 146 - "Community 146"
 Cohesion: 0.33
 Nodes (5): Model, Relation, DateTimeUtc, String, Uuid
 
-### Community 108 - "Community 108"
+### Community 147 - "Community 147"
+Cohesion: 0.33
+Nodes (5): Model, Relation, Option, String, Uuid
+
+### Community 148 - "Community 148"
 Cohesion: 0.33
 Nodes (5): Model, Relation, DateTimeUtc, String, Uuid
 
-### Community 109 - "Community 109"
+### Community 149 - "Community 149"
 Cohesion: 0.33
 Nodes (5): Model, Relation, DateTimeUtc, String, Uuid
 
-### Community 110 - "Community 110"
+### Community 150 - "Community 150"
+Cohesion: 0.33
+Nodes (5): Model, Relation, DateTimeUtc, Option, Uuid
+
+### Community 151 - "Community 151"
 Cohesion: 0.33
 Nodes (5): Model, Relation, DateTimeUtc, String, Uuid
 
-### Community 111 - "Community 111"
+### Community 152 - "Community 152"
 Cohesion: 0.33
 Nodes (5): Model, Relation, DateTimeUtc, String, Uuid
 
-### Community 112 - "Community 112"
+### Community 153 - "Community 153"
+Cohesion: 0.33
+Nodes (5): Model, Relation, Option, String, Uuid
+
+### Community 154 - "Community 154"
+Cohesion: 0.33
+Nodes (5): Model, Relation, DateTimeUtc, String, Uuid
+
+### Community 155 - "Community 155"
+Cohesion: 0.33
+Nodes (5): Model, Relation, DateTimeUtc, String, Uuid
+
+### Community 156 - "Community 156"
+Cohesion: 0.33
+Nodes (5): Model, Relation, DateTimeUtc, String, Uuid
+
+### Community 157 - "Community 157"
+Cohesion: 0.33
+Nodes (5): Model, Relation, DateTimeUtc, String, Uuid
+
+### Community 158 - "Community 158"
 Cohesion: 0.47
 Nodes (5): create(), ApiResult, AppContext, Uuid, CreateWorkspaceRequest
 
-### Community 113 - "Community 113"
+### Community 159 - "Community 159"
 Cohesion: 0.40
-Nodes (4): request_context(), Response, Next, Request
+Nodes (4): request_context(), Request, Response, Next
 
-### Community 114 - "Community 114"
+### Community 160 - "Community 160"
+Cohesion: 0.40
+Nodes (4): Model, Relation, DateTimeUtc, Uuid
+
+### Community 161 - "Community 161"
+Cohesion: 0.40
+Nodes (4): Model, Relation, Json, Uuid
+
+### Community 162 - "Community 162"
+Cohesion: 0.40
+Nodes (4): Model, Relation, Json, Uuid
+
+### Community 163 - "Community 163"
 Cohesion: 0.40
 Nodes (4): Model, Relation, String, Uuid
 
-### Community 115 - "Community 115"
+### Community 164 - "Community 164"
 Cohesion: 0.50
 Nodes (3): Protocol, StructuredCall, StructuredModel
 
-### Community 116 - "Community 116"
+### Community 165 - "Community 165"
 Cohesion: 0.40
 Nodes (4): main(), Box, Error, Result
 
-### Community 118 - "Community 118"
+### Community 167 - "Community 167"
 Cohesion: 0.50
 Nodes (3): rejects_invalid_request_semantics(), request(), Value
 
-### Community 119 - "Community 119"
+### Community 168 - "Community 168"
 Cohesion: 0.70
 Nodes (4): java_environment(), main(), Explicit local SDK setup and demo build; never runs checks or accepts SDK…, setup()
 
-### Community 120 - "Community 120"
+### Community 169 - "Community 169"
 Cohesion: 0.50
 Nodes (3): Model, Relation, Uuid
 
-### Community 121 - "Community 121"
+### Community 170 - "Community 170"
+Cohesion: 0.50
+Nodes (3): Model, Relation, Uuid
+
+### Community 171 - "Community 171"
+Cohesion: 0.50
+Nodes (3): Entity, Related, RelationDef
+
+### Community 172 - "Community 172"
+Cohesion: 0.50
+Nodes (3): Entity, Related, RelationDef
+
+### Community 173 - "Community 173"
 Cohesion: 0.83
 Nodes (3): gradlew script, die(), warn()
 
-### Community 124 - "Community 124"
+### Community 175 - "Community 175"
+Cohesion: 0.83
+Nodes (3): definition(), legacy_binding_round_trips_without_changing_new_shape(), validates_stable_identity_and_unique_capabilities()
+
+### Community 177 - "Community 177"
 Cohesion: 0.67
 Nodes (3): main(), Explicit repository formatting; generators retain ownership of generated output., run()
 
-### Community 125 - "Community 125"
+### Community 178 - "Community 178"
 Cohesion: 0.67
 Nodes (3): install(), main(), Explicit project-local Android intake tool installation, never run at API…
 
-### Community 127 - "Community 127"
+### Community 181 - "Community 181"
 Cohesion: 0.67
 Nodes (3): migration, mobile-qa, mobile-qa-contracts
 
 ## Knowledge Gaps
-- **193 isolated node(s):** `CoverageFlowModel`, `CoverageFlowStatus`, `CoverageNode`, `CoverageNodeData`, `FlowOrientation` (+188 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 809 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **29 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **270 isolated node(s):** `ErrorNoticeProps`, `PageHeadingProps`, `CoverageFlowModel`, `CoverageFlowStatus`, `CoverageNode` (+265 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1179 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **63 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `QualificationError` connect `Community 3` to `Community 35`, `Community 5`, `Community 38`, `Community 7`, `Community 9`, `Community 13`, `Community 46`, `Community 19`, `Community 23`?**
-  _High betweenness centrality (0.107) - this node is a cross-community bridge._
-- **Why does `WorkerModelCapabilities` connect `Community 15` to `Community 40`, `Community 17`, `Community 19`, `Community 43`?**
-  _High betweenness centrality (0.089) - this node is a cross-community bridge._
-- **Why does `worker_capabilities()` connect `Community 19` to `Community 9`, `Community 3`, `Community 15`, `Community 7`?**
-  _High betweenness centrality (0.087) - this node is a cross-community bridge._
-- **Are the 63 inferred relationships involving `QualificationError` (e.g. with `DiscoveryBroker` and `BrokerClient`) actually correct?**
-  _`QualificationError` has 63 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 80 inferred relationships involving `field()` (e.g. with `build()` and `create()`) actually correct?**
-  _`field()` has 80 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 70 inferred relationships involving `one()` (e.g. with `artifact()` and `build()`) actually correct?**
-  _`one()` has 70 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 66 inferred relationships involving `exec()` (e.g. with `create()` and `activate()`) actually correct?**
-  _`exec()` has 66 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `QualificationError` connect `Community 5` to `Community 34`, `Community 4`, `Community 7`, `Community 73`, `Community 11`, `Community 12`, `Community 14`, `Community 16`, `Community 49`, `Community 19`, `Community 27`?**
+  _High betweenness centrality (0.076) - this node is a cross-community bridge._
+- **Why does `Session` connect `Community 1` to `Community 65`, `Community 6`, `Community 42`, `Community 47`, `Community 61`?**
+  _High betweenness centrality (0.057) - this node is a cross-community bridge._
+- **Why does `worker_capabilities()` connect `Community 27` to `Community 4`, `Community 7`, `Community 11`, `Community 16`, `Community 23`?**
+  _High betweenness centrality (0.040) - this node is a cross-community bridge._
+- **Are the 83 inferred relationships involving `QualificationError` (e.g. with `DiscoveryBroker` and `BrokerClient`) actually correct?**
+  _`QualificationError` has 83 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 43 inferred relationships involving `Profile` (e.g. with `explore()` and `invoke()`) actually correct?**
+  _`Profile` has 43 INFERRED edges - model-reasoned connections that need verification._
+- **What connects `ErrorNoticeProps`, `PageHeadingProps`, `CoverageFlowModel` to the rest of the system?**
+  _270 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `Community 0` be split into smaller, more focused modules?**
+  _Cohesion score 0.053510226644555 - nodes in this community are weakly interconnected._

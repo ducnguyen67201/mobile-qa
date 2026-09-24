@@ -1,0 +1,51 @@
+# syntax=docker/dockerfile:1
+# Linux/amd64 registry manifests resolved 2026-09-22. Refresh deliberately and
+# qualify the resulting release image; runtime secrets are never build inputs.
+ARG NODE_IMAGE=node:24.14.1-bookworm-slim@sha256:e484ae3f1e3c378021c967fd42254f343c302a9263e412280eac32bf5bca7008
+ARG RUST_IMAGE=rust:1.95.0-bookworm@sha256:4c2fd73ef19c5ef9d54bee03b06b2839a392604fbfcd578ed948b71b37c1d7fb
+ARG RUNTIME_IMAGE=debian:bookworm-slim@sha256:f3034a6ec3c1205360777c4aae76234998866ad18806ae62b63a3f84ccad782b
+FROM ${NODE_IMAGE} AS web
+WORKDIR /build/apps/web
+RUN npm install --global pnpm@11.16.0
+COPY apps/web/package.json apps/web/pnpm-lock.yaml apps/web/pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
+COPY apps/web/ ./
+RUN pnpm build
+
+FROM ${RUST_IMAGE} AS server
+WORKDIR /build
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY crates/ crates/
+COPY contracts/fixtures/ contracts/fixtures/
+COPY apps/api/ apps/api/
+RUN cargo build --release --locked --package mobile-qa --bin mobile-qa-cli
+
+FROM ${RUNTIME_IMAGE} AS runtime
+# Debian bookworm slim amd64; Rust builder must use the same glibc baseline.
+RUN apt-get update && apt-get install --yes --no-install-recommends \
+    ca-certificates curl python3 openjdk-17-jre-headless libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+COPY infra/deployment/install_runtime.sh /tmp/install_runtime.sh
+RUN sh /tmp/install_runtime.sh && rm /tmp/install_runtime.sh
+WORKDIR /opt/mobile-qa
+COPY scripts/setup_android.py scripts/setup_android.py
+# Existing intake pins are intentionally distinct from the device image SDK.
+RUN python3 scripts/setup_android.py \
+    && mv .private/android-sdk /opt/mobile-qa/android-sdk \
+    && rmdir .private \
+    && chmod -R a+rX /opt/mobile-qa/android-sdk
+COPY --from=server /build/target/release/mobile-qa-cli /usr/local/bin/mobile-qa-api
+COPY --from=web /build/apps/web/dist apps/web/dist
+COPY apps/api/config/ apps/api/config/
+RUN useradd --system --uid 10001 --create-home mobile-qa \
+    && install -d -m 0700 -o mobile-qa -g mobile-qa /var/lib/mobile-qa/scratch
+ENV PORT=5150 \
+    JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 \
+    MOBILE_QA_ANDROID_SDK=/opt/mobile-qa/android-sdk \
+    ARTIFACT_SCRATCH_DIR=/var/lib/mobile-qa/scratch
+USER mobile-qa
+WORKDIR /opt/mobile-qa/apps/api
+EXPOSE 5150
+# Railway platform injects only a scoped Doppler bootstrap token; no .env files.
+ENTRYPOINT ["doppler", "run", "--no-fallback", "--forward-signals", "--"]
+CMD ["mobile-qa-api", "start", "--environment", "production"]

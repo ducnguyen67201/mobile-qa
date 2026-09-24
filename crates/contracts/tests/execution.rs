@@ -48,7 +48,7 @@ fn manual_methods_are_defined_but_not_implicitly_executable() {
     TestDefinition::Case(c).validate().unwrap();
 }
 #[test]
-fn real_profile_cannot_overstate_demo_installer_capacity() {
+fn execution_profile_accepts_inclusive_two_gib_without_overstating_intake() {
     let mut profile = ExecutionProfile {
         execution_context: None,
         id: uuid::Uuid::nil(),
@@ -66,6 +66,8 @@ fn real_profile_cannot_overstate_demo_installer_capacity() {
         qualification_reference: String::new(),
         max_apk_bytes: 104857600,
     };
+    profile.validate().unwrap();
+    profile.max_apk_bytes = 2147483648;
     profile.validate().unwrap();
     profile.max_apk_bytes += 1;
     assert!(profile.validate().is_err());

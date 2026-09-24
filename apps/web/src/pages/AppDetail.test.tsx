@@ -1,4 +1,5 @@
 import { MantineProvider } from '@mantine/core'
+import { webcrypto } from 'node:crypto'
 import { theme } from '@/theme'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
@@ -15,6 +16,7 @@ import type {
   UploadResponse,
 } from '@/api/generated/types.gen'
 import { zCreateRunRequest } from '@/api/generated/zod.gen'
+import { ApkUpload } from '@/components/app/apk-upload'
 function show(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   render(
@@ -44,6 +46,50 @@ function fixtureFetch(currentBuild: BuildResponse = build, currentUpload: Upload
     if (url.pathname.includes('/build-uploads/')) return Response.json(currentUpload)
     throw new Error(`Unexpected synthetic request ${request.method} ${url.pathname}`)
   })
+}
+
+const multipartSession = {
+  upload_id: uploadId,
+  part_size: 16 * 1024 * 1024,
+  max_parallel_parts: 2,
+  expires_at: upload.expires_at,
+  state: 'uploading' as const,
+  parts: [],
+}
+
+function showUpload(enabled = false, saved = true) {
+  const router = createMemoryRouter(
+    [
+      {
+        path: '/',
+        element: (
+          <ApkUpload appId={appId} maxBytes={settings.max_apk_bytes} multipartEnabled={enabled} />
+        ),
+      },
+    ],
+    { initialEntries: [saved ? `/?upload=${uploadId}` : '/'] },
+  )
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  render(
+    <MantineProvider theme={theme} env="test">
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </MantineProvider>,
+  )
+  return router
+}
+
+function failure(status: number) {
+  return Response.json(
+    {
+      code: 'multipart_lookup_failed',
+      message: 'Saved upload lookup failed',
+      details: null,
+      request_id: appId,
+    },
+    { status },
+  )
 }
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -199,6 +245,176 @@ it('requires original file reselection for an unfinished upload', async () => {
   await screen.findByLabelText('Choose APK file')
   await userEvent.click(screen.getByRole('button', { name: 'Upload and validate' }))
   expect(await screen.findByText('Choose the APK file to continue.')).toBeInTheDocument()
+})
+it.each([404, 500])(
+  'handles an absent multipart session separately from a failed discard (%i)',
+  async (status) => {
+    const base = fixtureFetch(build, { ...upload, state: 'pending', actual_size: null })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (request: Request) => {
+        if (request.url.endsWith('/settings'))
+          return Response.json({
+            ...settings,
+            multipart: { part_size: 16777216, max_parallel_parts: 2 },
+          })
+        if (request.url.endsWith('/multipart') && request.method === 'GET')
+          return Response.json({ code: 'missing', message: 'Discard failed' }, { status })
+        return base(request)
+      }),
+    )
+    show(`/apps/${appId}?upload=${uploadId}`)
+    await screen.findByRole('button', { name: 'Resume and validate' })
+    await userEvent.click(screen.getByRole('button', { name: 'New upload' }))
+    if (status === 404) {
+      expect(await screen.findByRole('button', { name: 'Upload and validate' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'New upload' })).not.toBeInTheDocument()
+    } else {
+      await waitFor(() => expect(screen.getByRole('button', { name: 'New upload' })).toBeEnabled())
+      expect(screen.getByRole('button', { name: 'Resume and validate' })).toBeInTheDocument()
+    }
+  },
+)
+
+it('resumes a verified multipart upload without current multipart capability metadata', async () => {
+  vi.stubGlobal('crypto', webcrypto)
+  let sealed = false
+  const fetchMock = vi.fn(async (request: Request) => {
+    if (request.url.endsWith('/multipart') && request.method === 'GET')
+      return Response.json({
+        ...multipartSession,
+        parts: [
+          {
+            part_number: 1,
+            byte_size: 4,
+            sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+            etag: '"saved"',
+          },
+        ],
+      })
+    if (request.url.endsWith('/multipart/complete')) {
+      sealed = true
+      return Response.json(upload, { status: 202 })
+    }
+    if (request.url.endsWith('/complete')) return Response.json(build)
+    return Response.json({ ...upload, state: sealed ? 'uploaded' : 'receiving' })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  showUpload()
+  const resume = await screen.findByRole('button', { name: 'Resume and validate' })
+  const bytes = new TextEncoder().encode('test')
+  const file = new File([bytes], upload.original_filename)
+  // Supply jsdom's missing Blob reader while using the real fingerprint code.
+  Object.defineProperty(file, 'slice', {
+    value: (start: number, end: number) => {
+      const part = bytes.slice(start, end)
+      const blob = new Blob([part])
+      Object.defineProperty(blob, 'arrayBuffer', { value: async () => part.buffer })
+      return blob
+    },
+  })
+  await userEvent.upload(screen.getByLabelText('Choose APK file'), file)
+  await userEvent.click(resume)
+  await waitFor(() =>
+    expect(
+      fetchMock.mock.calls.some(([request]) =>
+        request.url.endsWith(`/build-uploads/${uploadId}/complete`),
+      ),
+    ).toBe(true),
+  )
+  const requests = fetchMock.mock.calls.map(([request]) => request)
+  expect(
+    requests.filter((request) => request.url.endsWith('/multipart') && request.method === 'GET'),
+  ).toHaveLength(2)
+  expect(
+    requests.some((request) => request.url.endsWith('/multipart') && request.method === 'POST'),
+  ).toBe(false)
+  expect(requests.some((request) => request.method === 'PUT')).toBe(false)
+})
+
+it.each([401, 500])(
+  'preserves the saved upload after a fresh multipart lookup fails (%i)',
+  async (status) => {
+    let lookups = 0
+    const fetchMock = vi.fn(async (request: Request) => {
+      if (request.url.endsWith('/multipart')) {
+        lookups += 1
+        return lookups === 1 ? Response.json(multipartSession) : failure(status)
+      }
+      return Response.json({ ...upload, state: 'receiving' })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const router = showUpload()
+    const resume = await screen.findByRole('button', { name: 'Resume and validate' })
+    await userEvent.upload(
+      screen.getByLabelText('Choose APK file'),
+      new File(['test'], upload.original_filename),
+    )
+    await userEvent.click(resume)
+    expect(await screen.findByText('Upload needs attention')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Upload and validate' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'New upload' }))
+    await waitFor(() => expect(lookups).toBe(3))
+    expect(router.state.location.search).toContain(uploadId)
+    expect(fetchMock.mock.calls.every(([request]) => request.method === 'GET')).toBe(true)
+  },
+)
+
+it('aborts an existing multipart session without current multipart capability metadata', async () => {
+  const fetchMock = vi.fn(async (request: Request) => {
+    if (request.url.endsWith('/multipart'))
+      return Response.json({
+        ...multipartSession,
+        state: request.method === 'DELETE' ? 'aborted' : 'uploading',
+      })
+    return Response.json({ ...upload, state: 'receiving' })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  const router = showUpload()
+  await screen.findByRole('button', { name: 'Resume and validate' })
+  await userEvent.click(screen.getByRole('button', { name: 'New upload' }))
+  await waitFor(() => expect(router.state.location.search).toBe(''))
+  const methods = fetchMock.mock.calls
+    .filter(([request]) => request.url.endsWith('/multipart'))
+    .map(([request]) => request.method)
+  expect(methods).toEqual(['GET', 'GET', 'DELETE'])
+})
+
+it('keeps a legacy receiving upload blocked when no multipart descriptor exists', async () => {
+  const fetchMock = vi.fn(async (request: Request) =>
+    request.url.endsWith('/multipart')
+      ? failure(404)
+      : Response.json({ ...upload, state: 'receiving' }),
+  )
+  vi.stubGlobal('fetch', fetchMock)
+  showUpload()
+  await waitFor(() =>
+    expect(fetchMock.mock.calls.some(([request]) => request.url.endsWith('/multipart'))).toBe(true),
+  )
+  expect(screen.getByRole('button', { name: 'Upload and validate' })).toBeDisabled()
+  expect(screen.queryByLabelText('Choose APK file')).not.toBeInTheDocument()
+  expect(fetchMock.mock.calls.every(([request]) => request.method === 'GET')).toBe(true)
+})
+
+it('uses streaming transfer for local storage without multipart support', async () => {
+  const fetchMock = vi.fn(async (request: Request) => {
+    if (request.url.endsWith('/build-uploads') && request.method === 'POST')
+      return Response.json({ ...upload, state: 'pending' }, { status: 201 })
+    if (request.url.endsWith('/complete')) return Response.json(build)
+    return Response.json(upload)
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  showUpload(false, false)
+  await userEvent.upload(
+    screen.getByLabelText('Choose APK file'),
+    new File(['test'], upload.original_filename),
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Upload and validate' }))
+  await waitFor(() =>
+    expect(fetchMock.mock.calls.some(([request]) => request.url.endsWith('/complete'))).toBe(true),
+  )
+  expect(fetchMock.mock.calls.some(([request]) => request.method === 'PUT')).toBe(true)
+  expect(fetchMock.mock.calls.some(([request]) => request.url.includes('/multipart'))).toBe(false)
 })
 it('reconciles a lost completion response before retrying the same upload', async () => {
   const base = fixtureFetch()

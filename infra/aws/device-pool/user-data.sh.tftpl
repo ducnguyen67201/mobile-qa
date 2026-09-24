@@ -1,0 +1,13 @@
+#!/bin/bash
+set -euo pipefail
+umask 077
+install -d -m 0750 -o root -g mobile-qa /etc/mobile-qa
+# Only nonsecret configuration is in EC2 user data / OpenTofu state.
+printf '%s' '${host_config}' | base64 -d > /etc/mobile-qa/host.toml
+printf '%s' '${device_profile}' | base64 -d > /etc/mobile-qa/profile.toml
+printf '%s' '${bootstrap_config}' | base64 -d > /etc/mobile-qa/bootstrap.json
+chown root:mobile-qa /etc/mobile-qa/*.toml /etc/mobile-qa/bootstrap.json
+chmod 0640 /etc/mobile-qa/*.toml /etc/mobile-qa/bootstrap.json
+systemctl enable mobile-qa-host.service
+# cloud-final runs this script; starting synchronously would wait on ourselves.
+systemctl start --no-block mobile-qa-host.service

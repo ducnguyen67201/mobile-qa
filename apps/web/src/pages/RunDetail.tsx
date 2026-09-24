@@ -130,6 +130,13 @@ export function RunDetail() {
                   'A previous attempt still holds the phone. An operator must recover it before this run can start. No test has been evaluated.',
                 awaiting_worker_claim:
                   'A compatible worker is connected. Waiting for its next claim.',
+                host_starting: 'Starting a device host for this run.',
+                host_draining:
+                  'The device host is finishing cleanup. Your run will start when a clean device is available.',
+                pool_paused:
+                  'Device capacity is paused. An operator must resume it before this run can start.',
+                waiting_for_slot: 'Waiting for a free, qualified device.',
+                profile_incompatible: 'No device slot is qualified for this run’s device profile.',
               } as const
             )[r.queue_status.reason]
           }

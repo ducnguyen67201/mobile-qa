@@ -1,18 +1,18 @@
 # Hosting: Railway first, AWS later
 
-Status: application hosting direction selected by the user on 2026-09-12; deployment
-configuration and live deployment are not implemented. AWS is the later migration
-target when measured capacity, cost or operational needs justify it. Device hosting
-remains a separate qualification decision.
+Status: Railway application hosting was selected on 2026-09-12. Local deployment
+definitions now include the application image and a separate fixed EC2 device pool.
+Live deployment and device qualification remain release gates. Moving the application
+services to AWS remains a later decision based on measured cost and operations.
 
 ## Initial deployment shape
 
-| Component                                  | Initial placement                                               | Reason / boundary                                                                                       |
-| ------------------------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Rust API and compiled React dashboard      | One Railway application service                                 | Loco already has same-origin static SPA configuration; keep separate source apps but one deployed image |
-| PostgreSQL                                 | Railway database service                                        | API connects privately; Python never receives database credentials                                      |
-| APKs and report artifacts                  | Railway private Buckets for hosted APKs; reports follow spec 04 | S3-compatible adapter exists; hosted round-trip and provisioning remain open                            |
-| Python Minitap worker and Android emulator | One separately qualified Linux x86_64 KVM host                  | Current harness owns the emulator locally; Railway device execution is not qualified                    |
+| Component                             | Initial placement                                               | Reason / boundary                                                                                       |
+| ------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Rust API and compiled React dashboard | One Railway application service                                 | Loco already has same-origin static SPA configuration; keep separate source apps but one deployed image |
+| PostgreSQL                            | Railway database service                                        | API connects privately; Python never receives database credentials                                      |
+| APKs and report artifacts             | Railway private Buckets for hosted APKs; reports follow spec 04 | S3-compatible adapter exists; hosted round-trip and provisioning remain open                            |
+| Python worker and Android emulator    | One separately qualified Linux x86_64 KVM host                  | Current harness owns the emulator locally; Railway device execution is not qualified                    |
 
 Railway supports container services and monorepos. Its documentation describes
 non-privileged containers, and a Railway employee's nested-virtualization support
@@ -32,15 +32,15 @@ hosting preference does not select or authorize an AWS device instance. A manage
 remote phone would require a separate adapter assessment because today's harness owns
 a local emulator and owned process groups (with systemd containment on cloud Linux).
 
-## Deployment work to implement
+## Application deployment boundaries
 
 1. Build one portable application image: compile the web assets and Rust binary with
    pinned tools, preserve the expected static-asset paths, and run only the application.
    Keep repository-root build context because the API depends on `crates/contracts`.
    Source ownership remains `apps/api` and `apps/web`; no folder move is needed.
-2. Adapt production binding and port to Railway. Current production config binds
-   `127.0.0.1:5150`, so the scaffold is not directly ready for public container routing.
-   Configure a health check and verify SPA/API same-origin behavior after deployment.
+2. Production configuration binds `0.0.0.0` and reads platform `PORT`; the image defaults
+   to port 5150. Railway health checking uses `/api/health`. Verify SPA/API same-origin
+   behavior after deployment.
 3. Supply a config-scoped Doppler service credential through the platform secret store.
    Fetch application secrets only at runtime through Doppler; no env files or secrets
    in image builds. Configure the Railway-private database connection in the appropriate
@@ -57,12 +57,27 @@ a local emulator and owned process groups (with systemd containment on cloud Lin
 Railway documents repository-root builds for shared monorepos and deployment watch
 paths in its [monorepo guide](https://docs.railway.com/deployments/monorepo).
 
-Phase 02 remains an operator campaign without an API connection. In phase 04 the
-separate worker will initiate authenticated HTTPS claim/heartbeat/result calls to the
-Railway API. No public ADB port or remote database access is needed for that design;
-the production protocol itself remains planned.
+Phase 02 remains an operator campaign without an API connection. The implemented
+phase 04 worker initiates authenticated HTTPS claim/heartbeat/result calls to the API.
+No public ADB port or remote database access is needed. The new supervisor restricts
+pool admission to qualified generic direct execution; the existing standalone Minitap
+demo needs a separate qualified adapter before it can use supervised slots.
 
-## Later AWS migration
+## On-demand device infrastructure
+
+[Spec 11](implementation/11-elastic-device-hosts-and-large-apks.md) defines the fixed
+EC2 device pool, large build delivery and runtime start/drain/stop controller.
+`Dockerfile.api` packages the same-origin application; `railway.toml` selects its
+build and health check. OpenTofu under `infra/aws/device-pool` defines device
+resources independently of Railway. The controller defaults to disabled. Use the
+[device operations runbook](device-host-operations.md) for rollout and required
+qualification; checked-in configuration does not establish a live deployment.
+
+API production binding accepts the platform PORT on all interfaces. Runtime secrets
+still come from Doppler. The device image has its own SDK and qualification gates,
+and the host cache does not change private object storage as the source of APK bytes.
+
+## Later application migration to AWS
 
 Keep portable container images, ordinary PostgreSQL/SeaORM migrations, generated HTTP
 contracts, S3-compatible artifact access and Doppler configuration. Avoid provider

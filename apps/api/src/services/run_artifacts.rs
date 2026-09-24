@@ -1,30 +1,38 @@
 //! Evidence publication is pending until bounded bytes and their digest have been verified.
-use super::{execution_store::*, scheduler, worker_auth::Worker};
+use super::{
+    execution_store::{conflict, decode, hash},
+    scheduler,
+    worker_auth::Worker,
+};
 use crate::{
     config::Setup,
     errors::{ApiFailure, ApiResult},
+    models::_entities::{execution_artifacts, execution_attempts},
     storage::Scratch,
 };
 use axum::body::Body;
 use futures_util::StreamExt;
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::execution::*;
-use sea_orm::{QueryResult, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter,
+    QuerySelect, TransactionTrait,
+};
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
-pub fn record(r: &QueryResult) -> ApiResult<RunArtifact> {
+pub fn record(r: &execution_artifacts::Model) -> ApiResult<RunArtifact> {
     Ok(RunArtifact {
-        id: field(r, "id")?,
-        attempt_id: field(r, "attempt_id")?,
-        checkpoint_id: field(r, "checkpoint_id")?,
-        name: field(r, "name")?,
-        mime: field(r, "mime")?,
-        byte_size: field::<i64>(r, "byte_size")? as u32,
-        sha256: field(r, "sha256")?,
-        state: decode(serde_json::Value::String(field(r, "state")?))?,
-        reason: field(r, "reason")?,
+        id: r.id,
+        attempt_id: r.attempt_id,
+        checkpoint_id: r.checkpoint_id.clone(),
+        name: r.name.clone(),
+        mime: r.mime.clone(),
+        byte_size: r.byte_size as u32,
+        sha256: r.sha256.clone(),
+        state: decode(serde_json::Value::String(r.state.clone()))?,
+        reason: r.reason.clone(),
     })
 }
 
@@ -53,15 +61,14 @@ pub async fn reserve(
         return Err(ApiFailure::invalid("Unsupported evidence metadata"));
     }
     let tx = ctx.db.begin().await?;
-    let r = scheduler::lease(&tx, w, id, input.generation, token, true).await?;
-    let old = rows(
-        &tx,
-        "SELECT * FROM execution_artifacts WHERE attempt_id=$1 AND name=$2",
-        vec![id.into(), input.name.clone().into()],
-    )
-    .await?;
-    if let Some(r) = old.first() {
-        let artifact = record(r)?;
+    let lease = scheduler::lease(&tx, w, id, input.generation, token, true).await?;
+    let old = execution_artifacts::Entity::find()
+        .filter(execution_artifacts::Column::AttemptId.eq(id))
+        .filter(execution_artifacts::Column::Name.eq(input.name.clone()))
+        .one(&tx)
+        .await?;
+    if let Some(row) = old {
+        let artifact = record(&row)?;
         if artifact.sha256 != input.sha256
             || artifact.byte_size != input.byte_size
             || artifact.checkpoint_id != input.checkpoint_id
@@ -72,12 +79,11 @@ pub async fn reserve(
         tx.commit().await?;
         return Ok(ArtifactReceipt { artifact });
     }
-    if !["leased", "running", "cancel_requested"].contains(&field::<String>(&r, "state")?.as_str())
-    {
+    if !["leased", "running", "cancel_requested"].contains(&lease.attempt.state.as_str()) {
         return Err(conflict("Attempt no longer accepts artifacts"));
     }
-    let manifest: RunManifest = decode(field(&r, "manifest")?)?;
-    let c = &manifest.cases[field::<i32>(&r, "case_index")? as usize].case;
+    let manifest: RunManifest = decode(lease.run.manifest)?;
+    let c = &manifest.cases[lease.attempt.case_index as usize].case;
     let preflight = manifest.profile.execution_context.is_some()
         && input.checkpoint_id == "preflight"
         && matches!(
@@ -95,16 +101,13 @@ pub async fn reserve(
     {
         return Err(ApiFailure::invalid("Unknown checkpoint"));
     }
-    let used: i64 = field(
-        &one(
-            &tx,
-            "SELECT COALESCE(sum(byte_size),0)::bigint AS used FROM execution_artifacts WHERE \
-            attempt_id=$1",
-            vec![id.into()],
-        )
-        .await?,
-        "used",
-    )?;
+    let used = execution_artifacts::Entity::find()
+        .filter(execution_artifacts::Column::AttemptId.eq(id))
+        .all(&tx)
+        .await?
+        .into_iter()
+        .map(|artifact| artifact.byte_size)
+        .sum::<i64>();
     if used + i64::from(input.byte_size) > i64::from(c.budget.artifact_bytes) {
         return Err(ApiFailure::new(
             413,
@@ -113,53 +116,39 @@ pub async fn reserve(
         ));
     }
     let artifact = Uuid::new_v4();
-    let run_id: Uuid = field(&r, "run_id")?;
+    let run_id = lease.attempt.run_id;
     let key = format!("{}/{}/{}/{}", w.app_id, run_id, id, artifact);
     let setup = Setup::get(ctx);
-    exec(
-        &tx,
-        "INSERT INTO execution_artifacts(id,attempt_id,checkpoint_id,name,mime,byte_size,\
-            sha256,storage_key,storage_backend) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
-        vec![
-            artifact.into(),
-            id.into(),
-            input.checkpoint_id.into(),
-            input.name.into(),
-            input.mime.into(),
-            i64::from(input.byte_size).into(),
-            input.sha256.into(),
-            key.into(),
-            setup.storage_backend.into(),
-        ],
-    )
+    let row = execution_artifacts::ActiveModel {
+        id: Set(artifact),
+        attempt_id: Set(id),
+        checkpoint_id: Set(input.checkpoint_id),
+        name: Set(input.name),
+        mime: Set(input.mime),
+        byte_size: Set(i64::from(input.byte_size)),
+        sha256: Set(input.sha256),
+        storage_key: Set(key),
+        storage_backend: Set(setup.storage_backend),
+        ..Default::default()
+    }
+    .insert(&tx)
     .await?;
-    let result = record(
-        &one(
-            &tx,
-            "SELECT * FROM execution_artifacts WHERE id=$1",
-            vec![artifact.into()],
-        )
-        .await?,
-    )?;
+    let result = record(&row)?;
     tx.commit().await?;
     Ok(ArtifactReceipt { artifact: result })
 }
 
 pub async fn content(ctx: &AppContext, id: Uuid) -> ApiResult<(RunArtifact, Scratch)> {
-    let r = one(
-        &ctx.db,
-        "SELECT * FROM execution_artifacts WHERE id=$1 AND state='sealed'",
-        vec![id.into()],
-    )
-    .await?;
-    let artifact = record(&r)?;
+    let row = execution_artifacts::Entity::find_by_id(id)
+        .filter(execution_artifacts::Column::State.eq("sealed"))
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let artifact = record(&row)?;
     let setup = Setup::get(ctx);
     let file = setup
         .store
-        .materialize(
-            &field::<String>(&r, "storage_key")?,
-            &field::<String>(&r, "storage_backend")?,
-        )
+        .materialize(&row.storage_key, &row.storage_backend)
         .await?;
     let bytes = tokio::fs::read(&file.0).await?;
     if bytes.len() != artifact.byte_size as usize || hash(&bytes) != artifact.sha256 {
@@ -182,13 +171,12 @@ pub async fn upload(
     body: Body,
 ) -> ApiResult<ArtifactReceipt> {
     scheduler::lease(&ctx.db, w, id, g, token, false).await?;
-    let r = one(
-        &ctx.db,
-        "SELECT * FROM execution_artifacts WHERE id=$1 AND attempt_id=$2",
-        vec![artifact.into(), id.into()],
-    )
-    .await?;
-    let metadata = record(&r)?;
+    let row = execution_artifacts::Entity::find_by_id(artifact)
+        .filter(execution_artifacts::Column::AttemptId.eq(id))
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let metadata = record(&row)?;
     let setup = Setup::get(ctx);
     let (scratch, mut file) = setup.store.scratch().await?;
     let transfer = async {
@@ -220,8 +208,8 @@ pub async fn upload(
         .await
         .map_err(|_| ApiFailure::new(408, "upload_timeout", "Evidence upload timed out"))??;
     drop(file);
-    let key: String = field(&r, "storage_key")?;
-    let backend: String = field(&r, "storage_backend")?;
+    let key = row.storage_key.clone();
+    let backend = row.storage_backend.clone();
     // A prior publication may have survived a DB outage. Only identical bytes are reusable.
     if let Ok(existing) = setup.store.materialize(&key, &backend).await {
         let bytes = tokio::fs::read(&existing.0).await?;
@@ -233,54 +221,52 @@ pub async fn upload(
     }
     let tx = ctx.db.begin().await?;
     let attempt = scheduler::lease(&tx, w, id, g, token, true).await?;
-    if !["leased", "running", "cancel_requested"]
-        .contains(&field::<String>(&attempt, "state")?.as_str())
+    if !["leased", "running", "cancel_requested"].contains(&attempt.attempt.state.as_str())
         && metadata.state != EvidenceState::Sealed
     {
         return Err(conflict("Attempt no longer accepts evidence"));
     }
-    exec(
-        &tx,
-        "UPDATE execution_artifacts SET state='sealed' WHERE id=$1",
-        vec![artifact.into()],
-    )
-    .await?;
-    let artifact = record(
-        &one(
-            &tx,
-            "SELECT * FROM execution_artifacts WHERE id=$1",
-            vec![artifact.into()],
-        )
-        .await?,
-    )?;
+    let row = execution_artifacts::Entity::find_by_id(artifact)
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let mut active = row.into_active_model();
+    active.state = Set("sealed".into());
+    let row = active.update(&tx).await?;
+    let artifact = record(&row)?;
     tx.commit().await?;
     Ok(ArtifactReceipt { artifact })
 }
 /// Explicit maintenance reclaims abandoned uploads only after their attempt has ended.
 pub async fn cleanup_pending(ctx: &AppContext) -> ApiResult<()> {
-    let abandoned = rows(
-        &ctx.db,
-        "SELECT f.id,f.storage_key,f.storage_backend FROM execution_artifacts f JOIN \
-            execution_attempts a ON a.id=f.attempt_id WHERE f.state='pending' AND \
-            f.created_at<now()-interval '1 day' AND a.state IN ('finished','recovery_required') \
-            LIMIT 100",
-        vec![],
-    )
-    .await?;
-    for r in abandoned {
-        let id: Uuid = field(&r, "id")?;
+    let candidates = execution_artifacts::Entity::find()
+        .filter(execution_artifacts::Column::State.eq("pending"))
+        .filter(
+            execution_artifacts::Column::CreatedAt
+                .lt(chrono::Utc::now() - chrono::Duration::days(1)),
+        )
+        .limit(100)
+        .all(&ctx.db)
+        .await?;
+    for row in candidates {
+        let ended = execution_attempts::Entity::find_by_id(row.attempt_id)
+            .filter(execution_attempts::Column::State.is_in(["finished", "recovery_required"]))
+            .one(&ctx.db)
+            .await?
+            .is_some();
+        if !ended {
+            continue;
+        }
         // Missing objects are normal when transfer never published; retain the missing-evidence record.
         let setup = Setup::get(ctx);
-        let key: String = field(&r, "storage_key")?;
-        let backend: String = field(&r, "storage_backend")?;
-        setup.store.delete(&key, &backend).await?;
-        exec(
-            &ctx.db,
-            "UPDATE execution_artifacts SET state='unavailable',reason='upload_abandoned' WHERE \
-            id=$1 AND state='pending'",
-            vec![id.into()],
-        )
-        .await?;
+        setup
+            .store
+            .delete(&row.storage_key, &row.storage_backend)
+            .await?;
+        let mut active = row.into_active_model();
+        active.state = Set("unavailable".into());
+        active.reason = Set(Some("upload_abandoned".into()));
+        active.update(&ctx.db).await?;
     }
     Ok(())
 }

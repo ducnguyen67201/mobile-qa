@@ -1,0 +1,17 @@
+[Unit]
+Description=Mobile QA emulator egress boundary
+After=network-online.target
+Wants=network-online.target
+Before=mobile-qa-host.service
+PartOf=mobile-qa-host.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Group=root
+ExecStart=/usr/bin/python3 -I /opt/mobile-qa/repo/infra/device-host/network/policy.py start
+ExecStop=/usr/bin/python3 -I /opt/mobile-qa/repo/infra/device-host/network/policy.py stop
+TimeoutStartSec=45
+TimeoutStopSec=15
+UMask=0022

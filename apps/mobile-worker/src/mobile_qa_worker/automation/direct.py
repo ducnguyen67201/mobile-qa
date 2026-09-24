@@ -9,7 +9,7 @@ from xml.etree import ElementTree
 
 from mobile_qa_worker.device.android import AndroidDevice as Device
 from mobile_qa_worker.generated.models import DirectCommand, DirectTarget, ExpectedCheck
-from mobile_qa_worker.qualification.config import SERIAL, QualificationError
+from mobile_qa_worker.qualification.config import QualificationError
 
 
 class ElementRpc(Protocol):
@@ -24,13 +24,23 @@ class DeviceRpc(Protocol):
     def dump_hierarchy(self, *, compressed: bool = False, max_depth: int = 50) -> str: ...
 
 
+def device_rpc(device: Device) -> DeviceRpc:
+    module = importlib.import_module("uiautomator2")
+    if device.adb_server_port == 5037:
+        return cast(DeviceRpc, module.connect(device.serial))
+    adbutils = importlib.import_module("adbutils")
+    client = adbutils.AdbClient(host="127.0.0.1", port=device.adb_server_port)
+    return cast(DeviceRpc, module.connect(client.device(device.serial)))
+
+
 def hierarchy(device: Device) -> bytes:
+    if device.remote_commands:
+        return device.hierarchy()
     # A running UiAutomator instrumentation owns accessibility. The shell dumper
     # cannot run alongside it; use the same service after the first direct RPC.
     if device.direct_automation:
         try:
-            module = importlib.import_module("uiautomator2")
-            rpc = cast(DeviceRpc, module.connect(SERIAL))
+            rpc = device_rpc(device)
             return rpc.dump_hierarchy(compressed=False, max_depth=50).encode()
         except Exception as exc:
             raise QualificationError("hierarchy_unavailable") from exc
@@ -83,6 +93,11 @@ def execute(
     rpc: DeviceRpc | None = None,
     stopped: Callable[[], bool] = lambda: False,
 ) -> None:
+    if device.remote_commands:
+        if stopped():
+            raise QualificationError("task_stopped")
+        device.execute_direct(command)
+        return
     operation = command.root
     if stopped():
         raise QualificationError("task_stopped")
@@ -114,8 +129,7 @@ def execute(
             raise QualificationError("device_action_uncertain") from exc
         return
     if rpc is None:
-        module = importlib.import_module("uiautomator2")
-        rpc = cast(DeviceRpc, module.connect(SERIAL))
+        rpc = device_rpc(device)
     device.direct_automation = True
     # A timeout after entering this block may have changed the app. Never retry it.
     try:

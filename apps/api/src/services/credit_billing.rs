@@ -4,6 +4,10 @@ use super::{apps, execution_store::*, runs};
 use crate::{
     config::Setup,
     errors::{ApiFailure, ApiResult},
+    models::_entities::{
+        apps as app_rows, billing_checkout_intents, billing_credit_periods, billing_credit_quotes,
+        billing_credit_usage, commercial_agreements, execution_artifacts, execution_attempts,
+    },
 };
 use chrono::{DateTime, TimeZone, Utc};
 use hmac::{Hmac, Mac};
@@ -15,7 +19,11 @@ use mobile_qa_contracts::{
     },
     execution::{JobState, ModelUsage, RunManifest},
 };
-use sea_orm::{ConnectionTrait, TransactionTrait};
+use sea_orm::{
+    sea_query::{Alias, Func},
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel,
+    QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
+};
 use serde_json::Value;
 use sha2::Sha256;
 use std::time::Duration;
@@ -83,32 +91,56 @@ struct Period {
 }
 
 async fn period(db: &impl ConnectionTrait, app: Uuid, lock: bool) -> ApiResult<Option<Period>> {
-    let sql = if lock {
-        "SELECT id,plan,granted_credits,starts_at,ends_at,rate_revision FROM billing_credit_periods WHERE app_id=$1 AND starts_at<=now() AND ends_at>now() ORDER BY starts_at DESC LIMIT 1 FOR UPDATE"
+    let now = Utc::now();
+    let query = billing_credit_periods::Entity::find()
+        .filter(billing_credit_periods::Column::AppId.eq(app))
+        .filter(billing_credit_periods::Column::StartsAt.lte(now))
+        .filter(billing_credit_periods::Column::EndsAt.gt(now))
+        .order_by_desc(billing_credit_periods::Column::StartsAt);
+    let row = if lock {
+        query.lock_exclusive().one(db).await?
     } else {
-        "SELECT id,plan,granted_credits,starts_at,ends_at,rate_revision FROM billing_credit_periods WHERE app_id=$1 AND starts_at<=now() AND ends_at>now() ORDER BY starts_at DESC LIMIT 1"
+        query.one(db).await?
     };
-    rows(db, sql, vec![app.into()])
-        .await?
-        .into_iter()
-        .next()
-        .map(|r| {
-            Ok(Period {
-                id: field(&r, "id")?,
-                plan: parse_plan(&field::<String>(&r, "plan")?)?,
-                grant: field(&r, "granted_credits")?,
-                starts_at: field(&r, "starts_at")?,
-                ends_at: field(&r, "ends_at")?,
-                rate_revision: field(&r, "rate_revision")?,
-            })
+    row.map(|row| {
+        Ok(Period {
+            id: row.id,
+            plan: parse_plan(&row.plan)?,
+            grant: row.granted_credits,
+            starts_at: row.starts_at,
+            ends_at: row.ends_at,
+            rate_revision: row.rate_revision,
         })
-        .transpose()
+    })
+    .transpose()
 }
 
 async fn balance(db: &impl ConnectionTrait, p: &Period) -> ApiResult<(i64, i64, i64)> {
-    let r = one(db, "SELECT COALESCE(sum(CASE WHEN state='settled' THEN charged_credits ELSE 0 END),0)::bigint AS charged, COALESCE(sum(CASE WHEN state='held' THEN held_credits ELSE 0 END),0)::bigint AS held FROM billing_credit_usage WHERE period_id=$1", vec![p.id.into()]).await?;
-    let charged: i64 = field(&r, "charged")?;
-    let held: i64 = field(&r, "held")?;
+    async fn usage_sum(
+        db: &impl ConnectionTrait,
+        period_id: Uuid,
+        state: &str,
+        column: billing_credit_usage::Column,
+    ) -> ApiResult<i64> {
+        Ok(billing_credit_usage::Entity::find()
+            .filter(billing_credit_usage::Column::PeriodId.eq(period_id))
+            .filter(billing_credit_usage::Column::State.eq(state))
+            .select_only()
+            .expr_as(Func::cast_as(column.sum(), Alias::new("bigint")), "total")
+            .into_tuple::<Option<i64>>()
+            .one(db)
+            .await?
+            .flatten()
+            .unwrap_or_default())
+    }
+    let charged = usage_sum(
+        db,
+        p.id,
+        "settled",
+        billing_credit_usage::Column::ChargedCredits,
+    )
+    .await?;
+    let held = usage_sum(db, p.id, "held", billing_credit_usage::Column::HeldCredits).await?;
     Ok((
         charged,
         held,
@@ -121,24 +153,44 @@ pub async fn status(db: &impl ConnectionTrait, app: Uuid) -> ApiResult<Option<Cr
         return Ok(None);
     };
     let (charged, held, available) = balance(db, &p).await?;
-    let pending = one(db, "SELECT i.pending_plan,i.pending_effective_at FROM billing_checkout_intents i JOIN billing_credit_periods p ON p.checkout_intent_id=i.id WHERE p.id=$1", vec![p.id.into()]).await?;
-    let pending_plan = field::<Option<String>>(&pending, "pending_plan")?
+    let grant = billing_credit_periods::Entity::find_by_id(p.id)
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let pending = billing_checkout_intents::Entity::find_by_id(grant.checkout_intent_id)
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let pending_plan = pending
+        .pending_plan
         .map(|value| parse_plan(&value))
         .transpose()?;
-    let pending_effective_at = field(&pending, "pending_effective_at")?;
+    let pending_effective_at = pending.pending_effective_at;
     let mut usage = Vec::new();
-    for r in rows(db, "SELECT run_id,state,held_credits,measured_credits,charged_credits,input_tokens,output_tokens,device_seconds,stored_bytes,reason FROM billing_credit_usage WHERE period_id=$1 ORDER BY created_at DESC,run_id DESC LIMIT 100", vec![p.id.into()]).await? {
+    for r in billing_credit_usage::Entity::find()
+        .filter(billing_credit_usage::Column::PeriodId.eq(p.id))
+        .order_by_desc(billing_credit_usage::Column::CreatedAt)
+        .order_by_desc(billing_credit_usage::Column::RunId)
+        .limit(100)
+        .all(db)
+        .await?
+    {
         usage.push(CreditUsageView {
-            run_id: field(&r,"run_id")?, state: field(&r,"state")?,
-            held_credits: i32::try_from(field::<i64>(&r,"held_credits")?).map_err(|_| ApiFailure::internal())?,
-            measured_credits: field::<Option<i64>>(&r,"measured_credits")?.map(|v|v.to_string()),
-            charged_credits: i32::try_from(field::<i64>(&r,"charged_credits")?).map_err(|_| ApiFailure::internal())?,
-            input_tokens: field::<Option<i64>>(&r,"input_tokens")?.map(|v|v.to_string()),
-            output_tokens: field::<Option<i64>>(&r,"output_tokens")?.map(|v|v.to_string()),
-            device_seconds: field::<Option<i64>>(&r,"device_seconds")?
-                .map(i32::try_from).transpose().map_err(|_| ApiFailure::internal())?,
-            stored_bytes: field::<Option<i64>>(&r,"stored_bytes")?.map(|v|v.to_string()),
-            reason: field(&r,"reason")?,
+            run_id: r.run_id,
+            state: r.state,
+            held_credits: i32::try_from(r.held_credits).map_err(|_| ApiFailure::internal())?,
+            measured_credits: r.measured_credits.map(|v| v.to_string()),
+            charged_credits: i32::try_from(r.charged_credits)
+                .map_err(|_| ApiFailure::internal())?,
+            input_tokens: r.input_tokens.map(|v| v.to_string()),
+            output_tokens: r.output_tokens.map(|v| v.to_string()),
+            device_seconds: r
+                .device_seconds
+                .map(i32::try_from)
+                .transpose()
+                .map_err(|_| ApiFailure::internal())?,
+            stored_bytes: r.stored_bytes.map(|v| v.to_string()),
+            reason: r.reason,
         });
     }
     Ok(Some(CreditAccessView {
@@ -211,22 +263,32 @@ pub async fn change_plan(
 ) -> ApiResult<()> {
     apps::authorized(ctx, actor, app).await?;
     let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![app.into()],
-    )
-    .await?;
+    app_rows::Entity::find_by_id(app)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
     let p = period(&tx, app, false)
         .await?
         .ok_or_else(|| conflict("A paid monthly allowance is required to change plans"))?;
-    let row = one(&tx, "SELECT i.id,i.plan,i.pending_plan,i.pending_effective_at,i.stripe_subscription_id,i.stripe_schedule_id FROM billing_checkout_intents i JOIN billing_credit_periods p ON p.checkout_intent_id=i.id WHERE p.id=$1 AND i.state='paid' FOR UPDATE OF i", vec![p.id.into()]).await?;
-    let intent_id: Uuid = field(&row, "id")?;
-    let current = parse_plan(&field::<String>(&row, "plan")?)?;
+    let grant = billing_credit_periods::Entity::find_by_id(p.id)
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let row = billing_checkout_intents::Entity::find_by_id(grant.checkout_intent_id)
+        .filter(billing_checkout_intents::Column::State.eq("paid"))
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let intent_id = row.id;
+    let current = parse_plan(&row.plan)?;
     if current != p.plan {
         return Err(conflict("The current paid period needs billing review"));
     }
-    let pending = field::<Option<String>>(&row, "pending_plan")?
+    let pending = row
+        .pending_plan
+        .clone()
         .map(|value| parse_plan(&value))
         .transpose()?;
     if pending == Some(target) {
@@ -249,7 +311,10 @@ pub async fn change_plan(
         .timeout(Duration::from_secs(15))
         .build()
         .map_err(|_| unavailable())?;
-    let sid = field::<String>(&row, "stripe_subscription_id")?;
+    let sid = row
+        .stripe_subscription_id
+        .clone()
+        .ok_or_else(ApiFailure::internal)?;
     stripe_id(&Value::String(sid.clone()), "sub_")?;
     let subscription = stripe_get(&client, &secret, &format!("subscriptions/{sid}")).await?;
     let item = subscription["items"]["data"]
@@ -272,7 +337,7 @@ pub async fn change_plan(
     {
         return Err(conflict("Subscription and paid period need billing review"));
     }
-    let stored_schedule: Option<String> = field(&row, "stripe_schedule_id")?;
+    let stored_schedule = row.stripe_schedule_id.clone();
     if pending.is_some() {
         let schedule = stored_schedule
             .as_deref()
@@ -301,7 +366,11 @@ pub async fn change_plan(
             )
             .await?;
         }
-        exec(&tx, "UPDATE billing_checkout_intents SET pending_plan=NULL,pending_effective_at=NULL,stripe_schedule_id=NULL WHERE id=$1", vec![intent_id.into()]).await?;
+        let mut active = row.clone().into_active_model();
+        active.pending_plan = Set(None);
+        active.pending_effective_at = Set(None);
+        active.stripe_schedule_id = Set(None);
+        active.update(&tx).await?;
         tx.commit().await?;
         return Ok(());
     }
@@ -353,7 +422,11 @@ pub async fn change_plan(
             && future["currency"] == "usd"
             && future["recurring"]["interval"] == "month"
         {
-            exec(&tx, "UPDATE billing_checkout_intents SET pending_plan=$2,pending_effective_at=$3,stripe_schedule_id=$4 WHERE id=$1", vec![intent_id.into(),terms(target).2.into(),p.ends_at.into(),schedule_id.into()]).await?;
+            let mut active = row.clone().into_active_model();
+            active.pending_plan = Set(Some(terms(target).2.into()));
+            active.pending_effective_at = Set(Some(p.ends_at));
+            active.stripe_schedule_id = Set(Some(schedule_id.into()));
+            active.update(&tx).await?;
             tx.commit().await?;
             return Ok(());
         }
@@ -431,7 +504,11 @@ pub async fn change_plan(
     {
         return Err(unavailable());
     }
-    exec(&tx, "UPDATE billing_checkout_intents SET pending_plan=$2,pending_effective_at=$3,stripe_schedule_id=$4 WHERE id=$1", vec![intent_id.into(),target_word.into(),p.ends_at.into(),schedule_id.into()]).await?;
+    let mut active = row.into_active_model();
+    active.pending_plan = Set(Some(target_word.into()));
+    active.pending_effective_at = Set(Some(p.ends_at));
+    active.stripe_schedule_id = Set(Some(schedule_id.into()));
+    active.update(&tx).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -457,36 +534,45 @@ pub async fn checkout(
     let (cents, _, word) = terms(plan);
     let origin = Setup::get(ctx).origin;
     let tx = ctx.db.begin().await?;
-    let app_row = one(
-        &tx,
-        "SELECT id,organization_id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![app.into()],
-    )
-    .await?;
-    let workspace: Uuid = field(&app_row, "organization_id")?;
+    let app_row = app_rows::Entity::find_by_id(app)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let workspace = app_row.organization_id;
     if period(&tx, app, false).await?.is_some() {
         return Err(conflict("This app already has an active monthly allowance"));
     }
-    if !rows(
-        &tx,
-        "SELECT id FROM billing_checkout_intents WHERE app_id=$1 AND state='paid' LIMIT 1",
-        vec![app.into()],
-    )
-    .await?
-    .is_empty()
+    if billing_checkout_intents::Entity::find()
+        .filter(billing_checkout_intents::Column::AppId.eq(app))
+        .filter(billing_checkout_intents::Column::State.eq("paid"))
+        .one(&tx)
+        .await?
+        .is_some()
     {
         return Err(conflict(
             "An existing subscription owns this app; avoid creating a second checkout",
         ));
     }
-    if !rows(&tx,"SELECT id FROM commercial_agreements WHERE app_id=$1 AND status='active' AND ends_at>now()",vec![app.into()]).await?.is_empty() {
+    if commercial_agreements::Entity::find()
+        .filter(commercial_agreements::Column::AppId.eq(app))
+        .filter(commercial_agreements::Column::Status.eq("active"))
+        .filter(commercial_agreements::Column::EndsAt.gt(Utc::now()))
+        .one(&tx)
+        .await?
+        .is_some()
+    {
         return Err(conflict("This app already has an active check agreement"));
     }
-    let open = rows(&tx, "SELECT id,plan,stripe_session_id,stripe_session_url,created_at FROM billing_checkout_intents WHERE app_id=$1 AND state IN ('pending','checkout')", vec![app.into()]).await?;
-    let reusable = if let Some(r) = open.first() {
-        let existing_id: Uuid = field(r, "id")?;
-        let session_id: Option<String> = field(r, "stripe_session_id")?;
-        if Utc::now() - field::<DateTime<Utc>>(r, "created_at")? >= chrono::Duration::hours(24) {
+    let open = billing_checkout_intents::Entity::find()
+        .filter(billing_checkout_intents::Column::AppId.eq(app))
+        .filter(billing_checkout_intents::Column::State.is_in(["pending", "checkout"]))
+        .one(&tx)
+        .await?;
+    let reusable = if let Some(r) = open {
+        let existing_id = r.id;
+        let session_id = r.stripe_session_id.clone();
+        if Utc::now() - r.created_at >= chrono::Duration::hours(24) {
             // An overdue local intent may have completed payment while its
             // webhook is delayed. Only Stripe-confirmed expiry frees the app.
             let session_id = session_id.ok_or_else(|| conflict("Checkout needs billing review"))?;
@@ -497,23 +583,20 @@ pub async fn checkout(
                 return Err(unavailable());
             }
             if remote["status"] == "expired" {
-                exec(
-                    &tx,
-                    "UPDATE billing_checkout_intents SET state='expired' WHERE id=$1",
-                    vec![existing_id.into()],
-                )
-                .await?;
+                let mut active = r.into_active_model();
+                active.state = Set("expired".into());
+                active.update(&tx).await?;
                 None
             } else {
                 return Err(conflict("Checkout or payment is still being confirmed"));
             }
         } else {
-            if field::<String>(r, "plan")? != word {
+            if r.plan != word {
                 return Err(conflict(
                     "Finish the existing checkout before choosing another plan",
                 ));
             }
-            if let Some(url) = field::<Option<String>>(r, "stripe_session_url")? {
+            if let Some(url) = r.stripe_session_url {
                 tx.commit().await?;
                 return Ok(CreditCheckoutResponse { url });
             }
@@ -526,11 +609,14 @@ pub async fn checkout(
         id
     } else {
         let id = Uuid::new_v4();
-        exec(
-            &tx,
-            "INSERT INTO billing_checkout_intents(id,app_id,actor_id,plan) VALUES($1,$2,$3,$4)",
-            vec![id.into(), app.into(), actor.into(), word.into()],
-        )
+        billing_checkout_intents::ActiveModel {
+            id: Set(id),
+            app_id: Set(app),
+            actor_id: Set(actor),
+            plan: Set(word.into()),
+            ..Default::default()
+        }
+        .insert(&tx)
         .await?;
         id
     };
@@ -575,7 +661,23 @@ pub async fn checkout(
     if !url.starts_with("https://checkout.stripe.com/") {
         return Err(unavailable());
     }
-    exec(&ctx.db, "UPDATE billing_checkout_intents SET state='checkout',stripe_session_id=$2,stripe_session_url=$3 WHERE id=$1 AND state='pending'", vec![id.into(),session.into(),url.into()]).await?;
+    billing_checkout_intents::Entity::update_many()
+        .col_expr(
+            billing_checkout_intents::Column::State,
+            sea_orm::sea_query::Expr::value("checkout"),
+        )
+        .col_expr(
+            billing_checkout_intents::Column::StripeSessionId,
+            sea_orm::sea_query::Expr::value(Some(session.to_owned())),
+        )
+        .col_expr(
+            billing_checkout_intents::Column::StripeSessionUrl,
+            sea_orm::sea_query::Expr::value(Some(url.to_owned())),
+        )
+        .filter(billing_checkout_intents::Column::Id.eq(id))
+        .filter(billing_checkout_intents::Column::State.eq("pending"))
+        .exec(&ctx.db)
+        .await?;
     Ok(CreditCheckoutResponse { url: url.into() })
 }
 
@@ -707,31 +809,27 @@ pub async fn apply_verified_invoice(
         return Err(ApiFailure::internal());
     }
     let tx = ctx.db.begin().await?;
-    let app_row = one(
-        &tx,
-        "SELECT app_id FROM billing_checkout_intents WHERE id=$1",
-        vec![intent_id.into()],
-    )
-    .await?;
-    let app: Uuid = field(&app_row, "app_id")?;
+    let app = billing_checkout_intents::Entity::find_by_id(intent_id)
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?
+        .app_id;
     // All billing mutations lock the app before the intent, including checkout
     // and plan changes. Keeping the same order avoids renewal deadlocks.
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![app.into()],
-    )
-    .await?;
-    let row = one(
-        &tx,
-        "SELECT app_id,plan,pending_plan,pending_effective_at,stripe_subscription_id FROM billing_checkout_intents WHERE id=$1 FOR UPDATE",
-        vec![intent_id.into()],
-    )
-    .await?;
-    if field::<Uuid>(&row, "app_id")? != app {
+    app_rows::Entity::find_by_id(app)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let row = billing_checkout_intents::Entity::find_by_id(intent_id)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    if row.app_id != app {
         return Err(ApiFailure::internal());
     }
-    let recorded_subscription: Option<String> = field(&row, "stripe_subscription_id")?;
+    let recorded_subscription = row.stripe_subscription_id.clone();
     if recorded_subscription
         .as_deref()
         .is_some_and(|id| id != subscription_id)
@@ -740,22 +838,38 @@ pub async fn apply_verified_invoice(
     }
     // An old invoice can be replayed after Stripe has advanced to a new price.
     // Its already verified grant stays immutable and never applies a second time.
-    let existing = rows(&tx, "SELECT stripe_invoice_id,stripe_subscription_id,app_id FROM billing_credit_periods WHERE stripe_invoice_id=$1 OR (stripe_subscription_id=$2 AND starts_at=$3)", vec![invoice_id.into(),subscription_id.into(),start.into()]).await?;
-    if let Some(grant) = existing.first() {
-        if field::<String>(grant, "stripe_invoice_id")? == invoice_id
-            && field::<String>(grant, "stripe_subscription_id")? == subscription_id
-            && field::<Uuid>(grant, "app_id")? == app
+    let existing = billing_credit_periods::Entity::find()
+        .filter(
+            Condition::any()
+                .add(billing_credit_periods::Column::StripeInvoiceId.eq(invoice_id))
+                .add(
+                    Condition::all()
+                        .add(
+                            billing_credit_periods::Column::StripeSubscriptionId
+                                .eq(subscription_id),
+                        )
+                        .add(billing_credit_periods::Column::StartsAt.eq(start)),
+                ),
+        )
+        .one(&tx)
+        .await?;
+    if let Some(grant) = existing {
+        if grant.stripe_invoice_id == invoice_id
+            && grant.stripe_subscription_id == subscription_id
+            && grant.app_id == app
         {
             tx.commit().await?;
             return Ok(());
         }
         return Err(ApiFailure::internal());
     }
-    let current = parse_plan(&field::<String>(&row, "plan")?)?;
-    let pending = field::<Option<String>>(&row, "pending_plan")?
+    let current = parse_plan(&row.plan)?;
+    let pending = row
+        .pending_plan
+        .clone()
         .map(|value| parse_plan(&value))
         .transpose()?;
-    let effective: Option<DateTime<Utc>> = field(&row, "pending_effective_at")?;
+    let effective = row.pending_effective_at;
     let switching = pending.is_some() && effective == Some(start);
     if pending.is_some() && effective.is_some_and(|date| start > date) {
         return Err(ApiFailure::internal());
@@ -789,13 +903,31 @@ pub async fn apply_verified_invoice(
     if line_price != price_id {
         return Err(ApiFailure::internal());
     }
-    exec(&tx, "INSERT INTO billing_credit_periods(id,app_id,checkout_intent_id,stripe_subscription_id,stripe_invoice_id,plan,granted_credits,starts_at,ends_at,rate_revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)", vec![Uuid::new_v4().into(),app.into(),intent_id.into(),subscription_id.into(),invoice_id.into(),word.into(),credits.into(),start.into(),end.into(),RATE_REVISION.into()]).await?;
-    exec(
-        &tx,
-        "UPDATE billing_checkout_intents SET state='paid',stripe_subscription_id=$2,plan=$3,pending_plan=CASE WHEN $4 THEN NULL ELSE pending_plan END,pending_effective_at=CASE WHEN $4 THEN NULL ELSE pending_effective_at END,stripe_schedule_id=CASE WHEN $4 THEN NULL ELSE stripe_schedule_id END WHERE id=$1",
-        vec![intent_id.into(), subscription_id.into(),word.into(),switching.into()],
-    )
+    billing_credit_periods::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        app_id: Set(app),
+        checkout_intent_id: Set(intent_id),
+        stripe_subscription_id: Set(subscription_id.into()),
+        stripe_invoice_id: Set(invoice_id.into()),
+        plan: Set(word.into()),
+        granted_credits: Set(i64::from(credits)),
+        starts_at: Set(start),
+        ends_at: Set(end),
+        rate_revision: Set(RATE_REVISION),
+        ..Default::default()
+    }
+    .insert(&tx)
     .await?;
+    let mut active = row.into_active_model();
+    active.state = Set("paid".into());
+    active.stripe_subscription_id = Set(Some(subscription_id.into()));
+    active.plan = Set(word.into());
+    if switching {
+        active.pending_plan = Set(None);
+        active.pending_effective_at = Set(None);
+        active.stripe_schedule_id = Set(None);
+    }
+    active.update(&tx).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -818,8 +950,34 @@ fn measured_credits(
     i64::try_from(ceil(numerator, denominator)).map_err(|_| ApiFailure::internal())
 }
 
+fn authorized_device_seconds(manifest: &RunManifest) -> ApiResult<i64> {
+    let attempts = i64::try_from(manifest.cases.len())
+        .map_err(|_| ApiFailure::internal())?
+        .checked_mul(1 + i64::from(manifest.diagnostic_retries))
+        .ok_or_else(ApiFailure::internal)?;
+    let cleanup = manifest
+        .profile
+        .execution_context
+        .as_ref()
+        .map_or(610_i64, |context| {
+            i64::from(context.stages.cleanup_seconds) + 10
+        });
+    let per_attempt = 1800_i64
+        .checked_add(cleanup)
+        .ok_or_else(ApiFailure::internal)?;
+    i64::from(manifest.budget.duration_seconds)
+        .checked_add(
+            attempts
+                .checked_mul(per_attempt)
+                .ok_or_else(ApiFailure::internal)?,
+        )
+        .ok_or_else(ApiFailure::internal)
+}
+
 fn maximum(manifest: &RunManifest) -> ApiResult<i64> {
-    let seconds = i64::from(manifest.budget.duration_seconds);
+    // A hold bounds occupancy through preparation and cleanup; it is not a flat charge.
+    // Billing still measures claim→release and caps settlement at the accepted quote.
+    let seconds = authorized_device_seconds(manifest)?;
     let bytes = i64::from(manifest.budget.artifact_bytes);
     TOKEN_RESERVE
         .checked_add(measured_credits(0, 0, seconds, bytes)?)
@@ -851,8 +1009,25 @@ pub async fn quote(
     let id = Uuid::new_v4();
     let expiry = Utc::now() + chrono::Duration::minutes(10);
     let manifest_hash = hash(serde_json::to_vec(manifest).map_err(|_| ApiFailure::internal())?);
-    exec(&ctx.db,"INSERT INTO billing_credit_quotes(id,period_id,app_id,actor_id,kind,request_hash,manifest_hash,build_id,source_version_id,profile_id,environment_revision,rate_revision,max_credits,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
-        vec![id.into(),p.id.into(),app.into(),actor.into(),kind.into(),request_hash.into(),manifest_hash.into(),build.into(),source.into(),manifest.profile.id.into(),environment_revision.into(),p.rate_revision.into(),max.into(),expiry.into()]).await?;
+    billing_credit_quotes::ActiveModel {
+        id: Set(id),
+        period_id: Set(p.id),
+        app_id: Set(app),
+        actor_id: Set(actor),
+        kind: Set(kind.into()),
+        request_hash: Set(request_hash.into()),
+        manifest_hash: Set(manifest_hash),
+        build_id: Set(build),
+        source_version_id: Set(source),
+        profile_id: Set(manifest.profile.id),
+        environment_revision: Set(environment_revision),
+        rate_revision: Set(p.rate_revision),
+        max_credits: Set(max),
+        expires_at: Set(expiry),
+        ..Default::default()
+    }
+    .insert(&ctx.db)
+    .await?;
     Ok(Some(CommercialQuoteResponse {
         id,
         app_id: app,
@@ -884,7 +1059,12 @@ pub async fn reserve(
     manifest: &RunManifest,
     run_id: Uuid,
 ) -> ApiResult<bool> {
-    let Some(q)=rows(db,"SELECT period_id,app_id,actor_id,kind,request_hash,manifest_hash,build_id,source_version_id,profile_id,environment_revision,rate_revision,max_credits,expires_at FROM billing_credit_quotes WHERE id=$1",vec![quote_id.into()]).await?.into_iter().next() else { return Ok(false); };
+    let Some(q) = billing_credit_quotes::Entity::find_by_id(quote_id)
+        .one(db)
+        .await?
+    else {
+        return Ok(false);
+    };
     let p = period(db, app, true)
         .await?
         .ok_or_else(|| conflict("The monthly allowance has ended"))?;
@@ -905,19 +1085,19 @@ pub async fn reserve(
         })
         .or(manifest.plan_version_id)
         .ok_or_else(ApiFailure::internal)?;
-    let max: i64 = field(&q, "max_credits")?;
-    if field::<Uuid>(&q, "period_id")? != p.id
-        || field::<Uuid>(&q, "app_id")? != app
-        || field::<Uuid>(&q, "actor_id")? != actor
-        || field::<String>(&q, "kind")? != kind
-        || field::<String>(&q, "request_hash")? != request_hash
-        || field::<String>(&q, "manifest_hash")? != digest
-        || field::<Uuid>(&q, "build_id")? != manifest.build_id
-        || field::<Uuid>(&q, "source_version_id")? != source
-        || field::<Uuid>(&q, "profile_id")? != manifest.profile.id
-        || field::<i32>(&q, "environment_revision")? != manifest.environment_revision
-        || field::<i32>(&q, "rate_revision")? != p.rate_revision
-        || field::<DateTime<Utc>>(&q, "expires_at")? <= Utc::now()
+    let max = q.max_credits;
+    if q.period_id != p.id
+        || q.app_id != app
+        || q.actor_id != actor
+        || q.kind != kind
+        || q.request_hash != request_hash
+        || q.manifest_hash != digest
+        || q.build_id != manifest.build_id
+        || q.source_version_id != source
+        || q.profile_id != manifest.profile.id
+        || q.environment_revision != manifest.environment_revision
+        || q.rate_revision != p.rate_revision
+        || q.expires_at <= Utc::now()
         || max != maximum(manifest)?
     {
         return Err(conflict(
@@ -930,8 +1110,16 @@ pub async fn reserve(
             "Not enough credits for this run's maximum authorization",
         ));
     }
-    exec(db,"INSERT INTO billing_credit_usage(run_id,quote_id,period_id,app_id,held_credits) VALUES($1,$2,$3,$4,$5)",
-        vec![run_id.into(),quote_id.into(),p.id.into(),app.into(),max.into()]).await?;
+    billing_credit_usage::ActiveModel {
+        run_id: Set(run_id),
+        quote_id: Set(quote_id),
+        period_id: Set(p.id),
+        app_id: Set(app),
+        held_credits: Set(max),
+        ..Default::default()
+    }
+    .insert(db)
+    .await?;
     Ok(true)
 }
 
@@ -943,98 +1131,114 @@ pub async fn review(
     reason: &str,
 ) -> ApiResult<bool> {
     let tx = ctx.db.begin().await?;
-    let Some(row) = rows(
-        &tx,
-        "SELECT period_id,held_credits,state FROM billing_credit_usage WHERE run_id=$1 FOR UPDATE",
-        vec![run.into()],
-    )
-    .await?
-    .into_iter()
-    .next() else {
+    let Some(row) = billing_credit_usage::Entity::find_by_id(run)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+    else {
         return Ok(false);
     };
-    if field::<String>(&row, "state")? != "held" {
+    if row.state != "held" {
         return Err(conflict("This run was already reviewed"));
     }
     let detail = runs::detail(&tx, run).await?;
     if detail.state != JobState::Finished {
         return Err(conflict("Finish this run before reviewing its usage"));
     }
-    let (state, measured, charged, input, output, seconds, bytes) = if decision
-        == CommercialUsageState::Credited
-    {
-        ("released", None, 0, None, None, None, None)
-    } else {
-        let mut input = 0_i64;
-        let mut output = 0_i64;
-        let mut seconds = 0_i64;
-        for r in rows(
-            &tx,
-            "SELECT claim_id,claimed_at,released_at,usage FROM execution_attempts WHERE run_id=$1",
-            vec![run.into()],
-        )
-        .await?
-        {
-            let claim: Option<Uuid> = field(&r, "claim_id")?;
-            if claim.is_some() {
-                let start: Option<DateTime<Utc>> = field(&r, "claimed_at")?;
-                let end: Option<DateTime<Utc>> = field(&r, "released_at")?;
-                let (Some(start), Some(end)) = (start, end) else {
-                    return Err(conflict("Device time is incomplete; review after recovery"));
-                };
-                seconds = seconds.saturating_add(
-                    ((end - start).num_milliseconds() + 999)
-                        .div_euclid(1000)
-                        .max(1),
-                );
-            }
-            let value: Value = field(&r, "usage")?;
-            let usages: Vec<ModelUsage> =
-                serde_json::from_value(value).map_err(|_| ApiFailure::internal())?;
-            if claim.is_some()
-                && detail.manifest.resolved_model.is_some()
-                && !usages.iter().any(|usage| usage.calls > 0)
-            {
-                return Err(conflict(
-                    "Provider usage is missing for a model run; review the meter before settlement",
-                ));
-            }
-            for usage in usages {
-                if usage.unknown_calls > 0
-                    || (usage.calls > 0
-                        && (usage.input_tokens.is_none() || usage.output_tokens.is_none()))
+    let (state, measured, charged, input, output, seconds, bytes) =
+        if decision == CommercialUsageState::Credited {
+            ("released", None, 0, None, None, None, None)
+        } else {
+            let mut input = 0_i64;
+            let mut output = 0_i64;
+            let mut seconds = 0_i64;
+            let attempts = execution_attempts::Entity::find()
+                .filter(execution_attempts::Column::RunId.eq(run))
+                .all(&tx)
+                .await?;
+            for r in &attempts {
+                let claim = r.claim_id;
+                if claim.is_some() {
+                    let start = r.claimed_at;
+                    let end = r.released_at;
+                    let (Some(start), Some(end)) = (start, end) else {
+                        return Err(conflict("Device time is incomplete; review after recovery"));
+                    };
+                    seconds = seconds.saturating_add(
+                        ((end - start).num_milliseconds() + 999)
+                            .div_euclid(1000)
+                            .max(1),
+                    );
+                }
+                let usages: Vec<ModelUsage> =
+                    serde_json::from_value(r.usage.clone()).map_err(|_| ApiFailure::internal())?;
+                if claim.is_some()
+                    && detail.manifest.resolved_model.is_some()
+                    && !usages.iter().any(|usage| usage.calls > 0)
                 {
                     return Err(conflict(
+                    "Provider usage is missing for a model run; review the meter before settlement",
+                ));
+                }
+                for usage in usages {
+                    if usage.unknown_calls > 0
+                        || (usage.calls > 0
+                            && (usage.input_tokens.is_none() || usage.output_tokens.is_none()))
+                    {
+                        return Err(conflict(
                         "Provider token usage is incomplete; review the meter before settlement",
                     ));
+                    }
+                    input = input.saturating_add(i64::from(usage.input_tokens.unwrap_or(0)));
+                    output = output.saturating_add(i64::from(usage.output_tokens.unwrap_or(0)));
                 }
-                input = input.saturating_add(i64::from(usage.input_tokens.unwrap_or(0)));
-                output = output.saturating_add(i64::from(usage.output_tokens.unwrap_or(0)));
             }
-        }
-        let r=one(&tx,"SELECT COALESCE(sum(f.byte_size),0)::bigint AS bytes FROM execution_artifacts f JOIN execution_attempts a ON a.id=f.attempt_id WHERE a.run_id=$1 AND f.state='sealed'",vec![run.into()]).await?;
-        let bytes: i64 = field(&r, "bytes")?;
-        let measured = measured_credits(input, output, seconds, bytes)?;
-        let held: i64 = field(&row, "held_credits")?;
-        (
-            "settled",
-            Some(measured),
-            measured.min(held),
-            Some(input),
-            Some(output),
-            Some(seconds),
-            Some(bytes),
-        )
-    };
-    let period: Uuid = field(&row, "period_id")?;
-    one(
-        &tx,
-        "SELECT id FROM billing_credit_periods WHERE id=$1 FOR UPDATE",
-        vec![period.into()],
-    )
-    .await?;
-    exec(&tx,"UPDATE billing_credit_usage SET state=$2,measured_credits=$3,charged_credits=$4,input_tokens=$5,output_tokens=$6,device_seconds=$7,stored_bytes=$8,reason=$9,reviewer_id=$10,reviewed_at=now() WHERE run_id=$1",
-        vec![run.into(),state.into(),measured.into(),charged.into(),input.into(),output.into(),seconds.into(),bytes.into(),reason.into(),actor.into()]).await?;
+            let attempt_ids = attempts
+                .iter()
+                .map(|attempt| attempt.id)
+                .collect::<Vec<_>>();
+            let bytes = if attempt_ids.is_empty() {
+                0
+            } else {
+                execution_artifacts::Entity::find()
+                    .filter(execution_artifacts::Column::AttemptId.is_in(attempt_ids))
+                    .filter(execution_artifacts::Column::State.eq("sealed"))
+                    .all(&tx)
+                    .await?
+                    .into_iter()
+                    .fold(0_i64, |sum, artifact| {
+                        sum.saturating_add(artifact.byte_size)
+                    })
+            };
+            let measured = measured_credits(input, output, seconds, bytes)?;
+            let held = row.held_credits;
+            (
+                "settled",
+                Some(measured),
+                measured.min(held),
+                Some(input),
+                Some(output),
+                Some(seconds),
+                Some(bytes),
+            )
+        };
+    billing_credit_periods::Entity::find_by_id(row.period_id)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let mut active = row.into_active_model();
+    active.state = Set(state.into());
+    active.measured_credits = Set(measured);
+    active.charged_credits = Set(charged);
+    active.input_tokens = Set(input);
+    active.output_tokens = Set(output);
+    active.device_seconds = Set(seconds);
+    active.stored_bytes = Set(bytes);
+    active.reason = Set(Some(reason.into()));
+    active.reviewer_id = Set(Some(actor));
+    active.reviewed_at = Set(Some(Utc::now()));
+    active.update(&tx).await?;
     tx.commit().await?;
     Ok(true)
 }
@@ -1044,22 +1248,33 @@ pub async fn release_queued_cancel(
     actor: Uuid,
     run: Uuid,
 ) -> ApiResult<bool> {
-    let Some(row) = rows(
-        db,
-        "SELECT period_id,state FROM billing_credit_usage WHERE run_id=$1 FOR UPDATE",
-        vec![run.into()],
-    )
-    .await?
-    .into_iter()
-    .next() else {
+    let Some(row) = billing_credit_usage::Entity::find_by_id(run)
+        .lock_exclusive()
+        .one(db)
+        .await?
+    else {
         return Ok(false);
     };
-    if field::<String>(&row, "state")? != "held" {
+    if row.state != "held" {
         return Ok(true);
     }
-    let claimed=rows(db,"SELECT id FROM execution_attempts WHERE run_id=$1 AND (claim_id IS NOT NULL OR state<>'finished' OR reason IS DISTINCT FROM 'canceled_before_dispatch') LIMIT 1",vec![run.into()]).await?;
-    if claimed.is_empty() {
-        exec(db,"UPDATE billing_credit_usage SET state='released',reason='Canceled before device claim',reviewer_id=$2,reviewed_at=now() WHERE run_id=$1",vec![run.into(),actor.into()]).await?;
+    let claimed = execution_attempts::Entity::find()
+        .filter(execution_attempts::Column::RunId.eq(run))
+        .all(db)
+        .await?
+        .into_iter()
+        .any(|attempt| {
+            attempt.claim_id.is_some()
+                || attempt.state != "finished"
+                || attempt.reason.as_deref() != Some("canceled_before_dispatch")
+        });
+    if !claimed {
+        let mut active = row.into_active_model();
+        active.state = Set("released".into());
+        active.reason = Set(Some("Canceled before device claim".into()));
+        active.reviewer_id = Set(Some(actor));
+        active.reviewed_at = Set(Some(Utc::now()));
+        active.update(db).await?;
     }
     Ok(true)
 }
@@ -1067,6 +1282,30 @@ pub async fn release_queued_cancel(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn quote_reserves_preparation_and_cleanup_for_each_possible_attempt() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/execution/comparison.json"
+        ))
+        .unwrap();
+        let mut manifest: RunManifest =
+            serde_json::from_value(fixture["manifest"].clone()).unwrap();
+        manifest.diagnostic_retries = 1;
+        let cleanup = i64::from(
+            manifest
+                .profile
+                .execution_context
+                .as_ref()
+                .unwrap()
+                .stages
+                .cleanup_seconds,
+        ) + 10;
+        assert_eq!(
+            authorized_device_seconds(&manifest).unwrap(),
+            i64::from(manifest.budget.duration_seconds)
+                + manifest.cases.len() as i64 * 2 * (1800 + cleanup)
+        );
+    }
     #[test]
     fn monthly_terms_and_single_rounding() {
         assert_eq!(terms(CreditPlan::Starter), (50_000, 50_000, "starter"));

@@ -61,7 +61,24 @@ additive. Protocol 5 is mandatory for a frozen model assignment with one host mo
 protocol 6 advertises a bounded qualified model set. Claims still require the exact
 frozen reference and provider, and a direct-only claim needs no model.
 
-## Future work
+## Large artifacts and managed device hosts
+
+`artifacts_api.rs` owns multipart sessions, part authorization/receipts and scoped
+worker build delivery. Its temporary signed URLs are an explicit exception to the
+rule against exposing storage locators: each is short-lived, authorized for one
+operation, excluded from persistence/logs, and sent without API credentials to the
+storage origin. Durable customer-facing build records still expose no storage key.
+The 2 GiB ceiling is emitted as a bounded JSON number, including its inclusive upper
+boundary; generated browser code must not infer a signed 32-bit ceiling.
+
+`device_hosts.rs` owns host protocol 1, boot generations, slots, internal device IPC
+and controller requests. `device_hosts_api.rs` declares internal host/control routes;
+scoped bearer authorization is independent of browser cookies. Both Python worker
+and capacity controller consume the generated worker models. The controller imports
+the same generated package, not a second handwritten wire model. A host credential
+cannot authorize a customer build; app/profile grants and execution leases still do.
+
+## Further contract changes
 
 Keep Loco source registries and injection markers inside apps/api. Generated domain
 DTOs move into crates/contracts, with re-exports from apps/api/src/dtos when useful.

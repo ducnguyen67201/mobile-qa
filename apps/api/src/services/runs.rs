@@ -1,10 +1,20 @@
 //! Freeze saved coverage before queuing. Reports are projections of durable facts.
 use super::{apps, execution_store::*, model_registry, test_definitions as definitions};
-use crate::errors::{ApiFailure, ApiResult};
+use crate::{
+    errors::{ApiFailure, ApiResult},
+    models::_entities::{
+        apps as app_rows, builds, environments, execution_artifacts, execution_attempts,
+        execution_events, execution_preflight_receipts, execution_recovery_events,
+        execution_reservations, execution_runs, execution_workers, phone_sessions,
+    },
+};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::execution::*;
 use mobile_qa_contracts::model_registry::{ModelCapability, ModelPurpose};
-use sea_orm::{ConnectionTrait, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionTrait,
+};
 use uuid::Uuid;
 
 pub async fn preview(
@@ -73,12 +83,11 @@ pub(crate) async fn assemble(
         manifest: None,
         blockers: vec![],
     };
-    let b = one(
-        db,
-        "SELECT * FROM builds WHERE id=$1 AND app_id=$2",
-        vec![build.into(), app.into()],
-    )
-    .await?;
+    let b = builds::Entity::find_by_id(build)
+        .filter(builds::Column::AppId.eq(app))
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
     let profile = definitions::profile(db, app, p.profile_id).await?;
     let uses_navigation = cases.iter().any(|c| {
         c.case
@@ -121,15 +130,13 @@ pub(crate) async fn assemble(
             out.blockers.push(e.message);
         }
     }
-    let env = one(
-        db,
-        "SELECT revision,account_secret_reference_id,reset_secret_reference_id FROM \
-            environments WHERE app_id=$1",
-        vec![app.into()],
-    )
-    .await?;
-    let size: i64 = field(&b, "byte_size")?;
-    if field::<String>(&b, "validation_state")? != "validated" {
+    let env = environments::Entity::find()
+        .filter(environments::Column::AppId.eq(app))
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let size = b.byte_size;
+    if b.validation_state != "validated" {
         out.blockers.push("APK intake validation must pass".into());
     }
     if !profile.qualified {
@@ -139,15 +146,11 @@ pub(crate) async fn assemble(
     if size < 1 || size > i64::from(profile.max_apk_bytes) {
         out.blockers.push("APK exceeds worker capability".into());
     }
-    let app_package: String = field(
-        &one(
-            db,
-            "SELECT android_package FROM apps WHERE id=$1",
-            vec![app.into()],
-        )
-        .await?,
-        "android_package",
-    )?;
+    let app_package = app_rows::Entity::find_by_id(app)
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?
+        .android_package;
     if app_package != profile.package
         || cases.iter().any(|c| {
             c.case.package != profile.package
@@ -162,9 +165,7 @@ pub(crate) async fn assemble(
             .push("App or checks are incompatible with this adapter".into());
     }
     // This adapter owns its synthetic backend and has no customer account or remote reset.
-    if field::<Option<Uuid>>(&env, "account_secret_reference_id")?.is_some()
-        || field::<Option<Uuid>>(&env, "reset_secret_reference_id")?.is_some()
-    {
+    if env.account_secret_reference_id.is_some() || env.reset_secret_reference_id.is_some() {
         out.blockers
             .push("Customer credential/reset references need a qualified adapter".into());
     }
@@ -188,8 +189,8 @@ pub(crate) async fn assemble(
     out.manifest = Some(RunManifest {
         app_id: app,
         build_id: build,
-        build_sha256: field(&b, "sha256")?,
-        build_bytes: u32::try_from(size).unwrap_or(0),
+        build_sha256: b.sha256,
+        build_bytes: u32::try_from(size).map_err(|_| ApiFailure::internal())?,
         source: source.clone(),
         plan_version_id: if source.is_some() { None } else { Some(d.id) },
         plan_hash: if source.is_some() {
@@ -197,7 +198,7 @@ pub(crate) async fn assemble(
         } else {
             Some(d.content_hash)
         },
-        environment_revision: field(&env, "revision")?,
+        environment_revision: env.revision,
         profile,
         resolved_model,
         model_assignment_revision: assignment.map(|(_, revision)| revision),
@@ -239,32 +240,30 @@ pub async fn create_with_quote(
         hash(serde_json::to_vec(&(actor, &input)).map_err(|_| ApiFailure::internal())?)
     };
     let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![app.into()],
-    )
-    .await?;
-    let old = rows(
-        &tx,
-        "SELECT id,fingerprint FROM execution_runs WHERE app_id=$1 AND idempotency_key=$2",
-        vec![app.into(), key.into()],
-    )
-    .await?;
-    if let Some(r) = old.first() {
-        if field::<String>(r, "fingerprint")? != fingerprint {
+    app_rows::Entity::find_by_id(app)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let old = execution_runs::Entity::find()
+        .filter(execution_runs::Column::AppId.eq(app))
+        .filter(execution_runs::Column::IdempotencyKey.eq(key))
+        .one(&tx)
+        .await?;
+    if let Some(r) = old {
+        if r.fingerprint != fingerprint {
             return Err(conflict("Idempotency key belongs to another submission"));
         }
-        let result = detail(&tx, field(r, "id")?).await?;
+        let result = detail(&tx, r.id).await?;
         tx.commit().await?;
         return Ok((result, false));
     }
-    one(
-        &tx,
-        "SELECT id FROM environments WHERE app_id=$1 FOR SHARE",
-        vec![app.into()],
-    )
-    .await?;
+    environments::Entity::find()
+        .filter(environments::Column::AppId.eq(app))
+        .lock_shared()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
     let preview = preview(&tx, app, input.build_id, Some(input.plan_version_id)).await?;
     if !preview.blockers.is_empty() {
         return Err(ApiFailure::invalid(preview.blockers.join("; ")));
@@ -274,21 +273,18 @@ pub async fn create_with_quote(
         return Err(conflict("Environment changed; refresh the preview"));
     }
     let id = Uuid::new_v4();
-    exec(
-        &tx,
-        "INSERT INTO execution_runs(id,app_id,creator_id,build_id,plan_id,idempotency_key,\
-            fingerprint,manifest) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
-        vec![
-            id.into(),
-            app.into(),
-            actor.into(),
-            input.build_id.into(),
-            input.plan_version_id.into(),
-            key.into(),
-            fingerprint.into(),
-            json(&manifest)?.into(),
-        ],
-    )
+    execution_runs::ActiveModel {
+        id: Set(id),
+        app_id: Set(app),
+        creator_id: Set(actor),
+        build_id: Set(input.build_id),
+        plan_id: Set(Some(input.plan_version_id)),
+        idempotency_key: Set(key.to_owned()),
+        fingerprint: Set(fingerprint),
+        manifest: Set(json(&manifest)?),
+        ..Default::default()
+    }
+    .insert(&tx)
     .await?;
     super::commercial::reserve_or_test_fixture(
         ctx,
@@ -303,13 +299,16 @@ pub async fn create_with_quote(
     )
     .await?;
     for (index, _) in manifest.cases.iter().enumerate() {
-        exec(
-            &tx,
-            "INSERT INTO execution_attempts(id,run_id,case_index) VALUES($1,$2,$3)",
-            vec![Uuid::new_v4().into(), id.into(), (index as i32).into()],
-        )
+        execution_attempts::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            run_id: Set(id),
+            case_index: Set(index as i32),
+            ..Default::default()
+        }
+        .insert(&tx)
         .await?;
     }
+    super::capacity_control::enqueue(&tx, app, manifest.profile.id).await?;
     let result = detail(&tx, id).await?;
     tx.commit().await?;
     super::execution_wakeup::notify(ctx);
@@ -323,84 +322,116 @@ pub async fn create_with_quote(
 }
 
 pub async fn authorize(ctx: &AppContext, user: Uuid, id: Uuid) -> ApiResult<Uuid> {
-    let app: Uuid = field(
-        &one(
-            &ctx.db,
-            "SELECT app_id FROM execution_runs WHERE id=$1",
-            vec![id.into()],
-        )
-        .await?,
-        "app_id",
-    )?;
+    let app = execution_runs::Entity::find_by_id(id)
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?
+        .app_id;
     apps::authorized(ctx, user, app).await?;
     Ok(app)
 }
 
 pub async fn attempt(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<AttemptResponse> {
-    let r = one(
-        db,
-        "SELECT a.*,r.manifest FROM execution_attempts a JOIN execution_runs r ON \
-            r.id=a.run_id WHERE a.id=$1",
-        vec![id.into()],
-    )
-    .await?;
-    let manifest: RunManifest = decode(field(&r, "manifest")?)?;
-    let index: i32 = field(&r, "case_index")?;
-    let artifacts = rows(
-        db,
-        "SELECT * FROM execution_artifacts WHERE attempt_id=$1 ORDER BY name",
-        vec![id.into()],
-    )
-    .await?
-    .iter()
-    .map(super::run_artifacts::record)
-    .collect::<ApiResult<Vec<_>>>()?;
-    Ok(AttemptResponse {
-        preflight: rows(db,"SELECT payload FROM execution_preflight_receipts WHERE attempt_id=$1 ORDER BY generation DESC LIMIT 1",vec![id.into()]).await?.first().map(|r| decode(field(r,"payload")?)).transpose()?,
-        recovery_events: rows(db,"SELECT actor_id,evidence_reference,created_at FROM execution_recovery_events WHERE attempt_id=$1 ORDER BY created_at,id",vec![id.into()]).await?.iter().map(|r| Ok(mobile_qa_contracts::execution_lifecycle::RecoveryEvent {actor_id:field(r,"actor_id")?,evidence_reference:field(r,"evidence_reference")?,created_at:field(r,"created_at")?})).collect::<ApiResult<Vec<_>>>()?,
-        original_cleanup: field::<Option<serde_json::Value>>(&r,"cleanup_receipt")?.and_then(|v| serde_json::from_value(v).ok()),
-        id,
-        case_version_id: manifest.cases[index as usize].definition_id,
-        generation: field(&r, "generation")?,
-        number: field::<i32>(&r, "number")? as u32,
-        state: decode(serde_json::Value::String(field(&r, "state")?))?,
-        outcome: field::<Option<String>>(&r, "outcome")?
-            .map(|s| decode(serde_json::Value::String(s)))
-            .transpose()?,
-        cleanup: decode(serde_json::Value::String(field(&r, "cleanup")?))?,
-        reason: field(&r, "reason")?,
-        checks: decode(field(&r, "checks")?)?,
-        artifacts,
-        usage: decode(field(&r, "usage")?)?,
-        events: rows(
-            db,
-            "SELECT payload FROM execution_events WHERE attempt_id=$1 ORDER BY sequence",
-            vec![id.into()],
-        )
+    let r = execution_attempts::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let manifest: RunManifest = decode(
+        execution_runs::Entity::find_by_id(r.run_id)
+            .one(db)
+            .await?
+            .ok_or_else(ApiFailure::missing)?
+            .manifest,
+    )?;
+    let index = r.case_index;
+    let artifacts = execution_artifacts::Entity::find()
+        .filter(execution_artifacts::Column::AttemptId.eq(id))
+        .order_by_asc(execution_artifacts::Column::Name)
+        .all(db)
         .await?
         .iter()
-        .map(|r| decode(field(r, "payload")?))
-        .collect::<ApiResult<Vec<_>>>()?,
+        .map(super::run_artifacts::record)
+        .collect::<ApiResult<Vec<_>>>()?;
+    let preflight = execution_preflight_receipts::Entity::find()
+        .filter(execution_preflight_receipts::Column::AttemptId.eq(id))
+        .order_by_desc(execution_preflight_receipts::Column::Generation)
+        .one(db)
+        .await?
+        .map(|row| decode(row.payload))
+        .transpose()?;
+    let recovery_events = execution_recovery_events::Entity::find()
+        .filter(execution_recovery_events::Column::AttemptId.eq(id))
+        .order_by_asc(execution_recovery_events::Column::CreatedAt)
+        .order_by_asc(execution_recovery_events::Column::Id)
+        .all(db)
+        .await?
+        .into_iter()
+        .map(
+            |row| mobile_qa_contracts::execution_lifecycle::RecoveryEvent {
+                actor_id: row.actor_id,
+                evidence_reference: row.evidence_reference,
+                created_at: row.created_at,
+            },
+        )
+        .collect();
+    let events = execution_events::Entity::find()
+        .filter(execution_events::Column::AttemptId.eq(id))
+        .order_by_asc(execution_events::Column::Sequence)
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|row| decode(row.payload))
+        .collect::<ApiResult<Vec<_>>>()?;
+    Ok(AttemptResponse {
+        preflight,
+        recovery_events,
+        original_cleanup: r
+            .cleanup_receipt
+            .and_then(|v| serde_json::from_value(v).ok()),
+        id,
+        case_version_id: manifest.cases[index as usize].definition_id,
+        generation: r.generation,
+        number: r.number as u32,
+        state: decode(serde_json::Value::String(r.state))?,
+        outcome: r
+            .outcome
+            .map(|s| decode(serde_json::Value::String(s)))
+            .transpose()?,
+        cleanup: decode(serde_json::Value::String(r.cleanup))?,
+        reason: r.reason,
+        checks: decode(r.checks)?,
+        artifacts,
+        usage: decode(r.usage)?,
+        events,
     })
 }
 
 pub async fn detail(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<RunResponse> {
-    let row = one(
-        db,
-        "SELECT r.*,COALESCE(b.metadata->>'version_name',b.original_filename) AS build_label FROM execution_runs r JOIN builds b ON b.id=r.build_id WHERE r.id=$1",
-        vec![id.into()],
-    )
-    .await?;
-    let manifest: RunManifest = decode(field(&row, "manifest")?)?;
+    let row = execution_runs::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let build = builds::Entity::find_by_id(row.build_id)
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let build_label = build
+        .metadata
+        .as_ref()
+        .and_then(|value| value.get("version_name"))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
+        .unwrap_or(build.original_filename);
+    let manifest: RunManifest = decode(row.manifest.clone())?;
     let mut attempts = vec![];
-    for r in rows(
-        db,
-        "SELECT id FROM execution_attempts WHERE run_id=$1 ORDER BY case_index,number",
-        vec![id.into()],
-    )
-    .await?
-    {
-        attempts.push(attempt(db, field(&r, "id")?).await?);
+    let attempt_rows = execution_attempts::Entity::find()
+        .filter(execution_attempts::Column::RunId.eq(id))
+        .order_by_asc(execution_attempts::Column::CaseIndex)
+        .order_by_asc(execution_attempts::Column::Number)
+        .all(db)
+        .await?;
+    for attempt_row in attempt_rows {
+        attempts.push(attempt(db, attempt_row.id).await?);
     }
     let state = if attempts
         .iter()
@@ -409,7 +440,7 @@ pub async fn detail(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<RunRespons
         JobState::RecoveryRequired
     } else if attempts.iter().all(|a| a.state == JobState::Finished) {
         JobState::Finished
-    } else if field::<bool>(&row, "cancel_requested")? {
+    } else if row.cancel_requested {
         JobState::CancelRequested
     } else if attempts.iter().any(|a| a.state == JobState::Finalizing) {
         JobState::Finalizing
@@ -422,20 +453,18 @@ pub async fn detail(db: &impl ConnectionTrait, id: Uuid) -> ApiResult<RunRespons
         JobState::Queued
     };
     let summary = summary(&manifest, &attempts);
-    let created_at: chrono::DateTime<chrono::Utc> = field(&row, "created_at")?;
+    let created_at = row.created_at;
     let queue_status = if state == JobState::Queued {
         Some(queue_status(db, &manifest, created_at).await?)
     } else {
         None
     };
     Ok(RunResponse {
-        cancel_requested: field(&row, "cancel_requested")?,
-        build_label: Some(field(&row, "build_label")?),
+        cancel_requested: row.cancel_requested,
+        build_label: Some(build_label),
         queue_status,
-        comparison: field::<Option<serde_json::Value>>(&row, "comparison")?
-            .map(decode)
-            .transpose()?,
-        baseline_run_id: field(&row, "baseline_run_id")?,
+        comparison: row.comparison.map(decode).transpose()?,
+        baseline_run_id: row.baseline_run_id,
         id,
         manifest,
         state,
@@ -450,19 +479,23 @@ async fn queue_status(
     manifest: &RunManifest,
     created_at: chrono::DateTime<chrono::Utc>,
 ) -> ApiResult<QueueStatus> {
-    let workers=rows(db,"SELECT execution_model_capabilities,execution_protocol_version,execution_last_seen_at FROM execution_workers WHERE app_id=$1 AND profile_id=$2 AND revoked=false",vec![manifest.app_id.into(),manifest.profile.id.into()]).await?;
+    let workers = execution_workers::Entity::find()
+        .filter(execution_workers::Column::AppId.eq(manifest.app_id))
+        .filter(execution_workers::Column::ProfileId.eq(manifest.profile.id))
+        .filter(execution_workers::Column::Revoked.eq(false))
+        .all(db)
+        .await?;
     let mut live = false;
     let mut model_live = false;
     let mut compatible_live = false;
     let mut last_compatible = None;
     let threshold = chrono::Utc::now() - chrono::Duration::seconds(90);
     for row in workers {
-        let seen: Option<chrono::DateTime<chrono::Utc>> = field(&row, "execution_last_seen_at")?;
-        let version: Option<i32> = field(&row, "execution_protocol_version")?;
-        let capabilities =
-            field::<Option<serde_json::Value>>(&row, "execution_model_capabilities")?.and_then(
-                |v| decode::<mobile_qa_contracts::model_registry::WorkerModelCapabilities>(v).ok(),
-            );
+        let seen = row.execution_last_seen_at;
+        let version = row.execution_protocol_version;
+        let capabilities = row.execution_model_capabilities.and_then(|value| {
+            decode::<mobile_qa_contracts::model_registry::WorkerModelCapabilities>(value).ok()
+        });
         let model_matches = manifest
             .resolved_model
             .as_ref()
@@ -496,25 +529,54 @@ async fn queue_status(
             }
         }
     }
-    let reservations=rows(db,"SELECT a.state AS attempt_state,s.payload->>'state' AS phone_state,br.id AS blocking_run_id,br.app_id AS blocking_app_id FROM execution_reservations r LEFT JOIN execution_attempts a ON a.id=r.attempt_id LEFT JOIN execution_runs br ON br.id=a.run_id LEFT JOIN phone_sessions s ON s.id=r.session_id WHERE r.resource=$1 OR r.resource=$2",vec![format!("app:{}",manifest.app_id).into(),format!("device:{}",manifest.profile.device_identity).into()]).await?;
+    let reservations = execution_reservations::Entity::find()
+        .filter(execution_reservations::Column::Resource.is_in([
+            format!("app:{}", manifest.app_id),
+            format!("device:{}", manifest.profile.device_identity),
+        ]))
+        .all(db)
+        .await?;
     let mut recovery_required = false;
     let mut blocking_run_id = None;
     for row in &reservations {
-        let attempt_state: Option<String> = field(row, "attempt_state")?;
-        let phone_state: Option<String> = field(row, "phone_state")?;
-        if attempt_state.as_deref() == Some("recovery_required") {
-            recovery_required = true;
-            if field::<Option<Uuid>>(row, "blocking_app_id")? == Some(manifest.app_id) {
-                blocking_run_id = field(row, "blocking_run_id")?;
+        if let Some(attempt_id) = row.attempt_id {
+            if let Some(attempt) = execution_attempts::Entity::find_by_id(attempt_id)
+                .one(db)
+                .await?
+            {
+                if attempt.state == "recovery_required" {
+                    recovery_required = true;
+                    if let Some(run) = execution_runs::Entity::find_by_id(attempt.run_id)
+                        .one(db)
+                        .await?
+                    {
+                        if run.app_id == manifest.app_id {
+                            blocking_run_id = Some(run.id);
+                        }
+                    }
+                }
             }
-        } else if phone_state.as_deref() == Some("quarantined") {
-            recovery_required = true;
+        } else if let Some(session_id) = row.session_id {
+            if let Some(session) = phone_sessions::Entity::find_by_id(session_id)
+                .one(db)
+                .await?
+            {
+                let session: mobile_qa_contracts::task_sessions::PhoneSession =
+                    decode(session.payload)?;
+                if session.state == mobile_qa_contracts::task_sessions::PhoneState::Quarantined {
+                    recovery_required = true;
+                }
+            }
         }
     }
+    let capacity_reason =
+        super::capacity_control::queue_reason(db, manifest.app_id, manifest.profile.id).await?;
     let reason = if recovery_required {
         QueueReason::DeviceRecoveryRequired
     } else if !reservations.is_empty() {
         QueueReason::CapacityBusy
+    } else if let Some(reason) = capacity_reason {
+        reason
     } else if !live {
         QueueReason::WorkerOffline
     } else if !model_live {
@@ -632,33 +694,37 @@ pub fn summary(manifest: &RunManifest, attempts: &[AttemptResponse]) -> String {
 pub async fn cancel(ctx: &AppContext, user: Uuid, id: Uuid) -> ApiResult<RunResponse> {
     authorize(ctx, user, id).await?;
     let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM execution_runs WHERE id=$1 FOR UPDATE",
-        vec![id.into()],
-    )
-    .await?;
-    exec(
-        &tx,
-        "UPDATE execution_runs SET cancel_requested=true WHERE id=$1",
-        vec![id.into()],
-    )
-    .await?;
-    exec(
-        &tx,
-        "UPDATE execution_attempts SET state='finished',outcome='canceled',\
-            cleanup='verified_clean',reason='canceled_before_dispatch' WHERE run_id=$1 AND \
-            state='queued'",
-        vec![id.into()],
-    )
-    .await?;
-    exec(
-        &tx,
-        "UPDATE execution_attempts SET state='cancel_requested' WHERE run_id=$1 AND state IN \
-            ('leased','running')",
-        vec![id.into()],
-    )
-    .await?;
+    let run = execution_runs::Entity::find_by_id(id)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let mut active = run.into_active_model();
+    active.cancel_requested = Set(true);
+    active.update(&tx).await?;
+    let queued = execution_attempts::Entity::find()
+        .filter(execution_attempts::Column::RunId.eq(id))
+        .filter(execution_attempts::Column::State.eq("queued"))
+        .all(&tx)
+        .await?;
+    for attempt in queued {
+        let mut active = attempt.into_active_model();
+        active.state = Set("finished".into());
+        active.outcome = Set(Some("canceled".into()));
+        active.cleanup = Set("verified_clean".into());
+        active.reason = Set(Some("canceled_before_dispatch".into()));
+        active.update(&tx).await?;
+    }
+    let active_attempts = execution_attempts::Entity::find()
+        .filter(execution_attempts::Column::RunId.eq(id))
+        .filter(execution_attempts::Column::State.is_in(["leased", "running"]))
+        .all(&tx)
+        .await?;
+    for attempt in active_attempts {
+        let mut active = attempt.into_active_model();
+        active.state = Set("cancel_requested".into());
+        active.update(&tx).await?;
+    }
     // A run canceled before any worker claim consumed no delivered device check.
     super::commercial::credit_queued_cancel(&tx, user, id).await?;
     let result = detail(&tx, id).await?;
@@ -673,16 +739,17 @@ pub async fn list(
     cursor: Option<Uuid>,
 ) -> ApiResult<RunListResponse> {
     apps::authorized(ctx, user, app).await?;
-    let ids = rows(
-        &ctx.db,
-        "SELECT id FROM execution_runs WHERE app_id=$1 AND ($2::uuid IS NULL OR id<$2) ORDER \
-            BY id DESC LIMIT 21",
-        vec![app.into(), cursor.into()],
-    )
-    .await?;
+    let mut query = execution_runs::Entity::find()
+        .filter(execution_runs::Column::AppId.eq(app))
+        .order_by_desc(execution_runs::Column::Id)
+        .limit(21);
+    if let Some(cursor) = cursor {
+        query = query.filter(execution_runs::Column::Id.lt(cursor));
+    }
+    let ids = query.all(&ctx.db).await?;
     let mut items = vec![];
-    for r in ids.iter().take(20) {
-        items.push(detail(&ctx.db, field(r, "id")?).await?);
+    for row in ids.iter().take(20) {
+        items.push(detail(&ctx.db, row.id).await?);
     }
     let next_cursor = if ids.len() > 20 {
         items.last().map(|r| r.id.to_string())

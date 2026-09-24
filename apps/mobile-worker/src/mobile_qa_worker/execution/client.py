@@ -1,8 +1,12 @@
 """Bounded, same-origin HTTP; generated Pydantic validates every JSON response."""
 
 import json
+import os
+import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
+from pathlib import Path
 from typing import TypeVar
 from urllib.parse import urlsplit
 
@@ -42,6 +46,93 @@ class Client:
         self.origin = origin.rstrip("/")
         self.token = token
         self.opener = urllib.request.build_opener(NoRedirect())
+
+    def get(self, path: str, model: type[T], lease_token: str = "") -> T:
+        return model.model_validate_json(
+            self.raw("GET", path, lease_token=lease_token), strict=True
+        )
+
+    def download(
+        self,
+        address: str,
+        destination: Path,
+        *,
+        expected_bytes: int,
+        lease_token: str,
+        signed: bool,
+        check: Callable[[], None],
+        deadline: float,
+    ) -> None:
+        """Bounded binary transfer, with no credential forwarding to signed storage URLs.
+
+        The caller maintains the lease on a separate heartbeat thread. Socket inactivity
+        is limited to 60 seconds; the complete preparation has a separate deadline.
+        Partial files are never returned on failure and all redirects are rejected.
+        """
+        if not 0 < expected_bytes <= 2 * 1024**3:
+            raise ValueError("invalid_artifact_size")
+        headers: dict[str, str] = {"Accept-Encoding": "identity"}
+        if signed:
+            parsed = urlsplit(address)
+            if (
+                len(address) > 16384
+                or parsed.scheme != "https"
+                or not parsed.hostname
+                or parsed.username
+                or parsed.password
+                or parsed.fragment
+            ):
+                raise ValueError("invalid_artifact_url")
+            url = address
+        else:
+            if not address.startswith("/api/") or address.startswith("//"):
+                raise ValueError("invalid_api_path")
+            url = self.origin + address
+            headers.update(Authorization="Bearer " + self.token)
+            headers["X-Lease-Token"] = lease_token
+        request = urllib.request.Request(url, headers=headers, method="GET")
+        check()
+        if time.monotonic() >= deadline:
+            raise ValueError("artifact_transfer_deadline")
+        descriptor = os.open(
+            destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600
+        )
+        try:
+            with os.fdopen(descriptor, "wb") as output:
+                with self.opener.open(
+                    request, timeout=min(60, deadline - time.monotonic())
+                ) as response:
+                    if response.headers.get("Content-Encoding", "identity") != "identity":
+                        raise ValueError("unexpected_artifact_encoding")
+                    declared = response.headers.get("Content-Length")
+                    if declared is not None and int(declared) != expected_bytes:
+                        raise ValueError("build_size_mismatch")
+                    received = 0
+                    while True:
+                        check()
+                        if time.monotonic() >= deadline:
+                            raise ValueError("artifact_transfer_deadline")
+                        chunk = response.read1(65536)
+                        if not chunk:
+                            break
+                        received += len(chunk)
+                        if received > expected_bytes:
+                            raise ValueError("build_size_mismatch")
+                        output.write(chunk)
+                    check()
+                    if received != expected_bytes:
+                        raise ValueError("build_size_mismatch")
+                    output.flush()
+                    os.fsync(output.fileno())
+        except urllib.error.HTTPError as exc:
+            destination.unlink(missing_ok=True)
+            raise TransportError(exc.code) from None
+        except (urllib.error.URLError, TimeoutError, OSError):
+            destination.unlink(missing_ok=True)
+            raise TransportError(0) from None
+        except BaseException:
+            destination.unlink(missing_ok=True)
+            raise
 
     def raw(
         self,

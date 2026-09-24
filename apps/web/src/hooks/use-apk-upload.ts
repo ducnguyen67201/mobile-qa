@@ -2,19 +2,38 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
-import type { UploadResponse } from '@/api/generated/types.gen'
+import type { MultipartUpload, UploadResponse } from '@/api/generated/types.gen'
 import { completeUpload, createUpload, getUpload, transferUpload } from '@/api/setup'
+import { abortMultipartUpload, getMultipartUpload } from '@/api/multipart'
+import { ApiClientError } from '@/api/runtime'
+import { uploadMultipartFile, type TransferProgress } from '@/lib/multipart-upload'
 import { formatBytes } from '@/lib/format'
 
-export function useApkUpload(appId: string, maxBytes: number) {
+async function savedMultipart(appId: string, uploadId: string, signal: AbortSignal) {
+  try {
+    const descriptor = await getMultipartUpload(appId, uploadId, signal)
+    if (descriptor.upload_id !== uploadId)
+      throw new Error('The saved upload reference does not match.')
+    return descriptor
+  } catch (reason) {
+    // Only an absent descriptor proves this is a legacy transfer. Authentication,
+    // network and validation failures must retain the saved upload reference.
+    if (reason instanceof ApiClientError && reason.status === 404) return null
+    throw reason
+  }
+}
+
+export function useApkUpload(appId: string, maxBytes: number, multipartEnabled = false) {
   const [params, setParams] = useSearchParams()
   const uploadId = params.get('upload')
   const client = useQueryClient()
   const [file, setFile] = useState<File | null>(null)
   const [upload, setUpload] = useState<UploadResponse | null>(null)
+  const [multipart, setMultipart] = useState<MultipartUpload | null>(null)
   const [phase, setPhase] = useState('')
   const [error, setError] = useState<unknown>(null)
   const [inputError, setInputError] = useState('')
+  const [progress, setProgress] = useState<TransferProgress | null>(null)
   const abort = useRef<AbortController | null>(null)
   const active = useRef(true)
   const paramsRef = useRef(params)
@@ -28,19 +47,27 @@ export function useApkUpload(appId: string, maxBytes: number) {
   }, [])
   useEffect(() => {
     let current = true
+    const controller = new AbortController()
     if (uploadId)
-      void getUpload(appId, uploadId)
-        .then((value) => {
-          if (current) {
-            setUpload(value)
-            setError(null)
-          }
+      void getUpload(appId, uploadId, controller.signal)
+        .then(async (value) => {
+          if (!current) return
+          setUpload(value)
+          setMultipart(null)
+          const descriptor =
+            value.state === 'receiving'
+              ? await savedMultipart(appId, uploadId, controller.signal)
+              : null
+          if (!current) return
+          setMultipart(descriptor)
+          setError(null)
         })
         .catch((reason) => {
           if (current) setError(reason)
         })
     return () => {
       current = false
+      controller.abort()
     }
   }, [appId, uploadId])
   const updateUrl = (id: string, buildId?: string) => {
@@ -50,39 +77,57 @@ export function useApkUpload(appId: string, maxBytes: number) {
     setParams(next, { replace: true })
   }
   const inspect = async () => {
-    if (!uploadId) return
+    if (!uploadId || abort.current) return
+    abort.current = new AbortController()
     setPhase('Checking saved upload…')
     setError(null)
     try {
-      const value = await getUpload(appId, uploadId)
-      if (active.current) setUpload(value)
+      const value = await getUpload(appId, uploadId, abort.current.signal)
+      if (!active.current) return
+      setUpload(value)
+      setMultipart(null)
+      const descriptor =
+        value.state === 'receiving'
+          ? await savedMultipart(appId, uploadId, abort.current.signal)
+          : null
+      if (active.current) setMultipart(descriptor)
     } catch (reason) {
       if (active.current) setError(reason)
     } finally {
+      abort.current = null
       if (active.current) setPhase('')
     }
   }
   const run = async () => {
+    if (abort.current) return
     setError(null)
     setInputError('')
+    setProgress(null)
     abort.current = new AbortController()
     const signal = abort.current.signal
     try {
       setPhase('Checking upload…')
       // Always reconcile an existing upload before retrying a mutation after uncertainty.
-      let current = uploadId ? await getUpload(appId, uploadId) : null
+      let current = uploadId ? await getUpload(appId, uploadId, signal) : null
       if (!active.current) return
+      setUpload(current)
+      setMultipart(null)
       if (current?.state === 'expired') {
         setUpload(current)
         setInputError('This upload expired. Start a new upload.')
         return
       }
-      if (current?.state === 'receiving') {
-        setUpload(current)
+      // Resolve saved sessions independently of cached settings so retries use
+      // their original transfer protocol.
+      const existingMultipart =
+        current?.state === 'receiving' ? await savedMultipart(appId, current.id, signal) : null
+      if (!active.current) return
+      setMultipart(existingMultipart)
+      if (current?.state === 'receiving' && !existingMultipart) {
         setInputError('The server is still receiving this file. Check its status before retrying.')
         return
       }
-      if (!current || current.state === 'pending') {
+      if (!current || current.state === 'pending' || current.state === 'receiving') {
         if (!file) {
           setInputError('Choose the APK file to continue.')
           return
@@ -107,8 +152,24 @@ export function useApkUpload(appId: string, maxBytes: number) {
           updateUrl(current.id)
           setUpload(current)
         }
-        setPhase('Transferring APK…')
-        current = await transferUpload(appId, current.id, file, signal)
+        const useMultipart = !!existingMultipart || multipartEnabled
+        setPhase(useMultipart ? 'Checking saved parts and transferring APK…' : 'Transferring APK…')
+        current = useMultipart
+          ? await uploadMultipartFile(
+              appId,
+              current.id,
+              file,
+              signal,
+              (value) => {
+                if (active.current) {
+                  setProgress(value)
+                  if (value.completedBytes === value.totalBytes)
+                    setPhase('Verifying stored APK bytes…')
+                }
+              },
+              existingMultipart ?? undefined,
+            )
+          : await transferUpload(appId, current.id, file, signal)
         if (!active.current) return
         setUpload(current)
       }
@@ -118,25 +179,62 @@ export function useApkUpload(appId: string, maxBytes: number) {
       updateUrl(current.id, build.id)
       client.setQueryData(['build', appId, build.id], build)
       void client.invalidateQueries({ queryKey: ['builds', appId] })
-      const recovered = await getUpload(appId, current.id)
+      const recovered = await getUpload(appId, current.id, signal)
       if (active.current) {
         setUpload(recovered)
         setFile(null)
       }
     } catch (reason) {
-      if (active.current) setError(reason)
+      if (active.current) {
+        if (signal.aborted)
+          setInputError(
+            'Request stopped. Your upload reference is saved; check its status or resume with the original file.',
+          )
+        else setError(reason)
+      }
     } finally {
+      abort.current = null
       if (active.current) setPhase('')
     }
   }
-  const clear = () => {
+  const clear = async () => {
+    if (abort.current) return
+    if (uploadId && (!upload || ['pending', 'receiving'].includes(upload.state))) {
+      abort.current = new AbortController()
+      setPhase('Discarding incomplete upload…')
+      try {
+        const current = await getUpload(appId, uploadId, abort.current.signal)
+        if (!active.current) return
+        setUpload(current)
+        setMultipart(null)
+        if (['pending', 'receiving'].includes(current.state)) {
+          const descriptor = await savedMultipart(appId, uploadId, abort.current.signal)
+          if (!active.current) return
+          setMultipart(descriptor)
+          if (descriptor) await abortMultipartUpload(appId, uploadId, abort.current.signal)
+        }
+      } catch (reason) {
+        // A saved upload can exist before its first multipart session is created.
+        // There are no provider parts to discard when that session is absent.
+        if (!(reason instanceof ApiClientError && reason.status === 404)) {
+          if (active.current) setError(reason)
+          return
+        }
+      } finally {
+        abort.current = null
+        if (active.current) setPhase('')
+      }
+    }
+    if (!active.current) return
     const next = new URLSearchParams(paramsRef.current)
     next.delete('upload')
     setParams(next, { replace: true })
     setUpload(null)
+    setMultipart(null)
     setFile(null)
     setError(null)
     setInputError('')
+    setProgress(null)
   }
   const selectFile = (value: File | null) => {
     setFile(value)
@@ -146,9 +244,11 @@ export function useApkUpload(appId: string, maxBytes: number) {
   return {
     uploadId,
     upload,
+    canResumeMultipart: multipart?.state === 'uploading',
     phase,
     error,
     inputError,
+    progress,
     selectFile,
     run,
     inspect,

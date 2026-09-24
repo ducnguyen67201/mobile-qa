@@ -353,3 +353,47 @@ def test_saved_case_manifest_keeps_legacy_plan_shape_optional():
     current = RunManifest.model_validate(raw)
     assert current.plan_version_id is None
     assert current.model_dump(mode="json", exclude_none=True)["source"] == raw["source"]
+
+
+def test_canceled_preparation_does_not_start_device_and_reports_clean(tmp_path, monkeypatch):
+    from datetime import UTC, datetime, timedelta
+    from types import SimpleNamespace
+
+    from mobile_qa_worker.execution import runner
+
+    assigned = job()
+    lease = ExecutionLease.model_validate(
+        {
+            "attempt_id": assigned.attempt_id,
+            "run_id": uuid4(),
+            "case_index": 0,
+            "generation": 1,
+            "lease_token": "lease-private",
+            "expires_at": datetime.now(UTC) + timedelta(minutes=1),
+            "manifest": assigned.manifest,
+        }
+    )
+    client = SimpleNamespace(send=lambda *_: SimpleNamespace(cancel_requested=True))
+    monkeypatch.setattr(runner, "run_prepared", lambda *_: pytest.fail("device started"))
+    reports = []
+    monkeypatch.setattr(runner, "report_result", lambda *_args: reports.append(_args[-1]))
+    runner.run_lease(client, lease, tmp_path, None, "pass")
+    assert len(reports) == 1
+    assert reports[0].outcome.value == "canceled"
+    assert reports[0].reset.value == "verified_clean"
+    assert reports[0].stopped is True
+    assert not (tmp_path / str(lease.attempt_id) / "build.apk").exists()
+
+
+def test_slot_child_inherits_only_private_device_capability(monkeypatch):
+    from mobile_qa_worker.execution.runner import child_environment
+
+    monkeypatch.setenv("MOBILE_QA_SLOT_SOCKET", "/private/slot.sock")
+    monkeypatch.setenv("MOBILE_QA_SLOT_TOKEN", "local-capability")
+    monkeypatch.setenv("MOBILE_QA_SLOT_LEASE_ROOT", "/private/lease")
+    monkeypatch.setenv("MOBILE_QA_WORKER_TOKEN", "http-secret")
+    child = child_environment()
+    assert child["MOBILE_QA_SLOT_SOCKET"] == "/private/slot.sock"
+    assert child["MOBILE_QA_SLOT_TOKEN"] == "local-capability"
+    assert child["MOBILE_QA_SLOT_LEASE_ROOT"] == "/private/lease"
+    assert "MOBILE_QA_WORKER_TOKEN" not in child

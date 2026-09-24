@@ -5,9 +5,13 @@ import signal
 import subprocess
 import sys
 import time
+from contextlib import ExitStack
 from pathlib import Path
 from uuid import UUID, uuid4
 
+from mobile_qa_worker.artifacts.cache import Cache
+from mobile_qa_worker.artifacts.delivery import prepared_build
+from mobile_qa_worker.artifacts.preparation import PreparationStopped, PreparationWatch
 from mobile_qa_worker.execution.client import Client, TransportError
 from mobile_qa_worker.execution.journal import read, write
 from mobile_qa_worker.generated.models import (
@@ -48,7 +52,18 @@ def child_environment() -> dict[str, str]:
     return {
         k: v
         for k, v in os.environ.items()
-        if k in ("PATH", "HOME", "LANG", "LC_ALL", "JAVA_HOME", "VIRTUAL_ENV")
+        if k
+        in (
+            "PATH",
+            "HOME",
+            "LANG",
+            "LC_ALL",
+            "JAVA_HOME",
+            "VIRTUAL_ENV",
+            "MOBILE_QA_SLOT_SOCKET",
+            "MOBILE_QA_SLOT_TOKEN",
+            "MOBILE_QA_SLOT_LEASE_ROOT",
+        )
     }
 
 
@@ -177,17 +192,62 @@ def run_lease(
     )
     write(directory / "job.json", job.model_dump(mode="json"))
     prefix = f"/api/worker/attempts/{lease.attempt_id}"
-    build = client.raw(
-        "GET",
-        prefix + f"/build?generation={lease.generation}",
-        lease_token=lease.lease_token,
-        limit=lease.manifest.build_bytes,
-    )
-    apk = directory / "build.apk"
-    apk.write_bytes(build)
-    apk.chmod(0o600)
-    if len(build) != lease.manifest.build_bytes or sha256(apk) != lease.manifest.build_sha256:
-        raise ValueError("build_checksum_mismatch")
+
+    def heartbeat() -> bool:
+        return client.send(
+            prefix + "/heartbeat",
+            {"generation": lease.generation},
+            LeaseStatusResponse,
+            lease.lease_token,
+        ).cancel_requested
+
+    with ExitStack() as resources:
+        try:
+            # The first heartbeat and build capability authorize even a cache hit.
+            # The pin outlives preparation and remains held until device cleanup.
+            with PreparationWatch(heartbeat) as preparation:
+                resources.enter_context(
+                    prepared_build(
+                        client,
+                        endpoint=prefix + f"/build/delivery?generation={lease.generation}",
+                        lease_token=lease.lease_token,
+                        app_id=lease.manifest.app_id,
+                        digest=lease.manifest.build_sha256,
+                        size=lease.manifest.build_bytes,
+                        state=state,
+                        target=directory / "build.apk",
+                        check=preparation.check,
+                    )
+                )
+                preparation.check()
+        except (ValueError, OSError, TransportError) as exc:
+            # No device process has started. Failure here has a known clean reset;
+            # later failures retain the existing dirty journal and recovery fence.
+            canceled = isinstance(exc, PreparationStopped) and str(exc) == (
+                "build_preparation_canceled"
+            )
+            result = LocalExecutionResult.model_validate(
+                {
+                    "outcome": "canceled" if canceled else "inconclusive",
+                    "reason": "build_preparation_canceled"
+                    if canceled
+                    else "build_preparation_failed",
+                    "usage": [],
+                    "reset": "verified_clean",
+                    "stopped": True,
+                    "boot_id": "preparation-only",
+                    "evidence_reference": str(directory),
+                }
+            )
+        else:
+            result = run_prepared(client, lease, directory, profile, scenario)
+        report_result(client, lease, directory, profile, result)
+
+
+def run_prepared(
+    client: Client, lease: ExecutionLease, directory: Path, profile: Path | None, scenario: str
+) -> LocalExecutionResult:
+    prefix = f"/api/worker/attempts/{lease.attempt_id}"
     args = [
         sys.executable,
         "-m",
@@ -283,6 +343,17 @@ def run_lease(
         )
     else:
         result = LocalExecutionResult.model_validate_json(path.read_bytes(), strict=True)
+    return result
+
+
+def report_result(
+    client: Client,
+    lease: ExecutionLease,
+    directory: Path,
+    profile: Path | None,
+    result: LocalExecutionResult,
+) -> None:
+    prefix = f"/api/worker/attempts/{lease.attempt_id}"
     # Keep a bounded transport retry window; API loss never re-executes the case.
     deadline = time.monotonic() + 35
     while True:
@@ -363,6 +434,7 @@ def serve(
             preflight_android_tools(host_profile)
         connected = False
         while True:
+            Cache.from_environment(state).admit()
             claim_id = str(read(journal)["claim_id"]) if journal.exists() else str(uuid4())
             write(journal, {"state": "claiming", "claim_id": claim_id})
             try:

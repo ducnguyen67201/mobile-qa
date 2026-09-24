@@ -1,5 +1,35 @@
 # Implementation status and evidence
 
+## Elastic Android hosts and large APKs — local implementation (2026-09-22)
+
+The source now includes inclusive 2 GiB intake, resumable multipart transfers,
+durable validation, scoped signed delivery and a bounded verified host cache.
+The new host supervisor owns qualified direct-execution slots; the API owns
+boot/claim/drain fences and durable power intents. OpenTofu, Packer, systemd and a
+Lambda controller define the separately operated fixed EC2 pool. Multipart intake
+is enabled automatically for remote storage, with no environment toggle. Automatic
+capacity remains disabled by default; warm target is zero.
+
+Local validation covers 80 API tests against disposable PostgreSQL databases,
+24 pure contract tests, 243 worker tests, 38 controller tests, three deployment
+checker tests, generated contract drift and 36 CI scope cases. Browser validation
+passed the 189-test initial suite plus 31 targeted rollout regression tests after
+fixes. Rust Clippy, Python type/lint checks, browser type/lint/build checks,
+OpenTofu/Packer configuration checks and Linux C compilation passed. A durable
+validation stack-overflow regression was fixed with bounded heap buffers and a
+boxed job future; its normal-stack recovery test now passes. Both Docker images built locally. The API image passed a non-root, network-disabled
+smoke of its binary, Java/APK validators, static assets and writable scratch; the
+controller image passed an offline import/memory smoke. Details are in the report.
+
+No AWS resources or paid AMIs were created. Railway multipart/CORS interoperability,
+real near-2 GiB installation, Linux/KVM/ADB/rendering and guest packet isolation,
+warm reset, density/cost measurements and a hosted stop/start cycle remain release
+gates. Supervised pools currently support qualified generic direct execution;
+the standalone Minitap demo needs an additional supervised adapter and qualification.
+The plan remains active for these gates. See [spec 11](implementation/11-elastic-device-hosts-and-large-apks.md),
+[operations](device-host-operations.md), and the
+[implementation report](../../.claude/PRPs/reports/elastic-android-device-farm-and-large-apks-report.md).
+
 ## PR #16 review hardening — local verification (2026-09-22)
 
 Review fixes keep one checkout intent and Stripe idempotency key after an

@@ -33,6 +33,78 @@ fn read<T: serde::de::DeserializeOwned>(path: &str) -> ApiResult<T> {
 }
 pub async fn execute(ctx: &AppContext, v: &Vars) -> ApiResult<()> {
     let action = arg(v, "action")?;
+    if action == "register-pool" {
+        let registration: mobile_qa_contracts::device_hosts::PoolRegistration =
+            read(arg(v, "file")?)?;
+        let host_token = std::env::var("MOBILE_QA_HOST_TOKEN")
+            .map_err(|_| ApiFailure::invalid("Inject MOBILE_QA_HOST_TOKEN"))?;
+        let control_token = std::env::var("MOBILE_QA_CAPACITY_CONTROL_TOKEN")
+            .map_err(|_| ApiFailure::invalid("Inject MOBILE_QA_CAPACITY_CONTROL_TOKEN"))?;
+        return crate::services::device_hosts::provision(
+            ctx,
+            id(v, "actor")?,
+            registration,
+            &host_token,
+            &control_token,
+        )
+        .await;
+    }
+    if action == "resolve-power-operation" {
+        let power = match arg(v, "power")? {
+            "stopped" => mobile_qa_contracts::device_hosts::ObservedPower::Stopped,
+            "running" => mobile_qa_contracts::device_hosts::ObservedPower::Running,
+            _ => {
+                return Err(ApiFailure::invalid(
+                    "Power must be externally verified stopped or running",
+                ))
+            }
+        };
+        let version = arg(v, "control-version")?
+            .parse()
+            .map_err(|_| ApiFailure::invalid("Invalid control version"))?;
+        return crate::services::device_hosts::resolve_operation(
+            ctx,
+            id(v, "actor")?,
+            id(v, "pool")?,
+            id(v, "operation")?,
+            version,
+            power,
+            arg(v, "controller-disabled")? == "true",
+            arg(v, "evidence")?,
+        )
+        .await;
+    }
+    if action == "show-pool" {
+        let snapshot = crate::services::capacity_control::snapshot(&ctx.db, id(v, "pool")?).await?;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&snapshot).map_err(|_| ApiFailure::internal())?
+        );
+        return Ok(());
+    }
+    if matches!(
+        action,
+        "pause-pool"
+            | "resume-pool"
+            | "recover-host"
+            | "rotate-host-token"
+            | "rotate-control-token"
+    ) {
+        let token = std::env::var(if action == "rotate-host-token" {
+            "MOBILE_QA_HOST_TOKEN"
+        } else {
+            "MOBILE_QA_CAPACITY_CONTROL_TOKEN"
+        })
+        .ok();
+        return crate::services::device_hosts::maintain(
+            ctx,
+            id(v, "actor")?,
+            id(v, "pool")?,
+            action,
+            token.as_deref(),
+        )
+        .await;
+    }
     if action == "reconcile" {
         scheduler::reconcile(ctx).await?;
         return crate::services::run_artifacts::cleanup_pending(ctx).await;

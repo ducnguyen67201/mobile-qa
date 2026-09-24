@@ -9,6 +9,9 @@
     "authoring_response": {
       "$ref": "#/$defs/AuthoringModelResponse"
     },
+    "build_delivery": {
+      "$ref": "#/$defs/BuildDelivery"
+    },
     "discovery_call": {
       "$ref": "#/$defs/DiscoveryCall"
     },
@@ -20,6 +23,9 @@
     },
     "execution": {
       "$ref": "#/$defs/ExecutionContracts"
+    },
+    "hosts": {
+      "$ref": "#/$defs/HostContracts"
     },
     "model_definition": {
       "$ref": "#/$defs/ModelDefinition"
@@ -53,6 +59,8 @@
     }
   },
   "required": [
+    "build_delivery",
+    "hosts",
     "discovery_drafts",
     "discovery_call",
     "discovery_reply",
@@ -434,6 +442,263 @@
         "checks"
       ]
     },
+    "BuildDelivery": {
+      "type": "object",
+      "properties": {
+        "app_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "authentication": {
+          "$ref": "#/$defs/DeliveryAuthentication"
+        },
+        "byte_size": {
+          "type": "integer",
+          "format": "uint32",
+          "maximum": 2147483648,
+          "minimum": 1
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "expires_at",
+        "byte_size",
+        "sha256",
+        "app_id",
+        "headers",
+        "authentication"
+      ]
+    },
+    "CapacityAction": {
+      "type": "string",
+      "enum": [
+        "observe",
+        "start",
+        "drain",
+        "commit_stop",
+        "record_power",
+        "quarantine"
+      ]
+    },
+    "CapacityActionRequest": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/CapacityAction"
+        },
+        "expected_control_version": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "host_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "observed_power": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObservedPower"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operation_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "action",
+        "host_id",
+        "expected_control_version"
+      ]
+    },
+    "CapacityHint": {
+      "type": "object",
+      "properties": {
+        "pool_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "request_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "pool_id",
+        "request_id"
+      ]
+    },
+    "CapacityOperation": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/CapacityAction"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "action",
+        "created_at"
+      ]
+    },
+    "CapacitySnapshot": {
+      "type": "object",
+      "properties": {
+        "active_work": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "boot_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "cache_bytes": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "clean_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "control_version": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "current_operation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CapacityOperation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "desired_online": {
+          "type": "boolean"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "heartbeat_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "host_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "instance_id": {
+          "type": "string"
+        },
+        "last_demand_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "observed_power": {
+          "$ref": "#/$defs/ObservedPower"
+        },
+        "policy": {
+          "$ref": "#/$defs/PoolPolicy"
+        },
+        "pool_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "queued_jobs": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "startup_started_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "state": {
+          "$ref": "#/$defs/HostState"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "pool_id",
+        "host_id",
+        "instance_id",
+        "policy",
+        "state",
+        "observed_power",
+        "generation",
+        "control_version",
+        "queued_jobs",
+        "active_work",
+        "desired_online",
+        "last_demand_at",
+        "cache_bytes"
+      ]
+    },
     "CaseDefinition": {
       "type": "object",
       "properties": {
@@ -677,6 +942,24 @@
         "usage"
       ]
     },
+    "ConsumeHintRequest": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "timestamp": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "timestamp"
+      ]
+    },
     "ContractProbe": {
       "type": "object",
       "properties": {
@@ -724,6 +1007,13 @@
         "happy_path",
         "validation",
         "persistence"
+      ]
+    },
+    "DeliveryAuthentication": {
+      "type": "string",
+      "enum": [
+        "signed_url",
+        "worker_lease"
       ]
     },
     "DirectCommand": {
@@ -1608,7 +1898,8 @@
         "max_apk_bytes": {
           "type": "integer",
           "format": "uint32",
-          "minimum": 0
+          "maximum": 2147483648,
+          "minimum": 1
         },
         "model": {
           "anyOf": [
@@ -1943,6 +2234,259 @@
         "canceled"
       ]
     },
+    "HintReceipt": {
+      "type": "object",
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "accepted"
+      ]
+    },
+    "HostCleanupRequest": {
+      "type": "object",
+      "properties": {
+        "boot_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "journals_resolved": {
+          "type": "boolean"
+        },
+        "ports_released": {
+          "type": "boolean"
+        },
+        "processes_stopped": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "boot_id",
+        "processes_stopped",
+        "ports_released",
+        "journals_resolved"
+      ]
+    },
+    "HostContracts": {
+      "description": "Reachable schema root for the generated worker and controller consumers.",
+      "type": "object",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/CapacityActionRequest"
+        },
+        "cleanup": {
+          "$ref": "#/$defs/HostCleanupRequest"
+        },
+        "consume_hint": {
+          "$ref": "#/$defs/ConsumeHintRequest"
+        },
+        "device_request": {
+          "$ref": "#/$defs/SlotDeviceRequest"
+        },
+        "device_response": {
+          "$ref": "#/$defs/SlotDeviceResponse"
+        },
+        "grant": {
+          "$ref": "#/$defs/SlotGrantRequest"
+        },
+        "grant_response": {
+          "$ref": "#/$defs/SlotGrantResponse"
+        },
+        "heartbeat": {
+          "$ref": "#/$defs/HostHeartbeatRequest"
+        },
+        "hint": {
+          "$ref": "#/$defs/CapacityHint"
+        },
+        "hint_receipt": {
+          "$ref": "#/$defs/HintReceipt"
+        },
+        "register": {
+          "$ref": "#/$defs/HostRegisterRequest"
+        },
+        "registration": {
+          "$ref": "#/$defs/PoolRegistration"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/CapacitySnapshot"
+        },
+        "status": {
+          "$ref": "#/$defs/HostStatus"
+        }
+      },
+      "required": [
+        "registration",
+        "register",
+        "status",
+        "heartbeat",
+        "grant",
+        "grant_response",
+        "cleanup",
+        "action",
+        "snapshot",
+        "hint",
+        "consume_hint",
+        "hint_receipt",
+        "device_request",
+        "device_response"
+      ]
+    },
+    "HostHeartbeatRequest": {
+      "type": "object",
+      "properties": {
+        "boot_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "cache_bytes": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SlotHeartbeat"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "boot_id",
+        "slots",
+        "cache_bytes"
+      ]
+    },
+    "HostRegisterRequest": {
+      "type": "object",
+      "properties": {
+        "boot_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "toolchain_digest": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "boot_id",
+        "toolchain_digest"
+      ]
+    },
+    "HostSlotStatus": {
+      "type": "object",
+      "properties": {
+        "definition": {
+          "$ref": "#/$defs/SlotDefinition"
+        },
+        "emulator_boot_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "state": {
+          "$ref": "#/$defs/SlotState"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "definition",
+        "state"
+      ]
+    },
+    "HostState": {
+      "type": "string",
+      "enum": [
+        "stopped",
+        "starting",
+        "ready",
+        "draining",
+        "stop_committed",
+        "stopping",
+        "quarantined"
+      ]
+    },
+    "HostStatus": {
+      "type": "object",
+      "properties": {
+        "bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SlotBinding"
+          }
+        },
+        "boot_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "heartbeat_seconds": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "host_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "policy": {
+          "$ref": "#/$defs/PoolPolicy"
+        },
+        "pool_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HostSlotStatus"
+          }
+        },
+        "state": {
+          "$ref": "#/$defs/HostState"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "host_id",
+        "pool_id",
+        "generation",
+        "state",
+        "heartbeat_seconds",
+        "policy",
+        "slots",
+        "bindings"
+      ]
+    },
     "JobState": {
       "type": "string",
       "enum": [
@@ -2197,6 +2741,16 @@
         "absent"
       ]
     },
+    "ObservedPower": {
+      "type": "string",
+      "enum": [
+        "unknown",
+        "stopped",
+        "pending",
+        "running",
+        "stopping"
+      ]
+    },
     "Outcome": {
       "type": "string",
       "enum": [
@@ -2355,7 +2909,8 @@
         "build_bytes": {
           "type": "integer",
           "format": "uint32",
-          "minimum": 0
+          "maximum": 2147483648,
+          "minimum": 1
         },
         "build_sha256": {
           "type": "string"
@@ -2615,6 +3170,86 @@
         "clean"
       ]
     },
+    "PoolPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "idle_seconds": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "warm_target": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "warm_windows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WarmWindow"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "idle_seconds",
+        "warm_target",
+        "timezone",
+        "warm_windows"
+      ]
+    },
+    "PoolRegistration": {
+      "description": "Trusted CLI input; credentials are injected separately, never serialized in this file.",
+      "type": "object",
+      "properties": {
+        "bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SlotBinding"
+          }
+        },
+        "host_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "instance_id": {
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "#/$defs/PoolPolicy"
+        },
+        "pool_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SlotDefinition"
+          }
+        },
+        "toolchain_digest": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "pool_id",
+        "host_id",
+        "instance_id",
+        "toolchain_digest",
+        "policy",
+        "slots",
+        "bindings"
+      ]
+    },
     "PreflightAcknowledgement": {
       "type": "object",
       "properties": {
@@ -2727,7 +3362,7 @@
             "bytes": {
               "type": "integer",
               "format": "uint32",
-              "maximum": 262144000,
+              "maximum": 2147483648,
               "minimum": 1
             },
             "mime": {
@@ -3175,7 +3810,8 @@
         "build_bytes": {
           "type": "integer",
           "format": "uint32",
-          "minimum": 0
+          "maximum": 2147483648,
+          "minimum": 1
         },
         "build_id": {
           "type": "string",
@@ -3366,6 +4002,293 @@
         }
       ]
     },
+    "SlotBinding": {
+      "type": "object",
+      "properties": {
+        "app_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "profile_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "slot_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "slot_id",
+        "app_id",
+        "profile_id"
+      ]
+    },
+    "SlotDefinition": {
+      "type": "object",
+      "properties": {
+        "adb_server_port": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "console_port": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "cpu_cores": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "device_identity": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "index": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "memory_mb": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "qualification_reference": {
+          "type": "string"
+        },
+        "qualified": {
+          "type": "boolean"
+        },
+        "system_image": {
+          "type": "string"
+        },
+        "warm_qualified": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "index",
+        "device_identity",
+        "system_image",
+        "memory_mb",
+        "cpu_cores",
+        "console_port",
+        "adb_server_port",
+        "qualified",
+        "warm_qualified",
+        "qualification_reference"
+      ]
+    },
+    "SlotDeviceOperation": {
+      "type": "string",
+      "enum": [
+        "boot",
+        "install",
+        "launch",
+        "adb",
+        "snapshot",
+        "stop",
+        "discard",
+        "direct",
+        "hierarchy"
+      ]
+    },
+    "SlotDeviceRequest": {
+      "type": "object",
+      "properties": {
+        "arguments": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "command": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DirectCommand"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "launch_component": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operation": {
+          "$ref": "#/$defs/SlotDeviceOperation"
+        },
+        "package": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "timeout_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "token",
+        "operation"
+      ]
+    },
+    "SlotDeviceResponse": {
+      "type": "object",
+      "properties": {
+        "data_base64": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "xml_base64": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ok"
+      ]
+    },
+    "SlotGrantRequest": {
+      "type": "object",
+      "properties": {
+        "app_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "boot_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "profile_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "boot_id",
+        "app_id",
+        "profile_id"
+      ]
+    },
+    "SlotGrantResponse": {
+      "type": "object",
+      "properties": {
+        "app_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "profile_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "worker_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "worker_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "worker_id",
+        "app_id",
+        "profile_id",
+        "worker_token"
+      ]
+    },
+    "SlotHeartbeat": {
+      "type": "object",
+      "properties": {
+        "emulator_boot_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "slot_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "state": {
+          "$ref": "#/$defs/SlotState"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "slot_id",
+        "state"
+      ]
+    },
+    "SlotState": {
+      "type": "string",
+      "enum": [
+        "offline",
+        "preparing",
+        "idle",
+        "leased",
+        "cleaning",
+        "quarantined"
+      ]
+    },
     "StageBudgets": {
       "type": "object",
       "properties": {
@@ -3478,6 +4401,32 @@
         "content_description",
         "checked",
         "enabled"
+      ]
+    },
+    "WarmWindow": {
+      "type": "object",
+      "properties": {
+        "end": {
+          "type": "string"
+        },
+        "start": {
+          "type": "string"
+        },
+        "weekdays": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "weekdays",
+        "start",
+        "end"
       ]
     },
     "WorkerModelCapabilities": {

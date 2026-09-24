@@ -62,6 +62,15 @@ check-worker:
     cd apps/mobile-worker && uv run --no-sync --frozen pyright
     cd apps/mobile-worker && uv run --no-sync --frozen pytest
 
+# Offline provider/controller validation; never applies infrastructure or boots Android.
+check-infra:
+    uv sync --project infra/aws/capacity-controller --frozen
+    uv run --project infra/aws/capacity-controller --frozen ruff check infra/aws/capacity-controller
+    cd infra/aws/capacity-controller && uv run --frozen pyright
+    cd infra/aws/capacity-controller && uv run --frozen pytest
+    python3 -m unittest scripts.test_check_deployment
+    python3 scripts/check_deployment.py
+
 check: check-contracts check-web check-api check-worker
 
 build:

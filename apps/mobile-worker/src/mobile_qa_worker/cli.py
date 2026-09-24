@@ -1,4 +1,4 @@
-"""Explicit developer commands, not a long-running production worker.
+"""Explicit worker, operator and fixture commands.
 
 `fake` emits one JSON result and exits. `sdk-import` checks only package compatibility;
 only scripts/sdk_smoke.py additionally blocks socket connections during that import.
@@ -17,6 +17,7 @@ from pathlib import Path
 from uuid import UUID
 
 from mobile_qa_worker.fake import execute, parse_request
+from mobile_qa_worker.qualification.config import QualificationError
 
 
 def sdk_import() -> dict[str, str]:
@@ -107,6 +108,16 @@ def main() -> int:
     phone.add_argument("--state", type=Path, required=True)
     phone.add_argument("--profile", type=Path, required=True)
     phone.add_argument("--once", action="store_true")
+    host = commands.add_parser("host-supervisor", help="Run boot-fenced, isolated production slots")
+    host.add_argument("--config", type=Path, required=True)
+    host.add_argument(
+        "--once", action="store_true", help="One control cycle; never a qualification"
+    )
+    report = commands.add_parser(
+        "host-capacity-report", help="Summarize recorded operator measurements"
+    )
+    report.add_argument("--campaign", type=Path, required=True)
+    report.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "_minitap-discovery":
         from mobile_qa_worker.authoring.minitap_discovery import run as discover
@@ -120,6 +131,16 @@ def main() -> int:
         return 0
 
     try:
+        if args.command == "host-supervisor":
+            from mobile_qa_worker.host.supervisor import serve as serve_host
+
+            serve_host(args.config, once=args.once)
+            return 0
+        if args.command == "host-capacity-report":
+            from mobile_qa_worker.host.qualification import report as capacity_report
+
+            capacity_report(args.campaign, args.output)
+            return 0
         if args.command == "task-worker":
             from mobile_qa_worker.task_sessions import serve as serve_tasks
 
@@ -153,7 +174,13 @@ def main() -> int:
         # Exit status reports CLI success, not whether the simulated test passed.
         # Consumers read outcome from JSON; setup/invalid input exits 2 below.
         return 0
-    except (ValueError, OSError, ImportError, importlib.metadata.PackageNotFoundError) as exc:
+    except (
+        ValueError,
+        OSError,
+        ImportError,
+        QualificationError,
+        importlib.metadata.PackageNotFoundError,
+    ) as exc:
         # Avoid dumping fixture payloads, paths or credentials into logs.
         logging.error(
             "Input or setup failed (%s). Check the fixture or installed dependency.",

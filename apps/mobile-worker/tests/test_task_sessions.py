@@ -159,3 +159,81 @@ def test_session_binds_image_and_model_before_side_effects(
             task_sessions.run_session(client, lease, tmp_path, tmp_path / "host.toml")
         lock.assert_not_called()
     assert client.mock_calls == []
+
+
+def test_phone_canceled_during_install_never_launches_and_cleans(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+
+    from test_device import profile as host_profile
+    from test_execution import job
+
+    from mobile_qa_worker import task_sessions
+    from mobile_qa_worker.artifacts.preparation import PreparationStopped
+
+    host = host_profile(tmp_path)
+    assignment = job().manifest.profile
+    assignment.image = host.system_image
+    lease = SimpleNamespace(
+        session=SimpleNamespace(
+            id=uuid4(),
+            app_id=uuid4(),
+            profile=assignment,
+            resolved_model=None,
+            authoring_model=None,
+        ),
+        lease_token="private",
+        build_sha256="a" * 64,
+        build_bytes=3,
+    )
+    calls = []
+    connections = []
+    original_connection = task_sessions.SessionConnection
+
+    def connection(*args):
+        instance = original_connection(*args)
+        connections.append(instance)
+        return instance
+
+    class FakeDevice:
+        def boot(self):
+            calls.append("boot")
+
+        def install(self, *_):
+            calls.append("install")
+            connections[0].stopped.set()
+
+        def launch(self):
+            pytest.fail("launched after cancellation")
+
+        def stop(self):
+            calls.append("stop")
+
+        def discard(self):
+            calls.append("discard")
+
+    @contextmanager
+    def prepare(*_args, **kwargs):
+        kwargs["check"]()
+        path = kwargs["target"]
+        path.write_bytes(b"apk")
+        try:
+            yield path
+        finally:
+            path.unlink()
+
+    def send(*_args, **_kwargs):
+        return SimpleNamespace(state=task_sessions.PhoneState.preparing)
+
+    monkeypatch.setattr(task_sessions.Profile, "load", lambda _: host)
+    monkeypatch.setattr(task_sessions, "device_for", lambda *_: FakeDevice())
+    monkeypatch.setattr(task_sessions, "doctor", lambda _: None)
+    monkeypatch.setattr(task_sessions, "prepared_build", prepare)
+    monkeypatch.setattr(task_sessions, "SessionConnection", connection)
+    with pytest.raises(PreparationStopped, match="canceled"):
+        task_sessions.run_session(
+            SimpleNamespace(send=send), lease, tmp_path, tmp_path / "host.toml"
+        )
+    assert calls == ["boot", "install", "stop", "discard"]
+    assert not (host.state_root / "dirty.json").exists()
+    assert not (tmp_path / str(lease.session.id) / "build.apk").exists()

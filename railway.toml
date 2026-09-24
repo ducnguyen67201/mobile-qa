@@ -1,0 +1,12 @@
+# Deploy the prebuilt, digest-pinned API image after local/image qualification.
+# Image source selection is an operator release action in Railway. Base images
+# in Dockerfile.api are pinned to Linux/amd64 registry manifest digests.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.api"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 180
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

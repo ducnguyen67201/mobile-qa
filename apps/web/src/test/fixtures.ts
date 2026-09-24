@@ -61,6 +61,7 @@ export const settings = {
   session_ttl_seconds: 28800,
   max_active_uploads: 3,
   storage: 'Private local storage',
+  multipart: null,
   accepted_build_retention: 'Accepted builds are retained. Automated retention is not configured.',
 } satisfies SettingsResponse
 export const upload = {

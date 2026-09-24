@@ -246,8 +246,8 @@ pub struct AppListResponse {
 #[serde(deny_unknown_fields)]
 pub struct CreateBuildUploadRequest {
     pub original_filename: String,
-    // APK bytes are bounded to 250 MiB; keep browser JSON numbers, not int64/BigInt.
-    #[schema(value_type = u32, minimum = 1, maximum = 262144000)]
+    // APK bytes are bounded to 2 GiB; keep browser JSON numbers, not int64/BigInt.
+    #[schema(schema_with = crate::artifacts_api::apk_byte_schema)]
     pub expected_size: i64,
 }
 
@@ -257,10 +257,10 @@ pub struct UploadResponse {
     pub id: Uuid,
     pub app_id: Uuid,
     pub original_filename: String,
-    // APK bytes are bounded to 250 MiB; keep browser JSON numbers, not int64/BigInt.
-    #[schema(value_type = u32, minimum = 1, maximum = 262144000)]
+    // APK bytes are bounded to 2 GiB; keep browser JSON numbers, not int64/BigInt.
+    #[schema(schema_with = crate::artifacts_api::apk_byte_schema)]
     pub expected_size: i64,
-    #[schema(value_type = Option<u32>, minimum = 1, maximum = 262144000)]
+    #[schema(schema_with = crate::artifacts_api::optional_apk_byte_schema)]
     pub actual_size: Option<i64>,
     pub state: UploadState,
     pub expires_at: DateTime<Utc>,
@@ -299,7 +299,7 @@ pub struct BuildResponse {
     pub id: Uuid,
     pub app_id: Uuid,
     pub original_filename: String,
-    #[schema(value_type = u32, minimum = 1, maximum = 262144000)]
+    #[schema(schema_with = crate::artifacts_api::apk_byte_schema)]
     pub byte_size: i64,
     pub sha256: String,
     pub created_at: DateTime<Utc>,
@@ -319,8 +319,9 @@ pub struct BuildListResponse {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SettingsResponse {
+    pub multipart: Option<crate::artifacts_api::MultipartPolicy>,
     pub memberships: Vec<OrganizationMembership>,
-    #[schema(value_type = u32, minimum = 1, maximum = 262144000)]
+    #[schema(schema_with = crate::artifacts_api::apk_byte_schema)]
     pub max_apk_bytes: i64,
     pub upload_ttl_seconds: u32,
     pub session_ttl_seconds: u32,
@@ -763,6 +764,8 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
     api.merge(crate::automation_api::AutomationApi::openapi());
     api.merge(crate::test_library_api::TestLibraryApi::openapi());
     api.merge(crate::commercial_api::CommercialApi::openapi());
+    api.merge(crate::artifacts_api::ArtifactsApi::openapi());
+    api.merge(crate::device_hosts_api::DeviceHostsApi::openapi());
     if let Some(components) = api.components.as_mut() {
         components.add_security_scheme(
             "session_cookie",

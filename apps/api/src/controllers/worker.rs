@@ -2,6 +2,7 @@
 use crate::{
     config::Setup,
     errors::{ApiFailure, ApiResult},
+    models::_entities::builds,
     services::{execution_store::*, run_artifacts, scheduler, worker_auth::Worker},
 };
 use axum::{
@@ -13,6 +14,7 @@ use axum::{
 };
 use loco_rs::{app::AppContext, controller::Routes};
 use mobile_qa_contracts::execution::*;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::Deserialize;
 use uuid::Uuid;
 fn token(h: &HeaderMap) -> ApiResult<&str> {
@@ -130,39 +132,64 @@ async fn build(
     Query(q): Query<BuildQuery>,
 ) -> ApiResult<Response> {
     let r = scheduler::lease(&ctx.db, &w, id, q.generation, token(&h)?, false).await?;
-    let manifest: RunManifest = decode(field(&r, "manifest")?)?;
-    let b = one(
-        &ctx.db,
-        "SELECT storage_key,storage_backend,sha256 FROM builds WHERE id=$1 AND app_id=$2",
-        vec![manifest.build_id.into(), w.app_id.into()],
-    )
-    .await?;
-    if field::<String>(&b, "sha256")? != manifest.build_sha256 {
+    crate::services::build_delivery::require_active_attempt(&r.attempt.state)?;
+    let manifest: RunManifest = decode(r.run.manifest)?;
+    let b = builds::Entity::find_by_id(manifest.build_id)
+        .filter(builds::Column::AppId.eq(w.app_id))
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    if b.sha256 != manifest.build_sha256 || b.byte_size != i64::from(manifest.build_bytes) {
         return Err(conflict("Build identity changed"));
     }
-    let file = Setup::get(&ctx)
-        .store
-        .materialize(
-            &field::<String>(&b, "storage_key")?,
-            &field::<String>(&b, "storage_backend")?,
-        )
-        .await?;
-    let bytes = tokio::fs::read(&file.0).await?;
-    if hash(&bytes) != manifest.build_sha256 || bytes.len() != manifest.build_bytes as usize {
-        return Err(conflict("Stored build differs from manifest"));
-    }
-    let mut r = Response::new(Body::from(bytes));
-    r.headers_mut().insert(
-        "content-type",
-        "application/vnd.android.package-archive"
-            .parse()
-            .expect("literal"),
-    );
-    Ok(r)
+    crate::services::build_delivery::stream(
+        &Setup::get(&ctx),
+        &b.storage_key,
+        &b.storage_backend,
+        i64::from(manifest.build_bytes),
+        &manifest.build_sha256,
+    )
+    .await
 }
+async fn delivery(
+    State(ctx): State<AppContext>,
+    w: Worker,
+    Path(id): Path<Uuid>,
+    h: HeaderMap,
+    Query(q): Query<BuildQuery>,
+) -> ApiResult<Json<mobile_qa_contracts::artifacts_api::BuildDelivery>> {
+    let r = scheduler::lease(&ctx.db, &w, id, q.generation, token(&h)?, false).await?;
+    crate::services::build_delivery::require_active_attempt(&r.attempt.state)?;
+    let manifest: RunManifest = decode(r.run.manifest)?;
+    let b = builds::Entity::find_by_id(manifest.build_id)
+        .filter(builds::Column::AppId.eq(w.app_id))
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    if b.sha256 != manifest.build_sha256 || b.byte_size != i64::from(manifest.build_bytes) {
+        return Err(conflict("Build identity changed"));
+    }
+    Ok(Json(crate::services::build_delivery::grant(
+        &Setup::get(&ctx),
+        &b.storage_key,
+        &b.storage_backend,
+        w.app_id,
+        i64::from(manifest.build_bytes),
+        manifest.build_sha256,
+        format!(
+            "/api/worker/attempts/{id}/build?generation={}",
+            q.generation
+        ),
+    )?))
+}
+
 pub fn routes() -> Routes {
     use axum::routing::{get, post, put};
     Routes::new()
+        .add(
+            "/api/worker/attempts/{attempt_id}/build/delivery",
+            get(delivery),
+        )
         .add("/api/worker/claims", post(claim))
         .add(
             "/api/worker/attempts/{attempt_id}/heartbeat",

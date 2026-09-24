@@ -1333,6 +1333,350 @@
         ]
       }
     },
+    "/api/apps/{app_id}/build-uploads/{upload_id}/multipart": {
+      "get": {
+        "tags": [],
+        "operationId": "getMultipartUpload",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "upload_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Multipart session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultipartUpload"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [],
+        "operationId": "startMultipartUpload",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "upload_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Multipart session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultipartUpload"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [],
+        "operationId": "abortMultipartUpload",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "upload_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Multipart session aborted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultipartUpload"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
+    "/api/apps/{app_id}/build-uploads/{upload_id}/multipart/complete": {
+      "post": {
+        "tags": [],
+        "operationId": "completeMultipartUpload",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "upload_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable sealing queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
+    "/api/apps/{app_id}/build-uploads/{upload_id}/multipart/parts": {
+      "post": {
+        "tags": [],
+        "operationId": "authorizeUploadPart",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "upload_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthorizeUploadPartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Temporary capability for one immutable part",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadPartAuthorization"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
+    "/api/apps/{app_id}/build-uploads/{upload_id}/multipart/parts/{part_number}": {
+      "put": {
+        "tags": [],
+        "operationId": "confirmUploadPart",
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "upload_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "part_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmUploadPartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Part receipt persisted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultipartUpload"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
     "/api/apps/{app_id}/builds": {
       "get": {
         "tags": [],
@@ -7264,6 +7608,684 @@
         }
       }
     },
+    "/api/internal/capacity/pools/{pool_id}": {
+      "get": {
+        "tags": [],
+        "operationId": "getCapacitySnapshot",
+        "parameters": [
+          {
+            "name": "pool_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapacitySnapshot"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Scoped bearer required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale authority or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/capacity/pools/{pool_id}/actions": {
+      "post": {
+        "tags": [],
+        "operationId": "applyCapacityAction",
+        "parameters": [
+          {
+            "name": "pool_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapacityActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapacitySnapshot"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Scoped bearer required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale authority or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/capacity/pools/{pool_id}/hints": {
+      "post": {
+        "tags": [],
+        "operationId": "consumeCapacityHint",
+        "parameters": [
+          {
+            "name": "pool_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsumeHintRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HintReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Scoped bearer required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale authority or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/hosts/{host_id}/cleanup": {
+      "post": {
+        "tags": [],
+        "operationId": "acknowledgeHostCleanup",
+        "parameters": [
+          {
+            "name": "host_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostCleanupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Scoped bearer required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale authority or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/hosts/{host_id}/heartbeat": {
+      "post": {
+        "tags": [],
+        "operationId": "heartbeatDeviceHost",
+        "parameters": [
+          {
+            "name": "host_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostHeartbeatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Scoped bearer required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale authority or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/hosts/{host_id}/register": {
+      "post": {
+        "tags": [],
+        "operationId": "registerDeviceHost",
+        "parameters": [
+          {
+            "name": "host_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Scoped bearer required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale authority or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/hosts/{host_id}/slots/{slot_id}/grant": {
+      "post": {
+        "tags": [],
+        "operationId": "createSlotGrant",
+        "parameters": [
+          {
+            "name": "host_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "slot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlotGrantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotGrantResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Scoped bearer required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale authority or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/phones/{session_id}": {
       "get": {
         "tags": [],
@@ -8454,6 +9476,62 @@
         ]
       }
     },
+    "/api/worker/attempts/{attempt_id}/build/delivery": {
+      "get": {
+        "tags": [],
+        "operationId": "getAttemptBuildDelivery",
+        "parameters": [
+          {
+            "name": "attempt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "generation",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "X-Lease-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lease-scoped build capability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/worker/attempts/{attempt_id}/preflight": {
       "post": {
         "tags": [],
@@ -8552,6 +9630,53 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/worker/phones/{session_id}/build/delivery": {
+      "get": {
+        "tags": [],
+        "operationId": "getPhoneBuildDelivery",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Lease-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lease-scoped build capability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildDelivery"
                 }
               }
             }
@@ -9162,6 +10287,33 @@
         },
         "additionalProperties": false
       },
+      "AuthorizeUploadPartRequest": {
+        "type": "object",
+        "required": [
+          "part_number",
+          "byte_size",
+          "sha256"
+        ],
+        "properties": {
+          "byte_size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 16777216,
+            "minimum": 1
+          },
+          "part_number": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 128,
+            "minimum": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "additionalProperties": false
+      },
       "AutomationSequence": {
         "type": "object",
         "required": [
@@ -9218,6 +10370,52 @@
           }
         }
       },
+      "BuildDelivery": {
+        "type": "object",
+        "required": [
+          "url",
+          "expires_at",
+          "byte_size",
+          "sha256",
+          "app_id",
+          "headers",
+          "authentication"
+        ],
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authentication": {
+            "$ref": "#/components/schemas/DeliveryAuthentication"
+          },
+          "byte_size": {
+            "type": "integer",
+            "maximum": 2147483648,
+            "minimum": 1
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "BuildListResponse": {
         "type": "object",
         "required": [
@@ -9260,8 +10458,7 @@
           },
           "byte_size": {
             "type": "integer",
-            "format": "int32",
-            "maximum": 262144000,
+            "maximum": 2147483648,
             "minimum": 1
           },
           "can_retry_validation": {
@@ -9344,6 +10541,201 @@
           },
           "validator_version": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CapacityAction": {
+        "type": "string",
+        "enum": [
+          "observe",
+          "start",
+          "drain",
+          "commit_stop",
+          "record_power",
+          "quarantine"
+        ]
+      },
+      "CapacityActionRequest": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "action",
+          "host_id",
+          "expected_control_version"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/CapacityAction"
+          },
+          "expected_control_version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "host_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observed_power": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ObservedPower"
+              }
+            ]
+          },
+          "operation_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CapacityOperation": {
+        "type": "object",
+        "required": [
+          "id",
+          "action",
+          "created_at"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/CapacityAction"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CapacitySnapshot": {
+        "type": "object",
+        "required": [
+          "pool_id",
+          "host_id",
+          "instance_id",
+          "policy",
+          "state",
+          "observed_power",
+          "generation",
+          "control_version",
+          "queued_jobs",
+          "active_work",
+          "desired_online",
+          "last_demand_at",
+          "cache_bytes"
+        ],
+        "properties": {
+          "active_work": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "boot_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "cache_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clean_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "control_version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "current_operation": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CapacityOperation"
+              }
+            ]
+          },
+          "desired_online": {
+            "type": "boolean"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "heartbeat_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "host_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "instance_id": {
+            "type": "string"
+          },
+          "last_demand_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observed_power": {
+            "$ref": "#/components/schemas/ObservedPower"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/PoolPolicy"
+          },
+          "pool_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "queued_jobs": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startup_started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/HostState"
           }
         },
         "additionalProperties": false
@@ -10168,6 +11560,36 @@
         },
         "additionalProperties": false
       },
+      "ConfirmUploadPartRequest": {
+        "type": "object",
+        "required": [
+          "etag"
+        ],
+        "properties": {
+          "etag": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConsumeHintRequest": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "timestamp"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "CoverageKind": {
         "type": "string",
         "enum": [
@@ -10225,8 +11647,7 @@
         "properties": {
           "expected_size": {
             "type": "integer",
-            "format": "int32",
-            "maximum": 262144000,
+            "maximum": 2147483648,
             "minimum": 1
           },
           "original_filename": {
@@ -10623,6 +12044,13 @@
           }
         },
         "additionalProperties": false
+      },
+      "DeliveryAuthentication": {
+        "type": "string",
+        "enum": [
+          "signed_url",
+          "worker_lease"
+        ]
       },
       "DirectCommand": {
         "oneOf": [
@@ -11253,8 +12681,8 @@
           },
           "max_apk_bytes": {
             "type": "integer",
-            "format": "int32",
-            "minimum": 0
+            "maximum": 2147483648,
+            "minimum": 1
           },
           "model": {
             "oneOf": [
@@ -11571,6 +12999,194 @@
         "enum": [
           "ok"
         ]
+      },
+      "HintReceipt": {
+        "type": "object",
+        "required": [
+          "accepted"
+        ],
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "HostCleanupRequest": {
+        "type": "object",
+        "required": [
+          "generation",
+          "boot_id",
+          "processes_stopped",
+          "ports_released",
+          "journals_resolved"
+        ],
+        "properties": {
+          "boot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "journals_resolved": {
+            "type": "boolean"
+          },
+          "ports_released": {
+            "type": "boolean"
+          },
+          "processes_stopped": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "HostHeartbeatRequest": {
+        "type": "object",
+        "required": [
+          "generation",
+          "boot_id",
+          "slots",
+          "cache_bytes"
+        ],
+        "properties": {
+          "boot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cache_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SlotHeartbeat"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "HostRegisterRequest": {
+        "type": "object",
+        "required": [
+          "version",
+          "boot_id",
+          "toolchain_digest"
+        ],
+        "properties": {
+          "boot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toolchain_digest": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "HostSlotStatus": {
+        "type": "object",
+        "required": [
+          "definition",
+          "state"
+        ],
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/SlotDefinition"
+          },
+          "emulator_boot_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SlotState"
+          }
+        },
+        "additionalProperties": false
+      },
+      "HostState": {
+        "type": "string",
+        "enum": [
+          "stopped",
+          "starting",
+          "ready",
+          "draining",
+          "stop_committed",
+          "stopping",
+          "quarantined"
+        ]
+      },
+      "HostStatus": {
+        "type": "object",
+        "required": [
+          "host_id",
+          "pool_id",
+          "generation",
+          "state",
+          "heartbeat_seconds",
+          "policy",
+          "slots",
+          "bindings"
+        ],
+        "properties": {
+          "bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SlotBinding"
+            }
+          },
+          "boot_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "heartbeat_seconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "host_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/PoolPolicy"
+          },
+          "pool_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HostSlotStatus"
+            }
+          },
+          "state": {
+            "$ref": "#/components/schemas/HostState"
+          }
+        },
+        "additionalProperties": false
       },
       "JobState": {
         "type": "string",
@@ -12302,11 +13918,91 @@
         },
         "additionalProperties": false
       },
+      "MultipartPolicy": {
+        "type": "object",
+        "required": [
+          "part_size",
+          "max_parallel_parts"
+        ],
+        "properties": {
+          "max_parallel_parts": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "part_size": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "MultipartState": {
+        "type": "string",
+        "enum": [
+          "uploading",
+          "completing",
+          "sealed",
+          "aborted"
+        ]
+      },
+      "MultipartUpload": {
+        "type": "object",
+        "required": [
+          "upload_id",
+          "part_size",
+          "max_parallel_parts",
+          "expires_at",
+          "state",
+          "parts"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "max_parallel_parts": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "part_size": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UploadedPart"
+            }
+          },
+          "state": {
+            "$ref": "#/components/schemas/MultipartState"
+          },
+          "upload_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
       "ObservationKind": {
         "type": "string",
         "enum": [
           "present_value",
           "absent"
+        ]
+      },
+      "ObservedPower": {
+        "type": "string",
+        "enum": [
+          "unknown",
+          "stopped",
+          "pending",
+          "running",
+          "stopping"
         ]
       },
       "OpenPhoneRequest": {
@@ -12946,6 +14642,41 @@
         },
         "additionalProperties": false
       },
+      "PoolPolicy": {
+        "type": "object",
+        "required": [
+          "enabled",
+          "idle_seconds",
+          "warm_target",
+          "timezone",
+          "warm_windows"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "idle_seconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "warm_target": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "warm_windows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WarmWindow"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "PreflightAcknowledgement": {
         "type": "object",
         "required": [
@@ -13038,6 +14769,11 @@
       "QueueReason": {
         "type": "string",
         "enum": [
+          "host_starting",
+          "host_draining",
+          "pool_paused",
+          "waiting_for_slot",
+          "profile_incompatible",
           "worker_offline",
           "model_unavailable",
           "worker_upgrade_required",
@@ -13400,8 +15136,8 @@
           },
           "build_bytes": {
             "type": "integer",
-            "format": "int32",
-            "minimum": 0
+            "maximum": 2147483648,
+            "minimum": 1
           },
           "build_id": {
             "type": "string",
@@ -13812,8 +15548,7 @@
           },
           "max_apk_bytes": {
             "type": "integer",
-            "format": "int32",
-            "maximum": 262144000,
+            "maximum": 2147483648,
             "minimum": 1
           },
           "memberships": {
@@ -13821,6 +15556,16 @@
             "items": {
               "$ref": "#/components/schemas/OrganizationMembership"
             }
+          },
+          "multipart": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MultipartPolicy"
+              }
+            ]
           },
           "session_ttl_seconds": {
             "type": "integer",
@@ -13837,6 +15582,182 @@
           }
         },
         "additionalProperties": false
+      },
+      "SlotBinding": {
+        "type": "object",
+        "required": [
+          "slot_id",
+          "app_id",
+          "profile_id"
+        ],
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profile_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slot_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SlotDefinition": {
+        "type": "object",
+        "required": [
+          "id",
+          "index",
+          "device_identity",
+          "system_image",
+          "memory_mb",
+          "cpu_cores",
+          "console_port",
+          "adb_server_port",
+          "qualified",
+          "warm_qualified",
+          "qualification_reference"
+        ],
+        "properties": {
+          "adb_server_port": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "console_port": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "cpu_cores": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "device_identity": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "index": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "memory_mb": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "qualification_reference": {
+            "type": "string"
+          },
+          "qualified": {
+            "type": "boolean"
+          },
+          "system_image": {
+            "type": "string"
+          },
+          "warm_qualified": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SlotGrantRequest": {
+        "type": "object",
+        "required": [
+          "generation",
+          "boot_id",
+          "app_id",
+          "profile_id"
+        ],
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "boot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "profile_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SlotGrantResponse": {
+        "type": "object",
+        "required": [
+          "worker_id",
+          "app_id",
+          "profile_id",
+          "worker_token"
+        ],
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profile_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "worker_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "worker_token": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SlotHeartbeat": {
+        "type": "object",
+        "required": [
+          "slot_id",
+          "state"
+        ],
+        "properties": {
+          "emulator_boot_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "slot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SlotState"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SlotState": {
+        "type": "string",
+        "enum": [
+          "offline",
+          "preparing",
+          "idle",
+          "leased",
+          "cleaning",
+          "quarantined"
+        ]
       },
       "StageBudgets": {
         "type": "object",
@@ -14213,6 +16134,39 @@
           }
         }
       },
+      "UploadPartAuthorization": {
+        "type": "object",
+        "required": [
+          "part_number",
+          "url",
+          "expires_at",
+          "headers"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "part_number": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "UploadResponse": {
         "type": "object",
         "required": [
@@ -14229,8 +16183,7 @@
               "integer",
               "null"
             ],
-            "format": "int32",
-            "maximum": 262144000,
+            "maximum": 2147483648,
             "minimum": 1
           },
           "app_id": {
@@ -14246,8 +16199,7 @@
           },
           "expected_size": {
             "type": "integer",
-            "format": "int32",
-            "maximum": 262144000,
+            "maximum": 2147483648,
             "minimum": 1
           },
           "expires_at": {
@@ -14285,6 +16237,36 @@
           "expired"
         ]
       },
+      "UploadedPart": {
+        "type": "object",
+        "required": [
+          "part_number",
+          "byte_size",
+          "sha256"
+        ],
+        "properties": {
+          "byte_size": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "etag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "part_number": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "UserIdentity": {
         "type": "object",
         "required": [
@@ -14319,6 +16301,31 @@
           "unsupported",
           "error"
         ]
+      },
+      "WarmWindow": {
+        "type": "object",
+        "required": [
+          "weekdays",
+          "start",
+          "end"
+        ],
+        "properties": {
+          "end": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "weekdays": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "WorkerModelCapabilities": {
         "type": "object",

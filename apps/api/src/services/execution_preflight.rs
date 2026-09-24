@@ -1,19 +1,25 @@
 //! Fenced start acknowledgement. A worker cannot report actions before retained start proof.
-use super::{execution_store::*, run_artifacts, scheduler, verification, worker_auth::Worker};
-use crate::errors::{ApiFailure, ApiResult};
+use super::{
+    execution_store::{conflict, decode, hash, json},
+    run_artifacts, scheduler, verification,
+    worker_auth::Worker,
+};
+use crate::{
+    errors::{ApiFailure, ApiResult},
+    models::_entities::execution_preflight_receipts,
+};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::{execution::*, execution_lifecycle::*};
-use sea_orm::{ConnectionTrait, TransactionTrait};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ConnectionTrait, EntityTrait, TransactionTrait};
 use uuid::Uuid;
 
 pub async fn recorded(db: &impl ConnectionTrait, id: Uuid, generation: i32) -> ApiResult<bool> {
-    Ok(!rows(
-        db,
-        "SELECT attempt_id FROM execution_preflight_receipts WHERE attempt_id=$1 AND generation=$2",
-        vec![id.into(), generation.into()],
+    Ok(
+        execution_preflight_receipts::Entity::find_by_id((id, generation))
+            .one(db)
+            .await?
+            .is_some(),
     )
-    .await?
-    .is_empty())
 }
 pub async fn require(
     db: &impl ConnectionTrait,
@@ -34,7 +40,7 @@ pub async fn acknowledge(
     input: PreflightRequest,
 ) -> ApiResult<PreflightAcknowledgement> {
     let row = scheduler::lease(&ctx.db, w, id, input.generation, token, false).await?;
-    let manifest: RunManifest = decode(field(&row, "manifest")?)?;
+    let manifest: RunManifest = decode(row.run.manifest)?;
     let expected = manifest
         .profile
         .execution_context
@@ -94,24 +100,28 @@ pub async fn acknowledge(
     let digest = hash(serde_json::to_vec(&input).map_err(|_| ApiFailure::internal())?);
     let tx = ctx.db.begin().await?;
     let locked = scheduler::lease(&tx, w, id, input.generation, token, true).await?;
-    let old = rows(
-        &tx,
-        "SELECT digest FROM execution_preflight_receipts WHERE attempt_id=$1 AND generation=$2",
-        vec![id.into(), input.generation.into()],
-    )
-    .await?;
-    if let Some(old) = old.first() {
-        if field::<String>(old, "digest")? != digest {
+    let old = execution_preflight_receipts::Entity::find_by_id((id, input.generation))
+        .one(&tx)
+        .await?;
+    if let Some(old) = old {
+        if old.digest != digest {
             return Err(conflict("Start receipt changed"));
         }
     } else {
-        if !["leased", "running"].contains(&field::<String>(&locked, "state")?.as_str())
-            || field::<bool>(&locked, "cancel_requested")?
+        if !["leased", "running"].contains(&locked.attempt.state.as_str())
+            || locked.run.cancel_requested
         {
             return Err(conflict("This attempt no longer accepts a start receipt"));
         }
-        exec(&tx,"INSERT INTO execution_preflight_receipts(attempt_id,generation,digest,payload) VALUES($1,$2,$3,$4)",
-            vec![id.into(), input.generation.into(), digest.into(), json(r)?.into()]).await?;
+        execution_preflight_receipts::ActiveModel {
+            attempt_id: Set(id),
+            generation: Set(input.generation),
+            digest: Set(digest),
+            payload: Set(json(r)?),
+            ..Default::default()
+        }
+        .insert(&tx)
+        .await?;
     }
     tx.commit().await?;
     Ok(PreflightAcknowledgement {

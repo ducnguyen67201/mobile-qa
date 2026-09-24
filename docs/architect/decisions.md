@@ -176,3 +176,27 @@ change is cancellable before renewal; choosing a different plan requires canceli
 the existing change first. Fail closed on an unsupported Stripe schedule or a
 subscription that diverges from the app's paid period. See
 [Product section 28](product.md#28-monthly-credit-plans--local-implementation).
+
+## 2026-09-22 — Elastic fixed hosts and large artifacts
+
+Store APK bytes in private object storage, metadata in PostgreSQL, and verified
+reusable bytes in a bounded host cache. The intake ceiling is 2 GiB inclusive;
+multipart transfer and durable validation avoid whole-file memory use. A profile
+must still qualify the actual application size and resource limits.
+
+As clarified on 2026-09-23, multipart availability follows the configured remote
+storage backend without a separate environment toggle. This avoids redundant
+deployment configuration; signing and CORS verification remain hosted release checks.
+
+Begin with one protected EBS-backed EC2 instance. OpenTofu provisions resources;
+a separate Lambda reconciler starts and stops the instance through persisted
+operation intents. It cannot stop until all execution and phone work has drained
+and a current boot has proven cleanup. Uncertain outcomes retain fences and require
+reconciliation or explicit operator recovery. Warm capacity defaults to zero;
+additional slots require measured density and reset/network qualification.
+
+The API, database and object storage remain online on Railway. Guest network
+isolation is a Linux cgroup/nftables boundary with a narrow fixed-path launcher;
+cloud-hosted generic direct execution is the initial supported adapter. Cloud
+provisioning, image builds and real device campaigns require their own authorization.
+See [spec 11](implementation/11-elastic-device-hosts-and-large-apks.md).

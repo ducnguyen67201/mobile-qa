@@ -39,6 +39,32 @@ class AuthoringUsage(BaseModel):
     unknown_calls: Annotated[int, Field(ge=0)]
 
 
+class CapacityAction(StrEnum):
+    observe = 'observe'
+    start = 'start'
+    drain = 'drain'
+    commit_stop = 'commit_stop'
+    record_power = 'record_power'
+    quarantine = 'quarantine'
+
+
+class CapacityHint(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    pool_id: UUID
+    request_id: UUID
+
+
+class CapacityOperation(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    action: CapacityAction
+    created_at: AwareDatetime
+    id: UUID
+
+
 class CheckMethod(StrEnum):
     ui_property_equals_v1 = 'ui_property_equals_v1'
     ui_element_presence_v1 = 'ui_element_presence_v1'
@@ -51,11 +77,24 @@ class CleanupState(StrEnum):
     quarantined = 'quarantined'
 
 
+class ConsumeHintRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: UUID
+    timestamp: int
+
+
 class CoverageKind(StrEnum):
     smoke = 'smoke'
     happy_path = 'happy_path'
     validation = 'validation'
     persistence = 'persistence'
+
+
+class DeliveryAuthentication(StrEnum):
+    signed_url = 'signed_url'
+    worker_lease = 'worker_lease'
 
 
 class DirectCommand4(BaseModel):
@@ -209,6 +248,43 @@ class GenerationState(StrEnum):
     canceled = 'canceled'
 
 
+class HintReceipt(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    accepted: bool
+
+
+class HostCleanupRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    boot_id: UUID
+    generation: int
+    journals_resolved: bool
+    ports_released: bool
+    processes_stopped: bool
+
+
+class HostRegisterRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    boot_id: UUID
+    toolchain_digest: str
+    version: Annotated[int, Field(ge=0, le=255)]
+
+
+class HostState(StrEnum):
+    stopped = 'stopped'
+    starting = 'starting'
+    ready = 'ready'
+    draining = 'draining'
+    stop_committed = 'stop_committed'
+    stopping = 'stopping'
+    quarantined = 'quarantined'
+
+
 class JobState(StrEnum):
     queued = 'queued'
     leased = 'leased'
@@ -267,6 +343,14 @@ class ModelUsage(BaseModel):
 class ObservationKind(StrEnum):
     present_value = 'present_value'
     absent = 'absent'
+
+
+class ObservedPower(StrEnum):
+    unknown = 'unknown'
+    stopped = 'stopped'
+    pending = 'pending'
+    running = 'running'
+    stopping = 'stopping'
 
 
 class Outcome(StrEnum):
@@ -341,7 +425,7 @@ class QualificationArtifact1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    bytes: Annotated[int, Field(ge=1, le=262144000)]
+    bytes: Annotated[int, Field(ge=1, le=2147483648)]
     mime: str
     name: str
     path: str
@@ -480,6 +564,83 @@ class Scenario(RootModel[Scenario1 | Scenario2 | Scenario3]):
     root: Scenario1 | Scenario2 | Scenario3
 
 
+class SlotBinding(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    app_id: UUID
+    profile_id: UUID
+    slot_id: UUID
+
+
+class SlotDefinition(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    adb_server_port: Annotated[int, Field(ge=0, le=65535)]
+    console_port: Annotated[int, Field(ge=0, le=65535)]
+    cpu_cores: Annotated[int, Field(ge=0)]
+    device_identity: str
+    id: UUID
+    index: Annotated[int, Field(ge=0)]
+    memory_mb: Annotated[int, Field(ge=0)]
+    qualification_reference: str
+    qualified: bool
+    system_image: str
+    warm_qualified: bool
+
+
+class SlotDeviceOperation(StrEnum):
+    boot = 'boot'
+    install = 'install'
+    launch = 'launch'
+    adb = 'adb'
+    snapshot = 'snapshot'
+    stop = 'stop'
+    discard = 'discard'
+    direct = 'direct'
+    hierarchy = 'hierarchy'
+
+
+class SlotDeviceResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    data_base64: str | None = None
+    ok: bool
+    reason: str | None = None
+    xml_base64: str | None = None
+
+
+class SlotGrantRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    app_id: UUID
+    boot_id: UUID
+    generation: int
+    profile_id: UUID
+
+
+class SlotGrantResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    app_id: UUID
+    profile_id: UUID
+    worker_id: UUID
+    worker_token: str
+
+
+class SlotState(StrEnum):
+    offline = 'offline'
+    preparing = 'preparing'
+    idle = 'idle'
+    leased = 'leased'
+    cleaning = 'cleaning'
+    quarantined = 'quarantined'
+
+
 class StageBudgets(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -512,6 +673,19 @@ class UiProperty(StrEnum):
     enabled = 'enabled'
 
 
+class Weekday(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=255)]
+
+
+class WarmWindow(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    end: str
+    start: str
+    weekdays: list[Weekday]
+
+
 class WorkerModelCapabilities(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -531,6 +705,32 @@ class ArtifactReceipt(BaseModel):
         extra='forbid',
     )
     artifact: RunArtifact
+
+
+class BuildDelivery(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    app_id: UUID
+    authentication: DeliveryAuthentication
+    byte_size: Annotated[int, Field(ge=1, le=2147483648)]
+    expires_at: AwareDatetime
+    headers: dict[str, str]
+    sha256: str
+    url: str
+
+
+class CapacityActionRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    action: CapacityAction
+    expected_control_version: int
+    host_id: UUID
+    observed_power: ObservedPower | None = None
+    operation_id: UUID | None = None
+    reason: str | None = None
+    request_id: UUID
 
 
 class CheckResult(BaseModel):
@@ -765,6 +965,15 @@ class FakeExecutionResult(BaseModel):
     version: Annotated[int, Field(ge=1, le=1)]
 
 
+class HostSlotStatus(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    definition: SlotDefinition
+    emulator_boot_id: UUID | None = None
+    state: SlotState
+
+
 class LocalExecutionResult(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -820,6 +1029,30 @@ class PhoneClaimRequest(BaseModel):
     protocol_version: Annotated[int, Field(ge=0)] = 0
 
 
+class PoolPolicy(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    enabled: bool
+    idle_seconds: Annotated[int, Field(ge=0)]
+    timezone: str
+    warm_target: Annotated[int, Field(ge=0)]
+    warm_windows: list[WarmWindow]
+
+
+class PoolRegistration(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    bindings: list[SlotBinding]
+    host_id: UUID
+    instance_id: str
+    policy: PoolPolicy
+    pool_id: UUID
+    slots: list[SlotDefinition]
+    toolchain_digest: str
+
+
 class QualificationRequest(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -858,6 +1091,30 @@ class QualificationResult(BaseModel):
     started_at: AwareDatetime
     usage: list[QualificationUsage]
     version: Annotated[int, Field(ge=1, le=1)]
+
+
+class SlotDeviceRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    arguments: list[str] = []
+    command: DirectCommand | None = None
+    launch_component: str | None = None
+    operation: SlotDeviceOperation
+    package: str | None = None
+    path: str | None = None
+    sha256: str | None = None
+    timeout_seconds: Annotated[int | None, Field(ge=0)] = None
+    token: str
+
+
+class SlotHeartbeat(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    emulator_boot_id: UUID | None = None
+    slot_id: UUID
+    state: SlotState
 
 
 class StepReceipt(BaseModel):
@@ -915,6 +1172,31 @@ class AutomationSequence(BaseModel):
     )
     actions: list[TestAction]
     checks: list[ExpectedCheck]
+
+
+class CapacitySnapshot(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    active_work: int
+    boot_id: UUID | None = None
+    cache_bytes: int
+    clean_at: AwareDatetime | None = None
+    control_version: int
+    current_operation: CapacityOperation | None = None
+    desired_online: bool
+    generation: int
+    heartbeat_at: AwareDatetime | None = None
+    host_id: UUID
+    instance_id: str
+    last_demand_at: AwareDatetime
+    observed_power: ObservedPower
+    policy: PoolPolicy
+    pool_id: UUID
+    queued_jobs: int
+    reason: str | None = None
+    startup_started_at: AwareDatetime | None = None
+    state: HostState
 
 
 class CaseDefinition(BaseModel):
@@ -996,7 +1278,7 @@ class ExecutionProfile(BaseModel):
     execution_context: ExecutionContextV1 | None = None
     id: UUID
     image: str
-    max_apk_bytes: Annotated[int, Field(ge=0)]
+    max_apk_bytes: Annotated[int, Field(ge=1, le=2147483648)]
     model: ModelBinding | None = None
     name: str
     package: str
@@ -1016,6 +1298,31 @@ class GenerationProposal(BaseModel):
     sequence: AutomationSequence
     source_ids: list[UUID]
     title: str
+
+
+class HostHeartbeatRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    boot_id: UUID
+    cache_bytes: int
+    generation: int
+    slots: list[SlotHeartbeat]
+
+
+class HostStatus(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    bindings: list[SlotBinding]
+    boot_id: UUID | None = None
+    generation: int
+    heartbeat_seconds: Annotated[int, Field(ge=0)]
+    host_id: UUID
+    policy: PoolPolicy
+    pool_id: UUID
+    slots: list[HostSlotStatus]
+    state: HostState
 
 
 class PreflightReceipt(BaseModel):
@@ -1072,7 +1379,7 @@ class RunManifest(BaseModel):
     )
     app_id: UUID
     budget: ExecutionBudget
-    build_bytes: Annotated[int, Field(ge=0)]
+    build_bytes: Annotated[int, Field(ge=1, le=2147483648)]
     build_id: UUID
     build_sha256: str
     cases: list[ResolvedCase]
@@ -1160,6 +1467,26 @@ class GenerationProgress(BaseModel):
     state: GenerationState
     trace: list[DirectCommand]
     usage: AuthoringUsage
+
+
+class HostContracts(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    action: CapacityActionRequest
+    cleanup: HostCleanupRequest
+    consume_hint: ConsumeHintRequest
+    device_request: SlotDeviceRequest
+    device_response: SlotDeviceResponse
+    grant: SlotGrantRequest
+    grant_response: SlotGrantResponse
+    heartbeat: HostHeartbeatRequest
+    hint: CapacityHint
+    hint_receipt: HintReceipt
+    register_: Annotated[HostRegisterRequest, Field(alias='register')]
+    registration: PoolRegistration
+    snapshot: CapacitySnapshot
+    status: HostStatus
 
 
 class PhoneTask(BaseModel):
@@ -1250,7 +1577,7 @@ class PhoneLease(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    build_bytes: Annotated[int, Field(ge=0)]
+    build_bytes: Annotated[int, Field(ge=1, le=2147483648)]
     build_sha256: str
     lease_token: str
     session: PhoneSession
@@ -1269,10 +1596,12 @@ class WorkerContracts(BaseModel):
     )
     authoring_request: AuthoringModelEnvelope
     authoring_response: AuthoringModelResponse
+    build_delivery: BuildDelivery
     discovery_call: DiscoveryCall
     discovery_drafts: DiscoveryDraftBatch
     discovery_reply: DiscoveryReply
     execution: ExecutionContracts
+    hosts: HostContracts
     model_definition: ModelDefinition
     phone_claim: PhoneClaimResponse
     phone_claim_request: PhoneClaimRequest

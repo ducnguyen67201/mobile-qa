@@ -1,0 +1,17 @@
+//! SeaORM persistence for app-scoped execution reviewer grants.
+use sea_orm::entity::prelude::*;
+
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+#[sea_orm(table_name = "execution_reviewer_grants")]
+pub struct Model {
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub app_id: Uuid,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub user_id: Uuid,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub purpose: String,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
+impl ActiveModelBehavior for ActiveModel {}

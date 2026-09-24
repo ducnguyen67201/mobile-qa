@@ -9,7 +9,7 @@ Hosted acceptance, full device qualification and UI-to-worker job dispatch remai
 | Location               | Responsibility                                                                      | Current state                                                                                         |
 | ---------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `apps/api`             | Rust/Loco API, authorization, domain services, scheduling, verification and reports | Auth, apps/environments, private APK intake and build history implemented; scheduling/reports planned |
-| `apps/api/migration`   | SeaORM database migrations                                                          | Twelve product tables with tenant/lifecycle constraints; real PostgreSQL tests                        |
+| `apps/api/migration`   | SeaORM database migrations                                                          | Typed SeaQuery schema evolution/backfills with real PostgreSQL tests                                  |
 | `apps/web`             | React/Vite dashboard using React Router, TanStack Query, Mantine                    | Authenticated Mantine dashboard, App and Settings; Tests/Runs placeholders                            |
 | `apps/mobile-worker`   | Python/uv adapter, device observations and evidence                                 | Local ADB demo and live Minitap demo verified; network jobs planned                                   |
 | `crates/contracts`     | Pure Rust transport DTOs and browser endpoint declarations                          | Browser setup operations plus worker fixture and qualification contracts; no Loco/DB dependency       |
@@ -72,6 +72,11 @@ existing build IDs/checksums remain stable. The adapter is implemented; hosted i
 Use SeaORM through Loco with PostgreSQL. Add entities/domain services and versioned
 migrations as features arrive; do not introduce a parallel hand-maintained SQL access
 layer. SQLx is an upstream dependency of the ORM, not a second application data layer.
+Runtime and API-test persistence uses entity queries and active models. Historical
+migrations use `SchemaManager` and typed SeaQuery builders, with migration-local entities
+for data validation/backfills. A deny-style API test rejects raw statement execution,
+custom SQL expressions and SQL-leading literals under `apps/api`; PostgreSQL bootstrap
+and supervisor readiness probes remain outside this Rust persistence boundary.
 The ORM reduces mapping and query boilerplate; it does not replace schema evolution,
 indexes, transaction design or business invariants. Database records are distinct from
 public transport DTOs. [Spec 03](implementation/03-app-setup-and-ui-backend.md) owns the

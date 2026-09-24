@@ -1,11 +1,20 @@
 //! Authoritative model resolution. This module is the only legacy-name mapper.
-use super::execution_store::*;
-use crate::errors::{ApiFailure, ApiResult};
+use super::execution_store::{conflict, decode, hash, json};
+use crate::{
+    errors::{ApiFailure, ApiResult},
+    models::_entities::{
+        apps as app_rows, execution_workers, model_assignment_events, model_assignments,
+        model_definitions,
+    },
+};
 use mobile_qa_contracts::model_registry::{
     ModelAssignment, ModelAssignmentState, ModelBinding, ModelCapability, ModelDefinition,
     ModelProvider, ModelPurpose, ModelReference, ResolvedModel, WorkerModelCapabilities,
 };
-use sea_orm::{ConnectionTrait, TransactionSession, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionSession, TransactionTrait,
+};
 use uuid::Uuid;
 
 /// Poll advertisements are committed independently of a lease transaction: an idle
@@ -17,12 +26,33 @@ pub async fn advertise_execution(
     version: u8,
     capabilities: Option<&WorkerModelCapabilities>,
 ) -> ApiResult<()> {
-    exec(
-        db,
-        "UPDATE execution_workers SET model_capabilities=$2,model_last_seen_at=now(),execution_model_capabilities=$2,execution_last_seen_at=now(),execution_protocol_version=$3 WHERE id=$1 AND revoked=false",
-        vec![worker.into(), json(&capabilities)?.into(), (version as i32).into()],
-    )
-    .await?;
+    let now = chrono::Utc::now();
+    let payload = json(&capabilities)?;
+    execution_workers::Entity::update_many()
+        .col_expr(
+            execution_workers::Column::ModelCapabilities,
+            sea_orm::sea_query::Expr::value(Some(payload.clone())),
+        )
+        .col_expr(
+            execution_workers::Column::ModelLastSeenAt,
+            sea_orm::sea_query::Expr::value(Some(now)),
+        )
+        .col_expr(
+            execution_workers::Column::ExecutionModelCapabilities,
+            sea_orm::sea_query::Expr::value(Some(payload)),
+        )
+        .col_expr(
+            execution_workers::Column::ExecutionLastSeenAt,
+            sea_orm::sea_query::Expr::value(Some(now)),
+        )
+        .col_expr(
+            execution_workers::Column::ExecutionProtocolVersion,
+            sea_orm::sea_query::Expr::value(Some(version as i32)),
+        )
+        .filter(execution_workers::Column::Id.eq(worker))
+        .filter(execution_workers::Column::Revoked.eq(false))
+        .exec(db)
+        .await?;
     Ok(())
 }
 
@@ -32,12 +62,33 @@ pub async fn advertise_phone(
     version: u32,
     capabilities: Option<&WorkerModelCapabilities>,
 ) -> ApiResult<()> {
-    exec(
-        db,
-        "UPDATE execution_workers SET model_capabilities=$2,model_last_seen_at=now(),phone_model_capabilities=$2,phone_last_seen_at=now(),phone_protocol_version=$3 WHERE id=$1 AND revoked=false",
-        vec![worker.into(), json(&capabilities)?.into(), (version as i32).into()],
-    )
-    .await?;
+    let now = chrono::Utc::now();
+    let payload = json(&capabilities)?;
+    execution_workers::Entity::update_many()
+        .col_expr(
+            execution_workers::Column::ModelCapabilities,
+            sea_orm::sea_query::Expr::value(Some(payload.clone())),
+        )
+        .col_expr(
+            execution_workers::Column::ModelLastSeenAt,
+            sea_orm::sea_query::Expr::value(Some(now)),
+        )
+        .col_expr(
+            execution_workers::Column::PhoneModelCapabilities,
+            sea_orm::sea_query::Expr::value(Some(payload)),
+        )
+        .col_expr(
+            execution_workers::Column::PhoneLastSeenAt,
+            sea_orm::sea_query::Expr::value(Some(now)),
+        )
+        .col_expr(
+            execution_workers::Column::PhoneProtocolVersion,
+            sea_orm::sea_query::Expr::value(Some(version as i32)),
+        )
+        .filter(execution_workers::Column::Id.eq(worker))
+        .filter(execution_workers::Column::Revoked.eq(false))
+        .exec(db)
+        .await?;
     Ok(())
 }
 
@@ -49,33 +100,31 @@ pub async fn register(
     definition.validate().map_err(ApiFailure::invalid)?;
     let payload = json(definition)?;
     let tx = db.begin().await?;
-    let existing = rows(
-        &tx,
-        "SELECT payload FROM model_definitions WHERE key=$1 AND revision=$2 FOR UPDATE",
-        vec![
-            definition.reference.key.clone().into(),
-            (definition.reference.revision as i32).into(),
-        ],
-    )
+    let existing = model_definitions::Entity::find_by_id((
+        definition.reference.key.clone(),
+        definition.reference.revision as i32,
+    ))
+    .lock_exclusive()
+    .one(&tx)
     .await?;
-    if let Some(existing) = existing.first() {
-        if field::<serde_json::Value>(existing, "payload")? != payload {
+    if let Some(existing) = existing {
+        if existing.payload != payload {
             return Err(conflict(
                 "Model revisions are immutable; register a new revision",
             ));
         }
     } else {
-        exec(
-            &tx,
-                "INSERT INTO model_definitions(key,revision,payload,registered_by,payload_sha256) VALUES($1,$2,$3,$4,$5)",
-            vec![
-                definition.reference.key.clone().into(),
-                (definition.reference.revision as i32).into(),
-                payload.into(),
-                actor.into(),
-                hash(serde_json::to_vec(definition).map_err(|_| ApiFailure::internal())?).into(),
-            ],
-        )
+        model_definitions::ActiveModel {
+            key: Set(definition.reference.key.clone()),
+            revision: Set(definition.reference.revision as i32),
+            payload: Set(payload),
+            registered_by: Set(Some(actor)),
+            payload_sha256: Set(Some(hash(
+                serde_json::to_vec(definition).map_err(|_| ApiFailure::internal())?,
+            ))),
+            ..Default::default()
+        }
+        .insert(&tx)
         .await?;
     }
     tx.commit().await?;
@@ -84,15 +133,15 @@ pub async fn register(
 
 pub async fn retire(db: &impl ConnectionTrait, reference: &ModelReference) -> ApiResult<()> {
     reference.validate().map_err(ApiFailure::invalid)?;
-    if exec(
-        db,
-        "UPDATE model_definitions SET retired_at=COALESCE(retired_at,now()) WHERE key=$1 AND revision=$2",
-        vec![reference.key.clone().into(), (reference.revision as i32).into()],
-    )
-    .await?
-        == 0
-    {
-        return Err(ApiFailure::missing());
+    let row =
+        model_definitions::Entity::find_by_id((reference.key.clone(), reference.revision as i32))
+            .one(db)
+            .await?
+            .ok_or_else(ApiFailure::missing)?;
+    if row.retired_at.is_none() {
+        let mut active = row.into_active_model();
+        active.retired_at = Set(Some(chrono::Utc::now()));
+        active.update(db).await?;
     }
     Ok(())
 }
@@ -102,15 +151,15 @@ pub async fn resolve(
     reference: &ModelReference,
 ) -> ApiResult<(ResolvedModel, bool)> {
     reference.validate().map_err(ApiFailure::invalid)?;
-    let row = one(
-        db,
-        "SELECT payload,retired_at IS NOT NULL AS retired FROM model_definitions WHERE key=$1 AND revision=$2",
-        vec![reference.key.clone().into(), (reference.revision as i32).into()],
-    )
-    .await?;
-    let definition: ModelDefinition = decode(field(&row, "payload")?)?;
+    let row =
+        model_definitions::Entity::find_by_id((reference.key.clone(), reference.revision as i32))
+            .one(db)
+            .await?
+            .ok_or_else(ApiFailure::missing)?;
+    let retired = row.retired_at.is_some();
+    let definition: ModelDefinition = decode(row.payload)?;
     definition.validate().map_err(ApiFailure::invalid)?;
-    Ok((definition.resolve(), field(&row, "retired")?))
+    Ok((definition.resolve(), retired))
 }
 
 pub async fn resolve_for_new_work(
@@ -150,22 +199,28 @@ async fn resolve_legacy(
     db: &impl ConnectionTrait,
     provider_model: &str,
 ) -> ApiResult<ResolvedModel> {
-    let matches = rows(
-        db,
-        "SELECT payload FROM model_definitions WHERE retired_at IS NULL AND payload->>'provider'=$1 AND payload->>'provider_model'=$2 ORDER BY key,revision",
-        vec!["open_ai".into(), provider_model.into()],
-    )
-    .await?;
+    let matches = model_definitions::Entity::find()
+        .filter(model_definitions::Column::RetiredAt.is_null())
+        .order_by_asc(model_definitions::Column::Key)
+        .order_by_asc(model_definitions::Column::Revision)
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|row| decode::<ModelDefinition>(row.payload))
+        .collect::<ApiResult<Vec<_>>>()?
+        .into_iter()
+        .filter(|definition| {
+            definition.provider == ModelProvider::OpenAi
+                && definition.provider_model == provider_model
+        })
+        .collect::<Vec<_>>();
     match matches.as_slice() {
         [] => Err(ApiFailure::new(
             409,
             "legacy_model_unmapped",
             "The historical model name is not registered",
         )),
-        [row] => {
-            let definition: ModelDefinition = decode(field(row, "payload")?)?;
-            Ok(definition.resolve())
-        }
+        [definition] => Ok(definition.resolve()),
         _ => Err(ApiFailure::new(
             409,
             "legacy_model_ambiguous",
@@ -244,25 +299,51 @@ pub async fn stage_assignment(
         return Err(conflict("Model revision is unavailable for this purpose"));
     }
     let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![assignment.app_id.into()],
-    )
+    app_rows::Entity::find_by_id(assignment.app_id)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let purpose = purpose_name(assignment.purpose);
+    let existing = model_assignments::Entity::find_by_id((
+        assignment.app_id,
+        assignment.profile_id,
+        purpose.to_owned(),
+        assignment.revision as i32,
+    ))
+    .one(&tx)
     .await?;
-    let existing = rows(&tx,"SELECT payload FROM model_assignments WHERE app_id=$1 AND profile_id=$2 AND purpose=$3 AND revision=$4",vec![assignment.app_id.into(),assignment.profile_id.into(),purpose_name(assignment.purpose).into(),(assignment.revision as i32).into()]).await?;
-    if let Some(row) = existing.first() {
-        let prior: ModelAssignment = decode(field(row, "payload")?)?;
+    if let Some(row) = existing {
+        let prior: ModelAssignment = decode(row.payload)?;
         if prior != *assignment {
             return Err(conflict("Assignment revisions are immutable"));
         }
         return Ok(());
     }
-    let next: i32 = field(&one(&tx,"SELECT COALESCE(MAX(revision),0)+1 AS next FROM model_assignments WHERE app_id=$1 AND profile_id=$2 AND purpose=$3",vec![assignment.app_id.into(),assignment.profile_id.into(),purpose_name(assignment.purpose).into()]).await?,"next")?;
+    let next = model_assignments::Entity::find()
+        .filter(model_assignments::Column::AppId.eq(assignment.app_id))
+        .filter(model_assignments::Column::ProfileId.eq(assignment.profile_id))
+        .filter(model_assignments::Column::Purpose.eq(purpose))
+        .order_by_desc(model_assignments::Column::Revision)
+        .one(&tx)
+        .await?
+        .map_or(1, |row| row.revision + 1);
     if assignment.revision != next as u32 {
         return Err(conflict("Assignment revision must be next"));
     }
-    exec(&tx,"INSERT INTO model_assignments(app_id,profile_id,purpose,revision,payload,state,created_by,changed_by) VALUES($1,$2,$3,$4,$5,'staged',$6,$6)",vec![assignment.app_id.into(),assignment.profile_id.into(),purpose_name(assignment.purpose).into(),next.into(),json(assignment)?.into(),actor.into()]).await?;
+    model_assignments::ActiveModel {
+        app_id: Set(assignment.app_id),
+        profile_id: Set(assignment.profile_id),
+        purpose: Set(purpose.to_owned()),
+        revision: Set(next),
+        payload: Set(json(assignment)?),
+        state: Set("staged".into()),
+        created_by: Set(actor),
+        changed_by: Set(actor),
+        ..Default::default()
+    }
+    .insert(&tx)
+    .await?;
     tx.commit().await?;
     Ok(())
 }
@@ -275,17 +356,26 @@ pub async fn transition_assignment(
 ) -> ApiResult<()> {
     super::test_definitions::operator(ctx, actor, assignment.app_id).await?;
     let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![assignment.app_id.into()],
-    )
-    .await?;
-    let row = one(&tx,"SELECT payload,state FROM model_assignments WHERE app_id=$1 AND profile_id=$2 AND purpose=$3 AND revision=$4 FOR UPDATE",vec![assignment.app_id.into(),assignment.profile_id.into(),purpose_name(assignment.purpose).into(),(assignment.revision as i32).into()]).await?;
-    if decode::<ModelAssignment>(field(&row, "payload")?)? != *assignment {
+    app_rows::Entity::find_by_id(assignment.app_id)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let purpose = purpose_name(assignment.purpose);
+    let row = model_assignments::Entity::find_by_id((
+        assignment.app_id,
+        assignment.profile_id,
+        purpose.to_owned(),
+        assignment.revision as i32,
+    ))
+    .lock_exclusive()
+    .one(&tx)
+    .await?
+    .ok_or_else(ApiFailure::missing)?;
+    if decode::<ModelAssignment>(row.payload.clone())? != *assignment {
         return Err(conflict("Assignment payload differs"));
     }
-    let current: String = field(&row, "state")?;
+    let current = row.state.clone();
     let target = state_name(next);
     if current == target {
         return Ok(());
@@ -304,31 +394,35 @@ pub async fn transition_assignment(
         if retired {
             return Err(conflict("Model revision is retired"));
         }
-        let counterpart = rows(&tx,"SELECT payload FROM model_assignments WHERE app_id=$1 AND profile_id=$2 AND purpose<>$3 AND state='active'",vec![assignment.app_id.into(),assignment.profile_id.into(),purpose_name(assignment.purpose).into()]).await?;
+        let counterpart = model_assignments::Entity::find()
+            .filter(model_assignments::Column::AppId.eq(assignment.app_id))
+            .filter(model_assignments::Column::ProfileId.eq(assignment.profile_id))
+            .filter(model_assignments::Column::Purpose.ne(purpose))
+            .filter(model_assignments::Column::State.eq("active"))
+            .one(&tx)
+            .await?;
         let other = counterpart
-            .first()
-            .map(|row| decode::<ModelAssignment>(field(row, "payload")?))
+            .map(|row| decode::<ModelAssignment>(row.payload))
             .transpose()?;
         let other = if let Some(other) = other {
             Some(resolve(&tx, &other.reference).await?.0)
         } else {
             None
         };
-        let live = rows(&tx,"SELECT phone_model_capabilities,phone_protocol_version,phone_last_seen_at,execution_model_capabilities,execution_protocol_version,execution_last_seen_at FROM execution_workers WHERE app_id=$1 AND profile_id=$2 AND revoked=false",vec![assignment.app_id.into(),assignment.profile_id.into()]).await?;
+        let live = execution_workers::Entity::find()
+            .filter(execution_workers::Column::AppId.eq(assignment.app_id))
+            .filter(execution_workers::Column::ProfileId.eq(assignment.profile_id))
+            .filter(execution_workers::Column::Revoked.eq(false))
+            .all(&tx)
+            .await?;
         let recent = chrono::Utc::now() - chrono::Duration::seconds(90);
         if !live.iter().any(|row| {
-            let phone_caps = field::<Option<serde_json::Value>>(row, "phone_model_capabilities")
-                .ok()
-                .flatten()
+            let phone_caps = row
+                .phone_model_capabilities
+                .clone()
                 .and_then(|value| decode::<WorkerModelCapabilities>(value).ok());
-            let phone_version = field::<Option<i32>>(row, "phone_protocol_version")
-                .ok()
-                .flatten()
-                .unwrap_or(0);
-            let phone_seen =
-                field::<Option<chrono::DateTime<chrono::Utc>>>(row, "phone_last_seen_at")
-                    .ok()
-                    .flatten();
+            let phone_version = row.phone_protocol_version.unwrap_or(0);
+            let phone_seen = row.phone_last_seen_at;
             let phone_matches = phone_version >= 5
                 && phone_seen.is_some_and(|seen| seen > recent)
                 && worker_matches(&resolved, phone_caps.as_ref())
@@ -341,19 +435,12 @@ pub async fn transition_assignment(
             if assignment.purpose != ModelPurpose::Navigation || other.is_some() {
                 return false;
             }
-            let execution_caps =
-                field::<Option<serde_json::Value>>(row, "execution_model_capabilities")
-                    .ok()
-                    .flatten()
-                    .and_then(|value| decode::<WorkerModelCapabilities>(value).ok());
-            let execution_version = field::<Option<i32>>(row, "execution_protocol_version")
-                .ok()
-                .flatten()
-                .unwrap_or(0);
-            let execution_seen =
-                field::<Option<chrono::DateTime<chrono::Utc>>>(row, "execution_last_seen_at")
-                    .ok()
-                    .flatten();
+            let execution_caps = row
+                .execution_model_capabilities
+                .clone()
+                .and_then(|value| decode::<WorkerModelCapabilities>(value).ok());
+            let execution_version = row.execution_protocol_version.unwrap_or(0);
+            let execution_seen = row.execution_last_seen_at;
             execution_version >= 5
                 && execution_seen.is_some_and(|seen| seen > recent)
                 && worker_matches(&resolved, execution_caps.as_ref())
@@ -362,15 +449,54 @@ pub async fn transition_assignment(
                 "A qualified compatible worker must be live before activation",
             ));
         }
-        let prior = rows(&tx,"SELECT revision FROM model_assignments WHERE app_id=$1 AND profile_id=$2 AND purpose=$3 AND state='active' FOR UPDATE",vec![assignment.app_id.into(),assignment.profile_id.into(),purpose_name(assignment.purpose).into()]).await?;
+        let prior = model_assignments::Entity::find()
+            .filter(model_assignments::Column::AppId.eq(assignment.app_id))
+            .filter(model_assignments::Column::ProfileId.eq(assignment.profile_id))
+            .filter(model_assignments::Column::Purpose.eq(purpose))
+            .filter(model_assignments::Column::State.eq("active"))
+            .lock_exclusive()
+            .all(&tx)
+            .await?;
         for row in prior {
-            let revision: i32 = field(&row, "revision")?;
-            exec(&tx,"UPDATE model_assignments SET state='draining',changed_by=$5,changed_at=now() WHERE app_id=$1 AND profile_id=$2 AND purpose=$3 AND revision=$4",vec![assignment.app_id.into(),assignment.profile_id.into(),purpose_name(assignment.purpose).into(),revision.into(),actor.into()]).await?;
-            exec(&tx,"INSERT INTO model_assignment_events(id,app_id,profile_id,purpose,revision,old_state,new_state,actor_id) VALUES($1,$2,$3,$4,$5,'active','draining',$6)",vec![Uuid::new_v4().into(),assignment.app_id.into(),assignment.profile_id.into(),purpose_name(assignment.purpose).into(),revision.into(),actor.into()]).await?;
+            let revision = row.revision;
+            let mut active = row.into_active_model();
+            active.state = Set("draining".into());
+            active.changed_by = Set(actor);
+            active.changed_at = Set(chrono::Utc::now());
+            active.update(&tx).await?;
+            model_assignment_events::ActiveModel {
+                id: Set(Uuid::new_v4()),
+                app_id: Set(assignment.app_id),
+                profile_id: Set(assignment.profile_id),
+                purpose: Set(purpose.into()),
+                revision: Set(revision),
+                old_state: Set("active".into()),
+                new_state: Set("draining".into()),
+                actor_id: Set(actor),
+                ..Default::default()
+            }
+            .insert(&tx)
+            .await?;
         }
     }
-    exec(&tx,"UPDATE model_assignments SET state=$5,changed_by=$6,changed_at=now() WHERE app_id=$1 AND profile_id=$2 AND purpose=$3 AND revision=$4",vec![assignment.app_id.into(),assignment.profile_id.into(),purpose_name(assignment.purpose).into(),(assignment.revision as i32).into(),target.into(),actor.into()]).await?;
-    exec(&tx,"INSERT INTO model_assignment_events(id,app_id,profile_id,purpose,revision,old_state,new_state,actor_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",vec![Uuid::new_v4().into(),assignment.app_id.into(),assignment.profile_id.into(),purpose_name(assignment.purpose).into(),(assignment.revision as i32).into(),current.into(),target.into(),actor.into()]).await?;
+    let mut active = row.into_active_model();
+    active.state = Set(target.into());
+    active.changed_by = Set(actor);
+    active.changed_at = Set(chrono::Utc::now());
+    active.update(&tx).await?;
+    model_assignment_events::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        app_id: Set(assignment.app_id),
+        profile_id: Set(assignment.profile_id),
+        purpose: Set(purpose.into()),
+        revision: Set(assignment.revision as i32),
+        old_state: Set(current),
+        new_state: Set(target.into()),
+        actor_id: Set(actor),
+        ..Default::default()
+    }
+    .insert(&tx)
+    .await?;
     tx.commit().await?;
     Ok(())
 }
@@ -381,11 +507,17 @@ pub async fn active_assignment(
     profile: Uuid,
     purpose: ModelPurpose,
 ) -> ApiResult<Option<(ResolvedModel, u32)>> {
-    let rows=rows(db,"SELECT payload FROM model_assignments WHERE app_id=$1 AND profile_id=$2 AND purpose=$3 AND state='active'",vec![app.into(),profile.into(),purpose_name(purpose).into()]).await?;
-    let Some(row) = rows.first() else {
+    let row = model_assignments::Entity::find()
+        .filter(model_assignments::Column::AppId.eq(app))
+        .filter(model_assignments::Column::ProfileId.eq(profile))
+        .filter(model_assignments::Column::Purpose.eq(purpose_name(purpose)))
+        .filter(model_assignments::Column::State.eq("active"))
+        .one(db)
+        .await?;
+    let Some(row) = row else {
         return Ok(None);
     };
-    let assignment: ModelAssignment = decode(field(row, "payload")?)?;
+    let assignment: ModelAssignment = decode(row.payload)?;
     let (model, retired) = resolve(db, &assignment.reference).await?;
     if retired {
         return Err(conflict("Active model definition is retired"));

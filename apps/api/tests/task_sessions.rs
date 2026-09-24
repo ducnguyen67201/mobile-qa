@@ -1,6 +1,12 @@
 //! Actual HTTP and PostgreSQL session lifecycle; worker responses are synthetic.
 mod support;
-use mobile_qa::services::{execution_store::*, model_registry, test_definitions, worker_auth};
+use mobile_qa::{
+    models::_entities::{
+        execution_profiles, execution_reservations, execution_workers, phone_sessions,
+        test_library_drafts, test_library_entries,
+    },
+    services::{model_registry, test_definitions, worker_auth},
+};
 use mobile_qa_contracts::model_registry::*;
 use mobile_qa_contracts::{automation::*, execution::*, task_sessions::*, test_library::*};
 use support::*;
@@ -46,13 +52,16 @@ async fn historical_model_free_direct_profile_remains_in_phone_options() {
         .unwrap();
         // Both pre-registry sentinels remain model-free reads, never new writes.
         for legacy in ["none", ""] {
-            exec(
-                &ctx.db,
-                "UPDATE execution_profiles SET payload=jsonb_set(payload,'{model}',$2) WHERE id=$1",
-                vec![profile.id.into(), serde_json::json!(legacy).into()],
-            )
-            .await
-            .unwrap();
+            let row = execution_profiles::Entity::find_by_id(profile.id)
+                .one(&ctx.db)
+                .await
+                .unwrap()
+                .unwrap();
+            let mut payload = row.payload.clone();
+            payload["model"] = serde_json::json!(legacy);
+            let mut active: execution_profiles::ActiveModel = row.into();
+            active.payload = Set(payload);
+            active.update(&ctx.db).await.unwrap();
             let response = owner
                 .read(server.get(&format!("/api/apps/{app}/phone-options")))
                 .await;
@@ -135,10 +144,9 @@ async fn assert_session_protocol(protocol_version: u32) {
             .await;
         idle.assert_status_ok();
         assert!(idle.json::<PhoneClaimResponse>().lease.is_none());
-        assert!(field::<bool>(
-            &one(&ctx.db, "SELECT model_last_seen_at IS NOT NULL AS seen FROM execution_workers WHERE profile_id=$1", vec![profile.id.into()]).await.unwrap(),
-            "seen"
-        ).unwrap());
+        assert!(execution_workers::Entity::find()
+            .filter(execution_workers::Column::ProfileId.eq(profile.id))
+            .one(&ctx.db).await.unwrap().unwrap().model_last_seen_at.is_some());
         let opts = owner
             .read(server.get(&options_path))
             .await;
@@ -284,14 +292,9 @@ async fn assert_session_protocol(protocol_version: u32) {
             .await
             .assert_status_ok();
         assert_eq!(
-            rows(
-                &ctx.db,
-                "SELECT resource FROM execution_reservations WHERE session_id=$1",
-                vec![s.id.into()]
-            )
-            .await
-            .unwrap()
-            .len(),
+            execution_reservations::Entity::find()
+                .filter(execution_reservations::Column::SessionId.eq(s.id))
+                .all(&ctx.db).await.unwrap().len(),
             2
         );
         status.state = PhoneState::Closed;
@@ -300,14 +303,9 @@ async fn assert_session_protocol(protocol_version: u32) {
         let closed = publish().json(&status).await;
         closed.assert_status_ok();
         assert_eq!(closed.json::<PhoneSession>().state, PhoneState::Closed);
-        assert!(rows(
-            &ctx.db,
-            "SELECT resource FROM execution_reservations WHERE session_id=$1",
-            vec![s.id.into()]
-        )
-        .await
-        .unwrap()
-        .is_empty());
+        assert!(execution_reservations::Entity::find()
+            .filter(execution_reservations::Column::SessionId.eq(s.id))
+            .all(&ctx.db).await.unwrap().is_empty());
         assert_eq!(publish().json(&status).await.status_code().as_u16(), 409);
         // Protocol 2 continues to admit direct commands but cannot claim Minitap discovery.
         let old_direct = OpenPhoneRequest {
@@ -543,14 +541,9 @@ async fn assert_session_protocol(protocol_version: u32) {
             .json::<LibraryDraftResponse>();
         assert!(!draft.issues.is_empty());
         assert!(!draft.entry.ai_generated);
-        let before = rows(
-            &ctx.db,
-            "SELECT id FROM test_library_entries WHERE app_id=$1",
-            vec![app.into()],
-        )
-        .await
-        .unwrap()
-        .len();
+        let before = test_library_entries::Entity::find()
+            .filter(test_library_entries::Column::AppId.eq(app))
+            .all(&ctx.db).await.unwrap().len();
         let mut invalid = save.clone();
         invalid.mutation_id = Uuid::new_v4();
         invalid.tests.push(SaveAuthoredTest {
@@ -567,14 +560,9 @@ async fn assert_session_protocol(protocol_version: u32) {
             .status_code()
             .is_success());
         assert_eq!(
-            rows(
-                &ctx.db,
-                "SELECT id FROM test_library_entries WHERE app_id=$1",
-                vec![app.into()]
-            )
-            .await
-            .unwrap()
-            .len(),
+            test_library_entries::Entity::find()
+                .filter(test_library_entries::Column::AppId.eq(app))
+                .all(&ctx.db).await.unwrap().len(),
             before
         );
         let generation = GenerateTestsRequest {
@@ -729,11 +717,12 @@ async fn assert_session_protocol(protocol_version: u32) {
         generated_entry.assert_status_ok();
         assert!(generated_entry.json::<LibraryEntryResponse>().ai_generated);
         // Earlier authoring releases used the longer proposal marker; preserve their origin badge.
-        exec(
-            &ctx.db,
-            "UPDATE test_library_drafts SET payload=jsonb_set(payload,'{content,provenance}',to_jsonb($2::text)) WHERE entry_id=$1",
-            vec![ids[0].into(), format!("authored-task:{}:proposal:{}", generation.id, proposal.id).into()],
-        ).await.unwrap();
+        let row=test_library_drafts::Entity::find_by_id(ids[0]).one(&ctx.db).await.unwrap().unwrap();
+        let mut payload=row.payload.clone();
+        payload["content"]["provenance"]=serde_json::json!(format!("authored-task:{}:proposal:{}", generation.id, proposal.id));
+        let mut active:test_library_drafts::ActiveModel=row.into();
+        active.payload=Set(payload);
+        active.update(&ctx.db).await.unwrap();
         let legacy_entry = owner
             .read(server.get(&format!("/api/apps/{app}/test-library/{}", ids[0])))
             .await;
@@ -772,13 +761,10 @@ async fn assert_session_protocol(protocol_version: u32) {
         assert_eq!(progress.journal.len(), 2);
         assert_eq!(progress.usage.calls, 0);
         status.task = None;
-        exec(
-            &ctx.db,
-            "UPDATE phone_sessions SET expires_at=now()-interval '1 second' WHERE id=$1",
-            vec![next.id.into()],
-        )
-        .await
-        .unwrap();
+        let row=phone_sessions::Entity::find_by_id(next.id).one(&ctx.db).await.unwrap().unwrap();
+        let mut active:phone_sessions::ActiveModel=row.into();
+        active.expires_at=Set(Some(Utc::now()-Duration::seconds(1)));
+        active.update(&ctx.db).await.unwrap();
         let expired = owner
             .read(server.get(&format!("/api/phones/{}", next.id)))
             .await;
@@ -787,14 +773,9 @@ async fn assert_session_protocol(protocol_version: u32) {
             PhoneState::Quarantined
         );
         assert_eq!(
-            rows(
-                &ctx.db,
-                "SELECT resource FROM execution_reservations WHERE session_id=$1",
-                vec![next.id.into()]
-            )
-            .await
-            .unwrap()
-            .len(),
+            execution_reservations::Entity::find()
+                .filter(execution_reservations::Column::SessionId.eq(next.id))
+                .all(&ctx.db).await.unwrap().len(),
             2
         );
     })

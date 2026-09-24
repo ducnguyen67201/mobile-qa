@@ -1,8 +1,18 @@
 //! Save editor content and its immutable executable snapshot in the caller's app transaction.
-use super::{execution_store::*, test_definitions as definitions, test_library as library};
-use crate::errors::{ApiFailure, ApiResult};
+use super::{
+    execution_store::{conflict, hash, json, word},
+    test_definitions as definitions, test_library as library,
+};
+use crate::{
+    errors::{ApiFailure, ApiResult},
+    models::_entities::{
+        execution_definitions, test_library_drafts, test_library_entries, test_library_versions,
+    },
+};
 use mobile_qa_contracts::test_library::*;
-use sea_orm::ConnectionTrait;
+use sea_orm::{
+    sea_query::OnConflict, ActiveModelTrait, ConnectionTrait, EntityTrait, IntoActiveModel, Set,
+};
 use uuid::Uuid;
 
 pub async fn save(
@@ -65,15 +75,11 @@ pub async fn save(
             let next: i32 = if latest.is_none() {
                 content.identity().2 as i32
             } else {
-                field(
-                    &one(
-                        db,
-                        "SELECT next_version FROM test_library_entries WHERE id=$1",
-                        vec![id.into()],
-                    )
-                    .await?,
-                    "next_version",
-                )?
+                test_library_entries::Entity::find_by_id(id)
+                    .one(db)
+                    .await?
+                    .ok_or_else(ApiFailure::missing)?
+                    .next_version
             };
             if next == i32::MAX {
                 return Err(conflict("Version limit reached"));
@@ -87,18 +93,59 @@ pub async fn save(
             let digest = hash(serde_json::to_vec(&payload).map_err(|_| ApiFailure::internal())?);
             let version_id = Uuid::new_v4();
             let (kind, key, _) = definition.identity();
-            exec(db, "INSERT INTO execution_definitions(id,app_id,kind,logical_key,version,content_hash,payload,author_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8)", vec![version_id.into(),app.into(),word(&kind).into(),key.into(),next.into(),digest.into(),payload.into(),actor.into()]).await?;
-            exec(
-                db,
-                "INSERT INTO test_library_versions(definition_id,entry_id) VALUES($1,$2)",
-                vec![version_id.into(), id.into()],
-            )
+            execution_definitions::ActiveModel {
+                id: Set(version_id),
+                app_id: Set(app),
+                kind: Set(word(&kind)),
+                logical_key: Set(key.to_owned()),
+                version: Set(next),
+                content_hash: Set(digest),
+                payload: Set(payload),
+                author_id: Set(actor),
+                ..Default::default()
+            }
+            .insert(db)
             .await?;
-            exec(db, "UPDATE test_library_entries SET next_version=GREATEST(next_version,$2) WHERE id=$1", vec![id.into(),(next+1).into()]).await?;
+            test_library_versions::ActiveModel {
+                definition_id: Set(version_id),
+                entry_id: Set(id),
+                ..Default::default()
+            }
+            .insert(db)
+            .await?;
+            let entry = test_library_entries::Entity::find_by_id(id)
+                .one(db)
+                .await?
+                .ok_or_else(ApiFailure::missing)?;
+            if entry.next_version < next + 1 {
+                let mut active = entry.into_active_model();
+                active.next_version = Set(next + 1);
+                active.update(db).await?;
+            }
             saved_id = Some(version_id);
         }
     }
     // NULL means the current saved editor content is incomplete, not permission to run an older snapshot.
-    exec(db, "INSERT INTO test_library_drafts(entry_id,version,source_version_id,payload,editor_id) VALUES($1,$2,$3,$4,$5) ON CONFLICT(entry_id) DO UPDATE SET version=EXCLUDED.version,source_version_id=EXCLUDED.source_version_id,payload=EXCLUDED.payload,editor_id=EXCLUDED.editor_id,updated_at=now()", vec![id.into(),(content.identity().2 as i32).into(),saved_id.into(),json(&content)?.into(),actor.into()]).await?;
+    test_library_drafts::Entity::insert(test_library_drafts::ActiveModel {
+        entry_id: Set(id),
+        version: Set(content.identity().2 as i32),
+        source_version_id: Set(saved_id),
+        payload: Set(json(&content)?),
+        editor_id: Set(actor),
+        ..Default::default()
+    })
+    .on_conflict(
+        OnConflict::column(test_library_drafts::Column::EntryId)
+            .update_columns([
+                test_library_drafts::Column::Version,
+                test_library_drafts::Column::SourceVersionId,
+                test_library_drafts::Column::Payload,
+                test_library_drafts::Column::EditorId,
+                test_library_drafts::Column::UpdatedAt,
+            ])
+            .to_owned(),
+    )
+    .exec_without_returning(db)
+    .await?;
     Ok(())
 }

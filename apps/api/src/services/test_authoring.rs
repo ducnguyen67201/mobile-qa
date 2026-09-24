@@ -1,10 +1,23 @@
 //! Interactive authoring reuses phone leases and library receipts; no parallel queue.
-use super::{apps, execution_store::*, task_sessions as phones, test_library};
-use crate::errors::{ApiFailure, ApiResult};
+use super::{
+    apps,
+    execution_store::{conflict, decode, hash, json},
+    task_sessions as phones, test_library,
+};
+use crate::{
+    errors::{ApiFailure, ApiResult},
+    models::_entities::{
+        apps as app_rows, environments, phone_sessions, phone_tasks, test_library_drafts,
+        test_library_entries,
+    },
+};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::model_registry::ModelCapability;
 use mobile_qa_contracts::{automation::*, execution::*, task_sessions::*, test_library::*};
-use sea_orm::{ConnectionTrait, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
+    QueryFilter, QuerySelect, Set, TransactionTrait,
+};
 use uuid::Uuid;
 
 pub async fn command(
@@ -64,39 +77,26 @@ async fn enqueue(
     task: PhoneTask,
 ) -> ApiResult<PhoneSession> {
     let tx = ctx.db.begin().await?;
-    let row = one(
-        &tx,
-        "SELECT payload FROM phone_sessions WHERE id=$1 FOR UPDATE",
-        vec![id.into()],
-    )
-    .await?;
-    let mut s: PhoneSession = decode(field(&row, "payload")?)?;
-    if let Some(prior) = rows(
-        &tx,
-        "SELECT session_id,fingerprint FROM phone_tasks WHERE id=$1",
-        vec![task.id.into()],
-    )
-    .await?
-    .first()
-    {
-        if field::<Uuid>(prior, "session_id")? != id
-            || field::<String>(prior, "fingerprint")? != fingerprint
-        {
+    let session_row = phone_sessions::Entity::find_by_id(id)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let mut s: PhoneSession = decode(session_row.payload.clone())?;
+    if let Some(prior) = phone_tasks::Entity::find_by_id(task.id).one(&tx).await? {
+        if prior.session_id != id || prior.fingerprint != fingerprint {
             return Err(conflict(
                 "Request identity was already used for different content",
             ));
         }
         return phones::detail(&tx, id).await;
     }
-    let revision_now: i32 = field(
-        &one(
-            &tx,
-            "SELECT revision FROM environments WHERE app_id=$1",
-            vec![s.app_id.into()],
-        )
-        .await?,
-        "revision",
-    )?;
+    let revision_now = environments::Entity::find()
+        .filter(environments::Column::AppId.eq(s.app_id))
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?
+        .revision;
     if s.environment_revision != revision_now as u32 {
         return Err(conflict("Environment changed. Open a new session."));
     }
@@ -113,34 +113,25 @@ async fn enqueue(
     if frame.is_some() && s.frame.as_ref().map(|f| f.id) != frame {
         return Err(conflict("The screen changed. Pick the control again."));
     }
-    let count: i64 = field(
-        &one(
-            &tx,
-            "SELECT count(*) AS n FROM phone_tasks WHERE session_id=$1",
-            vec![id.into()],
-        )
-        .await?,
-        "n",
-    )?;
+    let count = phone_tasks::Entity::find()
+        .filter(phone_tasks::Column::SessionId.eq(id))
+        .count(&tx)
+        .await?;
     if count >= 100 {
         return Err(ApiFailure::invalid("Open a new session after 100 commands"));
     }
-    exec(
-        &tx,
-        "INSERT INTO phone_tasks(id,session_id,fingerprint,payload,purpose) VALUES($1,$2,$3,$4,$5)",
-        vec![
-            task.id.into(),
-            id.into(),
-            fingerprint.into(),
-            json(&task)?.into(),
-            purpose
-                .map(|p| match p {
-                    mobile_qa_contracts::regression::CommandPurpose::Trial => "trial",
-                    mobile_qa_contracts::regression::CommandPurpose::Manual => "manual",
-                })
-                .into(),
-        ],
-    )
+    phone_tasks::ActiveModel {
+        id: Set(task.id),
+        session_id: Set(id),
+        fingerprint: Set(fingerprint),
+        payload: Set(json(&task)?),
+        purpose: Set(purpose.map(|purpose| match purpose {
+            mobile_qa_contracts::regression::CommandPurpose::Trial => "trial".into(),
+            mobile_qa_contracts::regression::CommandPurpose::Manual => "manual".into(),
+        })),
+        ..Default::default()
+    }
+    .insert(&tx)
     .await?;
     s.revision = s
         .revision
@@ -148,12 +139,9 @@ async fn enqueue(
         .ok_or_else(|| conflict("Session revision limit"))?;
     s.state = PhoneState::Acting;
     s.message = "Running your request".into();
-    exec(
-        &tx,
-        "UPDATE phone_sessions SET payload=$2 WHERE id=$1",
-        vec![id.into(), json(&s)?.into()],
-    )
-    .await?;
+    let mut active = session_row.into_active_model();
+    active.payload = Set(json(&s)?);
+    active.update(&tx).await?;
     tx.commit().await?;
     phones::detail(&ctx.db, id).await
 }
@@ -200,15 +188,11 @@ pub async fn generate(
     // Reuse is deliberately restricted to the same live session/initial state scope.
     let previous = if let Some(job) = input.reuse_job_id {
         let old = job_detail(ctx, user, app, job).await?;
-        let binding: Uuid = field(
-            &one(
-                &ctx.db,
-                "SELECT session_id FROM phone_tasks WHERE id=$1",
-                vec![job.into()],
-            )
-            .await?,
-            "session_id",
-        )?;
+        let binding = phone_tasks::Entity::find_by_id(job)
+            .one(&ctx.db)
+            .await?
+            .ok_or_else(ApiFailure::missing)?
+            .session_id;
         if binding != s.id
             || old.generation.as_ref().is_none_or(|g| {
                 g.allow_writes != input.allow_writes
@@ -254,17 +238,15 @@ pub async fn generate(
     .await
 }
 pub async fn job_detail(ctx: &AppContext, user: Uuid, app: Uuid, id: Uuid) -> ApiResult<PhoneTask> {
-    let row = one(
-        &ctx.db,
-        "SELECT session_id,payload FROM phone_tasks WHERE id=$1",
-        vec![id.into()],
-    )
-    .await?;
-    let s = phones::authorized(ctx, user, field(&row, "session_id")?).await?;
+    let row = phone_tasks::Entity::find_by_id(id)
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let s = phones::authorized(ctx, user, row.session_id).await?;
     if s.app_id != app {
         return Err(ApiFailure::unauthorized());
     }
-    let task: PhoneTask = decode(field(&row, "payload")?)?;
+    let task: PhoneTask = decode(row.payload)?;
     if task.generation.is_none() {
         return Err(ApiFailure::invalid("This is not a generation request"));
     }
@@ -272,15 +254,11 @@ pub async fn job_detail(ctx: &AppContext, user: Uuid, app: Uuid, id: Uuid) -> Ap
 }
 pub async fn cancel(ctx: &AppContext, user: Uuid, app: Uuid, id: Uuid) -> ApiResult<PhoneSession> {
     job_detail(ctx, user, app, id).await?;
-    let session: Uuid = field(
-        &one(
-            &ctx.db,
-            "SELECT session_id FROM phone_tasks WHERE id=$1",
-            vec![id.into()],
-        )
-        .await?,
-        "session_id",
-    )?;
+    let session = phone_tasks::Entity::find_by_id(id)
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?
+        .session_id;
     phones::stop(ctx, user, session).await
 }
 fn action(id: &str, command: DirectCommand) -> TestAction {
@@ -406,15 +384,11 @@ pub async fn save(
     if !caps.can_edit {
         return Err(ApiFailure::unauthorized());
     }
-    let package: String = field(
-        &one(
-            db,
-            "SELECT android_package FROM apps WHERE id=$1",
-            vec![app.into()],
-        )
-        .await?,
-        "android_package",
-    )?;
+    let package = app_rows::Entity::find_by_id(app)
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?
+        .android_package;
     if serde_json::to_vec(&input)
         .map_err(|_| ApiFailure::internal())?
         .len()
@@ -425,8 +399,18 @@ pub async fn save(
     let adapter = super::execution_readiness::adapter(db, app, &package).await?;
     let mut proposal_ids = std::collections::BTreeMap::new();
     let source = if let Some(task) = input.source_task_id {
-        let row=one(db,"SELECT t.payload FROM phone_tasks t JOIN phone_sessions s ON s.id=t.session_id WHERE t.id=$1 AND s.app_id=$2 AND s.creator_id=$3",vec![task.into(),app.into(),user.into()]).await?;
-        let t: PhoneTask = decode(field(&row, "payload")?)?;
+        let row = phone_tasks::Entity::find_by_id(task)
+            .one(db)
+            .await?
+            .ok_or_else(ApiFailure::missing)?;
+        let session = phone_sessions::Entity::find_by_id(row.session_id)
+            .filter(phone_sessions::Column::AppId.eq(app))
+            .filter(phone_sessions::Column::CreatorId.eq(user))
+            .one(db)
+            .await?
+            .ok_or_else(ApiFailure::missing)?;
+        let _ = session;
+        let t: PhoneTask = decode(row.payload)?;
         if t.generation.is_some() {
             if t.state != PhoneTaskState::Completed {
                 return Err(conflict("Generation is not ready"));
@@ -513,8 +497,26 @@ pub async fn save(
         };
         let definition = LibraryDraftDefinition::Case(c);
         definition.check_bounds().map_err(ApiFailure::invalid)?;
-        exec(db,"INSERT INTO test_library_entries(id,app_id,kind,logical_key,next_version,actor_id) VALUES($1,$2,'case',$3,2,$4)",vec![id.into(),app.into(),key.into(),user.into()]).await?;
-        exec(db,"INSERT INTO test_library_drafts(entry_id,version,payload,editor_id) VALUES($1,1,$2,$3)",vec![id.into(),json(&definition)?.into(),user.into()]).await?;
+        test_library_entries::ActiveModel {
+            id: Set(id),
+            app_id: Set(app),
+            kind: Set("case".into()),
+            logical_key: Set(key),
+            next_version: Set(2),
+            actor_id: Set(user),
+            ..Default::default()
+        }
+        .insert(db)
+        .await?;
+        test_library_drafts::ActiveModel {
+            entry_id: Set(id),
+            version: Set(1),
+            payload: Set(json(&definition)?),
+            editor_id: Set(user),
+            ..Default::default()
+        }
+        .insert(db)
+        .await?;
         super::test_library_save::save(db, user, app, id, definition).await?;
         ids.push(id);
     }

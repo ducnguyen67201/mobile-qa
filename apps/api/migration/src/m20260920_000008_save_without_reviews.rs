@@ -1,16 +1,87 @@
 //! Review decisions remain historical audit facts; saved versions no longer need them.
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use sea_orm_migration::prelude::*;
+
+mod legacy_version {
+    use sea_orm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "test_library_versions")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub definition_id: Uuid,
+        pub legacy_review_state: Option<String>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 #[derive(DeriveMigrationName)]
 pub struct Migration;
+
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.get_connection().execute_unprepared("ALTER TABLE test_library_versions RENAME COLUMN review_state TO legacy_review_state; ALTER TABLE test_library_versions ALTER COLUMN legacy_review_state DROP NOT NULL;").await?;
-        Ok(())
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alias::new("test_library_versions"))
+                    .rename_column(
+                        Alias::new("review_state"),
+                        Alias::new("legacy_review_state"),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alias::new("test_library_versions"))
+                    .modify_column(
+                        ColumnDef::new(Alias::new("legacy_review_state"))
+                            .text()
+                            .null(),
+                    )
+                    .to_owned(),
+            )
+            .await
     }
+
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // A downgrade must not invent approvals for versions created by the save lifecycle.
-        manager.get_connection().execute_unprepared("DO $$ BEGIN IF EXISTS(SELECT 1 FROM test_library_versions WHERE legacy_review_state IS NULL) THEN RAISE EXCEPTION 'Saved versions exist; restore a pre-upgrade backup or forward-fix instead'; END IF; END $$; ALTER TABLE test_library_versions ALTER COLUMN legacy_review_state SET NOT NULL; ALTER TABLE test_library_versions RENAME COLUMN legacy_review_state TO review_state;").await?;
-        Ok(())
+        if legacy_version::Entity::find()
+            .filter(legacy_version::Column::LegacyReviewState.is_null())
+            .one(manager.get_connection())
+            .await?
+            .is_some()
+        {
+            return Err(DbErr::Custom(
+                "Saved versions exist; restore a pre-upgrade backup or forward-fix instead".into(),
+            ));
+        }
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alias::new("test_library_versions"))
+                    .modify_column(
+                        ColumnDef::new(Alias::new("legacy_review_state"))
+                            .text()
+                            .not_null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alias::new("test_library_versions"))
+                    .rename_column(
+                        Alias::new("legacy_review_state"),
+                        Alias::new("review_state"),
+                    )
+                    .to_owned(),
+            )
+            .await
     }
 }

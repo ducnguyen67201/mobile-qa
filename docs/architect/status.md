@@ -1,5 +1,25 @@
 # Implementation status and evidence
 
+## SeaORM-only backend persistence — locally validated (2026-09-24)
+
+All 33 inventoried Rust backend files that contained or enabled handwritten SQL now use
+SeaORM entities, active models, typed query traits, or typed SeaQuery migration builders.
+Fourteen missing entities cover execution approvals, the test library, model assignments
+and commercial records. The central raw statement helper was removed, and an
+`orm_boundary` integration test prevents raw statement execution, custom SQL expressions
+and SQL-leading literals from returning anywhere under `apps/api`.
+
+The entire historical migration chain applied from zero on a task-owned disposable
+PostgreSQL database. With the configured JDK 17 `Contents/Home`, all Rust workspace tests
+passed, including API integration coverage for commercial flows, execution, model
+registry, task sessions and the test library. Workspace Clippy passes with warnings
+denied; formatting, the raw-SQL census and diff checks pass. The retained shared test
+database was not reset because it still carries the previously documented migration
+ledger from another branch. The two operational PostgreSQL statements outside the Rust
+boundary (`infra/postgres/init.sql` and the supervisor readiness probe) remain unchanged.
+
+See the [implementation report](../../.claude/PRPs/reports/replace-raw-sql-with-seaorm-report.md).
+
 ## Elastic Android hosts and large APKs — local implementation (2026-09-22)
 
 The source now includes inclusive 2 GiB intake, resumable multipart transfers,

@@ -1,234 +1,787 @@
 //! First product schema. Explicit FK/check constraints protect tenant and lifecycle invariants.
 use sea_orm_migration::prelude::*;
+
 #[derive(DeriveMigrationName)]
 pub struct Migration;
+
+fn composite_foreign_key(
+    from_table: &str,
+    from_columns: &[&str],
+    to_table: &str,
+    to_columns: &[&str],
+) -> TableForeignKey {
+    let mut key = TableForeignKey::new();
+    key.from_tbl(Alias::new(from_table))
+        .to_tbl(Alias::new(to_table));
+    for column in from_columns {
+        key.from_col(Alias::new(*column));
+    }
+    for column in to_columns {
+        key.to_col(Alias::new(*column));
+    }
+    key
+}
+
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.get_connection().execute_unprepared(r#"CREATE TABLE users (
-id UUID PRIMARY KEY,
-email TEXT NOT NULL,
-password_hash TEXT NOT NULL,
-display_name TEXT NOT NULL,
-disabled_at TIMESTAMPTZ,
-created_at TIMESTAMPTZ NOT NULL,
-UNIQUE(email),
-CHECK (char_length(email) BETWEEN 3 AND 254)
-);
-CREATE TABLE organizations (
-id UUID PRIMARY KEY,
-name TEXT NOT NULL,
-created_at TIMESTAMPTZ NOT NULL
-);
-CREATE TABLE memberships (
-id UUID PRIMARY KEY,
-user_id UUID NOT NULL,
-organization_id UUID NOT NULL,
-role TEXT NOT NULL,
-active BOOLEAN NOT NULL,
-UNIQUE(user_id,organization_id),
-FOREIGN KEY(user_id) REFERENCES users(id),
-FOREIGN KEY(organization_id) REFERENCES organizations(id),
-CHECK(role IN ('operator','member'))
-);
-CREATE TABLE sessions (
-id UUID PRIMARY KEY,
-user_id UUID NOT NULL,
-csrf_token TEXT NOT NULL,
-expires_at TIMESTAMPTZ NOT NULL,
-revoked_at TIMESTAMPTZ,
-created_at TIMESTAMPTZ NOT NULL,
-FOREIGN KEY(user_id) REFERENCES users(id)
-);
-CREATE TABLE login_attempts (
-id UUID PRIMARY KEY,
-bucket TEXT NOT NULL,
-window_start TIMESTAMPTZ NOT NULL,
-count INTEGER NOT NULL,
-expires_at TIMESTAMPTZ NOT NULL,
-UNIQUE(bucket),
-CHECK(count >= 0)
-);
-CREATE TABLE apps (
-id UUID PRIMARY KEY,
-organization_id UUID NOT NULL,
-name TEXT NOT NULL,
-android_package TEXT NOT NULL,
-created_by UUID NOT NULL,
-created_at TIMESTAMPTZ NOT NULL,
-UNIQUE(organization_id,android_package),
-UNIQUE(id,organization_id),
-FOREIGN KEY(organization_id) REFERENCES organizations(id),
-FOREIGN KEY(created_by) REFERENCES users(id),
-CHECK(char_length(name) BETWEEN 1 AND 100),
-CHECK(char_length(android_package) BETWEEN 1 AND 255)
-);
-CREATE TABLE app_memberships (
-id UUID PRIMARY KEY,
-user_id UUID NOT NULL,
-organization_id UUID NOT NULL,
-app_id UUID NOT NULL,
-UNIQUE(user_id,app_id),
-FOREIGN KEY(user_id,organization_id) REFERENCES memberships(user_id,organization_id),
-FOREIGN KEY(app_id,organization_id) REFERENCES apps(id,organization_id)
-);
-CREATE TABLE environments (
-id UUID PRIMARY KEY,
-organization_id UUID NOT NULL,
-app_id UUID NOT NULL,
-name TEXT NOT NULL,
-backend_origins JSONB NOT NULL,
-login_origins JSONB NOT NULL,
-revision INTEGER NOT NULL,
-account_secret_reference_id UUID,
-reset_secret_reference_id UUID,
-updated_at TIMESTAMPTZ NOT NULL,
-UNIQUE(app_id),
-UNIQUE(id,app_id,organization_id),
-FOREIGN KEY(app_id,organization_id) REFERENCES apps(id,organization_id),
-CHECK(revision > 0),
-CHECK(char_length(name) BETWEEN 1 AND 80)
-);
-CREATE TABLE secret_references (
-id UUID PRIMARY KEY,
-organization_id UUID NOT NULL,
-app_id UUID NOT NULL,
-label TEXT NOT NULL,
-locator TEXT NOT NULL,
-kind TEXT NOT NULL,
-created_at TIMESTAMPTZ NOT NULL,
-UNIQUE(id,app_id,organization_id),
-FOREIGN KEY(app_id,organization_id) REFERENCES apps(id,organization_id),
-CHECK(kind IN ('account','reset'))
-);
-CREATE TABLE environment_checks (
-id UUID PRIMARY KEY,
-organization_id UUID NOT NULL,
-app_id UUID NOT NULL,
-environment_id UUID NOT NULL,
-environment_revision INTEGER NOT NULL,
-kind TEXT NOT NULL,
-state TEXT NOT NULL,
-note TEXT,
-checked_by UUID NOT NULL,
-checked_at TIMESTAMPTZ NOT NULL,
-FOREIGN KEY(environment_id,app_id,organization_id) REFERENCES environments(id,app_id,organization_id),
-FOREIGN KEY(checked_by) REFERENCES users(id),
-CHECK(kind IN ('backend','account','reset')),
-CHECK(state IN ('operator_reported_ok','operator_reported_blocked'))
-);
-CREATE TABLE build_uploads (
-id UUID PRIMARY KEY,
-organization_id UUID NOT NULL,
-app_id UUID NOT NULL,
-created_by UUID NOT NULL,
-original_filename TEXT NOT NULL,
-expected_size BIGINT NOT NULL,
-state TEXT NOT NULL,
-expires_at TIMESTAMPTZ NOT NULL,
-attempt_id UUID,
-lease_until TIMESTAMPTZ,
-storage_backend TEXT NOT NULL,
-sealed_storage_key TEXT,
-actual_size BIGINT,
-sha256 TEXT,
-created_at TIMESTAMPTZ NOT NULL,
-UNIQUE(id,app_id,organization_id),
-FOREIGN KEY(app_id,organization_id) REFERENCES apps(id,organization_id),
-FOREIGN KEY(created_by) REFERENCES users(id),
-CHECK(expected_size > 0 AND expected_size <= 262144000),
-CHECK(actual_size IS NULL OR (actual_size > 0 AND actual_size = expected_size)),
-CHECK(state IN ('pending','receiving','uploaded','finalized','expired'))
-);
-CREATE TABLE builds (
-id UUID PRIMARY KEY,
-organization_id UUID NOT NULL,
-app_id UUID NOT NULL,
-upload_id UUID NOT NULL,
-storage_backend TEXT NOT NULL,
-storage_key TEXT NOT NULL,
-sha256 TEXT NOT NULL,
-byte_size BIGINT NOT NULL,
-original_filename TEXT NOT NULL,
-validation_state TEXT NOT NULL,
-reason_code TEXT,
-message TEXT,
-metadata JSONB,
-validator_version TEXT NOT NULL,
-intake_policy_version TEXT NOT NULL,
-attempt_id UUID,
-lease_until TIMESTAMPTZ,
-created_at TIMESTAMPTZ NOT NULL,
-started_at TIMESTAMPTZ NOT NULL,
-validated_at TIMESTAMPTZ,
-UNIQUE(upload_id),
-FOREIGN KEY(upload_id,app_id,organization_id) REFERENCES build_uploads(id,app_id,organization_id),
-CHECK(byte_size > 0 AND char_length(sha256) = 64),
-CHECK(validation_state IN ('validating','validated','invalid','unsupported','error')),
-CHECK(validation_state <> 'validated' OR (metadata IS NOT NULL AND validated_at IS NOT NULL))
-);
-ALTER TABLE environments ADD FOREIGN KEY(account_secret_reference_id,app_id,organization_id) REFERENCES secret_references(id,app_id,organization_id);
-ALTER TABLE environments ADD FOREIGN KEY(reset_secret_reference_id,app_id,organization_id) REFERENCES secret_references(id,app_id,organization_id);
-CREATE INDEX sessions_expiry ON sessions(expires_at);
-CREATE INDEX sessions_user ON sessions(user_id);
-CREATE INDEX uploads_app_created ON build_uploads(app_id,created_at,id);
-CREATE INDEX uploads_state_expiry ON build_uploads(state,expires_at);
-CREATE INDEX builds_app_created ON builds(app_id,created_at,id);
-CREATE INDEX checks_environment_revision ON environment_checks(environment_id,environment_revision,checked_at);
-"#).await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("users"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("email"))
+                            .text()
+                            .not_null()
+                            .unique_key()
+                            .check(
+                                Func::char_length(Expr::col(Alias::new("email"))).between(3, 254),
+                            ),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("password_hash"))
+                            .text()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("display_name")).text().not_null())
+                    .col(ColumnDef::new(Alias::new("disabled_at")).timestamp_with_time_zone())
+                    .col(
+                        ColumnDef::new(Alias::new("created_at"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("organizations"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Alias::new("name")).text().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("created_at"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("memberships"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Alias::new("user_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("organization_id"))
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("role"))
+                            .text()
+                            .not_null()
+                            .check(Expr::col(Alias::new("role")).is_in(["operator", "member"])),
+                    )
+                    .col(ColumnDef::new(Alias::new("active")).boolean().not_null())
+                    .index(
+                        Index::create()
+                            .unique()
+                            .col(Alias::new("user_id"))
+                            .col(Alias::new("organization_id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("memberships"), Alias::new("user_id"))
+                            .to(Alias::new("users"), Alias::new("id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("memberships"), Alias::new("organization_id"))
+                            .to(Alias::new("organizations"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("sessions"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Alias::new("user_id")).uuid().not_null())
+                    .col(ColumnDef::new(Alias::new("csrf_token")).text().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("expires_at"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("revoked_at")).timestamp_with_time_zone())
+                    .col(
+                        ColumnDef::new(Alias::new("created_at"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("sessions"), Alias::new("user_id"))
+                            .to(Alias::new("users"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("login_attempts"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("bucket"))
+                            .text()
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("window_start"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("count"))
+                            .integer()
+                            .not_null()
+                            .check(Expr::col(Alias::new("count")).gte(0)),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("expires_at"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("apps"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("organization_id"))
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("name")).text().not_null().check(
+                            Func::char_length(Expr::col(Alias::new("name"))).between(1, 100),
+                        ),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("android_package"))
+                            .text()
+                            .not_null()
+                            .check(
+                                Func::char_length(Expr::col(Alias::new("android_package")))
+                                    .between(1, 255),
+                            ),
+                    )
+                    .col(ColumnDef::new(Alias::new("created_by")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("created_at"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .col(Alias::new("organization_id"))
+                            .col(Alias::new("android_package")),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .col(Alias::new("id"))
+                            .col(Alias::new("organization_id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("apps"), Alias::new("organization_id"))
+                            .to(Alias::new("organizations"), Alias::new("id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("apps"), Alias::new("created_by"))
+                            .to(Alias::new("users"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("app_memberships"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Alias::new("user_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("organization_id"))
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("app_id")).uuid().not_null())
+                    .index(
+                        Index::create()
+                            .unique()
+                            .col(Alias::new("user_id"))
+                            .col(Alias::new("app_id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(
+                                Alias::new("app_memberships"),
+                                (Alias::new("user_id"), Alias::new("organization_id")),
+                            )
+                            .to(
+                                Alias::new("memberships"),
+                                (Alias::new("user_id"), Alias::new("organization_id")),
+                            ),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(
+                                Alias::new("app_memberships"),
+                                (Alias::new("app_id"), Alias::new("organization_id")),
+                            )
+                            .to(
+                                Alias::new("apps"),
+                                (Alias::new("id"), Alias::new("organization_id")),
+                            ),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("environments"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("organization_id"))
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("app_id"))
+                            .uuid()
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("name"))
+                            .text()
+                            .not_null()
+                            .check(Func::char_length(Expr::col(Alias::new("name"))).between(1, 80)),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("backend_origins"))
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("login_origins"))
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("revision"))
+                            .integer()
+                            .not_null()
+                            .check(Expr::col(Alias::new("revision")).gt(0)),
+                    )
+                    .col(ColumnDef::new(Alias::new("account_secret_reference_id")).uuid())
+                    .col(ColumnDef::new(Alias::new("reset_secret_reference_id")).uuid())
+                    .col(
+                        ColumnDef::new(Alias::new("updated_at"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .col(Alias::new("id"))
+                            .col(Alias::new("app_id"))
+                            .col(Alias::new("organization_id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(
+                                Alias::new("environments"),
+                                (Alias::new("app_id"), Alias::new("organization_id")),
+                            )
+                            .to(
+                                Alias::new("apps"),
+                                (Alias::new("id"), Alias::new("organization_id")),
+                            ),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("secret_references"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("organization_id"))
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("app_id")).uuid().not_null())
+                    .col(ColumnDef::new(Alias::new("label")).text().not_null())
+                    .col(ColumnDef::new(Alias::new("locator")).text().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("kind"))
+                            .text()
+                            .not_null()
+                            .check(Expr::col(Alias::new("kind")).is_in(["account", "reset"])),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("created_at"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .col(Alias::new("id"))
+                            .col(Alias::new("app_id"))
+                            .col(Alias::new("organization_id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(
+                                Alias::new("secret_references"),
+                                (Alias::new("app_id"), Alias::new("organization_id")),
+                            )
+                            .to(
+                                Alias::new("apps"),
+                                (Alias::new("id"), Alias::new("organization_id")),
+                            ),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("environment_checks"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("organization_id"))
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("app_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("environment_id"))
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("environment_revision"))
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("kind")).text().not_null().check(
+                        Expr::col(Alias::new("kind")).is_in(["backend", "account", "reset"]),
+                    ))
+                    .col(
+                        ColumnDef::new(Alias::new("state")).text().not_null().check(
+                            Expr::col(Alias::new("state"))
+                                .is_in(["operator_reported_ok", "operator_reported_blocked"]),
+                        ),
+                    )
+                    .col(ColumnDef::new(Alias::new("note")).text())
+                    .col(ColumnDef::new(Alias::new("checked_by")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("checked_at"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(
+                                Alias::new("environment_checks"),
+                                (
+                                    Alias::new("environment_id"),
+                                    Alias::new("app_id"),
+                                    Alias::new("organization_id"),
+                                ),
+                            )
+                            .to(
+                                Alias::new("environments"),
+                                (
+                                    Alias::new("id"),
+                                    Alias::new("app_id"),
+                                    Alias::new("organization_id"),
+                                ),
+                            ),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("environment_checks"), Alias::new("checked_by"))
+                            .to(Alias::new("users"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("build_uploads"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("organization_id"))
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("app_id")).uuid().not_null())
+                    .col(ColumnDef::new(Alias::new("created_by")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("original_filename"))
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("expected_size"))
+                            .big_integer()
+                            .not_null()
+                            .check(
+                                Expr::col(Alias::new("expected_size")).gt(0).and(
+                                    Expr::col(Alias::new("expected_size")).lte(262_144_000_i64),
+                                ),
+                            ),
+                    )
+                    .col(ColumnDef::new(Alias::new("state")).text().not_null().check(
+                        Expr::col(Alias::new("state")).is_in([
+                            "pending",
+                            "receiving",
+                            "uploaded",
+                            "finalized",
+                            "expired",
+                        ]),
+                    ))
+                    .col(
+                        ColumnDef::new(Alias::new("expires_at"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("attempt_id")).uuid())
+                    .col(ColumnDef::new(Alias::new("lease_until")).timestamp_with_time_zone())
+                    .col(
+                        ColumnDef::new(Alias::new("storage_backend"))
+                            .text()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("sealed_storage_key")).text())
+                    .col(
+                        ColumnDef::new(Alias::new("actual_size"))
+                            .big_integer()
+                            .check(
+                                Expr::col(Alias::new("actual_size")).is_null().or(Expr::col(
+                                    Alias::new("actual_size"),
+                                )
+                                .gt(0)
+                                .and(
+                                    Expr::col(Alias::new("actual_size"))
+                                        .eq(Expr::col(Alias::new("expected_size"))),
+                                )),
+                            ),
+                    )
+                    .col(ColumnDef::new(Alias::new("sha256")).text())
+                    .col(
+                        ColumnDef::new(Alias::new("created_at"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .col(Alias::new("id"))
+                            .col(Alias::new("app_id"))
+                            .col(Alias::new("organization_id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(
+                                Alias::new("build_uploads"),
+                                (Alias::new("app_id"), Alias::new("organization_id")),
+                            )
+                            .to(
+                                Alias::new("apps"),
+                                (Alias::new("id"), Alias::new("organization_id")),
+                            ),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("build_uploads"), Alias::new("created_by"))
+                            .to(Alias::new("users"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("builds"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("organization_id"))
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("app_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("upload_id"))
+                            .uuid()
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("storage_backend"))
+                            .text()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("storage_key")).text().not_null())
+                    .col(ColumnDef::new(Alias::new("sha256")).text().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("byte_size"))
+                            .big_integer()
+                            .not_null()
+                            .check(
+                                Expr::col(Alias::new("byte_size"))
+                                    .gt(0)
+                                    .and(Func::char_length(Expr::col(Alias::new("sha256"))).eq(64)),
+                            ),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("original_filename"))
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("validation_state"))
+                            .text()
+                            .not_null()
+                            .check(Expr::col(Alias::new("validation_state")).is_in([
+                                "validating",
+                                "validated",
+                                "invalid",
+                                "unsupported",
+                                "error",
+                            ])),
+                    )
+                    .col(ColumnDef::new(Alias::new("reason_code")).text())
+                    .col(ColumnDef::new(Alias::new("message")).text())
+                    .col(ColumnDef::new(Alias::new("metadata")).json_binary())
+                    .col(
+                        ColumnDef::new(Alias::new("validator_version"))
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("intake_policy_version"))
+                            .text()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("attempt_id")).uuid())
+                    .col(ColumnDef::new(Alias::new("lease_until")).timestamp_with_time_zone())
+                    .col(
+                        ColumnDef::new(Alias::new("created_at"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("started_at"))
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("validated_at"))
+                            .timestamp_with_time_zone()
+                            .check(
+                                Expr::col(Alias::new("validation_state"))
+                                    .ne("validated")
+                                    .or(Expr::col(Alias::new("metadata"))
+                                        .is_not_null()
+                                        .and(Expr::col(Alias::new("validated_at")).is_not_null())),
+                            ),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(
+                                Alias::new("builds"),
+                                (
+                                    Alias::new("upload_id"),
+                                    Alias::new("app_id"),
+                                    Alias::new("organization_id"),
+                                ),
+                            )
+                            .to(
+                                Alias::new("build_uploads"),
+                                (
+                                    Alias::new("id"),
+                                    Alias::new("app_id"),
+                                    Alias::new("organization_id"),
+                                ),
+                            ),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        let account_secret_key = composite_foreign_key(
+            "environments",
+            &["account_secret_reference_id", "app_id", "organization_id"],
+            "secret_references",
+            &["id", "app_id", "organization_id"],
+        );
+        let reset_secret_key = composite_foreign_key(
+            "environments",
+            &["reset_secret_reference_id", "app_id", "organization_id"],
+            "secret_references",
+            &["id", "app_id", "organization_id"],
+        );
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alias::new("environments"))
+                    .add_foreign_key(&account_secret_key)
+                    .add_foreign_key(&reset_secret_key)
+                    .to_owned(),
+            )
+            .await?;
+        for (name, table, columns) in [
+            ("sessions_expiry", "sessions", vec!["expires_at"]),
+            ("sessions_user", "sessions", vec!["user_id"]),
+            (
+                "uploads_app_created",
+                "build_uploads",
+                vec!["app_id", "created_at", "id"],
+            ),
+            (
+                "uploads_state_expiry",
+                "build_uploads",
+                vec!["state", "expires_at"],
+            ),
+            (
+                "builds_app_created",
+                "builds",
+                vec!["app_id", "created_at", "id"],
+            ),
+            (
+                "checks_environment_revision",
+                "environment_checks",
+                vec!["environment_id", "environment_revision", "checked_at"],
+            ),
+        ] {
+            let mut index = Index::create();
+            index.name(name).table(Alias::new(table));
+            for column in columns {
+                index.col(Alias::new(column));
+            }
+            manager.create_index(index.to_owned()).await?;
+        }
         Ok(())
     }
+
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Explicit reverse migration only; normal startup never invokes this path.
-        manager.get_connection().execute_unprepared("ALTER TABLE environments DROP COLUMN account_secret_reference_id; ALTER TABLE environments DROP COLUMN reset_secret_reference_id;").await?;
         manager
-            .get_connection()
-            .execute_unprepared("DROP TABLE builds;")
+            .alter_table(
+                Table::alter()
+                    .table(Alias::new("environments"))
+                    .drop_column(Alias::new("account_secret_reference_id"))
+                    .drop_column(Alias::new("reset_secret_reference_id"))
+                    .to_owned(),
+            )
             .await?;
-        manager
-            .get_connection()
-            .execute_unprepared("DROP TABLE build_uploads;")
-            .await?;
-        manager
-            .get_connection()
-            .execute_unprepared("DROP TABLE environment_checks;")
-            .await?;
-        manager
-            .get_connection()
-            .execute_unprepared("DROP TABLE secret_references;")
-            .await?;
-        manager
-            .get_connection()
-            .execute_unprepared("DROP TABLE environments;")
-            .await?;
-        manager
-            .get_connection()
-            .execute_unprepared("DROP TABLE app_memberships;")
-            .await?;
-        manager
-            .get_connection()
-            .execute_unprepared("DROP TABLE apps;")
-            .await?;
-        manager
-            .get_connection()
-            .execute_unprepared("DROP TABLE login_attempts;")
-            .await?;
-        manager
-            .get_connection()
-            .execute_unprepared("DROP TABLE sessions;")
-            .await?;
-        manager
-            .get_connection()
-            .execute_unprepared("DROP TABLE memberships;")
-            .await?;
-        manager
-            .get_connection()
-            .execute_unprepared("DROP TABLE organizations;")
-            .await?;
-        manager
-            .get_connection()
-            .execute_unprepared("DROP TABLE users;")
-            .await?;
+        for table in [
+            "builds",
+            "build_uploads",
+            "environment_checks",
+            "secret_references",
+            "environments",
+            "app_memberships",
+            "apps",
+            "login_attempts",
+            "sessions",
+            "memberships",
+            "organizations",
+            "users",
+        ] {
+            manager
+                .drop_table(Table::drop().table(Alias::new(table)).to_owned())
+                .await?;
+        }
         Ok(())
     }
 }

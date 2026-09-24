@@ -1,9 +1,15 @@
 //! Commercial access is app-scoped and only the trusted process can change agreements.
 //! A quote binds a visible price to an exact run manifest; reservation shares its transaction.
 use super::{
-    apps, credit_billing, execution_store::*, runs, suite_runs, test_definitions, test_library,
+    apps, credit_billing, execution_store::hash, runs, suite_runs, test_definitions, test_library,
 };
-use crate::errors::{ApiFailure, ApiResult};
+use crate::{
+    errors::{ApiFailure, ApiResult},
+    models::_entities::{
+        apps as app_rows, commercial_agreements, commercial_audit, commercial_pilot_requests,
+        commercial_quotes, commercial_usage, execution_attempts, execution_definitions,
+    },
+};
 use chrono::{DateTime, Duration, Utc};
 use loco_rs::app::AppContext;
 use mobile_qa_contracts::{
@@ -11,7 +17,10 @@ use mobile_qa_contracts::{
     execution::{CreateRunRequest, Driver, RunManifest, TestDefinition},
     regression::SuiteRunRequest,
 };
-use sea_orm::{ConnectionTrait, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
+    QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
+};
 use uuid::Uuid;
 
 const PILOT_BASE_CENTS: i32 = 50_000;
@@ -41,28 +50,33 @@ fn commercial_conflict(message: &str) -> ApiFailure {
 }
 
 async fn latest(db: &impl ConnectionTrait, app: Uuid) -> ApiResult<Option<Agreement>> {
-    let Some(row) = rows(db,"SELECT id,offer,status,price_revision,starts_at,ends_at,first_source_version_id,second_source_version_id,profile_id,base_cents,second_suite_cents,check_cents,check_cap FROM commercial_agreements WHERE app_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1",vec![app.into()]).await?.into_iter().next() else {
+    let Some(row) = commercial_agreements::Entity::find()
+        .filter(commercial_agreements::Column::AppId.eq(app))
+        .order_by_desc(commercial_agreements::Column::CreatedAt)
+        .order_by_desc(commercial_agreements::Column::Id)
+        .one(db)
+        .await?
+    else {
         return Ok(None);
     };
-    let offer: String = field(&row, "offer")?;
     Ok(Some(Agreement {
-        id: field(&row, "id")?,
-        offer: match offer.as_str() {
+        id: row.id,
+        offer: match row.offer.as_str() {
             "pilot" => CommercialOffer::Pilot,
             "recurring" => CommercialOffer::Recurring,
             _ => return Err(ApiFailure::internal()),
         },
-        status: field(&row, "status")?,
-        price_revision: field(&row, "price_revision")?,
-        starts_at: field(&row, "starts_at")?,
-        ends_at: field(&row, "ends_at")?,
-        first_source: field(&row, "first_source_version_id")?,
-        second_source: field(&row, "second_source_version_id")?,
-        profile_id: field(&row, "profile_id")?,
-        base_cents: field(&row, "base_cents")?,
-        second_suite_cents: field(&row, "second_suite_cents")?,
-        check_cents: field(&row, "check_cents")?,
-        check_cap: field(&row, "check_cap")?,
+        status: row.status,
+        price_revision: row.price_revision,
+        starts_at: row.starts_at,
+        ends_at: row.ends_at,
+        first_source: row.first_source_version_id,
+        second_source: row.second_source_version_id,
+        profile_id: row.profile_id,
+        base_cents: row.base_cents,
+        second_suite_cents: row.second_suite_cents,
+        check_cents: row.check_cents,
+        check_cap: row.check_cap,
     }))
 }
 
@@ -88,8 +102,12 @@ async fn active(db: &impl ConnectionTrait, app: Uuid) -> ApiResult<Agreement> {
 }
 
 async fn used(db: &impl ConnectionTrait, agreement: Uuid) -> ApiResult<i32> {
-    let row = one(db,"SELECT COUNT(*)::integer AS n FROM commercial_usage WHERE agreement_id=$1 AND state IN ('reserved','delivered')",vec![agreement.into()]).await?;
-    field(&row, "n")
+    let count = commercial_usage::Entity::find()
+        .filter(commercial_usage::Column::AgreementId.eq(agreement))
+        .filter(commercial_usage::Column::State.is_in(["reserved", "delivered"]))
+        .count(db)
+        .await?;
+    i32::try_from(count).map_err(|_| ApiFailure::internal())
 }
 
 pub async fn status(
@@ -99,43 +117,55 @@ pub async fn status(
 ) -> ApiResult<CommercialAccessResponse> {
     apps::authorized(ctx, actor, app).await?;
     let agreement = latest(&ctx.db, app).await?;
-    let pilot_request_id = rows(
-        &ctx.db,
-        "SELECT id FROM commercial_pilot_requests WHERE app_id=$1",
-        vec![app.into()],
-    )
-    .await?
-    .first()
-    .map(|row| field(row, "id"))
-    .transpose()?;
+    let pilot_request_id = commercial_pilot_requests::Entity::find()
+        .filter(commercial_pilot_requests::Column::AppId.eq(app))
+        .one(&ctx.db)
+        .await?
+        .map(|row| row.id);
     let mut usage = Vec::new();
-    let (reserved_checks, delivered_checks, credited_checks, delivered_check_cents) = if let Some(
-        a,
-    ) =
-        &agreement
-    {
-        let totals = one(&ctx.db, "SELECT COUNT(*) FILTER (WHERE state='reserved')::integer AS reserved, COUNT(*) FILTER (WHERE state='delivered')::integer AS delivered, COUNT(*) FILTER (WHERE state='credited')::integer AS credited, COALESCE(SUM(amount_cents) FILTER (WHERE state='delivered'),0)::integer AS delivered_cents FROM commercial_usage WHERE agreement_id=$1", vec![a.id.into()]).await?;
-        for row in rows(&ctx.db,"SELECT run_id,state,amount_cents,reason,created_at,reviewed_at FROM commercial_usage WHERE agreement_id=$1 ORDER BY created_at DESC,run_id DESC LIMIT 100",vec![a.id.into()]).await? {
-            let word: String = field(&row,"state")?;
-            let current = match word.as_str() {
-                "reserved" => CommercialUsageState::Reserved,
-                "delivered" => CommercialUsageState::Delivered,
-                "credited" => CommercialUsageState::Credited,
-                _ => return Err(ApiFailure::internal()),
-            };
-            let amount: i32 = field(&row,"amount_cents")?;
-            usage.push(CommercialUsageView { run_id:field(&row,"run_id")?, state:current, amount_cents:amount,
-                reason:field(&row,"reason")?, created_at:field(&row,"created_at")?, reviewed_at:field(&row,"reviewed_at")? });
-        }
-        (
-            field(&totals, "reserved")?,
-            field(&totals, "delivered")?,
-            field(&totals, "credited")?,
-            field(&totals, "delivered_cents")?,
-        )
-    } else {
-        (0, 0, 0, 0)
-    };
+    let (reserved_checks, delivered_checks, credited_checks, delivered_check_cents) =
+        if let Some(a) = &agreement {
+            let all_usage = commercial_usage::Entity::find()
+                .filter(commercial_usage::Column::AgreementId.eq(a.id))
+                .order_by_desc(commercial_usage::Column::CreatedAt)
+                .order_by_desc(commercial_usage::Column::RunId)
+                .all(&ctx.db)
+                .await?;
+            let mut reserved = 0;
+            let mut delivered = 0;
+            let mut credited = 0;
+            let mut delivered_cents = 0;
+            for row in &all_usage {
+                match row.state.as_str() {
+                    "reserved" => reserved += 1,
+                    "delivered" => {
+                        delivered += 1;
+                        delivered_cents += row.amount_cents;
+                    }
+                    "credited" => credited += 1,
+                    _ => return Err(ApiFailure::internal()),
+                }
+            }
+            for row in all_usage.into_iter().take(100) {
+                let current = match row.state.as_str() {
+                    "reserved" => CommercialUsageState::Reserved,
+                    "delivered" => CommercialUsageState::Delivered,
+                    "credited" => CommercialUsageState::Credited,
+                    _ => return Err(ApiFailure::internal()),
+                };
+                usage.push(CommercialUsageView {
+                    run_id: row.run_id,
+                    state: current,
+                    amount_cents: row.amount_cents,
+                    reason: row.reason,
+                    created_at: row.created_at,
+                    reviewed_at: row.reviewed_at,
+                });
+            }
+            (reserved, delivered, credited, delivered_cents)
+        } else {
+            (0, 0, 0, 0)
+        };
     let current_state = state(agreement.as_ref(), Utc::now());
     let credit = credit_billing::status(&ctx.db, app).await?;
     Ok(CommercialAccessResponse {
@@ -185,29 +215,34 @@ pub async fn request_pilot(
         ));
     }
     let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![app.into()],
-    )
-    .await?;
+    app_rows::Entity::find_by_id(app)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
     if latest(&tx, app).await?.is_some() {
         return Err(commercial_conflict("This app already has an agreement"));
     }
-    if !rows(
-        &tx,
-        "SELECT id FROM commercial_pilot_requests WHERE app_id=$1",
-        vec![app.into()],
-    )
-    .await?
-    .is_empty()
+    if commercial_pilot_requests::Entity::find()
+        .filter(commercial_pilot_requests::Column::AppId.eq(app))
+        .one(&tx)
+        .await?
+        .is_some()
     {
         return Err(commercial_conflict(
             "A pilot request is already recorded for this app",
         ));
     }
     let id = Uuid::new_v4();
-    exec(&tx,"INSERT INTO commercial_pilot_requests(id,app_id,actor_id,coverage_note) VALUES($1,$2,$3,$4)",vec![id.into(),app.into(),actor.into(),note.to_owned().into()]).await?;
+    commercial_pilot_requests::ActiveModel {
+        id: Set(id),
+        app_id: Set(app),
+        actor_id: Set(actor),
+        coverage_note: Set(note.to_owned()),
+        ..Default::default()
+    }
+    .insert(&tx)
+    .await?;
     tx.commit().await?;
     Ok(CommercialPilotResponse { id, app_id: app })
 }
@@ -328,7 +363,25 @@ pub async fn quote(
     let id = Uuid::new_v4();
     let expiry = Utc::now() + Duration::minutes(10);
     let manifest_hash = hash(serde_json::to_vec(&manifest).map_err(|_| ApiFailure::internal())?);
-    exec(&ctx.db,"INSERT INTO commercial_quotes(id,agreement_id,app_id,actor_id,kind,request_hash,manifest_hash,build_id,source_version_id,profile_id,environment_revision,price_revision,amount_cents,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",vec![id.into(),agreement.id.into(),app.into(),actor.into(),kind.into(),request_hash.into(),manifest_hash.into(),build.into(),source.into(),manifest.profile.id.into(),manifest.environment_revision.into(),agreement.price_revision.into(),amount.into(),expiry.into()]).await?;
+    commercial_quotes::ActiveModel {
+        id: Set(id),
+        agreement_id: Set(agreement.id),
+        app_id: Set(app),
+        actor_id: Set(actor),
+        kind: Set(kind.into()),
+        request_hash: Set(request_hash),
+        manifest_hash: Set(manifest_hash),
+        build_id: Set(build),
+        source_version_id: Set(source),
+        profile_id: Set(manifest.profile.id),
+        environment_revision: Set(manifest.environment_revision),
+        price_revision: Set(agreement.price_revision),
+        amount_cents: Set(amount),
+        expires_at: Set(expiry),
+        ..Default::default()
+    }
+    .insert(&ctx.db)
+    .await?;
     Ok(CommercialQuoteResponse {
         id,
         app_id: app,
@@ -375,7 +428,10 @@ pub async fn reserve(
         return Ok(());
     }
     let a = active(db, app).await?;
-    let q = one(db,"SELECT agreement_id,app_id,actor_id,kind,request_hash,manifest_hash,build_id,source_version_id,profile_id,environment_revision,price_revision,amount_cents,expires_at FROM commercial_quotes WHERE id=$1",vec![quote_id.into()]).await?;
+    let q = commercial_quotes::Entity::find_by_id(quote_id)
+        .one(db)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
     let expected_source = match &manifest.source {
         Some(mobile_qa_contracts::regression::RunSource::SavedSuiteV1 { suite_version_id }) => {
             *suite_version_id
@@ -386,32 +442,30 @@ pub async fn reserve(
         _ => manifest.plan_version_id.ok_or_else(ApiFailure::internal)?,
     };
     let digest = hash(serde_json::to_vec(manifest).map_err(|_| ApiFailure::internal())?);
-    if field::<Uuid>(&q, "agreement_id")? != a.id
-        || field::<Uuid>(&q, "app_id")? != app
-        || field::<Uuid>(&q, "actor_id")? != actor
-        || field::<String>(&q, "kind")? != kind
-        || field::<String>(&q, "request_hash")? != request_hash
-        || field::<String>(&q, "manifest_hash")? != digest
-        || field::<Uuid>(&q, "build_id")? != manifest.build_id
-        || field::<Uuid>(&q, "source_version_id")? != expected_source
-        || field::<Uuid>(&q, "profile_id")? != manifest.profile.id
+    if q.agreement_id != a.id
+        || q.app_id != app
+        || q.actor_id != actor
+        || q.kind != kind
+        || q.request_hash != request_hash
+        || q.manifest_hash != digest
+        || q.build_id != manifest.build_id
+        || q.source_version_id != expected_source
+        || q.profile_id != manifest.profile.id
         || manifest.profile.id != a.profile_id
-        || field::<i32>(&q, "environment_revision")? != manifest.environment_revision
-        || field::<i32>(&q, "price_revision")? != a.price_revision
-        || field::<i32>(&q, "amount_cents")? != a.check_cents
-        || field::<DateTime<Utc>>(&q, "expires_at")? <= Utc::now()
+        || q.environment_revision != manifest.environment_revision
+        || q.price_revision != a.price_revision
+        || q.amount_cents != a.check_cents
+        || q.expires_at <= Utc::now()
     {
         return Err(commercial_conflict(
             "Price or run setup changed; review a new quote",
         ));
     }
-    if !rows(
-        db,
-        "SELECT run_id FROM commercial_usage WHERE quote_id=$1",
-        vec![quote_id.into()],
-    )
-    .await?
-    .is_empty()
+    if commercial_usage::Entity::find()
+        .filter(commercial_usage::Column::QuoteId.eq(quote_id))
+        .one(db)
+        .await?
+        .is_some()
     {
         return Err(commercial_conflict("This quote has already been used"));
     }
@@ -420,7 +474,18 @@ pub async fn reserve(
             "The agreed check limit has been reached",
         ));
     }
-    exec(db,"INSERT INTO commercial_usage(run_id,quote_id,agreement_id,app_id,period_start,period_end,amount_cents) VALUES($1,$2,$3,$4,$5,$6,$7)",vec![run_id.into(),quote_id.into(),a.id.into(),app.into(),a.starts_at.into(),a.ends_at.into(),a.check_cents.into()]).await?;
+    commercial_usage::ActiveModel {
+        run_id: Set(run_id),
+        quote_id: Set(quote_id),
+        agreement_id: Set(a.id),
+        app_id: Set(app),
+        period_start: Set(a.starts_at),
+        period_end: Set(a.ends_at),
+        amount_cents: Set(a.check_cents),
+        ..Default::default()
+    }
+    .insert(db)
+    .await?;
     Ok(())
 }
 
@@ -511,13 +576,12 @@ pub async fn activate(
     }
     for source in [Some(first), second].into_iter().flatten() {
         test_library::admitted(&ctx.db, app, source).await?;
-        let row = one(
-            &ctx.db,
-            "SELECT kind FROM execution_definitions WHERE app_id=$1 AND id=$2",
-            vec![app.into(), source.into()],
-        )
-        .await?;
-        let kind: String = field(&row, "kind")?;
+        let kind = execution_definitions::Entity::find_by_id(source)
+            .filter(execution_definitions::Column::AppId.eq(app))
+            .one(&ctx.db)
+            .await?
+            .ok_or_else(ApiFailure::missing)?
+            .kind;
         if (source == first && kind != "suite" && kind != "plan")
             || (Some(source) == second && kind != "suite")
         {
@@ -538,22 +602,27 @@ pub async fn activate(
         }
     }
     let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![app.into()],
-    )
-    .await?;
-    if !rows(&tx,"SELECT id FROM commercial_agreements WHERE app_id=$1 AND tstzrange(starts_at,ends_at,'[)') && tstzrange($2::timestamptz,$3::timestamptz,'[)') LIMIT 1",vec![app.into(),starts_at.into(),ends_at.into()]).await?.is_empty() {
+    app_rows::Entity::find_by_id(app)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    if commercial_agreements::Entity::find()
+        .filter(commercial_agreements::Column::AppId.eq(app))
+        .filter(commercial_agreements::Column::StartsAt.lt(ends_at))
+        .filter(commercial_agreements::Column::EndsAt.gt(starts_at))
+        .one(&tx)
+        .await?
+        .is_some()
+    {
         return Err(commercial_conflict("Agreement periods must not overlap"));
     }
-    if !rows(
-        &tx,
-        "SELECT id FROM commercial_agreements WHERE app_id=$1 AND status='active'",
-        vec![app.into()],
-    )
-    .await?
-    .is_empty()
+    if commercial_agreements::Entity::find()
+        .filter(commercial_agreements::Column::AppId.eq(app))
+        .filter(commercial_agreements::Column::Status.eq("active"))
+        .one(&tx)
+        .await?
+        .is_some()
     {
         return Err(commercial_conflict(
             "Pause or end the current agreement before activating another",
@@ -574,8 +643,42 @@ pub async fn activate(
             8,
         )
     };
-    exec(&tx,"INSERT INTO commercial_agreements(id,app_id,offer,status,price_revision,starts_at,ends_at,first_source_version_id,second_source_version_id,profile_id,base_cents,second_suite_cents,check_cents,check_cap,agreement_reference,created_by) VALUES($1,$2,$3,'active',1,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",vec![id.into(),app.into(),if offer==CommercialOffer::Pilot{"pilot".into()}else{"recurring".into()},starts_at.into(),ends_at.into(),first.into(),second.into(),profile.into(),base.into(),second_cents.into(),check.into(),cap.into(),reference.to_owned().into(),actor.into()]).await?;
-    exec(&tx,"INSERT INTO commercial_audit(id,agreement_id,actor_id,action,reason) VALUES($1,$2,$3,'activated',$4)",vec![Uuid::new_v4().into(),id.into(),actor.into(),reason.to_owned().into()]).await?;
+    commercial_agreements::ActiveModel {
+        id: Set(id),
+        app_id: Set(app),
+        offer: Set(if offer == CommercialOffer::Pilot {
+            "pilot"
+        } else {
+            "recurring"
+        }
+        .into()),
+        status: Set("active".into()),
+        price_revision: Set(1),
+        starts_at: Set(starts_at),
+        ends_at: Set(ends_at),
+        first_source_version_id: Set(first),
+        second_source_version_id: Set(second),
+        profile_id: Set(profile),
+        base_cents: Set(base),
+        second_suite_cents: Set(second_cents),
+        check_cents: Set(check),
+        check_cap: Set(cap),
+        agreement_reference: Set(reference.to_owned()),
+        created_by: Set(actor),
+        ..Default::default()
+    }
+    .insert(&tx)
+    .await?;
+    commercial_audit::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        agreement_id: Set(id),
+        actor_id: Set(actor),
+        action: Set("activated".into()),
+        reason: Set(reason.to_owned()),
+        ..Default::default()
+    }
+    .insert(&tx)
+    .await?;
     tx.commit().await?;
     tracing::info!(agreement_id=%id,app_id=%app,actor_id=%actor,action="activated","Commercial agreement activated");
     Ok(id)
@@ -593,12 +696,11 @@ pub async fn set_status(
         return Err(ApiFailure::invalid("Status or reason is invalid"));
     }
     let tx = ctx.db.begin().await?;
-    one(
-        &tx,
-        "SELECT id FROM apps WHERE id=$1 FOR UPDATE",
-        vec![app.into()],
-    )
-    .await?;
+    app_rows::Entity::find_by_id(app)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
     // Expiry only blocks new work. Operators must still be able to close the
     // expired row before activating the next nonoverlapping contract period.
     let a = latest(&tx, app).await?.ok_or_else(ApiFailure::missing)?;
@@ -607,13 +709,23 @@ pub async fn set_status(
             "This agreement status is already settled",
         ));
     }
-    exec(
-        &tx,
-        "UPDATE commercial_agreements SET status=$2 WHERE id=$1",
-        vec![a.id.into(), new_status.into()],
-    )
+    let agreement = commercial_agreements::Entity::find_by_id(a.id)
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
+    let mut active = agreement.into_active_model();
+    active.status = Set(new_status.into());
+    active.update(&tx).await?;
+    commercial_audit::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        agreement_id: Set(a.id),
+        actor_id: Set(actor),
+        action: Set(new_status.into()),
+        reason: Set(reason.to_owned()),
+        ..Default::default()
+    }
+    .insert(&tx)
     .await?;
-    exec(&tx,"INSERT INTO commercial_audit(id,agreement_id,actor_id,action,reason) VALUES($1,$2,$3,$4,$5)",vec![Uuid::new_v4().into(),a.id.into(),actor.into(),new_status.into(),reason.to_owned().into()]).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -635,30 +747,44 @@ pub async fn review(
         return Ok(());
     }
     let tx = ctx.db.begin().await?;
-    let row = one(
-        &tx,
-        "SELECT agreement_id,app_id,state FROM commercial_usage WHERE run_id=$1 FOR UPDATE",
-        vec![run.into()],
-    )
-    .await?;
+    let row = commercial_usage::Entity::find_by_id(run)
+        .lock_exclusive()
+        .one(&tx)
+        .await?
+        .ok_or_else(ApiFailure::missing)?;
     if runs::detail(&tx, run).await?.state != mobile_qa_contracts::execution::JobState::Finished {
         return Err(commercial_conflict(
             "Finish or cancel this run before settling its check",
         ));
     }
-    let old: String = field(&row, "state")?;
+    let old = row.state.clone();
     if old != "reserved" {
         return Err(commercial_conflict("This check was already reviewed"));
     }
-    let agreement: Uuid = field(&row, "agreement_id")?;
-    let app: Uuid = field(&row, "app_id")?;
+    let agreement = row.agreement_id;
+    let app = row.app_id;
     let state = if decision == CommercialUsageState::Delivered {
         "delivered"
     } else {
         "credited"
     };
-    exec(&tx,"UPDATE commercial_usage SET state=$2,reason=$3,reviewer_id=$4,reviewed_at=now() WHERE run_id=$1",vec![run.into(),state.into(),reason.to_owned().into(),actor.into()]).await?;
-    exec(&tx,"INSERT INTO commercial_audit(id,agreement_id,run_id,actor_id,action,reason) VALUES($1,$2,$3,$4,$5,$6)",vec![Uuid::new_v4().into(),agreement.into(),run.into(),actor.into(),state.into(),reason.to_owned().into()]).await?;
+    let mut active = row.into_active_model();
+    active.state = Set(state.into());
+    active.reason = Set(Some(reason.to_owned()));
+    active.reviewer_id = Set(Some(actor));
+    active.reviewed_at = Set(Some(Utc::now()));
+    active.update(&tx).await?;
+    commercial_audit::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        agreement_id: Set(agreement),
+        run_id: Set(Some(run)),
+        actor_id: Set(actor),
+        action: Set(state.into()),
+        reason: Set(reason.to_owned()),
+        ..Default::default()
+    }
+    .insert(&tx)
+    .await?;
     tx.commit().await?;
     tracing::info!(run_id=%run,app_id=%app,actor_id=%actor,action=%state,"Commercial check reviewed");
     Ok(())
@@ -671,25 +797,46 @@ pub async fn credit_queued_cancel(
     actor: Uuid,
     run: Uuid,
 ) -> ApiResult<()> {
-    let claimed=rows(db,"SELECT id FROM execution_attempts WHERE run_id=$1 AND (claim_id IS NOT NULL OR state<>'finished' OR reason IS DISTINCT FROM 'canceled_before_dispatch') LIMIT 1",vec![run.into()]).await?;
-    if !claimed.is_empty() {
+    let attempts = execution_attempts::Entity::find()
+        .filter(execution_attempts::Column::RunId.eq(run))
+        .all(db)
+        .await?;
+    if attempts.iter().any(|attempt| {
+        attempt.claim_id.is_some()
+            || attempt.state != "finished"
+            || attempt.reason.as_deref() != Some("canceled_before_dispatch")
+    }) {
         return Ok(());
     }
     if credit_billing::release_queued_cancel(db, actor, run).await? {
         return Ok(());
     }
-    let usage = rows(
-        db,
-        "SELECT agreement_id FROM commercial_usage WHERE run_id=$1 AND state='reserved' FOR UPDATE",
-        vec![run.into()],
-    )
-    .await?;
-    let Some(row) = usage.first() else {
+    let usage = commercial_usage::Entity::find_by_id(run)
+        .filter(commercial_usage::Column::State.eq("reserved"))
+        .lock_exclusive()
+        .one(db)
+        .await?;
+    let Some(row) = usage else {
         return Ok(());
     };
-    let agreement: Uuid = field(row, "agreement_id")?;
+    let agreement = row.agreement_id;
     let reason = "Canceled before device claim";
-    exec(db,"UPDATE commercial_usage SET state='credited',reason=$2,reviewer_id=$3,reviewed_at=now() WHERE run_id=$1",vec![run.into(),reason.into(),actor.into()]).await?;
-    exec(db,"INSERT INTO commercial_audit(id,agreement_id,run_id,actor_id,action,reason) VALUES($1,$2,$3,$4,'credited',$5)",vec![Uuid::new_v4().into(),agreement.into(),run.into(),actor.into(),reason.into()]).await?;
+    let mut active = row.into_active_model();
+    active.state = Set("credited".into());
+    active.reason = Set(Some(reason.into()));
+    active.reviewer_id = Set(Some(actor));
+    active.reviewed_at = Set(Some(Utc::now()));
+    active.update(db).await?;
+    commercial_audit::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        agreement_id: Set(agreement),
+        run_id: Set(Some(run)),
+        actor_id: Set(actor),
+        action: Set("credited".into()),
+        reason: Set(reason.into()),
+        ..Default::default()
+    }
+    .insert(db)
+    .await?;
     Ok(())
 }

@@ -1,33 +1,562 @@
 //! Durable definitions and physical-resource reservations; expiry never releases a phone.
 use sea_orm_migration::prelude::*;
+
 #[derive(DeriveMigrationName)]
 pub struct Migration;
+
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.get_connection().execute_unprepared(r#"
- CREATE TABLE execution_definitions (
- id UUID PRIMARY KEY, app_id UUID NOT NULL REFERENCES apps(id), kind TEXT NOT NULL CHECK(kind IN ('case','suite','plan')),
- logical_key TEXT NOT NULL, version INTEGER NOT NULL CHECK(version>0), content_hash TEXT NOT NULL,
- payload JSONB NOT NULL, author_id UUID NOT NULL REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
- UNIQUE(app_id,kind,logical_key,version));
- CREATE TABLE execution_reviewer_grants (app_id UUID NOT NULL REFERENCES apps(id), user_id UUID NOT NULL REFERENCES users(id), purpose TEXT NOT NULL CHECK(purpose IN ('business','executability')), PRIMARY KEY(app_id,user_id,purpose));
- CREATE TABLE execution_approvals (definition_id UUID NOT NULL REFERENCES execution_definitions(id), purpose TEXT NOT NULL CHECK(purpose IN ('business','executability')), actor_id UUID NOT NULL REFERENCES users(id), content_hash TEXT NOT NULL, approved_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY(definition_id,purpose));
- CREATE TABLE execution_profiles (id UUID PRIMARY KEY, app_id UUID NOT NULL REFERENCES apps(id), payload JSONB NOT NULL);
- CREATE TABLE execution_workers (id UUID PRIMARY KEY, app_id UUID NOT NULL REFERENCES apps(id), profile_id UUID NOT NULL REFERENCES execution_profiles(id), token_hash TEXT NOT NULL UNIQUE, revoked BOOLEAN NOT NULL DEFAULT false);
- CREATE TABLE execution_runs (id UUID PRIMARY KEY, app_id UUID NOT NULL REFERENCES apps(id), creator_id UUID NOT NULL REFERENCES users(id), build_id UUID NOT NULL REFERENCES builds(id), plan_id UUID NOT NULL REFERENCES execution_definitions(id), idempotency_key TEXT NOT NULL, fingerprint TEXT NOT NULL, manifest JSONB NOT NULL, cancel_requested BOOLEAN NOT NULL DEFAULT false, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), UNIQUE(app_id,idempotency_key));
- CREATE TABLE execution_attempts (id UUID PRIMARY KEY, run_id UUID NOT NULL REFERENCES execution_runs(id), case_index INTEGER NOT NULL CHECK(case_index>=0), number INTEGER NOT NULL DEFAULT 1 CHECK(number IN (1,2)), generation INTEGER NOT NULL DEFAULT 1, state TEXT NOT NULL DEFAULT 'queued' CHECK(state IN ('queued','leased','running','finalizing','finished','cancel_requested','recovery_required')), worker_id UUID REFERENCES execution_workers(id), claim_id UUID, lease_hash TEXT, expires_at TIMESTAMPTZ, outcome TEXT, cleanup TEXT NOT NULL DEFAULT 'pending' CHECK(cleanup IN ('pending','verified_clean','quarantined')), reason TEXT, checks JSONB NOT NULL DEFAULT '[]', usage JSONB NOT NULL DEFAULT '[]', completion_hash TEXT, cleanup_hash TEXT, cleanup_receipt JSONB, UNIQUE(run_id,case_index,number), UNIQUE(worker_id,claim_id));
- CREATE TABLE execution_reservations (resource TEXT PRIMARY KEY, attempt_id UUID NOT NULL REFERENCES execution_attempts(id));
- CREATE TABLE execution_events (id UUID PRIMARY KEY, attempt_id UUID NOT NULL REFERENCES execution_attempts(id), sequence INTEGER NOT NULL CHECK(sequence>0), payload JSONB NOT NULL, UNIQUE(attempt_id,sequence));
- CREATE TABLE execution_artifacts (id UUID PRIMARY KEY, attempt_id UUID NOT NULL REFERENCES execution_attempts(id), checkpoint_id TEXT NOT NULL, name TEXT NOT NULL, mime TEXT NOT NULL, byte_size BIGINT NOT NULL CHECK(byte_size>0), sha256 TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','sealed','unavailable')), reason TEXT, storage_key TEXT NOT NULL UNIQUE, storage_backend TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), UNIQUE(attempt_id,name));
- CREATE INDEX execution_runs_app ON execution_runs(app_id,created_at DESC,id);
- CREATE INDEX execution_attempt_queue ON execution_attempts(state,expires_at);
- CREATE INDEX execution_artifacts_attempt ON execution_artifacts(attempt_id);
- "#).await?;
-        Ok(())
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("execution_definitions"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Alias::new("app_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("kind"))
+                            .text()
+                            .not_null()
+                            .check(Expr::col(Alias::new("kind")).is_in(["case", "suite", "plan"])),
+                    )
+                    .col(ColumnDef::new(Alias::new("logical_key")).text().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("version"))
+                            .integer()
+                            .not_null()
+                            .check(Expr::col(Alias::new("version")).gt(0)),
+                    )
+                    .col(ColumnDef::new(Alias::new("content_hash")).text().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("payload"))
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("author_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("created_at"))
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .col(Alias::new("app_id"))
+                            .col(Alias::new("kind"))
+                            .col(Alias::new("logical_key"))
+                            .col(Alias::new("version")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_definitions"), Alias::new("app_id"))
+                            .to(Alias::new("apps"), Alias::new("id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_definitions"), Alias::new("author_id"))
+                            .to(Alias::new("users"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("execution_reviewer_grants"))
+                    .col(ColumnDef::new(Alias::new("app_id")).uuid().not_null())
+                    .col(ColumnDef::new(Alias::new("user_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("purpose"))
+                            .text()
+                            .not_null()
+                            .check(
+                                Expr::col(Alias::new("purpose"))
+                                    .is_in(["business", "executability"]),
+                            ),
+                    )
+                    .primary_key(
+                        Index::create()
+                            .col(Alias::new("app_id"))
+                            .col(Alias::new("user_id"))
+                            .col(Alias::new("purpose")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(
+                                Alias::new("execution_reviewer_grants"),
+                                Alias::new("app_id"),
+                            )
+                            .to(Alias::new("apps"), Alias::new("id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(
+                                Alias::new("execution_reviewer_grants"),
+                                Alias::new("user_id"),
+                            )
+                            .to(Alias::new("users"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("execution_approvals"))
+                    .col(
+                        ColumnDef::new(Alias::new("definition_id"))
+                            .uuid()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("purpose"))
+                            .text()
+                            .not_null()
+                            .check(
+                                Expr::col(Alias::new("purpose"))
+                                    .is_in(["business", "executability"]),
+                            ),
+                    )
+                    .col(ColumnDef::new(Alias::new("actor_id")).uuid().not_null())
+                    .col(ColumnDef::new(Alias::new("content_hash")).text().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("approved_at"))
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .primary_key(
+                        Index::create()
+                            .col(Alias::new("definition_id"))
+                            .col(Alias::new("purpose")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(
+                                Alias::new("execution_approvals"),
+                                Alias::new("definition_id"),
+                            )
+                            .to(Alias::new("execution_definitions"), Alias::new("id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_approvals"), Alias::new("actor_id"))
+                            .to(Alias::new("users"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("execution_profiles"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Alias::new("app_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("payload"))
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_profiles"), Alias::new("app_id"))
+                            .to(Alias::new("apps"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("execution_workers"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Alias::new("app_id")).uuid().not_null())
+                    .col(ColumnDef::new(Alias::new("profile_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("token_hash"))
+                            .text()
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("revoked"))
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_workers"), Alias::new("app_id"))
+                            .to(Alias::new("apps"), Alias::new("id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_workers"), Alias::new("profile_id"))
+                            .to(Alias::new("execution_profiles"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("execution_runs"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Alias::new("app_id")).uuid().not_null())
+                    .col(ColumnDef::new(Alias::new("creator_id")).uuid().not_null())
+                    .col(ColumnDef::new(Alias::new("build_id")).uuid().not_null())
+                    .col(ColumnDef::new(Alias::new("plan_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("idempotency_key"))
+                            .text()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("fingerprint")).text().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("manifest"))
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("cancel_requested"))
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("created_at"))
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .col(Alias::new("app_id"))
+                            .col(Alias::new("idempotency_key")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_runs"), Alias::new("app_id"))
+                            .to(Alias::new("apps"), Alias::new("id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_runs"), Alias::new("creator_id"))
+                            .to(Alias::new("users"), Alias::new("id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_runs"), Alias::new("build_id"))
+                            .to(Alias::new("builds"), Alias::new("id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_runs"), Alias::new("plan_id"))
+                            .to(Alias::new("execution_definitions"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("execution_attempts"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Alias::new("run_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("case_index"))
+                            .integer()
+                            .not_null()
+                            .check(Expr::col(Alias::new("case_index")).gte(0)),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("number"))
+                            .integer()
+                            .not_null()
+                            .default(1)
+                            .check(Expr::col(Alias::new("number")).is_in([1, 2])),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("generation"))
+                            .integer()
+                            .not_null()
+                            .default(1),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("state"))
+                            .text()
+                            .not_null()
+                            .default("queued")
+                            .check(Expr::col(Alias::new("state")).is_in([
+                                "queued",
+                                "leased",
+                                "running",
+                                "finalizing",
+                                "finished",
+                                "cancel_requested",
+                                "recovery_required",
+                            ])),
+                    )
+                    .col(ColumnDef::new(Alias::new("worker_id")).uuid())
+                    .col(ColumnDef::new(Alias::new("claim_id")).uuid())
+                    .col(ColumnDef::new(Alias::new("lease_hash")).text())
+                    .col(ColumnDef::new(Alias::new("expires_at")).timestamp_with_time_zone())
+                    .col(ColumnDef::new(Alias::new("outcome")).text())
+                    .col(
+                        ColumnDef::new(Alias::new("cleanup"))
+                            .text()
+                            .not_null()
+                            .default("pending")
+                            .check(Expr::col(Alias::new("cleanup")).is_in([
+                                "pending",
+                                "verified_clean",
+                                "quarantined",
+                            ])),
+                    )
+                    .col(ColumnDef::new(Alias::new("reason")).text())
+                    .col(
+                        ColumnDef::new(Alias::new("checks"))
+                            .json_binary()
+                            .not_null()
+                            .default("[]"),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("usage"))
+                            .json_binary()
+                            .not_null()
+                            .default("[]"),
+                    )
+                    .col(ColumnDef::new(Alias::new("completion_hash")).text())
+                    .col(ColumnDef::new(Alias::new("cleanup_hash")).text())
+                    .col(ColumnDef::new(Alias::new("cleanup_receipt")).json_binary())
+                    .index(
+                        Index::create()
+                            .unique()
+                            .col(Alias::new("run_id"))
+                            .col(Alias::new("case_index"))
+                            .col(Alias::new("number")),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .col(Alias::new("worker_id"))
+                            .col(Alias::new("claim_id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_attempts"), Alias::new("run_id"))
+                            .to(Alias::new("execution_runs"), Alias::new("id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_attempts"), Alias::new("worker_id"))
+                            .to(Alias::new("execution_workers"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("execution_reservations"))
+                    .col(
+                        ColumnDef::new(Alias::new("resource"))
+                            .text()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Alias::new("attempt_id")).uuid().not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(
+                                Alias::new("execution_reservations"),
+                                Alias::new("attempt_id"),
+                            )
+                            .to(Alias::new("execution_attempts"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("execution_events"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Alias::new("attempt_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("sequence"))
+                            .integer()
+                            .not_null()
+                            .check(Expr::col(Alias::new("sequence")).gt(0)),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("payload"))
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .col(Alias::new("attempt_id"))
+                            .col(Alias::new("sequence")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_events"), Alias::new("attempt_id"))
+                            .to(Alias::new("execution_attempts"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("execution_artifacts"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Alias::new("attempt_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("checkpoint_id"))
+                            .text()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Alias::new("name")).text().not_null())
+                    .col(ColumnDef::new(Alias::new("mime")).text().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("byte_size"))
+                            .big_integer()
+                            .not_null()
+                            .check(Expr::col(Alias::new("byte_size")).gt(0)),
+                    )
+                    .col(ColumnDef::new(Alias::new("sha256")).text().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("state"))
+                            .text()
+                            .not_null()
+                            .default("pending")
+                            .check(Expr::col(Alias::new("state")).is_in([
+                                "pending",
+                                "sealed",
+                                "unavailable",
+                            ])),
+                    )
+                    .col(ColumnDef::new(Alias::new("reason")).text())
+                    .col(
+                        ColumnDef::new(Alias::new("storage_key"))
+                            .text()
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("storage_backend"))
+                            .text()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("created_at"))
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .index(
+                        Index::create()
+                            .unique()
+                            .col(Alias::new("attempt_id"))
+                            .col(Alias::new("name")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("execution_artifacts"), Alias::new("attempt_id"))
+                            .to(Alias::new("execution_attempts"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .name("execution_runs_app")
+                    .table(Alias::new("execution_runs"))
+                    .col(Alias::new("app_id"))
+                    .col((Alias::new("created_at"), IndexOrder::Desc))
+                    .col(Alias::new("id"))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .name("execution_attempt_queue")
+                    .table(Alias::new("execution_attempts"))
+                    .col(Alias::new("state"))
+                    .col(Alias::new("expires_at"))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .name("execution_artifacts_attempt")
+                    .table(Alias::new("execution_artifacts"))
+                    .col(Alias::new("attempt_id"))
+                    .to_owned(),
+            )
+            .await
     }
+
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.get_connection().execute_unprepared("DROP TABLE execution_artifacts, execution_events, execution_reservations, execution_attempts, execution_runs, execution_workers, execution_profiles, execution_approvals, execution_reviewer_grants, execution_definitions;").await?;
+        for table in [
+            "execution_artifacts",
+            "execution_events",
+            "execution_reservations",
+            "execution_attempts",
+            "execution_runs",
+            "execution_workers",
+            "execution_profiles",
+            "execution_approvals",
+            "execution_reviewer_grants",
+            "execution_definitions",
+        ] {
+            manager
+                .drop_table(Table::drop().table(Alias::new(table)).to_owned())
+                .await?;
+        }
         Ok(())
     }
 }

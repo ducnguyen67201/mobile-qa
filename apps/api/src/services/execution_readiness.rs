@@ -1,8 +1,11 @@
 //! Shared adapter admission; no device calls and no inference from missing credentials.
-use super::execution_store::*;
-use crate::errors::{ApiFailure, ApiResult};
+use super::execution_store::decode;
+use crate::{
+    errors::{ApiFailure, ApiResult},
+    models::_entities::execution_profiles,
+};
 use mobile_qa_contracts::execution::*;
-use sea_orm::ConnectionTrait;
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
 
 pub fn case_matches(profile: &ExecutionProfile, case: &CaseDefinition) -> ApiResult<()> {
@@ -35,14 +38,12 @@ pub async fn assigned(
     app: Uuid,
     package: &str,
 ) -> ApiResult<ExecutionProfile> {
-    let candidates = rows(
-        db,
-        "SELECT payload FROM execution_profiles WHERE app_id=$1",
-        vec![app.into()],
-    )
-    .await?;
+    let candidates = execution_profiles::Entity::find()
+        .filter(execution_profiles::Column::AppId.eq(app))
+        .all(db)
+        .await?;
     for row in candidates {
-        let p: ExecutionProfile = decode(field(&row, "payload")?)?;
+        let p: ExecutionProfile = decode(row.payload)?;
         if p.adapter == "android_direct_v1"
             && p.package == package
             && p.qualified

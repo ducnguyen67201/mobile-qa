@@ -7,41 +7,158 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.get_connection().execute_unprepared(r#"
-ALTER TABLE model_definitions ADD COLUMN registered_by UUID;
-ALTER TABLE model_definitions ADD COLUMN payload_sha256 TEXT;
-CREATE TABLE model_assignments(
-  app_id UUID NOT NULL REFERENCES apps(id),
-  profile_id UUID NOT NULL REFERENCES execution_profiles(id),
-  purpose TEXT NOT NULL CHECK(purpose IN ('navigation','structured_authoring')),
-  revision INTEGER NOT NULL CHECK(revision > 0),
-  payload JSONB NOT NULL,
-  state TEXT NOT NULL CHECK(state IN ('staged','active','draining','retired')),
-  created_by UUID NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  changed_by UUID NOT NULL,
-  changed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY(app_id,profile_id,purpose,revision)
-);
-CREATE UNIQUE INDEX model_assignments_active ON model_assignments(app_id,profile_id,purpose) WHERE state='active';
-CREATE TABLE model_assignment_events(
-  id UUID PRIMARY KEY,
-  app_id UUID NOT NULL,
-  profile_id UUID NOT NULL,
-  purpose TEXT NOT NULL,
-  revision INTEGER NOT NULL,
-  old_state TEXT NOT NULL,
-  new_state TEXT NOT NULL,
-  actor_id UUID NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  FOREIGN KEY(app_id,profile_id,purpose,revision) REFERENCES model_assignments(app_id,profile_id,purpose,revision)
-);
-"#).await?;
-        Ok(())
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alias::new("model_definitions"))
+                    .add_column(ColumnDef::new(Alias::new("registered_by")).uuid())
+                    .add_column(ColumnDef::new(Alias::new("payload_sha256")).text())
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("model_assignments"))
+                    .col(ColumnDef::new(Alias::new("app_id")).uuid().not_null())
+                    .col(ColumnDef::new(Alias::new("profile_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("purpose"))
+                            .text()
+                            .not_null()
+                            .check(
+                                Expr::col(Alias::new("purpose"))
+                                    .is_in(["navigation", "structured_authoring"]),
+                            ),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("revision"))
+                            .integer()
+                            .not_null()
+                            .check(Expr::col(Alias::new("revision")).gt(0)),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("payload"))
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Alias::new("state")).text().not_null().check(
+                            Expr::col(Alias::new("state"))
+                                .is_in(["staged", "active", "draining", "retired"]),
+                        ),
+                    )
+                    .col(ColumnDef::new(Alias::new("created_by")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("created_at"))
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(ColumnDef::new(Alias::new("changed_by")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("changed_at"))
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .primary_key(
+                        Index::create()
+                            .col(Alias::new("app_id"))
+                            .col(Alias::new("profile_id"))
+                            .col(Alias::new("purpose"))
+                            .col(Alias::new("revision")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("model_assignments"), Alias::new("app_id"))
+                            .to(Alias::new("apps"), Alias::new("id")),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(Alias::new("model_assignments"), Alias::new("profile_id"))
+                            .to(Alias::new("execution_profiles"), Alias::new("id")),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .name("model_assignments_active")
+                    .unique()
+                    .table(Alias::new("model_assignments"))
+                    .col(Alias::new("app_id"))
+                    .col(Alias::new("profile_id"))
+                    .col(Alias::new("purpose"))
+                    .and_where(Expr::col(Alias::new("state")).eq("active"))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("model_assignment_events"))
+                    .col(
+                        ColumnDef::new(Alias::new("id"))
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Alias::new("app_id")).uuid().not_null())
+                    .col(ColumnDef::new(Alias::new("profile_id")).uuid().not_null())
+                    .col(ColumnDef::new(Alias::new("purpose")).text().not_null())
+                    .col(ColumnDef::new(Alias::new("revision")).integer().not_null())
+                    .col(ColumnDef::new(Alias::new("old_state")).text().not_null())
+                    .col(ColumnDef::new(Alias::new("new_state")).text().not_null())
+                    .col(ColumnDef::new(Alias::new("actor_id")).uuid().not_null())
+                    .col(
+                        ColumnDef::new(Alias::new("created_at"))
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from_tbl(Alias::new("model_assignment_events"))
+                            .from_col(Alias::new("app_id"))
+                            .from_col(Alias::new("profile_id"))
+                            .from_col(Alias::new("purpose"))
+                            .from_col(Alias::new("revision"))
+                            .to_tbl(Alias::new("model_assignments"))
+                            .to_col(Alias::new("app_id"))
+                            .to_col(Alias::new("profile_id"))
+                            .to_col(Alias::new("purpose"))
+                            .to_col(Alias::new("revision")),
+                    )
+                    .to_owned(),
+            )
+            .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.get_connection().execute_unprepared("DROP TABLE model_assignment_events; DROP TABLE model_assignments; ALTER TABLE model_definitions DROP COLUMN payload_sha256; ALTER TABLE model_definitions DROP COLUMN registered_by;").await?;
-        Ok(())
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(Alias::new("model_assignment_events"))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
+                    .table(Alias::new("model_assignments"))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alias::new("model_definitions"))
+                    .drop_column(Alias::new("payload_sha256"))
+                    .drop_column(Alias::new("registered_by"))
+                    .to_owned(),
+            )
+            .await
     }
 }
